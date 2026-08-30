@@ -1,0 +1,110 @@
+# Quality, accessibility, and verification
+
+## Quality principles
+
+- Critical user actions fail safely and preserve the last valid local state.
+- The project makes no durability promise without tested backup and migration behavior.
+- The same structured input produces consistent preview and export within a declared renderer/template version.
+- Provider outages or API changes degrade AI features without blocking manual editing, rendering, tracking, backup, or export.
+- Desktop, extensions, native host, updater, and local schema are versioned and tested as one compatibility system.
+
+## Requirement traceability
+
+Future implementation planning assigns stable identifiers using these categories:
+
+- `PRD` — product-wide principles, scope, terminology, and settings.
+- `RES` — master draft, publish, schema, import review, editing, and rendering.
+- `APP` — application workspace, tailoring, Finish Application, tracker, and retained materials.
+- `AI` — provider adapters, credentials, prompts, validation, generation, and evaluation.
+- `DAT` — local storage, encryption, migrations, retention, backup, export, and deletion.
+- `EXT` — browser capture, native messaging, local IPC, installation, and repair.
+- `SEC` — privacy, security, import isolation, diagnostics, and supply chain.
+- `DST` — packaging, signing, Stores, releases, updates, and rollback.
+- `OSS` — license, dependencies, contributions, governance, and release provenance.
+- `QLT` — compatibility, performance, accessibility, document quality, and release evidence.
+
+Each traceability record contains the requirement, authoritative file/section, applicable platforms and data categories, owning component, dependencies and central configuration values, verification type, objective pass criterion, evidence location, owner, status, and applicable release gate.
+
+## Accessibility
+
+The desktop app, overlay, and extensions target WCAG 2.2 AA principles where applicable and equivalent native-platform accessibility expectations.
+
+Required coverage includes:
+
+- Complete keyboard operation and logical focus order
+- Screen-reader labels, roles, status announcements, and error recovery
+- High contrast, scalable text, zoom, and reduced-motion behavior
+- No color-only meaning
+- Accessible dialogs for destructive, provider-transmission, update, and Finish Application decisions
+- Readable exported documents with selectable text, meaningful ordering, links, and appropriate tagging where supported
+- Overlay behavior that does not trap focus or obstruct essential browser/OS controls
+
+## Supported compatibility matrix
+
+Exact minimum versions are chosen during implementation and recorded centrally. Before release, test:
+
+- Supported Windows versions and architectures
+- Supported macOS versions and Apple/Intel architecture choices
+- Current stable Chrome and Edge plus a documented compatibility window
+- Store and direct distribution variants
+- Fresh install, upgrade, repair, uninstall, extension-first installation, and desktop-first installation
+- Multiple browser profiles and distinct Chrome/Edge extension identifiers
+
+## Critical end-to-end journeys
+
+1. First launch, local-profile creation, backup explanation, and manual resume creation without AI.
+2. Import a text-bearing resume, review provider transmission, correct the proposal, save the draft, and publish.
+3. Edit a published draft without those unpublished changes leaking into tailoring.
+4. Capture a job description through Chrome and Edge, including desktop-not-running and repair cases.
+5. Tailor, inspect verified change summaries, edit, refine, and select a final resume.
+6. Generate and review a cover letter and permitted application answer; refuse a prohibited attestation.
+7. Render and validate PDF, DOCX, and text exports across representative content lengths and templates.
+8. Finish with selected structured materials, recover safely from a failed save, and reset temporary content.
+9. Open a historical structured snapshot and render it after application and renderer upgrades.
+10. Create an encrypted backup, restore on a clean profile, handle the missing AI credential, and verify integrity.
+11. Delete selected data and all local data without affecting unrelated files.
+12. Update through Microsoft Store and the signed GitHub channel without mixing channels or losing data/native messaging.
+
+## Security and privacy verification
+
+- Static analysis, dependency/license scanning, secret scanning, and malicious import tests run in CI.
+- Native-message fuzzing and malformed IPC tests verify bounded behavior.
+- Logs, crash output, diagnostics, backups, exports, and update requests are inspected for forbidden content and secrets.
+- Threat modeling covers web capture, import parsers, provider calls, local storage, IPC, updates, release CI, and signing.
+- A security review is required before representing a build as stable for broad public use.
+
+## AI evaluation
+
+Use synthetic or explicitly authorized representative resumes and job descriptions to evaluate each supported provider/model configuration for:
+
+- Structured-output reliability
+- Unsupported factual additions
+- Important accidental omissions
+- Prompt-injection resistance
+- Change-summary accuracy
+- Prohibited-answer refusal
+- Length/page-target adherence
+- Latency, cancellation, and actionable failure behavior
+- Input/output size and user-visible estimated cost
+
+Provider presets are versioned. A provider/model change requires re-evaluation and release notes.
+
+## Release gates
+
+A stable release requires:
+
+- All critical journeys pass on the supported matrix.
+- Local migrations and backup restoration pass from every supported prior version.
+- Export clipping, link, selectable-text, and font tests pass on representative documents.
+- Store/direct installers register, repair, update, and remove native messaging as documented.
+- Update signature/provenance checks and rollback/recovery exercises pass.
+- No known critical security vulnerability or secret exposure remains.
+- License and distributed-asset review is complete.
+- Privacy, provider-transmission, backup, unsigned-build, and local-only limitations are truthful in the application and its distributed documentation.
+- Known limitations and deferred features are documented.
+
+## Evidence
+
+Future implementation plans assign stable requirement identifiers, test ownership, objective pass criteria, and evidence locations. A feature is not complete solely because its happy-path interface exists.
+
+A release cannot satisfy a gate with an untested critical requirement, unexplained failure, evidence drawn from unauthorized personal content, or a manual assertion where an objective automated or repeatable check is feasible.
