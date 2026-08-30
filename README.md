@@ -31,3 +31,20 @@ For a fast product review, read:
 ## Product summary
 
 Open Resume Toolkit helps a person maintain one master resume, tailor it to a deliberately captured job description, create optional cover letters and application answers, export documents locally, and track completed applications. User content remains on the user's computer. The project operates no product account system, subscription, hosted database, cloud document store, or centrally funded AI service.
+
+## License, attribution, and official releases
+
+Open Resume Toolkit is licensed under the GNU General Public License version 3 only (`GPL-3.0-only`). Commercial use, modification, and redistribution are permitted subject to the GPL.
+
+- [`LICENSE`](LICENSE) contains the unmodified GPLv3 text.
+- [`NOTICE`](NOTICE) identifies the copyright holders and canonical source repository.
+- [`ADDITIONAL_TERMS.md`](ADDITIONAL_TERMS.md) contains the GPLv3 Section 7(b) attribution term applicable to identified project material.
+- [`TRADEMARKS.md`](TRADEMARKS.md) explains how modified and third-party distributions must distinguish themselves from official releases.
+
+The canonical source repository is <https://github.com/xjreid/Open-Resume-Toolkit>. Official binary channels and signing status will be documented before release; source availability alone does not make a third-party build official.
+
+## Community and security
+
+- Read the [contribution guidelines](.github/CONTRIBUTING.md) before proposing a change. Substantial code contributions are deferred until the recorded architecture and licensing decisions are finalized.
+- Participation is governed by the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
+- Report vulnerabilities through the private process in the [security policy](.github/SECURITY.md), never through a public issue containing sensitive details.

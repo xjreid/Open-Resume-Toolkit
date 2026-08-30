@@ -4,6 +4,7 @@
 
 - Every official binary maps to a tagged public source revision and documented build workflow.
 - Official channels, publisher identity, checksums, signatures, and installation instructions are published consistently with each release.
+- Only project-controlled release channels, signing identities, package identifiers, and update metadata may represent a build as official. Modified and third-party builds use distinct identity and update infrastructure in accordance with `TRADEMARKS.md`.
 - Store and direct-download editions identify their update channel and never overwrite one another using a different channel's updater.
 - Unsigned preview builds are labeled prominently and never presented as equivalent to trusted signed releases.
 
@@ -58,5 +59,7 @@ Every public release provides:
 - Download assets and checksums
 - Signature/notarization status per asset
 - Source tag/commit and build-provenance link
+- GPLv3, copyright, Section 7 attribution, third-party notice, and trademark-policy links
+- A visible official/preview/third-party status that agrees with the publisher and signing identity
 - Data-schema or backup compatibility notes
 - Security fixes without prematurely disclosing exploitable detail

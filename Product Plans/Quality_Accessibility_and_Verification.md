@@ -68,6 +68,7 @@ Exact minimum versions are chosen during implementation and recorded centrally. 
 ## Security and privacy verification
 
 - Static analysis, dependency/license scanning, secret scanning, and malicious import tests run in CI.
+- Release checks verify that `LICENSE` remains the unmodified GPLv3 text; required copyright, canonical-source, Section 7, third-party, and trademark notices ship in source and binary distributions; and About/Legal content agrees with the release channel and signing identity.
 - Native-message fuzzing and malformed IPC tests verify bounded behavior.
 - Logs, crash output, diagnostics, backups, exports, and update requests are inspected for forbidden content and secrets.
 - Threat modeling covers web capture, import parsers, provider calls, local storage, IPC, updates, release CI, and signing.

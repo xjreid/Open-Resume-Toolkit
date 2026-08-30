@@ -48,6 +48,7 @@ This is the only central register for unresolved and deferred work in the produc
 11. **[IMPLEMENTATION]** Define channel-specific update metadata, signature verification, release provenance, schema-safe update order, and recovery.
 12. **[IMPLEMENTATION]** Define safe local diagnostic bundles without centralized telemetry.
 13. **[IMPLEMENTATION]** Freeze protective limits for import size/pages, extracted text, native messages, document pages, collections, backups, provider requests, and exports.
+14. **[IMPLEMENTATION]** Implement a user-visible About/Legal view containing GPL, copyright, canonical-source attribution, third-party notices, trademark-policy links, build provenance, and official/preview status without exposing secrets or local identifiers.
 
 ## Validation and release work
 
@@ -60,10 +61,11 @@ This is the only central register for unresolved and deferred work in the produc
 7. **[VALIDATION]** Evaluate each supported AI preset for factuality, prompt injection, prohibited answers, structural validity, provider cost visibility, and cancellation behavior.
 8. **[VALIDATION]** Test Chrome/Edge permissions, profiles, native messaging, IPC impersonation resistance, app launch, update skew, repair, and uninstall across the compatibility matrix.
 9. **[VALIDATION]** Verify that provider calls, update checks, diagnostics, and logs match the application's privacy explanations.
-10. **[RELEASE]** Finalize the exact `GPL-3.0-only` dependency/asset compatibility review and add repository governance files.
+10. **[RELEASE]** Obtain qualified review and finalize the exact `GPL-3.0-only` dependency/asset compatibility, Section 7 attribution term, contributor inbound-license treatment, SPDX approach, Store/signing-program eligibility, and trademark policy; add the remaining repository governance files.
 11. **[RELEASE]** Complete security review of imports, local storage, credential vault, extensions, native IPC, updater, release CI, and diagnostic export.
 12. **[RELEASE]** Complete accessibility testing and document-export readability checks.
 13. **[RELEASE]** Confirm current Store policies, signing requirements, API terms, and platform rules immediately before distribution.
+14. **[RELEASE]** Before accepting nontrivial external code contributions, decide whether hosted-service risk justifies changing future releases from GPLv3 to AGPLv3. The default remains `GPL-3.0-only`; any change requires copyright authority, compatibility review, a documented transition, and updates to every license and public claim.
 
 ## Later possibilities
 
@@ -83,3 +85,4 @@ This is the only central register for unresolved and deferred work in the produc
 - The app can recover from restart, provider failure, failed tracker save, extension/desktop version skew, and safe update without losing the last valid local state.
 - A user can understand where data is stored, what leaves the device, who charges for AI, how to back up, and how to delete everything.
 - Official releases are traceable to public source, appropriately signed or unmistakably labeled as previews, and distributed through documented channels.
+- Modified and third-party distributions can preserve required source attribution without being mistaken for official releases.

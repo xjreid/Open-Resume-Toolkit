@@ -23,7 +23,8 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 
 - The public name is **Open Resume Toolkit**, abbreviated **ORT** where a short identifier is needed.
 - ORT is free and open source. It is not described as a nonprofit.
-- The intended repository license is `GPL-3.0-only`, subject to a final dependency-license review before the repository is published.
+- The repository license is `GPL-3.0-only`, supplemented for identified original project material by the reasonable author-attribution term in `ADDITIONAL_TERMS.md` as permitted by GPLv3 Section 7(b). Commercial use, sale, modification, and redistribution remain permitted. The exact dependency, contribution, and additional-term compatibility remains subject to legal and license review before the first stable release.
+- `NOTICE` identifies the canonical source repository and copyright attribution. `TRADEMARKS.md` requires modified and third-party distributions to avoid implying that they are official releases; it does not restrict GPL rights in the code.
 - The desktop application is the primary product. Chrome and Edge extensions are narrow capture companions, not replacements for the desktop experience.
 - User content is local-first and remains on the user's computer. ORT operates no account service, subscription, product database, cloud document store, quota system, admin portal, or centrally funded AI key.
 - The desktop app remains useful without AI for manual resume editing, local document rendering, application tracking, and exports.
@@ -47,6 +48,13 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - [README](README.md) — workspace entry point and boundaries.
 - [Plan index](Plan_Index.md) — navigation, authority, current decisions, and document roles.
 - [Release scope and open decisions](<Product Plans/Release_Scope_and_Open_Decisions.md>) — the only unresolved/deferred-work register.
+- [GNU GPLv3 license](LICENSE) — unmodified `GPL-3.0-only` license text.
+- [Copyright and canonical-source notice](NOTICE) — project attribution and canonical repository.
+- [Additional attribution term](ADDITIONAL_TERMS.md) — GPLv3 Section 7(b) attribution requirement for identified original material.
+- [Trademark policy](TRADEMARKS.md) — permitted name use and official-versus-third-party distribution boundaries.
+- [Contribution guidelines](.github/CONTRIBUTING.md) — current contribution scope, pull-request expectations, inbound license, and DCO sign-off.
+- [Code of Conduct](.github/CODE_OF_CONDUCT.md) — community behavior, reporting, moderation, and enforcement expectations.
+- [Security policy](.github/SECURITY.md) — private vulnerability-reporting process and supported-release status.
 
 ### Product definition
 

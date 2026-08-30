@@ -89,15 +89,22 @@ The application cannot delete copies the user saved elsewhere or transmitted to 
 
 ## License
 
-The intended repository license is **GNU General Public License v3.0 only (`GPL-3.0-only`)**. GitHub labels its matching license template **GNU General Public License v3.0**. This permits use, study, modification, and redistribution while requiring distributed derivative versions to provide corresponding source under the GPL.
+The repository license is **GNU General Public License v3.0 only (`GPL-3.0-only`)**. GitHub labels its matching license template **GNU General Public License v3.0**. This permits commercial and noncommercial use, study, modification, sale, and redistribution while requiring distributed derivative versions to provide corresponding source under the GPL.
+
+The official GPL text remains unmodified in `LICENSE`. For original project material whose copyright holder applies it, `ADDITIONAL_TERMS.md` adds a narrow author-attribution requirement permitted by GPLv3 Section 7(b). The required notice identifies Open Resume Toolkit and its canonical source repository. It must be preserved in a source-distribution notice and in an existing About, Credits, or legal-notices view. It does not prohibit commercial activity or otherwise narrow the GPL's granted freedoms.
+
+`NOTICE` records project copyright attribution and the canonical repository. `TRADEMARKS.md` governs use of the project name and branding so that modified or third-party distributions do not imply official status. Trademark rules must not be used to prevent accurate attribution, discussion, compatibility statements, or the exercise of GPL rights in the code.
 
 Before publication:
 
-- Add the unmodified official license text as `LICENSE`.
-- Add SPDX identifiers to source files where appropriate.
+- Keep the unmodified official license text as `LICENSE`.
+- Keep `NOTICE`, `ADDITIONAL_TERMS.md`, and `TRADEMARKS.md` public and internally consistent with application and website legal notices.
+- Add SPDX identifiers, copyright notices, and an `ADDITIONAL_TERMS.md` applicability pointer to original source files where appropriate. Do not imply that the Section 7 term applies to third-party material or a contribution whose copyright holder has not accepted it.
 - Audit all runtime, build, font, template, icon, and asset licenses for GPL compatibility and redistribution rights.
 - Avoid proprietary bundled components that would make the published build non-reproducible or undermine SignPath eligibility.
 - Document separately licensed assets and required attribution.
+- Require the contribution process to state the inbound license clearly, including whether submitted material is provided under the applicable GPLv3 Section 7 attribution term. A Developer Certificate of Origin alone does not transfer contributor copyright.
+- Obtain qualified review of the exact Section 7 term, contributor treatment, automated license identification, Store rules, and signing-program eligibility before the first stable release.
 
 Using remote proprietary AI APIs selected by the user does not make those providers part of ORT, but bundled provider SDK licenses and terms still require review.
 
@@ -114,6 +121,7 @@ The repository should include:
 - Issue and pull-request templates
 - Maintainer, reviewer, and release-approver roles
 - A dependency and license policy
+- Public license, notice, additional-attribution, and trademark documents
 
 Contributors certify that they have the right to submit their work. A Developer Certificate of Origin/sign-off workflow is preferred initially over a broad contributor license agreement unless legal advice identifies a specific need.
 

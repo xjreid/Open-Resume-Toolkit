@@ -132,7 +132,7 @@ The desktop settings/status area shows without exposing secrets:
 - Backup destination, encryption status, last successful backup, restore, and backup test/reminder state.
 - Configured AI provider/model preset, connection test, provider usage/cost metadata when available, and replace/remove-key actions. The key is never displayed in full.
 - Chrome and Edge extension/native-host connection, component versions, compatibility, installation links, disconnect, and repair.
-- Links to documentation, GitHub Issues/Discussions, privacy information, license, and private security reporting.
+- Links to documentation, GitHub Issues/Discussions, privacy information, the GPL license, copyright and canonical-source attribution, third-party notices, the trademark policy, build provenance and official/preview status, and private security reporting.
 
 ## Deletion and uninstall
 
