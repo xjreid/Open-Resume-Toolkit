@@ -17,15 +17,16 @@ This is the only central register for unresolved and deferred work in the produc
 4. Three initial ATS-conscious resume style directions with local preview and rendering.
 5. Chrome and Edge deliberate capture through an installed native-messaging host.
 6. One locally recoverable application workspace with resume tailoring, approximately three verified change-summary bullets, cover-letter drafting, and permitted application-answer drafting.
-7. User-selected remote AI provider credentials stored in the OS credential vault; no ORT-funded key.
-8. Direct structured editing and local PDF, DOCX, and text export.
-9. Finish Application and a local tracker retaining selected resume, cover-letter, and answer JSON snapshots.
-10. Encrypted portable backup/restore and full structured data export.
-11. Check-for-updates behavior appropriate to Microsoft Store or signed direct-release channels.
+7. Exactly one active AI mode: a user-supplied OpenAI, Anthropic, or Gemini API key; a user-authorized ChatGPT/Codex subscription connection; or No AI. Secrets use the OS credential vault and ORT funds no inference.
+8. Curated, adaptable Economy/Balanced/Quality model choices; local AI Activity with per-model and per-provider token/cost totals; optional direct-API weekly, monthly, yearly, and all-time estimated-spend caps; and optional Codex provider-quota thresholds.
+9. Direct structured editing and local PDF, DOCX, and text export.
+10. Finish Application and a local tracker retaining selected resume, cover-letter, and answer JSON snapshots.
+11. Encrypted portable backup/restore and full structured data export.
+12. Check-for-updates behavior appropriate to Microsoft Store or signed direct-release channels.
 
 ## Initial non-goals
 
-- ORT accounts, authentication, subscriptions, payment, cloud storage, synchronization, hosted AI, admin tools, or behavioral analytics.
+- ORT-owned accounts, authentication, subscriptions, payment, cloud storage, synchronization, hosted AI, admin tools, or behavioral analytics. User-authorized provider authentication remains optional and provider-controlled.
 - Automatic application submission or form completion.
 - Job-board notifications, reminders, calendars, employer tooling, or job recommendations.
 - OCR, scanned resume support, or bundled local-model inference.
@@ -39,16 +40,19 @@ This is the only central register for unresolved and deferred work in the produc
 2. **[IMPLEMENTATION]** Define the versioned local schema, transaction model, migrations, crash recovery, and exact content-at-rest encryption/key-vault design.
 3. **[IMPLEMENTATION]** Define encrypted `.ort-backup` format, cryptography, integrity, restore/merge behavior, and forgotten-passphrase limitations.
 4. **[IMPLEMENTATION]** Select local PDF/DOCX extraction and rendering libraries and confirm licenses, font embedding, selectable text, links, tagging, and deterministic layout behavior.
-5. **[IMPLEMENTATION]** Select initial provider adapters and tested cost-conscious and high-quality model presets. Verify current public API availability before documenting a preset.
-6. **[IMPLEMENTATION]** Define prompt/schema versioning, provider cancellation, streaming, timeouts, retries, local request recovery, cost estimates, and error taxonomy.
-7. **[IMPLEMENTATION]** Specify the native-messaging protocol, IPC authentication, per-user installation, desktop launch, version window, repair, and uninstall behavior.
-8. **[IMPLEMENTATION]** Prove how Microsoft Store MSIX first-run setup writes browser-visible per-user native-host registrations and keeps their paths valid after updates.
-9. **[IMPLEMENTATION]** Select the Windows GitHub packaging/signing path and prepare a SignPath application after the project meets eligibility requirements.
-10. **[IMPLEMENTATION]** Select macOS package format and direct updater. Decide when to begin paid Developer ID signing/notarization versus publishing only an unsigned preview.
-11. **[IMPLEMENTATION]** Define channel-specific update metadata, signature verification, release provenance, schema-safe update order, and recovery.
-12. **[IMPLEMENTATION]** Define safe local diagnostic bundles without centralized telemetry.
-13. **[IMPLEMENTATION]** Freeze protective limits for import size/pages, extracted text, native messages, document pages, collections, backups, provider requests, and exports.
-14. **[IMPLEMENTATION]** Implement a user-visible About/Legal view containing GPL, copyright, canonical-source attribution, third-party notices, trademark-policy links, build provenance, and official/preview status without exposing secrets or local identifiers.
+5. **[IMPLEMENTATION]** Implement direct adapters for OpenAI, Anthropic, and Gemini and freeze the tested Economy/Balanced/Quality presets from the dated baseline in `AI_and_Import.md`. Verify model-list access, exact identifiers, lifecycle status, structured output, token categories, official prices, and account availability immediately before each release.
+6. **[IMPLEMENTATION]** Define prompt/schema versioning, provider cancellation, streaming, timeouts, retries, local request recovery, error taxonomy, requested-versus-effective model handling, and explicit no-fallback behavior.
+7. **[IMPLEMENTATION]** Define the standardized provider-call accounting boundary, versioned AI activity schema, provider/model aggregation, raw-usage normalization, signed pricing-catalog format/channel/signing/rollback process, official-source verification and expiry rules, cost-estimate rules, export, retention, deletion, and interrupted-attempt recovery.
+8. **[IMPLEMENTATION]** Specify direct-API guardrail transactions: credential identities, period/time-zone semantics, preflight token counting and maximum reservations, price/currency handling, settlement, unknown outcomes, notifications, activity-deletion separation, cap changes, and all-time baseline resets.
+9. **[IMPLEMENTATION]** Specify the Codex app-server integration: bundle-versus-detect distribution choice, license/protocol/version compatibility, ORT-specific config/auth root and keyring namespace, managed ChatGPT and device-code login, required client/service identification or registration, externally contained no-tool execution profile, dynamic model intersection, thread-token/account-usage/quota normalization, bucket-threshold caps, cleanup, and sign-out.
+10. **[IMPLEMENTATION]** Specify the native-messaging protocol, IPC authentication, per-user installation, desktop launch, version window, repair, and uninstall behavior.
+11. **[IMPLEMENTATION]** Prove how Microsoft Store MSIX first-run setup writes browser-visible per-user native-host registrations and keeps their paths valid after updates.
+12. **[IMPLEMENTATION]** Select the Windows GitHub packaging/signing path and prepare a SignPath application after the project meets eligibility requirements.
+13. **[IMPLEMENTATION]** Select macOS package format and direct updater. Decide when to begin paid Developer ID signing/notarization versus publishing only an unsigned preview.
+14. **[IMPLEMENTATION]** Define channel-specific update metadata, signature verification, release provenance, schema-safe update order, and recovery.
+15. **[IMPLEMENTATION]** Define safe local diagnostic bundles without centralized telemetry.
+16. **[IMPLEMENTATION]** Freeze protective limits for import size/pages, extracted text, native messages, document pages, collections, backups, provider requests, and exports.
+17. **[IMPLEMENTATION]** Implement a user-visible About/Legal view containing GPL, copyright, canonical-source attribution, third-party notices, trademark-policy links, build provenance, and official/preview status without exposing secrets or local identifiers.
 
 ## Validation and release work
 
@@ -58,14 +62,17 @@ This is the only central register for unresolved and deferred work in the produc
 4. **[VALIDATION]** Confirm Finish Application prevents accidental loss and survives failed tracker writes.
 5. **[VALIDATION]** Test long-lived local tracker performance and historical structured rendering with large representative profiles.
 6. **[VALIDATION]** Test backup creation, corruption detection, passphrase handling, full restore, version migration, and low-disk-space recovery.
-7. **[VALIDATION]** Evaluate each supported AI preset for factuality, prompt injection, prohibited answers, structural validity, provider cost visibility, and cancellation behavior.
-8. **[VALIDATION]** Test Chrome/Edge permissions, profiles, native messaging, IPC impersonation resistance, app launch, update skew, repair, and uninstall across the compatibility matrix.
-9. **[VALIDATION]** Verify that provider calls, update checks, diagnostics, and logs match the application's privacy explanations.
-10. **[RELEASE]** Obtain qualified review and finalize the exact `GPL-3.0-only` dependency/asset compatibility, Section 7 attribution term, contributor inbound-license treatment, SPDX approach, Store/signing-program eligibility, and trademark policy; add the remaining repository governance files.
-11. **[RELEASE]** Complete security review of imports, local storage, credential vault, extensions, native IPC, updater, release CI, and diagnostic export.
-12. **[RELEASE]** Complete accessibility testing and document-export readability checks.
-13. **[RELEASE]** Confirm current Store policies, signing requirements, API terms, and platform rules immediately before distribution.
-14. **[RELEASE]** Before accepting nontrivial external code contributions, decide whether hosted-service risk justifies changing future releases from GPLv3 to AGPLv3. The default remains `GPL-3.0-only`; any change requires copyright authority, compatibility review, a documented transition, and updates to every license and public claim.
+7. **[VALIDATION]** Evaluate every supported direct and Codex model preset for factuality, prompt injection, prohibited answers, structural validity, requested-versus-effective model behavior, provider cost/quota visibility, and cancellation behavior.
+8. **[VALIDATION]** Reconcile representative successful, failed, retried, cancelled, timed-out, streamed, cached/reasoning-token, missing-usage, rerouted, and ambiguous responses against model/provider totals and verified pricing fixtures; prove that unavailable cost is never displayed as zero or as an invoice.
+9. **[VALIDATION]** Prove direct-API caps under boundaries, concurrent dispatch, retries, crashes, time-zone/clock changes, price changes, missing usage, activity clearing, credential replacement, and all-time reset. No request may dispatch without a committed reservation when a cap is active.
+10. **[VALIDATION]** Prove Codex browser/device login, model discovery, no-tool containment, token/quota provenance, delayed/rounded quota updates, provider bucket changes, cap blocking, sign-out, protocol mismatch, and cleanup on every supported OS/package channel.
+11. **[VALIDATION]** Test Chrome/Edge permissions, profiles, native messaging, IPC impersonation resistance, app launch, update skew, repair, and uninstall across the compatibility matrix.
+12. **[VALIDATION]** Verify that provider calls, AI Activity, guardrail state, Codex account snapshots, update checks, diagnostics, and logs match the application's privacy explanations.
+13. **[RELEASE]** Obtain qualified review and finalize the exact `GPL-3.0-only` dependency/asset compatibility, Section 7 attribution term, contributor inbound-license treatment, SPDX approach, Store/signing-program eligibility, and trademark policy; add the remaining repository governance files.
+14. **[RELEASE]** Complete security review of imports, local storage, direct and Codex credential handling, app-server containment, guardrail transactions, extensions, native IPC, updater, release CI, and diagnostic export.
+15. **[RELEASE]** Complete accessibility testing and document-export readability checks.
+16. **[RELEASE]** Confirm current Store policies, signing requirements, API/Codex integration terms, provider model availability and pricing, and platform rules immediately before distribution.
+17. **[RELEASE]** Before accepting nontrivial external code contributions, decide whether hosted-service risk justifies changing future releases from GPLv3 to AGPLv3. The default remains `GPL-3.0-only`; any change requires copyright authority, compatibility review, a documented transition, and updates to every license and public claim.
 
 ## Later possibilities
 
@@ -84,5 +91,6 @@ This is the only central register for unresolved and deferred work in the produc
 - The same journey remains usable without AI except for explicitly AI-dependent transformations.
 - The app can recover from restart, provider failure, failed tracker save, extension/desktop version skew, and safe update without losing the last valid local state.
 - A user can understand where data is stored, what leaves the device, who charges for AI, how to back up, and how to delete everything.
+- A user can inspect every provider call made by ORT, distinguish operations from retry attempts, compare token and estimated-cost totals by model/provider, understand ORT-only versus account-wide and reported versus estimated usage, change a tested model for future calls, enforce optional direct or Codex guardrails, export or clear local history without resetting limits, and reach the provider's authoritative usage/billing tools.
 - Official releases are traceable to public source, appropriately signed or unmistakably labeled as previews, and distributed through documented channels.
 - Modified and third-party distributions can preserve required source attribution without being mistaken for official releases.

@@ -16,7 +16,7 @@ Implementation plans must preserve these logical boundaries without prematurely 
 
 ### Local profile
 
-Contains local preferences, schema version, installation identity, backup preferences, provider references, update channel, and pointers to the records below. It must not duplicate AI credentials stored in the operating-system vault.
+Contains local preferences, schema version, installation identity, backup preferences, the active AI connection mode, opaque direct-credential references or a Codex connection reference, update channel, and pointers to the records below. It must not duplicate API keys or Codex authentication tokens stored in the operating-system vault.
 
 ### Master-resume draft
 
@@ -50,9 +50,31 @@ Contains local preferences, schema version, installation identity, backup prefer
 - Records schema version, source published-master revision, provider/model and prompt configuration identifiers when AI-assisted, template/style version, renderer version, font-package version, page target, locale, creation time, and integrity checksum.
 - Editing a retained artifact creates a new snapshot and deliberately replaces the association; it does not rewrite historical source bytes silently.
 
-### Operational metadata
+### AI activity ledger
 
-Contains non-content diagnostic facts such as operation state, duration, error category, provider name/model, token/cost information returned by a provider, and timestamps. It must remain separable from resume, job, answer, and credential content when a user creates a diagnostic report.
+- Durable, user-visible local records for logical AI operations and their individual provider-call attempts.
+- Stores opaque local identifiers, operation type, connection mode, provider, credential identity where applicable, requested and effective model, preset version, timestamps, duration, status, retry relationship, coarse error category, provider-reported usage categories, local size estimates, contemporaneous cost estimate where applicable, currency, estimate completeness, and pricing-catalog version/effective date.
+- Does not store API keys, prompt or response bodies, resume/job/question content, full URLs, filenames, or provider-account credentials.
+- Preserves raw provider-reported usage separately from locally derived estimates so later code or pricing changes do not obscure provenance.
+- Represents only calls initiated by this ORT installation and is not an account-wide provider billing record.
+
+### AI guardrail state
+
+- Durable accounting state separate from activity-history display and retention.
+- Direct-API records contain the opaque credential identity, enabled calendar/all-time periods, configured currency caps, fixed time zone and boundaries, warning thresholds, counted estimated spend, active reservations, unresolved outcomes, next reset, and explicit policy/baseline-change audit facts.
+- Codex records contain stable provider quota-bucket identifiers, user thresholds, last provider-reported used percentage/window duration/reset time, refresh status, and the mapping/review state when provider buckets change.
+- Stores no API key, Codex access/refresh token, prompt, response, resume/job content, or provider cookie.
+- Clearing or expiring AI Activity cannot mutate this state. Changing or resetting it is a separate, explicit operation.
+
+### Codex account-usage snapshot
+
+- Optional last-known provider data used to render Codex status: plan type, account-level token summary, daily token buckets, quota bucket identifiers/names, used percentages, window durations, reset times, retrieval time, and availability/error state.
+- Account-level measurements remain labeled as account-wide and are not merged into ORT-only per-operation totals.
+- The snapshot is replaceable cache, not an authoritative invoice or the source of guardrail history. Authentication secrets and full account identifiers are excluded.
+
+### Operational diagnostics
+
+Contains bounded non-content troubleshooting facts needed beyond the durable AI activity ledger. Diagnostic data must remain separable from resume, job, answer, credential, and activity-history records when a user creates a diagnostic report. Short-lived diagnostic logs do not replace, silently add content to, or become the authoritative source for AI Activity.
 
 ## Local storage requirements
 
@@ -61,6 +83,9 @@ Contains non-content diagnostic facts such as operation state, duration, error c
 - Apply restrictive per-user file permissions.
 - Protect canonical content at rest with application-level encryption whose key is held in Windows Credential Manager or macOS Keychain, unless the implementation plan and security review document an equally protective platform-native design. Never store the decryption key beside the database.
 - Never write API keys, full resume text, job descriptions, generated answers, or document contents to ordinary logs.
+- Treat the AI activity ledger as encrypted canonical profile data rather than a plaintext log.
+- Treat AI guardrail state as encrypted canonical profile data with transactional reservation and settlement. Activity deletion, retention cleanup, crash recovery, and migration must not weaken or accidentally reset an enabled cap.
+- Codex app-server authentication belongs in the OS credential store selected by the implementation. ORT must not copy or import a general-purpose Codex auth file into its content database or backups.
 - Crash recovery may use journals or temporary files, but they must inherit the same protection and cleanup rules as the canonical data.
 
 ## Structured document requirements
@@ -85,10 +110,10 @@ Contains non-content diagnostic facts such as operation state, duration, error c
 
 Because ORT has no cloud recovery, the application must provide a first-class portable backup.
 
-- A backup contains the local profile, master draft and published snapshot, tracker entries, retained structured materials, settings safe to transfer, schema manifests, and integrity metadata.
+- A backup contains the local profile, master draft and published snapshot, tracker entries, retained structured materials, activity and guardrail settings safe to transfer, schema manifests, and integrity metadata.
 - Backups use a documented, versioned container such as `.ort-backup`.
 - Backups should be encrypted with a user-supplied passphrase using a current password-based key-derivation and authenticated-encryption design chosen during implementation.
-- API keys and credential-vault secrets are excluded by default and must be reconfigured on the destination device.
+- API keys, Codex sessions, and credential-vault secrets are excluded by default and must be reconfigured on the destination device. Imported guardrail policies remain inactive until the user binds and confirms them for a new credential or Codex connection; historical counters never silently attach to a different identity.
 - Restore validates format, integrity, schema compatibility, available disk space, and conflicts before replacing or merging data.
 - Before a destructive migration or restore, ORT creates or offers a recoverable safety copy.
 - Automatic backup may target a directory chosen by the user, including a folder synchronized by a third party. ORT must explain that choosing such a folder causes that third party—not ORT—to receive the encrypted backup.

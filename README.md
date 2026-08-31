@@ -30,7 +30,7 @@ For a fast product review, read:
 
 ## Product summary
 
-Open Resume Toolkit helps a person maintain one master resume, tailor it to a deliberately captured job description, create optional cover letters and application answers, export documents locally, and track completed applications. User content remains on the user's computer. The project operates no product account system, subscription, hosted database, cloud document store, or centrally funded AI service.
+Open Resume Toolkit helps a person maintain one master resume, tailor it to a deliberately captured job description, create optional cover letters and application answers, use a personal OpenAI/Anthropic/Gemini API key or eligible ChatGPT/Codex subscription, compare models and local usage, set optional spend/quota guardrails, export documents locally, and track completed applications. User content, AI activity, and guardrail records remain on the user's computer. The project operates no ORT-owned account system or subscription, hosted database, cloud document store, or centrally funded AI service.
 
 ## License, attribution, and official releases
 

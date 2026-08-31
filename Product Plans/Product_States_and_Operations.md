@@ -51,7 +51,7 @@ A failed tracker save returns to Final resume selected or Active with all worksp
 1. **File selected** — local file has not been parsed or transmitted.
 2. **Locally validating** — type, signature, size, page, compression, and parser-safety checks run.
 3. **Extracted for review** — usable text and structure hints are available locally.
-4. **Awaiting provider confirmation** — the user reviews provider/model, extracted content scope, and expected provider charges.
+4. **Awaiting provider confirmation** — the user reviews connection mode, provider/model, extracted content scope, and expected direct charges or subscription usage.
 5. **Provider operation active** — the selected provider is mapping extracted content.
 6. **Proposal under review** — structured content, confidence indicators, uncertainties, and duplicates are presented beside the source.
 7. **Accepted** — selected proposal data merges into the draft atomically; publishing is still separate.
@@ -64,7 +64,9 @@ The original document is not retained as a permanent profile record.
 An AI-assisted import, tailoring, refinement, cover letter, or application answer uses one logical local operation with one or more explicitly permitted attempts:
 
 - **Prepared** — inputs have been assembled locally but not transmitted.
-- **Awaiting confirmation** — provider/model, transmitted content, and possible charges are visible when confirmation is required.
+- **Awaiting confirmation** — connection mode, provider/model, transmitted content, and possible charges or subscription usage are visible when confirmation is required.
+- **Guardrail preflight** — ORT refreshes applicable pricing or Codex quota state, calculates the direct-API reservation when applicable, and atomically decides whether dispatch is allowed.
+- **Blocked by guardrail** — no transmission occurred; the active currency cap, unresolved reservation, unavailable price/quota data, or Codex percentage threshold prevents dispatch and provides corrective actions.
 - **Running** — the desktop owns the current attempt.
 - **Waiting on provider** — a remote response or stream is outstanding.
 - **Validating** — returned content is undergoing schema, size, factual, prohibited-answer, and renderer checks.
@@ -80,10 +82,37 @@ Transitions are monotonic for one attempt. Retrying creates a new attempt under 
 ## Operation security and metadata
 
 - Each operation has an opaque local identifier, type, provider/model preset version, prompt/schema version, attempt count, coarse state/error, timestamps, and user-visible recovery action.
+- Each attempted provider call has a separate opaque attempt identifier and a durable AI activity record created before dispatch. Retries attach new attempt records to the same logical operation.
+- Each direct-API attempt references a random local credential identity and, when a cap is active, an atomic guardrail reservation. Each Codex attempt references the stable quota-bucket snapshot checked before dispatch.
 - Resume, job, answer, key, and full-URL content never enters ordinary operation logs.
-- The provider key is read from the OS vault only when the confirmed attempt begins and remains memory-only for the call.
+- A direct provider key is read from the OS vault only when the confirmed attempt begins and remains memory-only for the call. In Codex mode, managed ChatGPT tokens remain owned by the local app-server/OS credential store and are never copied into ORT content records.
 - Reopening the overlay reconnects to the current local operation instead of creating a duplicate request.
 - User-visible errors include a stable local reference that can be included in a scrubbed diagnostic bundle.
+
+## AI activity-record lifecycle
+
+The AI activity ledger is user-facing product data, not centralized telemetry or an ordinary diagnostic log.
+
+1. **Prepared locally** — the logical operation exists, but no provider call is counted or priced yet.
+2. **Dispatch recorded** — immediately before network transmission, ORT commits an attempt record with provider/model, operation type, time, and locally estimated input size.
+3. **Guardrail reserved** — for capped direct API use, the conservative maximum is committed in the same transaction before dispatch. Codex instead stores the provider quota snapshot and threshold decision.
+4. **In flight** — status and duration may update without storing request or response content.
+5. **Usage received** — provider-reported usage categories, Codex thread token updates, and before/after account quota snapshots are attached when available and remain labeled by provenance.
+6. **Estimate settled** — direct-API reservations settle to the contemporaneous cost estimate, currency, price components, and pricing-catalog version, or remain visibly unresolved. Codex records no invented currency estimate.
+7. **Finalized** — success, failure, cancellation, timeout, blocked-before-dispatch, or unknown outcome is stored. An interrupted finalization is recovered at startup and never guessed to be unbilled or quota-free.
+
+A provider call begins only after the dispatch record commits. If the network outcome is ambiguous, the attempt is marked accordingly and retained because billing may still have occurred. Clearing an activity record never changes the operation result, deletes generated content, or represents a provider-side billing deletion.
+
+## AI connection-mode lifecycle
+
+- **No AI** — no credential/session is active and all AI-dependent actions explain how to configure one.
+- **Direct provider configured** — one OpenAI, Anthropic, or Gemini credential identity and tested model preset are active; other stored direct credentials are inactive.
+- **Codex sign-in pending** — the managed browser or device-code flow is underway and can be cancelled without changing the prior mode.
+- **Codex connected** — ChatGPT auth, a tested returned model, account/quota visibility, and app-server compatibility have passed checks.
+- **Connection degraded** — credential/session, model availability, protocol compatibility, pricing, or quota refresh needs action; ORT does not fall back to another mode.
+- **Switch pending** — an active operation must finish or be cancelled before a confirmed mode/provider switch commits atomically.
+
+A failed sign-in or connection test preserves the prior usable mode. Removing the active direct credential or signing out of Codex transitions to No AI after confirmation. Mode changes never import, expose, or exchange credentials between adapters.
 
 ## Retry and cancellation rules
 
@@ -108,4 +137,3 @@ Longer local work is reconnectable and visibly follows prepared, running, valida
 - Schema migration records its source/target versions and never marks success until integrity checks pass.
 - An update that requires migration verifies recovery material before replacing the running version.
 - Interrupted work is detected at next launch and offers the correct resume, rollback, retry, or support action without guessing success.
-

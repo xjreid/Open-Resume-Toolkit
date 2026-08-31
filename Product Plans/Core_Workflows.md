@@ -4,7 +4,7 @@
 
 - The first launch creates a local profile and explains that user content is stored on this device.
 - No ORT registration or login is required.
-- The user is prompted to configure backups and may optionally configure an AI provider.
+- The user is prompted to configure backups and may optionally choose Direct API, Connect Codex, or No AI.
 - The app reports whether Chrome and Edge extensions are installed and whether their native-messaging connections work.
 - Multiple operating-system users receive separate data by default. Running ORT on another computer creates an independent profile unless the user imports a backup.
 
@@ -46,7 +46,7 @@ Changing style changes presentation only. Exact appearance belongs in the aesthe
 
 ## Capture and application-workspace workflow
 
-The overlay header shows the user's name from the published master when available, the current AI provider/model or **AI not configured**, and browser-connection state. It has no account tier or subscription badge.
+The overlay header shows the user's name from the published master when available, the active direct provider/model, **Codex / model**, or **AI not configured**, and browser-connection state. A plan type may appear only inside Codex connection/usage details, not as an ORT account tier or entitlement badge.
 
 1. The user explicitly activates the Chrome or Edge extension on a job page.
 2. The user selects the relevant job-description text or application question.
@@ -123,6 +123,26 @@ Fields may remain blank when the user does not know them. Selecting Other permit
 
 Users can create entries manually, edit tracking fields, replace retained materials deliberately, delete individual materials, delete an entry with confirmation, filter/search locally, and export tracking data as CSV. Opening a retained resume or cover letter renders its structured snapshot on demand. Opening an answer set shows ordered questions and answers with copy/export controls.
 
+## AI Activity
+
+The desktop application provides an **AI Activity** view for understanding and controlling ORT's use of the user's configured providers.
+
+- The header shows the one active mode: Direct API, Codex subscription, or No AI. Direct API setup selects OpenAI, Anthropic, or Gemini, adds/tests a key, chooses an Economy/Balanced/Quality tested model, reviews current pricing, and optionally sets spending caps. Codex setup uses managed ChatGPT sign-in, chooses a tested model returned for the account, and optionally sets quota-percentage caps. Switching modes requires confirmation and never falls back silently.
+- Direct-API summary cards show calls, logical operations, input/output usage, and estimated cost for today, the current week, the current month, and a user-selected date range. Codex cards show ORT-reported tokens when available and current provider quota windows/account token activity with clear provenance instead of estimated API cost.
+- Breakdowns group activity by connection mode, provider, requested/effective model or preset, operation type, status, and date.
+- A model table shows each used model's logical operations, attempts, input, cached/cache-write, output, reasoning, total and other supported tokens, estimated direct-API cost, and incomplete/unpriced count. A provider table totals the same dimensions across models without combining currencies or hiding partial data.
+- A filterable call table shows the local operation and attempt identifiers, time, operation type, provider/model, status, duration, retry relationship, provider-reported token categories, and estimated cost when available.
+- One logical operation may contain multiple provider-call attempts. The interface distinguishes retries from unique user operations so totals are not misleading.
+- Failed, cancelled, and timed-out attempts remain visible because a provider may still bill after dispatch.
+- A detail view explains which measurements came from the provider, which values ORT estimated, which pricing-catalog version was used, and why a value may be unavailable. It does not reveal API keys, prompts, resume content, job content, or generated output.
+- Direct-API details show the preflight reservation, final estimate, cap period/balance, and unresolved status where applicable. Codex details distinguish ORT thread token updates, account-wide daily/lifetime tokens, exact provider quota-window duration/reset, and any approximate before/after quota change.
+- Users can export the filtered history as CSV or JSON, clear selected records or date ranges, and configure an optional age-based retention policy. These actions do not delete generated documents or other product content.
+- Provider and tested model-preset controls are reachable from AI Activity. A change updates the same canonical setting used elsewhere, applies only to future attempts, requires the normal provider disclosures, and never silently changes a running operation.
+- Provider billing links are available where practical. ORT labels calculated prices as estimates and never presents the activity ledger as an invoice or authoritative provider-account statement.
+- Guardrail controls show all enabled periods or quota buckets, next reset, warning state, blocking reason, and safe choices to use a cheaper model, lower the operation output bound, increase/disable the limit, reconnect, or verify the provider's own dashboard. Clearing history is visually separate and never resets guardrail counters.
+
+AI Activity covers every remote provider call made through ORT. Direct-API totals do not claim to discover calls made by other applications using the same API key, provider-side adjustments, credits, taxes, account-level tiers, or charges that a provider does not expose to ORT. Codex account quota/token summaries may include other Codex clients and are never presented as ORT-only.
+
 ## Settings and local status
 
 The desktop settings/status area shows without exposing secrets:
@@ -130,7 +150,7 @@ The desktop settings/status area shows without exposing secrets:
 - Application version, installation/update channel, signing status where available, last update check, and Check for updates.
 - Local profile storage use, storage location explanation, schema version, and data export/deletion actions.
 - Backup destination, encryption status, last successful backup, restore, and backup test/reminder state.
-- Configured AI provider/model preset, connection test, provider usage/cost metadata when available, and replace/remove-key actions. The key is never displayed in full.
+- Active AI mode; direct provider/credential identity/model preset and caps, or Codex account connection/model/quota caps; connection test, current pricing-catalog or quota-refresh status, link to AI Activity, and replace/remove/sign-out actions. API keys and Codex tokens are never displayed.
 - Chrome and Edge extension/native-host connection, component versions, compatibility, installation links, disconnect, and repair.
 - Links to documentation, GitHub Issues/Discussions, privacy information, the GPL license, copyright and canonical-source attribution, third-party notices, the trademark policy, build provenance and official/preview status, and private security reporting.
 
@@ -139,5 +159,6 @@ The desktop settings/status area shows without exposing secrets:
 - Discarding an application workspace permanently removes its temporary local content after confirmation.
 - Deleting a retained material leaves the tracker entry and other materials intact.
 - Deleting a tracker entry removes its associated snapshots after confirmation.
+- Clearing AI Activity removes only the selected content-free activity records; it does not delete the associated generated materials or affect provider-side billing records.
 - The settings area provides an explicit **Delete all local ORT data** action with a clear backup reminder and destructive confirmation.
 - Uninstall behavior must disclose whether local user data remains. Where platform packaging permits, uninstall and local-data deletion remain separate so accidental uninstall does not silently destroy the only copy.

@@ -7,6 +7,7 @@
 - Only project-controlled release channels, signing identities, package identifiers, and update metadata may represent a build as official. Modified and third-party builds use distinct identity and update infrastructure in accordance with `TRADEMARKS.md`.
 - Store and direct-download editions identify their update channel and never overwrite one another using a different channel's updater.
 - Unsigned preview builds are labeled prominently and never presented as equivalent to trusted signed releases.
+- A release that enables Codex subscription mode identifies whether it bundles a verified app-server component or requires a separately installed compatible runtime. Bundled binaries are pinned to reviewed public source, included in the SBOM/notices, signed with the containing package, and updated only through the ORT release channel. External runtimes are compatibility-checked and never modified silently by ORT.
 
 ## Windows
 
@@ -35,11 +36,12 @@
 ## Update behavior
 
 - The settings area contains **Check for updates** and displays the current version, channel, last check, and release notes.
-- Automatic background checking may be enabled by default with a clear preference to disable it. Checks disclose only ordinary request metadata required to reach the update service; no resume/application content or stable cross-site tracking identifier is sent.
+- Automatic background application and signed pricing/model-catalog checking may be enabled by default with a clear preference to disable it. Checks disclose only ordinary request metadata required to reach the update service; no resume/application content, AI credential, or stable cross-site tracking identifier is sent.
 - Updates are downloaded only from channel-approved HTTPS locations and verified before execution.
+- Content-only catalog updates are downloaded only from the canonical signed catalog channel, verified before activation, schema/sequence checked against rollback or freeze attacks, and never treated as executable code or permission to enable an untested model.
 - Downgrades require explicit developer/testing workflows and must not silently run against a newer incompatible data schema.
 - An application update that changes local data first creates or verifies a migration safety backup.
-- Desktop, native host, extension, document schema, renderer, and backup compatibility versions are evaluated together before release.
+- Desktop, native host, extension, document schema, renderer, backup, provider catalog, and Codex app-server protocol/runtime compatibility versions are evaluated together before release.
 
 ## Browser-extension stores
 
@@ -62,4 +64,5 @@ Every public release provides:
 - GPLv3, copyright, Section 7 attribution, third-party notice, and trademark-policy links
 - A visible official/preview/third-party status that agrees with the publisher and signing identity
 - Data-schema or backup compatibility notes
+- Supported direct-provider presets/pricing-catalog effective date and, when enabled, Codex app-server distribution/runtime requirement, tested model intersection, and known token/quota limitations
 - Security fixes without prematurely disclosing exploitable detail

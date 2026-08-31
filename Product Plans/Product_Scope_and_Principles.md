@@ -2,7 +2,7 @@
 
 ## Product identity
 
-**Open Resume Toolkit (ORT)** is a free, open-source, local-first desktop tool for preparing resumes and managing a person's own job applications. It combines a structured resume editor, optional user-funded AI assistance, local document rendering, an application tracker, a desktop overlay, and narrow Chrome/Edge capture extensions.
+**Open Resume Toolkit (ORT)** is a free, open-source, local-first desktop tool for preparing resumes and managing a person's own job applications. It combines a structured resume editor, optional user-authorized AI assistance through a personal API key or eligible ChatGPT/Codex subscription with local usage visibility and guardrails, local document rendering, an application tracker, a desktop overlay, and narrow Chrome/Edge capture extensions.
 
 ORT is a tool, not an employment service, employer product, job board, or automatic application agent. It must not claim to guarantee interviews, employment, applicant-tracking-system performance, or legal compliance.
 
@@ -18,7 +18,7 @@ The software may be used internationally, but documentation must not imply that 
 
 ## Product surfaces
 
-1. **Desktop application** — owns user data, resume editing, application workspaces, AI-provider configuration, rendering, exports, tracking, backup, restoration, updates, and the primary overlay.
+1. **Desktop application** — owns user data, resume editing, application workspaces, AI-provider configuration and activity history, rendering, exports, tracking, backup, restoration, updates, and the primary overlay.
 2. **Desktop overlay** — a compact always-available view for the current application workflow. It is part of the desktop app, not browser-injected product UI.
 3. **Chrome and Edge extensions** — capture user-selected job descriptions or application questions and send them to the local desktop app after review.
 4. **GitHub repository** — canonical public source, issue tracker, release history, contribution process, security policy, and build provenance.
@@ -39,9 +39,12 @@ The software may be used internationally, but documentation must not imply that 
 ### User control over AI
 
 - Manual editing, tracking, rendering, and export work without an AI provider.
-- The user selects and pays any remote AI provider used by the application.
+- The user selects either a supported personal provider API key or an eligible personal ChatGPT/Codex subscription. ORT never supplies or resells inference.
+- Direct API and Codex subscription modes are mutually exclusive, and provider/model changes never trigger a silent fallback.
 - Before transmission, ORT identifies the selected provider and the content to be sent.
 - AI output is always a proposal requiring review. It never silently replaces the master resume or submits an application.
+- ORT makes its own AI calls visible through a local activity history and distinguishes estimated charges from the provider's authoritative bill.
+- Optional direct-API estimated-spend caps and Codex provider-quota thresholds block future ORT calls when their measurable limit is reached, while clearly stating their local and provider-reporting limitations.
 
 ### Structured, portable documents
 
@@ -82,3 +85,6 @@ The software may be used internationally, but documentation must not imply that 
 - **Structured snapshot:** an immutable saved JSON representation of a selected tailored resume, cover letter, or answer set.
 - **Derived export:** a locally generated PDF, DOCX, or text file that is outside ORT's canonical database once saved.
 - **Provider adapter:** local code that translates an ORT request into a user-selected AI provider's API and validates the response.
+- **AI connection mode:** the single active choice of no AI, a direct provider API credential, or a managed ChatGPT/Codex subscription connection.
+- **AI activity ledger:** durable, content-free local history of logical AI operations and their provider-call attempts, usage measurements, statuses, and contemporaneous cost estimates.
+- **AI guardrail state:** durable local counters, reservations, period policies, and Codex quota thresholds used to block future ORT calls independently of activity-history retention.

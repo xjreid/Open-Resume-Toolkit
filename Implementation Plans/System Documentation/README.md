@@ -5,7 +5,7 @@ Future documentation in this folder should include:
 - Architecture overview and component/data-flow diagrams
 - Local schema and migration catalog
 - Native-messaging and local-IPC protocol specification
-- Provider-adapter and structured-document contracts
+- Direct-provider/Codex adapter, authentication, AI activity/accounting, provider/model aggregation, pricing-catalog, spend/quota-guardrail, telemetry-provenance, and structured-document contracts
 - Build and local-development setup
 - Test strategy and supported-platform matrix
 - Threat model and security-review evidence
@@ -16,4 +16,3 @@ Future documentation in this folder should include:
 - User-support and diagnostic-bundle troubleshooting guides
 
 Documentation must avoid real user content, credentials, signing secrets, and sensitive exploit details.
-

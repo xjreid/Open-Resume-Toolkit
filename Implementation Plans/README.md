@@ -2,7 +2,7 @@
 
 ## Status
 
-This workspace is intentionally reserved for the later technical implementation-planning phase. Current files define organization and required content only. They do not select frameworks, libraries, schemas, APIs, packaging tools, or code organization.
+This workspace is intentionally reserved for the later technical implementation-planning phase. Current files define organization and required content only. They do not yet select frameworks, libraries, schemas, SDKs/endpoint versions, packaging tools, or code organization beyond the provider and Codex product boundaries approved in the authoritative plans.
 
 ## Authority boundary
 
@@ -19,10 +19,10 @@ Before writing a component plan, read:
 
 ## Planned locations
 
-- `Desktop Application/` — shell, windows, overlay, editor, tracker, settings, accessibility, credential vault, and local orchestration.
+- `Desktop Application/` — shell, windows, overlay, editor, tracker, AI Activity, direct/Codex connection and guardrail settings, accessibility, credential vault, and local orchestration.
 - `Browser Extensions/` — Chrome/Edge extensions, native host, IPC, installation, repair, permissions, and compatibility.
-- `Local Data and Migration/` — schema, transactions, encryption, migrations, backup, restore, deletion, and portability.
-- `AI and Document Processing/` — provider adapters, prompts, validation, import extraction, rendering, exports, and evaluation.
+- `Local Data and Migration/` — schema, transactions, encryption, AI activity/guardrail state, Codex usage cache, migrations, backup, restore, deletion, and portability.
+- `AI and Document Processing/` — direct provider adapters, Codex app-server, prompts, model catalogs, usage/cost/quota accounting, guardrail enforcement, validation, import extraction, rendering, exports, and evaluation.
 - `Distribution and Updates/` — packaging, Stores, signing, notarization, GitHub releases, provenance, updates, and rollback.
 - `System Documentation/` — architecture decisions, interfaces, build/development setup, threat model, release runbooks, and troubleshooting.
 
@@ -45,7 +45,7 @@ Every technical plan should include:
 
 - Prefer one canonical contract and cross-reference it rather than copying it.
 - Version every durable schema and cross-component protocol.
-- Keep content data, secrets, diagnostics, and derived exports in their approved boundaries.
+- Keep content data, AI activity, guardrail counters, provider account snapshots, secrets, diagnostics, and derived exports in their approved boundaries.
 - Treat Store, direct-download, development, and preview builds as explicit channels.
 - Record major irreversible choices as architecture decision records under `System Documentation/`.
 - A provider or library name in a technical plan is not permanent product policy unless the authoritative product plan makes it one.

@@ -7,15 +7,15 @@ ORT may accurately describe itself as local-first when all canonical user conten
 The project must distinguish:
 
 - Local editing, storage, search, rendering, backup, and export.
-- Deliberate transmission to a user-selected AI provider.
+- Deliberate transmission to a user-selected direct AI provider or to OpenAI through a user-authorized ChatGPT/Codex subscription.
 - Update checks and browser-store communication.
 
 Project maintainers cannot access local resumes, job descriptions, tracker entries, generated materials, or AI keys unless a user deliberately shares them outside the application.
 
 ## Protected assets
 
-- Master draft, published master, imported content, application workspace, tracker, retained snapshots, backups, and exports.
-- AI-provider credentials and provider account information.
+- Master draft, published master, imported content, application workspace, tracker, retained snapshots, AI activity ledger, AI guardrail state, Codex usage snapshots, backups, and exports.
+- Direct-provider credentials, Codex authentication tokens, and provider account information.
 - Local database encryption keys when implemented.
 - Native-messaging and local-IPC secrets.
 - Release signing/notarization credentials, Store accounts, repository administration, CI workflows, and update metadata.
@@ -36,6 +36,21 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 - Logs and diagnostic exports exclude content and secrets by default.
 - Backups are encrypted and require a user-controlled passphrase.
 - Clipboard use, temporary preview files, drag-and-drop exports, and recent-file behavior receive explicit implementation review because they can create copies outside ORT.
+
+### AI credential, cost, and quota abuse
+
+- API keys and Codex tokens use the OS credential store and never enter content records, activity rows, guardrail state, logs, backups, exports, extension messages, or diagnostics.
+- Direct keys receive random local identities; ORT does not persist key prefixes or hashes as identifiers.
+- Spending caps use atomic reservations and durable counters so concurrent dispatch, retry, crash recovery, activity deletion, clock changes, and migration cannot bypass them.
+- A configured hard cap fails closed when price, currency, usage, or reservation state cannot be evaluated. An unknown provider outcome is never treated as free.
+- ORT explains that local direct-API caps cannot see use of the same key elsewhere and that Codex quota values can reflect other clients. Provider-side billing/usage controls remain authoritative.
+
+### Codex app-server containment
+
+- ORT uses managed ChatGPT authentication in an ORT-specific configuration/authentication root and keyring namespace. It never asks for a password, scrapes cookies, imports a general-purpose Codex authentication file, or changes another Codex client's model, plugin, permission, or login configuration.
+- Each operation runs in an empty ORT-owned scratch directory under a process-level sandbox with restricted read-only filesystem access and provider-only network egress. ORT configures no dynamic tools, web, MCP, app, plugin, skill, or collaboration access, sets approval policy to never, and interrupts/fails on any command, file-change, tool, web, connector, or permission event.
+- App-server binaries/protocols are version-pinned or compatibility-checked, signed packages are verified, and unexpected model rerouting or tool activity fails the operation rather than broadening access.
+- The integration accepts only reviewed input and validated structured final output. Codex threads and scratch content follow bounded cleanup rules and do not become a second resume store.
 
 ### Malicious imports and archives
 
@@ -58,6 +73,7 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 - Protect repository and Store accounts with MFA; use hardware-backed or phishing-resistant factors for release maintainers where possible.
 - Restrict CI release permissions, pin or verify build actions/dependencies, review build-script changes carefully, and keep signing credentials outside the repository.
 - Verify update signatures and channel identity before installation.
+- Verify signed pricing/model-catalog source, schema, sequence/effective dates, and rollback resistance; catalog data cannot carry executable code or broaden model/tool permissions.
 - Generate software bills of materials and provenance when the implementation toolchain supports them.
 - Maintain an embargoed security-reporting path and a documented revocation/recovery procedure for compromised releases.
 
@@ -71,6 +87,9 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 
 - No resume, job, answer, credential, full URL, filename, or document content is collected automatically.
 - Initial releases should operate without centralized telemetry.
+- AI Activity is encrypted local product data recording calls made by ORT; it is not maintainer telemetry and is never uploaded automatically.
+- Activity records exclude prompts, responses, document content, API keys, provider-account credentials, and full URLs. Raw provider-reported measurements remain distinguishable from ORT estimates.
+- Codex account-level token/quota snapshots remain local, are labeled separately from ORT-only activity, and are never used as maintainer analytics.
 - The application may generate a local diagnostic bundle that the user previews and deliberately attaches to a GitHub issue or support request.
 - A future opt-in crash service requires a separate product decision, published data fields, retention, processor review, and a true off switch.
 
@@ -80,7 +99,9 @@ There is no remote account-deletion workflow because ORT holds no product accoun
 
 - Current application workspace
 - Individual tracker artifacts or entries
-- Provider credentials
+- Direct provider credentials and the local Codex sign-in/session
+- Selected or all AI activity records
+- AI guardrail policies and counters through a separate confirmed reset/removal action; clearing activity alone never resets them
 - Local database and settings
 - Backups and exported documents, which may reside outside the app's control
 - Browser-extension data and native-host registrations
@@ -106,7 +127,7 @@ Before publication:
 - Require the contribution process to state the inbound license clearly, including whether submitted material is provided under the applicable GPLv3 Section 7 attribution term. A Developer Certificate of Origin alone does not transfer contributor copyright.
 - Obtain qualified review of the exact Section 7 term, contributor treatment, automated license identification, Store rules, and signing-program eligibility before the first stable release.
 
-Using remote proprietary AI APIs selected by the user does not make those providers part of ORT, but bundled provider SDK licenses and terms still require review.
+Using remote proprietary AI APIs or a user-authorized Codex subscription does not make those providers part of ORT, but bundled provider SDKs, Codex/app-server components, licenses, trademarks, distribution terms, and client-identification requirements still require review.
 
 ## Contributions and governance
 
@@ -127,7 +148,7 @@ Contributors certify that they have the right to submit their work. A Developer 
 
 ## Distributed documentation and claim boundaries
 
-- Distributed application documentation must explain local storage, update checks, extension communication, AI-provider transmission, diagnostics, backup limits, and deletion behavior.
+- Distributed application documentation must explain local storage, update checks, extension communication, AI-provider transmission, local AI Activity and estimate limitations, diagnostics, backup limits, and deletion behavior.
 - Do not claim legal, ATS, hiring, accuracy, or security guarantees.
 - Verify all third-party names, logos, templates, fonts, and icons before distribution.
 - Review encryption export and software-distribution obligations applicable to official releases.

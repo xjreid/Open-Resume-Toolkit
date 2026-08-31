@@ -12,6 +12,7 @@ Every implemented value should have a stable name, unit, scope, default, rationa
 - At most one published master resume per local profile.
 - At most one current application workspace per local profile.
 - At most one selected final tailored resume, one selected cover letter, and one ordered approved question-answer set per tracker entry.
+- Exactly one active AI connection mode per profile: no AI, one direct-API provider/credential/model preset, or one Codex subscription connection.
 - No plan-based usage or retained-record quotas.
 - No automatic expiry of the canonical current application workspace merely because it has been inactive; clearing requires explicit Finish Application, discard, replacement confirmation, or user data deletion.
 
@@ -107,9 +108,45 @@ Provider limits may be lower. ORT reports those errors without silently changing
 - Stale ORT-owned preview/export temporary files: sweep at startup and at least daily; files outside ORT-controlled temporary directories are never deleted automatically.
 - Content-free local diagnostic logs: disabled by default where practical or retained no longer than 30 days when enabled. Size rotation provides an additional cap.
 
+## AI activity and pricing defaults
+
+- AI activity history: retained until the user clears it by default; optional age-based policies are 30 days, 90 days, or one year.
+- Activity timestamps: stored in a stable UTC representation and displayed in the user's current local time zone.
+- Cost display: disabled for an attempt when the applicable model, usage category, currency, or price cannot be mapped reliably; ORT shows **unavailable** rather than zero.
+- Historical estimates: preserve the currency and pricing-catalog version/effective date used when the attempt finalized; never silently recalculate after a catalog update.
+- Usage aggregation: logical-operation totals and provider-call-attempt totals remain separately available so retries do not appear to be new user operations.
+- Activity export: CSV and JSON are supported and contain non-content fields only.
+- Pricing catalog: versioned with each supported provider/model preset; signed independently for content-only updates through canonical GitHub release infrastructure; and reviewed whenever a preset/provider price changes and before each release that advertises cost estimates. Entries carry official source, verification, and effective/expiry metadata.
+- Initial direct providers: OpenAI, Anthropic, and Google Gemini only. Curated Economy, Balanced, and Quality presets are selected from the dated research baseline in `AI_and_Import.md`; Balanced is the initial direct-API default after provider configuration.
+- Model discovery: provider availability may hide a preset, but never enables an untested model. A selected model that becomes unavailable blocks with an explicit replacement choice and never silently reroutes.
+- Provider/model summaries: show logical operations, attempts, reported input, cached/cache-write, output, reasoning, total and other supported token categories, estimated cost, and missing/unpriced counts. Cross-currency totals are not computed.
+
+## Direct-API guardrail defaults
+
+- Spending limits: disabled until deliberately enabled by the user.
+- Supported periods: calendar week, calendar month, calendar year, and all time; any or all may be enabled simultaneously for the active credential identity.
+- Initial baseline: each cap starts at zero when it is enabled and displays that activation time. It does not retroactively claim to include earlier ORT calls or outside provider use.
+- Calendar boundary: the user's current local time zone at policy creation; weeks begin Monday at 00:00. The selected zone and next reset are stored so travel or a later zone change does not move a period silently.
+- Currency: the pricing catalog's billing currency for the active provider/model. Initial catalogs use official USD list prices; automatic foreign-exchange conversion is unsupported.
+- Notifications: local warnings at 50% and 80% of each enabled cap and a blocking notice at 100%. Duplicate notifications are suppressed within a period unless a new threshold is crossed or policy changes.
+- Enforcement: atomic preflight reservation includes the counted estimate, unresolved reservations, estimated/provider-counted input, maximum configured output, and all applicable price components. Any enabled cap with missing, expired, unverified, or otherwise unevaluable pricing fails closed.
+- Unknown outcome: retain the conservative reservation as unresolved until trustworthy usage settles it or the user explicitly reconciles it after checking provider records.
+- Activity clearing: never resets guardrail period totals or unresolved reservations. An all-time baseline reset is a distinct confirmed action.
+
+## Codex subscription defaults
+
+- Authentication: managed ChatGPT browser flow through local Codex app-server, with device-code fallback where available; API-key auth is not accepted in Codex subscription mode.
+- Model selection: intersect picker-visible `model/list` results with ORT-tested models; prefer the service-recommended tested model. The initial compatibility candidates are GPT-5.6 Luna, Terra, and Sol.
+- Reasoning: use the returned model default initially; expose only supported efforts that ORT has evaluated. Ultra/subagent operation is unsupported.
+- Execution: one ephemeral thread per ORT operation in an empty ORT scratch directory; `approvalPolicy: never`; restricted read-only/external process sandbox; provider-only network egress; no configured dynamic tools, MCP, apps, plugins, skills, collaboration, or web access; fail on any tool/command/file event; and cleanup immediately after the activity record settles.
+- Quota refresh: on connection, when AI Activity opens, immediately before dispatch when a cap is enabled, after an operation, and on provider update notifications. Background polling is bounded and does not create ORT telemetry.
+- Usage caps: disabled until enabled. A threshold from 1% through 100% may apply to an individual stable quota-bucket identifier or all currently returned buckets. Failure to refresh an enabled cap blocks dispatch.
+- Codex costs: do not show API-equivalent currency estimates. Show provider-reported quota windows and token activity with account-wide versus ORT-only provenance.
+
 ## Update defaults
 
 - Background application update check: at most once every 24 hours by default, plus explicit user-triggered checks.
+- Background signed pricing/model-catalog check: at most once every 24 hours by default, plus an explicit refresh. A valid cached catalog remains usable until its applicable entry expires.
 - Update and download requests contain no resume/application content or AI credentials.
 
 ## Selection and change process

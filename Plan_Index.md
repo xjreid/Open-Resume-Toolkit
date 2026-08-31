@@ -6,7 +6,7 @@ This is the navigation and authority map for the product plans. A person or AI a
 
 ## Current planning status
 
-The product direction and core workflows are defined. Exact frameworks, schemas, APIs, operating-system integrations, provider adapters, build systems, installers, and visual design are intentionally deferred to the reserved workspaces.
+The product direction and core workflows are defined, including the initial direct providers and Codex integration boundary. Exact frameworks, schemas, SDKs/API endpoint versions, adapter internals, operating-system integrations, build systems, installers, and visual design are intentionally deferred to the reserved workspaces.
 
 ## Authority and precedence
 
@@ -26,16 +26,19 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - The repository license is `GPL-3.0-only`, supplemented for identified original project material by the reasonable author-attribution term in `ADDITIONAL_TERMS.md` as permitted by GPLv3 Section 7(b). Commercial use, sale, modification, and redistribution remain permitted. The exact dependency, contribution, and additional-term compatibility remains subject to legal and license review before the first stable release.
 - `NOTICE` identifies the canonical source repository and copyright attribution. `TRADEMARKS.md` requires modified and third-party distributions to avoid implying that they are official releases; it does not restrict GPL rights in the code.
 - The desktop application is the primary product. Chrome and Edge extensions are narrow capture companions, not replacements for the desktop experience.
-- User content is local-first and remains on the user's computer. ORT operates no account service, subscription, product database, cloud document store, quota system, admin portal, or centrally funded AI key.
+- User content is local-first and remains on the user's computer. ORT operates no account service, ORT subscription, product database, cloud document store, provider quota, admin portal, or centrally funded AI key. Optional local guardrails govern only future ORT calls.
 - The desktop app remains useful without AI for manual resume editing, local document rendering, application tracking, and exports.
-- AI features use a key and provider deliberately configured by the user. Credentials are stored in the operating-system credential vault and are never exposed to the browser extension.
+- AI features use exactly one active mode: a deliberately configured OpenAI, Anthropic, or Gemini API key; a managed ChatGPT/Codex subscription connection; or No AI. API keys and Codex tokens use the operating-system credential vault and are never exposed to the browser extension.
+- Direct API models use curated Economy/Balanced/Quality presets. Codex models are the tested intersection of the account's current app-server model list and ORT compatibility catalog; no adapter silently falls back or enables an untested model.
+- A local AI Activity view records every provider call initiated by ORT, including attempts, status, requested/effective model, provider-reported usage, per-model/provider token totals, and a clearly labeled direct-API cost estimate when calculable. Direct totals cannot claim to show calls made by other applications using the key; Codex account summaries are visibly account-wide.
+- Users may configure optional direct estimated-spend caps for calendar week/month/year/all-time periods or Codex provider-quota percentage thresholds. Guardrail state is durable and separate from activity-history deletion, while provider billing and quota controls remain authoritative.
 - AI requests require internet access unless a later local-model adapter is installed. Ordinary editing, tracking, rendering, and local search should work offline.
 - There is exactly one autosaved master-resume draft and at most one deliberately published master-resume snapshot in a local profile.
 - Tailoring uses the published master, never unpublished draft changes.
 - One active application workspace holds one reviewed job description, temporary tailored versions, optional cover-letter drafts, and optional application-answer drafts.
 - Finish Application optionally creates a local tracker entry with the selected final resume, cover letter, and approved answer set as structured snapshots, then deletes unselected temporary material and resets the workspace.
 - Structured JSON is the canonical document format. PDF, DOCX, and plain text are locally rendered derived artifacts and are not retained by default.
-- There are no plan-based application, import, AI, or storage quotas. Practical safety limits prevent malformed or excessively large inputs; the user's disk capacity and chosen AI provider govern usage.
+- There are no ORT plan-based application, import, AI, or storage quotas. Practical safety limits prevent malformed or excessively large inputs, and optional user-defined AI guardrails protect the user's provider budget or subscription quota.
 - Chrome and Edge on Windows and macOS are the initial browser/platform targets. Firefox, Safari, Linux, mobile, OCR, local AI models, job-board notifications, and automatic form submission are not initial commitments.
 - The initial Windows distribution target is a Microsoft Store MSIX, with GitHub releases and possible SignPath signing evaluated for direct downloads. The app performs or verifies per-user native-messaging registration without requiring manual registry editing in the normal flow.
 - Store installations update through Microsoft Store APIs. Direct installations may check signed GitHub Releases. Update channels must never overwrite one another.
@@ -60,14 +63,14 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 
 - [Product scope and principles](<Product Plans/Product_Scope_and_Principles.md>) — mission, audience, surfaces, terminology, goals, and non-goals.
 - [Resume editor and schema](<Product Plans/Resume_Editor_and_Schema.md>) — detailed editor layout, section and entry types, fields, ordering, optional-value rendering, and draft/publish experience.
-- [Core workflows](<Product Plans/Core_Workflows.md>) — master resume, capture, tailoring, supporting generation, Finish Application, and tracker behavior.
-- [Local data and document model](<Product Plans/Local_Data_and_Document_Model.md>) — local records, ownership, draft/publish rules, structured snapshots, backup, deletion, rendering, and migration.
-- [Product states and operations](<Product Plans/Product_States_and_Operations.md>) — canonical resume, workspace, import, AI-operation, tracker-save, and update states.
-- [Configuration limits and defaults](<Product Plans/Configuration_Limits_and_Defaults.md>) — centralized compatibility, payload, document, AI, timeout, retention, and performance defaults.
-- [Local data retention and recovery](<Product Plans/Local_Data_Retention_and_Recovery.md>) — local retention, temporary cleanup, backups, exports, credentials, diagnostics, and deletion behavior.
-- [AI and import](<Product Plans/AI_and_Import.md>) — user-selected AI providers, credentials, request safeguards, import, generation, factuality, and failure behavior.
+- [Core workflows](<Product Plans/Core_Workflows.md>) — master resume, capture, tailoring, supporting generation, AI Activity, Finish Application, and tracker behavior.
+- [Local data and document model](<Product Plans/Local_Data_and_Document_Model.md>) — local records, ownership, draft/publish rules, structured snapshots, AI activity/guardrails, Codex usage cache, backup, deletion, rendering, and migration.
+- [Product states and operations](<Product Plans/Product_States_and_Operations.md>) — canonical resume, workspace, import, AI connection/operation/activity/guardrail, tracker-save, and update states.
+- [Configuration limits and defaults](<Product Plans/Configuration_Limits_and_Defaults.md>) — centralized compatibility, payload, document, AI model, spend/quota guardrail, timeout, retention, and performance defaults.
+- [Local data retention and recovery](<Product Plans/Local_Data_Retention_and_Recovery.md>) — local retention, temporary cleanup, AI activity history, backups, exports, credentials, diagnostics, and deletion behavior.
+- [AI and import](<Product Plans/AI_and_Import.md>) — direct providers/models, Codex subscription integration, credentials, spend/quota guardrails, request safeguards, usage/cost accounting, import, generation, factuality, and failure behavior.
 - [Desktop-extension communication](<Product Plans/Desktop_Extension_Communication.md>) — Chrome/Edge capture, native messaging, local IPC, installation, permissions, and version compatibility.
-- [Distribution and updates](<Product Plans/Distribution_and_Updates.md>) — Store/GitHub channels, signing, updates, release integrity, and extension stores.
+- [Distribution and updates](<Product Plans/Distribution_and_Updates.md>) — Store/GitHub channels, signing, application/catalog updates, Codex app-server packaging, release integrity, and extension stores.
 - [Security, privacy, and open source](<Product Plans/Security_Privacy_and_Open_Source.md>) — threat boundaries, privacy promises, local security, open-source governance, licensing, and distributed documentation requirements.
 - [Quality, accessibility, and verification](<Product Plans/Quality_Accessibility_and_Verification.md>) — quality requirements, accessibility, critical journeys, and release evidence.
 
