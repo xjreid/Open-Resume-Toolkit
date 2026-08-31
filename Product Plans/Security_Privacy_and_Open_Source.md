@@ -49,7 +49,7 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 
 - ORT uses managed ChatGPT authentication in an ORT-specific configuration/authentication root and keyring namespace. It never asks for a password, scrapes cookies, imports a general-purpose Codex authentication file, or changes another Codex client's model, plugin, permission, or login configuration.
 - Each operation runs in an empty ORT-owned scratch directory under a process-level sandbox with restricted read-only filesystem access and provider-only network egress. ORT configures no dynamic tools, web, MCP, app, plugin, skill, or collaboration access, sets approval policy to never, and interrupts/fails on any command, file-change, tool, web, connector, or permission event.
-- App-server binaries/protocols are version-pinned or compatibility-checked, signed packages are verified, and unexpected model rerouting or tool activity fails the operation rather than broadening access.
+- The separately installed app-server executable and protocol are identity/version/capability checked before use; the supported version window is explicit, and unexpected model rerouting or tool activity fails the operation rather than broadening access.
 - The integration accepts only reviewed input and validated structured final output. Codex threads and scratch content follow bounded cleanup rules and do not become a second resume store.
 
 ### Malicious imports and archives
@@ -127,7 +127,7 @@ Before publication:
 - Require the contribution process to state the inbound license clearly, including whether submitted material is provided under the applicable GPLv3 Section 7 attribution term. A Developer Certificate of Origin alone does not transfer contributor copyright.
 - Obtain qualified review of the exact Section 7 term, contributor treatment, automated license identification, Store rules, and signing-program eligibility before the first stable release.
 
-Using remote proprietary AI APIs or a user-authorized Codex subscription does not make those providers part of ORT, but bundled provider SDKs, Codex/app-server components, licenses, trademarks, distribution terms, and client-identification requirements still require review.
+Using remote proprietary AI APIs or a user-authorized Codex subscription does not make those providers part of ORT, but bundled provider SDKs and the external Codex/app-server integration's licenses, trademarks, distribution terms, executable verification, authentication isolation, and client-identification requirements still require review. Bundling Codex later would require a new product, license, signing, SBOM, and update review.
 
 ## Contributions and governance
 

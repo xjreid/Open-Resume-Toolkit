@@ -68,7 +68,7 @@ Exact minimum versions are chosen during implementation and recorded centrally. 
 13. Enable weekly/monthly/yearly/all-time direct spending caps and prove warnings, atomic reservation, boundary reset, fail-closed unknown pricing/usage, crash recovery, credential replacement, and the separation between clearing activity and resetting a cap.
 14. Connect and sign out of Codex through browser and device-code paths; discover tested account models; verify isolated no-tool execution, ORT thread tokens where available, account-wide daily/lifetime tokens, exact quota windows, delayed/rounded updates, quota thresholds, bucket changes, and missing telemetry labels.
 15. Switch between Direct API, Codex subscription, and No AI without leaking credentials, changing an active operation, or silently falling back.
-16. Update through Microsoft Store and the signed GitHub channel without mixing channels or losing data/native messaging.
+16. Update through a SignPath-signed GitHub channel and, when used, the fallback Microsoft Store channel without mixing channels or losing data/native messaging; verify that unsigned macOS previews remain clearly labeled and do not enable an unauthenticated automatic updater.
 
 ## Security and privacy verification
 

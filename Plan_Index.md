@@ -40,9 +40,10 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - Structured JSON is the canonical document format. PDF, DOCX, and plain text are locally rendered derived artifacts and are not retained by default.
 - There are no ORT plan-based application, import, AI, or storage quotas. Practical safety limits prevent malformed or excessively large inputs, and optional user-defined AI guardrails protect the user's provider budget or subscription quota.
 - Chrome and Edge on Windows and macOS are the initial browser/platform targets. Firefox, Safari, Linux, mobile, OCR, local AI models, job-board notifications, and automatic form submission are not initial commitments.
-- The initial Windows distribution target is a Microsoft Store MSIX, with GitHub releases and possible SignPath signing evaluated for direct downloads. The app performs or verifies per-user native-messaging registration without requiring manual registry editing in the normal flow.
-- Store installations update through Microsoft Store APIs. Direct installations may check signed GitHub Releases. Update channels must never overwrite one another.
-- A polished direct macOS release requires Apple Developer ID signing and notarization. The project may offer a clearly labeled unsigned preview before funding the Apple membership, but must not disguise Gatekeeper limitations.
+- Codex subscription mode requires a separately installed compatible Codex runtime; ORT does not bundle Codex in the initial release. ORT detects and validates the runtime, launches and stops `codex app-server` automatically over local `stdio`, and keeps its configuration, authentication, keyring, and temporary-data boundary separate from the user's general Codex environment.
+- The preferred stable Windows channel is a SignPath Foundation-signed direct package published through canonical GitHub Releases after the project meets SignPath eligibility and is accepted. Before trusted signing is available, direct Windows artifacts are clearly labeled previews. Microsoft Store MSIX is the fallback stable channel if SignPath is unavailable or declined. The app performs or verifies per-user native-messaging registration without requiring manual registry editing in the normal flow.
+- Signed direct installations may check canonical GitHub Releases; a fallback Store edition uses Microsoft Store update APIs. Update channels must never overwrite one another.
+- Initial macOS GitHub artifacts are explicitly unsigned previews with checksums, provenance, Gatekeeper instructions, and authenticated update metadata. A stable macOS release requires Apple Developer ID signing and notarization once usage, support burden, organizational adoption, or funding justifies the recurring membership cost.
 
 ## Authoritative document catalog
 
@@ -70,7 +71,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - [Local data retention and recovery](<Product Plans/Local_Data_Retention_and_Recovery.md>) — local retention, temporary cleanup, AI activity history, backups, exports, credentials, diagnostics, and deletion behavior.
 - [AI and import](<Product Plans/AI_and_Import.md>) — direct providers/models, Codex subscription integration, credentials, spend/quota guardrails, request safeguards, usage/cost accounting, import, generation, factuality, and failure behavior.
 - [Desktop-extension communication](<Product Plans/Desktop_Extension_Communication.md>) — Chrome/Edge capture, native messaging, local IPC, installation, permissions, and version compatibility.
-- [Distribution and updates](<Product Plans/Distribution_and_Updates.md>) — Store/GitHub channels, signing, application/catalog updates, Codex app-server packaging, release integrity, and extension stores.
+- [Distribution and updates](<Product Plans/Distribution_and_Updates.md>) — GitHub/Store channels, signing, application/catalog updates, external Codex-runtime requirements, release integrity, and extension stores.
 - [Security, privacy, and open source](<Product Plans/Security_Privacy_and_Open_Source.md>) — threat boundaries, privacy promises, local security, open-source governance, licensing, and distributed documentation requirements.
 - [Quality, accessibility, and verification](<Product Plans/Quality_Accessibility_and_Verification.md>) — quality requirements, accessibility, critical journeys, and release evidence.
 

@@ -136,6 +136,9 @@ Provider limits may be lower. ORT reports those errors without silently changing
 ## Codex subscription defaults
 
 - Authentication: managed ChatGPT browser flow through local Codex app-server, with device-code fallback where available; API-key auth is not accepted in Codex subscription mode.
+- Runtime distribution: separately installed compatible Codex runtime; ORT does not bundle or silently install/update it initially.
+- Transport and lifecycle: ORT-managed local `stdio` child process with bounded startup/shutdown timeouts, health and capability checks, orphan recovery, and an explicit supported runtime/protocol version window; WebSocket transport is unsupported initially.
+- Isolation: ORT-specific configuration/authentication root, keyring namespace, environment, and scratch directories; the user's general Codex configuration and authentication state are neither inherited nor modified.
 - Model selection: intersect picker-visible `model/list` results with ORT-tested models; prefer the service-recommended tested model. The initial compatibility candidates are GPT-5.6 Luna, Terra, and Sol.
 - Reasoning: use the returned model default initially; expose only supported efforts that ORT has evaluated. Ultra/subagent operation is unsupported.
 - Execution: one ephemeral thread per ORT operation in an empty ORT scratch directory; `approvalPolicy: never`; restricted read-only/external process sandbox; provider-only network egress; no configured dynamic tools, MCP, apps, plugins, skills, collaboration, or web access; fail on any tool/command/file event; and cleanup immediately after the activity record settles.

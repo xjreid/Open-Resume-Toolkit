@@ -3,7 +3,7 @@
 Future plans in this folder should cover:
 
 - Direct-provider adapter interface for OpenAI, Anthropic, and Gemini; dated Economy/Balanced/Quality catalogs; vault identities; model discovery; lifecycle/deprecation handling; and requested-versus-effective model capture
-- Codex app-server integration, distribution/version strategy, managed ChatGPT/device-code authentication, tested model intersection, no-tool ephemeral execution profile, event handling, cancellation, and cleanup
+- External Codex-runtime discovery and verification; supported runtime/protocol window; generated schemas and capability negotiation; app-managed `stdio` child-process lifecycle; isolated ORT configuration/authentication/keyring; managed ChatGPT/device-code authentication; tested model intersection; no-tool ephemeral execution profile; event handling, cancellation, orphan recovery, cleanup, and safe disablement
 - Prompt, schema, preset, and evaluation versioning
 - Request minimization, streaming, timeouts, cancellation, retry, idempotency, and recovery
 - Input/output validation, factual comparison, prompt-injection defenses, prohibited-answer checks, and change summaries
