@@ -1,0 +1,18 @@
+{
+  "name": "@ort/extension",
+  "version": "0.0.0-dev",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm build:chrome && pnpm build:edge",
+    "build:chrome": "tsc -p tsconfig.json --outDir dist/chrome && node scripts/write-manifest.mjs chrome",
+    "build:edge": "tsc -p tsconfig.json --outDir dist/edge && node scripts/write-manifest.mjs edge",
+    "dev:chrome": "pnpm build:chrome",
+    "dev:edge": "pnpm build:edge",
+    "lint": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

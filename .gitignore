@@ -1,0 +1,24 @@
+# JavaScript
+node_modules/
+.pnpm-store/
+dist/
+.vite/
+
+# Rust
+target/
+apps/desktop/src-tauri/gen/
+
+# Local development and test data
+.ort-dev-data/
+.ort-test-data/
+
+# Platform/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Generated release material
+artifacts/
+evidence/*/tests/
+evidence/*/security/

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Open Resume Toolkit Dev",
+  "version": "0.0.0-dev",
+  "identifier": "com.openresumetoolkit.dev",
+  "build": {
+    "beforeDevCommand": "pnpm dev:web",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "pnpm build:web",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Open Resume Toolkit Dev",
+        "url": "index.html",
+        "width": 1080,
+        "height": 760,
+        "minWidth": 720,
+        "minHeight": 520,
+        "center": true,
+        "resizable": true
+      },
+      {
+        "label": "overlay",
+        "title": "Open Resume Toolkit Overlay Dev",
+        "url": "overlay.html",
+        "width": 680,
+        "height": 680,
+        "minWidth": 420,
+        "minHeight": 480,
+        "alwaysOnTop": true,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' asset: data:; font-src 'self'; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'",
+      "devCsp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; font-src 'self'; connect-src ipc: http://ipc.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'",
+      "capabilities": ["main", "overlay"]
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["../../../Aesthetic/Logo/exports/icons/open-frame-32.png"]
+  }
+}

@@ -1,0 +1,15 @@
+[package]
+name = "ort-contract-generator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ort-domain = { path = "../ort-domain" }
+schemars.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

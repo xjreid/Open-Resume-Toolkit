@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "version": "0.0.0-dev",
+  "commit": null,
+  "channel": "development",
+  "profileIdentity": "com.openresumetoolkit.dev",
+  "artifacts": [],
+  "checks": {
+    "contracts": "passed-local",
+    "typescript": "passed-local",
+    "rust": "passed-local-macos-arm64",
+    "security": "passed-local-static",
+    "encryptedStorage": "passed-local-synthetic-macos-arm64",
+    "storageRecovery": "passed-local-synthetic-macos-arm64",
+    "nativeVaultMatrix": "pending",
+    "portableBackup": "pending",
+    "platformBuilds": "pending"
+  },
+  "releaseEligible": false
+}

@@ -1,0 +1,154 @@
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+
+mod resume;
+
+pub use resume::{
+    Bullet, ContactDetails, DocumentLimits, EntityId, Link, NamedField, ResumeDocument,
+    ResumeEntry, ResumeSection, ValidationError,
+};
+
+pub const CONTRACT_VERSION: u16 = 2;
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HealthRequest {
+    pub contract_version: u16,
+    pub request_id: String,
+    pub payload: HealthPayload,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HealthPayload {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HealthResponse {
+    pub status: HealthStatus,
+    pub app_version: String,
+    pub profile: RuntimeProfile,
+    pub storage_status: StorageStatus,
+    pub contract_version: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HealthStatus {
+    Ok,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeProfile {
+    Development,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageStatus {
+    DevelopmentGated,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorEnvelope {
+    pub code: String,
+    pub message_key: String,
+    pub retryable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operation_id: Option<String>,
+    pub details: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum CommandResponse<T: Serialize> {
+    Success { ok: bool, value: T },
+    Failure { ok: bool, error: ErrorEnvelope },
+}
+
+impl<T: Serialize> CommandResponse<T> {
+    #[must_use]
+    pub const fn success(value: T) -> Self {
+        Self::Success { ok: true, value }
+    }
+
+    #[must_use]
+    pub fn failure(code: &str, message_key: &str, retryable: bool) -> Self {
+        Self::Failure {
+            ok: false,
+            error: ErrorEnvelope {
+                code: code.to_owned(),
+                message_key: message_key.to_owned(),
+                retryable,
+                operation_id: None,
+                details: Map::new(),
+            },
+        }
+    }
+}
+
+/// Validates the bounded fields shared by every health request.
+///
+/// # Errors
+///
+/// Returns a safe error envelope when the contract version is unsupported or
+/// the request identifier is outside the accepted character and length bounds.
+pub fn validate_health_request(request: &HealthRequest) -> Result<(), ErrorEnvelope> {
+    if request.contract_version != CONTRACT_VERSION {
+        return Err(ErrorEnvelope {
+            code: "UNSUPPORTED_CONTRACT_VERSION".to_owned(),
+            message_key: "errors.unsupportedContractVersion".to_owned(),
+            retryable: false,
+            operation_id: None,
+            details: Map::new(),
+        });
+    }
+
+    if !(8..=64).contains(&request.request_id.len())
+        || !request
+            .request_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    {
+        return Err(ErrorEnvelope {
+            code: "INVALID_REQUEST_ID".to_owned(),
+            message_key: "errors.invalidRequestId".to_owned(),
+            retryable: false,
+            operation_id: None,
+            details: Map::new(),
+        });
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_contract_version_drift() {
+        let request = HealthRequest {
+            contract_version: CONTRACT_VERSION + 1,
+            request_id: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086".to_owned(),
+            payload: HealthPayload {},
+        };
+
+        let error = validate_health_request(&request).expect_err("version must be rejected");
+        assert_eq!(error.code, "UNSUPPORTED_CONTRACT_VERSION");
+    }
+
+    #[test]
+    fn accepts_a_bounded_request_identifier() {
+        let request = HealthRequest {
+            contract_version: CONTRACT_VERSION,
+            request_id: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086".to_owned(),
+            payload: HealthPayload {},
+        };
+
+        assert!(validate_health_request(&request).is_ok());
+    }
+}

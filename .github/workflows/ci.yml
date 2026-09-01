@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Contracts, tests, and security checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Use pinned Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Use pinned pnpm
+        run: corepack enable && corepack prepare pnpm@11.19.0 --activate
+
+      - name: Use pinned Rust
+        run: rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify generated contracts
+        run: cargo run --locked -p ort-contract-generator && git diff --exit-code -- packages/contracts/generated
+
+      - name: Check formatting
+        run: pnpm format:check && cargo fmt --all --check
+
+      - name: Run JavaScript checks
+        run: pnpm lint && pnpm test && pnpm build && pnpm check:security
+
+      - name: Run Rust checks
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings && cargo test --workspace --all-targets --locked
+
+      - name: Audit JavaScript dependencies
+        run: pnpm audit --audit-level high --prod
+
+  desktop-build:
+    name: Desktop build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Use pinned Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Use pinned pnpm
+        shell: bash
+        run: corepack enable && corepack prepare pnpm@11.19.0 --activate
+
+      - name: Use pinned Rust
+        shell: bash
+        run: rustup toolchain install 1.98.0 --profile minimal
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend and Rust desktop shell
+        run: pnpm --filter @ort/desktop build && cargo check --locked -p ort-desktop

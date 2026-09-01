@@ -1,0 +1,27 @@
+{
+  "name": "open-resume-toolkit",
+  "version": "0.0.0-dev",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24.16.0 <25",
+    "pnpm": "11.19.0"
+  },
+  "scripts": {
+    "build": "pnpm --recursive --if-present build",
+    "check": "pnpm format:check && pnpm lint && pnpm test && pnpm build && pnpm check:security",
+    "check:security": "node tools/check-web-security.mjs && node tools/check-secrets.mjs",
+    "dev": "pnpm --filter @ort/desktop tauri dev",
+    "dev:extension:chrome": "pnpm --filter @ort/extension dev:chrome",
+    "dev:extension:edge": "pnpm --filter @ort/extension dev:edge",
+    "format": "prettier --write . --ignore-unknown",
+    "format:check": "prettier --check . --ignore-unknown",
+    "generate": "cargo run --locked -p ort-contract-generator",
+    "lint": "pnpm --recursive --if-present lint",
+    "test": "pnpm --recursive --if-present test"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
+}

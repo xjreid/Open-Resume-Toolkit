@@ -28,6 +28,17 @@ Exit evidence:
 
 ## M1 — encrypted local core and structured resume
 
+Current development status:
+
+- implemented locally: narrow vault abstraction, overwrite-safe database-key
+  lifecycle, pinned SQLCipher build, schema v1, structured resume validation,
+  optimistic draft revisions, immutable published snapshots, settings, integrity
+  checks, bounded non-sensitive diagnostics, encrypted WAL crash recovery,
+  corruption/newer-schema refusal, and verified encrypted same-device checkpoints;
+- still release-gated: native macOS and Windows vault matrices, signed-build
+  access behavior, platform crash/migration/low-disk suites, and the
+  password-protected portable backup container with hostile restore tests.
+
 Deliver:
 
 - OS vault abstraction and database-key lifecycle;
@@ -35,7 +46,9 @@ Deliver:
 - SQLCipher schema v1, migrations, repositories, transactions, and startup recovery;
 - profile, master draft, published snapshot, settings, and diagnostic records;
 - structured resume domain validation and optimistic draft revisions;
-- encrypted backup container prototype with create/inspect/restore tests.
+- encrypted backup container prototype with create/inspect/restore tests (the
+  implemented same-device checkpoint is a migration/recovery primitive, not the
+  portable cross-device container).
 
 Exit evidence:
 

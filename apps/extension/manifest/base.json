@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "version": "0.0.0.1",
+  "name": "Open Resume Toolkit Dev",
+  "description": "Inert development shell for Open Resume Toolkit browser integration.",
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open Resume Toolkit Dev (not connected)"
+  },
+  "permissions": []
+}

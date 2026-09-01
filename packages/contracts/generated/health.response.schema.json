@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HealthResponse",
+  "type": "object",
+  "properties": {
+    "appVersion": {
+      "type": "string"
+    },
+    "contractVersion": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "profile": {
+      "$ref": "#/$defs/RuntimeProfile"
+    },
+    "status": {
+      "$ref": "#/$defs/HealthStatus"
+    },
+    "storageStatus": {
+      "$ref": "#/$defs/StorageStatus"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "appVersion",
+    "profile",
+    "storageStatus",
+    "contractVersion"
+  ],
+  "$defs": {
+    "HealthStatus": {
+      "type": "string",
+      "enum": [
+        "ok"
+      ]
+    },
+    "RuntimeProfile": {
+      "type": "string",
+      "enum": [
+        "development"
+      ]
+    },
+    "StorageStatus": {
+      "type": "string",
+      "enum": [
+        "development_gated"
+      ]
+    }
+  }
+}

@@ -1,0 +1,22 @@
+[package]
+name = "ort-desktop"
+version.workspace = true
+description = "Open Resume Toolkit desktop shell"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "ort_desktop"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+ort-domain = { path = "../../../crates/ort-domain" }
+tauri.workspace = true
+
+[lints]
+workspace = true

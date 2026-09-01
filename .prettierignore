@@ -1,0 +1,12 @@
+Aesthetic/
+Implementation Plans/
+Product Plans/
+*.md
+LICENSE
+NOTICE
+ADDITIONAL_TERMS.md
+TRADEMARKS.md
+Plan_Index.md
+pnpm-lock.yaml
+packages/contracts/generated/*.json
+apps/desktop/src-tauri/gen/

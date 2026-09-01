@@ -1,10 +1,12 @@
-# Open Resume Toolkit planning workspace
+# Open Resume Toolkit
 
 ## Status
 
-This folder defines **Open Resume Toolkit**: a free, open-source, local-first desktop application with companion Chrome and Edge extensions.
+This repository defines and implements **Open Resume Toolkit**: a free, open-source, local-first desktop application with companion Chrome and Edge extensions.
 
-This planning workspace is self-contained. A reviewer should not need another repository, product plan, or historical document to understand the approved product direction and current technical implementation baseline.
+Implementation has begun at milestone M0. The current code is an architecture shell only: it provides isolated main/overlay development windows, a typed health command, generated contracts, and an inert permission-free extension skeleton. It does not yet store resumes or enable import, AI, browser messaging, or updates.
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) to configure a development machine and run the shell.
 
 ## Start here
 
