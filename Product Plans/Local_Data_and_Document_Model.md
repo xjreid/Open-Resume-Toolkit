@@ -34,7 +34,8 @@ Contains local preferences, schema version, installation identity, backup prefer
 ### Application workspace
 
 - Zero or one current workspace per profile.
-- Contains reviewed job text, sanitized URL, workflow state, temporary tailored versions, cover-letter drafts, question/answer drafts, user edits, and selected final materials.
+- Contains reviewed job text, sanitized URL, workflow state, temporary tailored versions, Required Qualification Alerts and their dismissed/ignored presentation state, cover-letter drafts, question/answer drafts, user edits, and selected final materials.
+- Each alert stores a stable workspace-local identifier, classification, normalized mandatory requirement, bounded job-text evidence reference, optional published-resume conflict evidence reference, source published-master revision, generation/validation version, and presentation state. It stores no inferred personal qualification or eligibility decision.
 - Stored locally with a bounded recovery policy so crashes and restarts do not destroy current work.
 - Cleared by successful Finish Application, explicit finish without saving, or explicit discard.
 

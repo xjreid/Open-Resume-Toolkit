@@ -35,6 +35,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - AI requests require internet access unless a later local-model adapter is installed. Ordinary editing, tracking, rendering, and local search should work offline.
 - There is exactly one autosaved master-resume draft and at most one deliberately published master-resume snapshot in a local profile.
 - Tailoring uses the published master, never unpublished draft changes.
+- The tailoring operation also produces optional Required Qualification Alerts for explicit mandatory job requirements that map to resume content. Alerts distinguish a confirmed conflict from a qualification not found in the published master, ignore preferred/ambiguous/personal-or-legal requirements, never become a fit score, and never block the user from continuing.
 - One active application workspace holds one reviewed job description, temporary tailored versions, optional cover-letter drafts, and optional application-answer drafts.
 - Finish Application optionally creates a local tracker entry with the selected final resume, cover letter, and approved answer set as structured snapshots, then deletes unselected temporary material and resets the workspace.
 - Structured JSON is the canonical document format. PDF, DOCX, and plain text are locally rendered derived artifacts and are not retained by default.

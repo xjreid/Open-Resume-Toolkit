@@ -6,7 +6,7 @@ Future plans in this folder should cover:
 - External Codex-runtime discovery and verification; supported runtime/protocol window; generated schemas and capability negotiation; app-managed `stdio` child-process lifecycle; isolated ORT configuration/authentication/keyring; managed ChatGPT/device-code authentication; tested model intersection; no-tool ephemeral execution profile; event handling, cancellation, orphan recovery, cleanup, and safe disablement
 - Prompt, schema, preset, and evaluation versioning
 - Request minimization, streaming, timeouts, cancellation, retry, idempotency, and recovery
-- Input/output validation, factual comparison, prompt-injection defenses, prohibited-answer checks, and change summaries
+- Input/output validation, factual comparison, prompt-injection defenses, prohibited-answer checks, change summaries, and same-call Required Qualification Alert extraction with mandatory/preferred classification, resume-schema mapping, evidence resolution, compact output bounds, and false-positive evaluation
 - Standardized provider-call accounting, usage-category normalization, versioned conditional pricing catalog, cost estimates, and provider-specific privacy/billing disclosures
 - Per-model/provider logical-operation and attempt aggregation, missing/partial usage behavior, cross-currency rules, and interrupted-call reconciliation
 - Direct-API cap reservations and settlement; weekly/monthly/yearly/all-time counters; notifications; unknown-outcome reconciliation; and fail-closed enforcement

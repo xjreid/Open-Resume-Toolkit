@@ -39,6 +39,7 @@ Required coverage includes:
 - Accessible AI Activity summaries, provider/model token and cost tables, mode/model controls, spending/quota-cap forms, progress warnings, blocked states, exports, and clearing/reset confirmations without color-only cost, quota, or error meaning
 - Readable exported documents with selectable text, meaningful ordering, links, and appropriate tagging where supported
 - Overlay behavior that does not trap focus or obstruct essential browser/OS controls
+- Required Qualification Alerts that are keyboard and screen-reader accessible, do not rely on color alone, expose the requirement and evidence relationship clearly, can be dismissed/ignored/reopened, and never seize focus or block the workflow
 
 ## Supported compatibility matrix
 
@@ -57,7 +58,7 @@ Exact minimum versions are chosen during implementation and recorded centrally. 
 2. Import a text-bearing resume, review provider transmission, correct the proposal, save the draft, and publish.
 3. Edit a published draft without those unpublished changes leaking into tailoring.
 4. Capture a job description through Chrome and Edge, including desktop-not-running and repair cases.
-5. Tailor, inspect verified change summaries, edit, refine, and select a final resume.
+5. Tailor, inspect verified change summaries and Required Qualification Alerts, dismiss/ignore/reopen alerts, edit, refine, and select a final resume without alerts blocking progress.
 6. Generate and review a cover letter and permitted application answer; refuse a prohibited attestation.
 7. Render and validate PDF, DOCX, and text exports across representative content lengths and templates.
 8. Finish with selected structured materials, recover safely from a failed save, and reset temporary content.
@@ -88,6 +89,7 @@ Use synthetic or explicitly authorized representative resumes and job descriptio
 - Important accidental omissions
 - Prompt-injection resistance
 - Change-summary accuracy
+- Required-versus-preferred qualification classification; supported resume-category mapping; confirmed-mismatch and not-found accuracy; resolvable job/resume evidence; duplicate suppression; and exclusion of ambiguous, personal, protected, and legal-attestation requirements
 - Prohibited-answer refusal
 - Length/page-target adherence
 - Latency, cancellation, and actionable failure behavior
@@ -113,6 +115,7 @@ A stable release requires:
 - License and distributed-asset review is complete.
 - Privacy, provider-transmission, backup, unsigned-build, and local-only limitations are truthful in the application and its distributed documentation.
 - AI Activity records every ORT provider attempt without storing forbidden content, survives interruption, exports and deletes correctly, and never represents an estimate as an invoice or account-wide usage statement.
+- Required Qualification Alerts are generated within the existing tailoring call, contain only validated explicit requirement/evidence references, use no fit score or eligibility claim, remain non-blocking and dismissible, and are removed with the workspace rather than retained in the tracker.
 - Direct spending caps cannot be bypassed by retry, concurrency, crash, activity deletion, clock change, or missing data; Codex caps block future operations based on freshly reported stable quota buckets and clearly disclose best-effort limits.
 - Known limitations and deferred features are documented.
 

@@ -28,9 +28,10 @@ Every local data category has a purpose, location, access rule, cleanup trigger,
 
 ## Current application workspace
 
-- Reviewed job text, sanitized URL, temporary tailored versions, cover-letter drafts, question answers, and selections remain in the one local workspace until Finish Application, explicit finish without saving, discard, deliberate replacement, or all-data deletion.
+- Reviewed job text, sanitized URL, temporary tailored versions, Required Qualification Alerts and their dismissed/ignored presentation state, cover-letter drafts, question answers, and selections remain in the one local workspace until Finish Application, explicit finish without saving, discard, deliberate replacement, or all-data deletion.
 - ORT does not automatically erase canonical workspace content after a fixed inactivity period. It may show the last-active time and offer cleanup, but deletion requires user intent.
 - Successful Finish Application retains only the selected structured artifacts and confirmed tracker data; unselected workspace content is removed.
+- Required Qualification Alerts are never copied into tracker entries or retained structured-material snapshots during Finish Application.
 - A failed tracker save preserves the complete workspace.
 - Temporary preview/render files are separate from the canonical workspace and follow the short cleanup defaults.
 

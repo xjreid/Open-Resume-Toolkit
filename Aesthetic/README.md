@@ -9,7 +9,7 @@ Visual design is intentionally deferred until product behavior and technical str
 - Open Resume Toolkit brand identity, logo, icon, voice, and naming usage
 - Color, typography, spacing, shape, elevation, and motion tokens
 - Light, dark, high-contrast, reduced-motion, and platform-adaptive behavior
-- Desktop window, overlay, resume editor, tracker, AI Activity model/provider dashboards, pricing comparisons, spend/quota-cap progress and blocked states, direct/Codex settings, and extension component appearance
+- Desktop window, overlay, resume editor, non-blocking Required Qualification Alert side area/popover and evidence states, tracker, AI Activity model/provider dashboards, pricing comparisons, spend/quota-cap progress and blocked states, direct/Codex settings, and extension component appearance
 - Resume and cover-letter template appearance, font licensing/embedding, print behavior, and document accessibility
 - Icons, illustrations, empty states, loading/progress, errors, updates, repair, backups, and destructive confirmations
 - Asset sources, licenses, attribution, source formats, export formats, and ownership

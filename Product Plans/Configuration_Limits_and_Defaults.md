@@ -15,6 +15,7 @@ Every implemented value should have a stable name, unit, scope, default, rationa
 - Exactly one active AI connection mode per profile: no AI, one direct-API provider/credential/model preset, or one Codex subscription connection.
 - No plan-based usage or retained-record quotas.
 - No automatic expiry of the canonical current application workspace merely because it has been inactive; clearing requires explicit Finish Application, discard, replacement confirmation, or user data deletion.
+- Required Qualification Alerts have exactly two user-visible classifications: **Confirmed mismatch** and **Not found in your published resume**. They are non-blocking temporary workspace data and are never retained automatically in the tracker.
 
 ## Platform compatibility defaults
 
@@ -84,6 +85,7 @@ Renderer failure is measured separately from an intentional validation rejection
 - One application question: 4,000 normalized characters.
 - Total provider input ceiling: 64,000 tokens or a lower provider/model limit.
 - Initial tailoring output: 5,000 tokens maximum.
+- Required Qualification Alert candidates share the initial tailoring operation, request, activity record, guardrail reservation, and 5,000-token output ceiling; ORT does not make a second qualification-analysis call.
 - Full-resume refinement output: 5,000 tokens maximum.
 - Patch refinement output: 2,000 tokens maximum.
 - Cover-letter output: 1,500 tokens maximum.

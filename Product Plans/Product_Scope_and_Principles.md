@@ -2,7 +2,7 @@
 
 ## Product identity
 
-**Open Resume Toolkit (ORT)** is a free, open-source, local-first desktop tool for preparing resumes and managing a person's own job applications. It combines a structured resume editor, optional user-authorized AI assistance through a personal API key or eligible ChatGPT/Codex subscription with local usage visibility and guardrails, local document rendering, an application tracker, a desktop overlay, and narrow Chrome/Edge capture extensions.
+**Open Resume Toolkit (ORT)** is a free, open-source, local-first desktop tool for preparing resumes and managing a person's own job applications. It combines a structured resume editor, optional user-authorized AI assistance through a personal API key or eligible ChatGPT/Codex subscription with local usage visibility and guardrails, required-qualification comparison against the published resume, local document rendering, an application tracker, a desktop overlay, and narrow Chrome/Edge capture extensions.
 
 ORT is a tool, not an employment service, employer product, job board, or automatic application agent. It must not claim to guarantee interviews, employment, applicant-tracking-system performance, or legal compliance.
 
@@ -88,3 +88,4 @@ The software may be used internationally, but documentation must not imply that 
 - **AI connection mode:** the single active choice of no AI, a direct provider API credential, or a managed ChatGPT/Codex subscription connection.
 - **AI activity ledger:** durable, content-free local history of logical AI operations and their provider-call attempts, usage measurements, statuses, and contemporaneous cost estimates.
 - **AI guardrail state:** durable local counters, reservations, period policies, and Codex quota thresholds used to block future ORT calls independently of activity-history retention.
+- **Required Qualification Alert:** a temporary, non-blocking comparison result for an explicit mandatory job qualification that either conflicts with an explicit published-resume fact or was not found in the published master. It is not an eligibility decision, fit score, or statement about information outside the resume.

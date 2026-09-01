@@ -63,13 +63,26 @@ The workspace is persisted locally so an application or computer restart does no
 1. The user reviews the job description and any instructions.
 2. ORT verifies that a published master exists and shows the selected AI provider/model.
 3. The desktop app sends only the necessary published structured resume, reviewed job description, selected style/page target, and instructions to the chosen provider.
-4. The provider returns validated structured resume data, not a PDF-only result.
+4. The provider returns validated structured resume data, concise change-summary material, and bounded Required Qualification Alert candidates in one logical tailoring operation, not a PDF-only result or a second qualification-analysis request.
 5. ORT compares the result with the published master and displays approximately three concise, verified bullets describing important selections, rewrites, or omissions.
-6. The user reviews the formatted result and material differences, edits it directly, and may request a refinement.
-7. A refinement may return a structured patch when safe or a full structured resume when required.
-8. The user deliberately selects a final version for export or tracker retention.
+6. ORT validates qualification-alert candidates against the reviewed job text and published master, then shows accepted alerts in a dismissible overlay side area or popover.
+7. The user reviews the formatted result, material differences, and alerts, edits the result directly, and may request a refinement.
+8. A refinement may return a structured patch when safe or a full structured resume when required.
+9. The user deliberately selects a final version for export or tracker retention.
 
 The AI may select, condense, reorganize, and truthfully rewrite confirmed information. It may not fabricate facts or silently change the published master. All intermediate versions remain within the current application workspace.
+
+### Required Qualification Alerts
+
+- ORT evaluates only job qualifications explicitly stated as required, mandatory, minimum, or must-have. Preferred, recommended, desired, bonus, and nice-to-have criteria do not create alerts.
+- A requirement must map meaningfully to published-resume content, such as an explicitly stated skill, technology, degree, graduation date, certification, license, experience duration, or role/domain experience. Work authorization, sponsorship, citizenship, disability, protected characteristics, criminal or medical history, signatures, consent, and other personal or legal attestations are outside this feature and are ignored.
+- **Confirmed mismatch** requires an explicit job requirement and an explicit conflicting fact in the published master. ORT does not infer a mismatch from silence, names, dates unrelated to the requirement, or demographic assumptions.
+- **Not found** means supporting information was not located in the published master. The interface says **Not found in your published resume** and never claims that the user lacks the qualification outside the resume.
+- Each alert includes a concise normalized requirement, its classification, a bounded supporting excerpt or location from the reviewed job text, and the relevant published-resume evidence for a confirmed mismatch. Provider-generated evidence references must resolve to the local inputs before display.
+- Matched requirements, ambiguous requirements, and requirements that cannot map safely to the resume produce no alert.
+- Alerts are advisory and non-blocking. They never change the tailored or published resume, create an eligibility/fit score, recommend that the user not apply, or prevent editing, export, Finish Application, or tracking.
+- The user may dismiss an alert, ignore all alerts for the current workspace, and reopen dismissed alerts. These choices affect presentation only and do not rewrite job or resume content.
+- Alerts and their dismissed/ignored state are temporary workspace data. They are cleared when the workspace is finished, discarded, or replaced and are not retained with the tracker entry.
 
 ## Cover letters and application answers
 

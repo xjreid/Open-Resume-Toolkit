@@ -136,7 +136,7 @@ Codex guardrails cover the connected ChatGPT account's reported quota, including
 ## Supported AI operations
 
 - Convert extracted resume text into a structured import proposal.
-- Tailor the published master to a reviewed job description.
+- Tailor the published master to a reviewed job description and return bounded Required Qualification Alert candidates within the same logical operation and provider request.
 - Refine a current tailored resume using a specific user instruction.
 - Generate or revise a cover letter.
 - Draft permitted answers to deliberately captured application questions.
@@ -164,11 +164,16 @@ Before display, ORT validates:
 - Size and collection bounds
 - Link formats
 - Relationship to the published master
+- Required-qualification classification, job-text evidence, published-resume evidence, and allowed alert category
 - Prohibited attestations
 - Requested word/character limits where applicable
 - Structural integrity required by the renderer
 
 Tailored resumes include approximately three change-summary bullets. ORT verifies these using a deterministic structural comparison rather than trusting only the model's self-description.
+
+Required Qualification Alert candidates use a separate versioned portion of the tailoring response schema. Before display, ORT verifies that each candidate points to an explicit mandatory requirement in the reviewed job text, maps to a supported resume-content category, and is either an explicit factual conflict or information not found in the published master. Preferred, ambiguous, non-resume, personal, protected, and legal-attestation requirements are dropped. A confirmed mismatch must cite resolvable conflicting resume evidence; absence alone can produce only **Not found in your published resume**. The model does not decide eligibility, calculate a fit score, or make application recommendations.
+
+The qualification comparison is part of the existing tailoring request because the provider already receives the reviewed job description and published master. ORT does not issue a second provider request or resend those inputs solely to generate alerts. The compact alert schema and collection bounds count within the existing tailoring output limit and direct-API guardrail reservation.
 
 If a result cannot be validated, ORT preserves the previous local state, explains the failure, and allows retry or manual editing. A partially streamed or malformed response is never silently promoted to a selected final artifact.
 

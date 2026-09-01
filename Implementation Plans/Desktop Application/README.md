@@ -4,6 +4,7 @@ Future plans in this folder should cover:
 
 - Framework and Windows/macOS architecture support
 - Application lifecycle, windows, tray/menu behavior, and real desktop overlay
+- Non-blocking Required Qualification Alert side area/popover, active/dismissed/ignored presentation state, reopen behavior, evidence display, and accessible focus/announcement behavior
 - Structured resume editor, draft/publish experience, tracker, AI Activity, settings, and local search
 - Mutually exclusive No AI, Direct API, and Codex subscription setup; vault integration; managed sign-in; provider/model comparison; and explicit switching
 - Local operation orchestration, cancellation, crash recovery, and progress

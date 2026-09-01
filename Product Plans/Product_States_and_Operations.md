@@ -25,11 +25,11 @@ One local profile has zero or one current application workspace:
    - No AI request begins until the user accepts the content.
 
 3. **Active**
-   - Contains one reviewed job context and may contain temporary tailored-resume versions, cover-letter drafts, application-question drafts, user edits, and exports-in-progress.
+   - Contains one reviewed job context and may contain temporary tailored-resume versions, Required Qualification Alerts with active/dismissed/ignored presentation state, cover-letter drafts, application-question drafts, user edits, and exports-in-progress.
    - Another job cannot be merged or substituted without explicit finish, discard, or replace confirmation.
 
 4. **Final resume selected**
-   - One reviewed tailored resume is selected for export or optional tracker retention.
+   - One reviewed tailored resume is selected for export or optional tracker retention. Active or dismissed Required Qualification Alerts remain advisory and do not block this transition.
    - A reviewed cover letter and approved ordered answer set may also be selected.
    - The user can continue editing, change selections, or return to Active.
 
@@ -69,7 +69,7 @@ An AI-assisted import, tailoring, refinement, cover letter, or application answe
 - **Blocked by guardrail** — no transmission occurred; the active currency cap, unresolved reservation, unavailable price/quota data, or Codex percentage threshold prevents dispatch and provides corrective actions.
 - **Running** — the desktop owns the current attempt.
 - **Waiting on provider** — a remote response or stream is outstanding.
-- **Validating** — returned content is undergoing schema, size, factual, prohibited-answer, and renderer checks.
+- **Validating** — returned content is undergoing schema, size, factual, prohibited-answer, Required Qualification Alert requirement/evidence/category, and renderer checks.
 - **Succeeded** — a reviewable validated result is stored in the current workflow.
 - **Failed retryable** — a transport, throttling, or transient provider error permits an explicit retry.
 - **Failed final** — validation, authentication, policy, permanent-provider, or safety failure prevents automatic retry.
