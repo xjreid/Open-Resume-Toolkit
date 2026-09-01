@@ -4,7 +4,7 @@
 
 This folder defines **Open Resume Toolkit**: a free, open-source, local-first desktop application with companion Chrome and Edge extensions.
 
-This planning workspace is self-contained. A reviewer should not need another repository, product plan, or historical document to understand the approved product direction and future implementation work.
+This planning workspace is self-contained. A reviewer should not need another repository, product plan, or historical document to understand the approved product direction and current technical implementation baseline.
 
 ## Start here
 
@@ -20,10 +20,12 @@ For a fast product review, read:
 6. [Configuration limits and defaults](<Product Plans/Configuration_Limits_and_Defaults.md>)
 7. [Release scope and open decisions](<Product Plans/Release_Scope_and_Open_Decisions.md>)
 
+For implementation, continue with [Technical implementation plans](<Implementation Plans/README.md>), then read the system architecture/security documents and the applicable component plan.
+
 ## Workspace boundaries
 
 - Approved product behavior belongs in `Product Plans/`.
-- Future code-level design belongs in `Implementation Plans/`.
+- Code-level design belongs in `Implementation Plans/`; working code may refine internal details without changing approved product behavior.
 - Future visual identity, themes, and document-template styling belong in `Aesthetic/`.
 - Unresolved choices and validation work belong only in `Product Plans/Release_Scope_and_Open_Decisions.md`.
 - Technical or aesthetic documents may implement approved behavior but may not silently redefine it.

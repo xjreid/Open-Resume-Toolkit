@@ -1,15 +1,6 @@
-# Local data and migration implementation plans — reserved
+# Local data and migration implementation
 
-Future plans in this folder should cover:
+- [`Local_Data_and_Migration_Plan.md`](Local_Data_and_Migration_Plan.md) is the implementation authority for local paths, encrypted persistence, transactions, migrations, backup/restore, retention, deletion, and portable exports.
+- Cross-component security and architecture rules are in [`../System Documentation/`](../System%20Documentation/).
 
-- Database/library selection and directory layout
-- Versioned schemas for profile, master draft, published snapshot, workspace, tracker, artifacts, settings, AI activity ledger, direct/Codex connection references, durable guardrail state, Codex account-usage cache, and operational diagnostics
-- Atomic writes, concurrency, journaling, crash recovery, indexes, and local search
-- File permissions and evaluated database-encryption/key-vault design
-- Temporary import lifecycle and secure cleanup limitations
-- Schema migration, compatibility window, rollback, and safety backups
-- Versioned encrypted `.ort-backup` format, cryptography, restore/merge, corruption tests, and device migration
-- Full portable export, tracker CSV, filtered AI-activity CSV/JSON, provider/model aggregates, and backup rules that exclude credentials and do not silently bind guardrails to a new identity
-- Transactional cap reservation/settlement, calendar-boundary migrations, unresolved reservations, and activity-retention independence
-- Low-disk-space behavior, storage reporting, deletion, uninstall, and orphan cleanup
-- Fuzzing and hostile archive/import validation
+Schema SQL, migrations, generated record schemas, backup-format fixtures, and recovery runbooks will be added when implementation begins. Secrets and real user content are forbidden in fixtures.

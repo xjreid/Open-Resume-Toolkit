@@ -1,18 +1,6 @@
-# AI and document-processing implementation plans — reserved
+# AI and document-processing implementation
 
-Future plans in this folder should cover:
+- [`AI_and_Document_Processing_Plan.md`](AI_and_Document_Processing_Plan.md) defines direct-provider and external Codex adapters, operation orchestration, accounting/guardrails, prompts and validation, Required Qualification Alerts, import, rendering, and export.
+- Storage and UI representation are defined by the sibling local-data and desktop plans.
 
-- Direct-provider adapter interface for OpenAI, Anthropic, and Gemini; dated Economy/Balanced/Quality catalogs; vault identities; model discovery; lifecycle/deprecation handling; and requested-versus-effective model capture
-- External Codex-runtime discovery and verification; supported runtime/protocol window; generated schemas and capability negotiation; app-managed `stdio` child-process lifecycle; isolated ORT configuration/authentication/keyring; managed ChatGPT/device-code authentication; tested model intersection; no-tool ephemeral execution profile; event handling, cancellation, orphan recovery, cleanup, and safe disablement
-- Prompt, schema, preset, and evaluation versioning
-- Request minimization, streaming, timeouts, cancellation, retry, idempotency, and recovery
-- Input/output validation, factual comparison, prompt-injection defenses, prohibited-answer checks, change summaries, and same-call Required Qualification Alert extraction with mandatory/preferred classification, resume-schema mapping, evidence resolution, compact output bounds, and false-positive evaluation
-- Standardized provider-call accounting, usage-category normalization, versioned conditional pricing catalog, cost estimates, and provider-specific privacy/billing disclosures
-- Per-model/provider logical-operation and attempt aggregation, missing/partial usage behavior, cross-currency rules, and interrupted-call reconciliation
-- Direct-API cap reservations and settlement; weekly/monthly/yearly/all-time counters; notifications; unknown-outcome reconciliation; and fail-closed enforcement
-- Codex thread-token and account-usage provenance, rate-limit bucket normalization, quota-threshold enforcement, delayed updates, and bucket migration
-- Local PDF/DOCX text extraction and scanned-document detection
-- Structured resume/cover-letter/question-answer schemas
-- Preview, PDF, DOCX, and plain-text rendering contracts
-- Font/template packaging, layout validation, accessibility, and historical renderer compatibility
-- Synthetic evaluation corpus and release gates per provider preset
+Provider endpoints, model IDs, prices, and Codex compatibility are versioned runtime/catalog facts. They must not be hard-coded as permanent product policy in this folder.

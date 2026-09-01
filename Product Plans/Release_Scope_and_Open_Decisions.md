@@ -2,12 +2,12 @@
 
 ## Status key
 
-- **[IMPLEMENTATION]** — select or specify while writing technical implementation plans.
+- **[IMPLEMENTATION]** — specified in the current technical plans; implementation and evidence are still required.
 - **[VALIDATION]** — prove with implemented builds and representative tests before stable release.
 - **[RELEASE]** — operational, distribution, policy, or external requirement before broad public release.
 - **[LATER]** — intentionally outside the initial release; not a current commitment.
 
-This is the only central register for unresolved and deferred work in the product plans.
+This is the central register for implementation gates, unresolved validation/release work, and deferred work in the product plans. The detailed technical selections are authoritative only for implementation mechanics and are indexed in `../Implementation Plans/README.md`.
 
 ## Initial release capabilities
 
@@ -34,7 +34,9 @@ This is the only central register for unresolved and deferred work in the produc
 - Firefox, Safari, Linux, or mobile clients.
 - Exact submitted PDF/DOCX archival.
 
-## Implementation decisions
+## Implementation specifications and gates
+
+The current selections and module-level acceptance criteria are documented under `../Implementation Plans/`. Items remain marked **[IMPLEMENTATION]** until working code and the specified evidence exist; they are no longer unanswered architecture placeholders.
 
 1. **[IMPLEMENTATION]** Select the desktop framework and supported Windows/macOS architectures while preserving overlay, renderer, secure storage, native messaging, accessibility, signing, and updater requirements.
 2. **[IMPLEMENTATION]** Define the versioned local schema, transaction model, migrations, crash recovery, and exact content-at-rest encryption/key-vault design.

@@ -2,11 +2,11 @@
 
 ## Purpose
 
-This is the navigation and authority map for the product plans. A person or AI agent should read this file before reviewing the product or creating technical implementation plans.
+This is the navigation and authority map for the product and technical implementation plans. A person or AI agent should read this file before reviewing or implementing the product.
 
 ## Current planning status
 
-The product direction and core workflows are defined, including the initial direct providers and Codex integration boundary. Exact frameworks, schemas, SDKs/API endpoint versions, adapter internals, operating-system integrations, build systems, installers, and visual design are intentionally deferred to the reserved workspaces.
+The product direction and core workflows are defined. The initial technical implementation baseline now selects Tauri 2, React/TypeScript, a Rust service core, SQLCipher local storage, Typst rendering, direct-provider adapters, an optional external Codex app-server, Manifest V3/native messaging, SignPath-first GitHub distribution, and a static Astro website. Coding and validation have not begun. Visual design remains intentionally deferred to `Aesthetic/`.
 
 ## Authority and precedence
 
@@ -15,7 +15,8 @@ When documents conflict, use this order:
 1. The product plan identified below as authoritative for the exact subject.
 2. The open-decisions register for an explicitly unresolved subject.
 3. Supporting summaries and cross-cutting guidance.
-4. Reserved implementation and aesthetic placeholders.
+4. Technical implementation plans, for implementation details that do not redefine product behavior.
+5. Reserved aesthetic planning.
 
 If two product plans genuinely conflict, update both deliberately. Precedence is not permission to leave contradictions.
 
@@ -76,10 +77,10 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - [Security, privacy, and open source](<Product Plans/Security_Privacy_and_Open_Source.md>) — threat boundaries, privacy promises, local security, open-source governance, licensing, and distributed documentation requirements.
 - [Quality, accessibility, and verification](<Product Plans/Quality_Accessibility_and_Verification.md>) — quality requirements, accessibility, critical journeys, and release evidence.
 
-### Reserved future workspaces
+### Technical implementation and future aesthetic work
 
-- [Implementation plans](<Implementation Plans/README.md>) — rules and template for future technical planning.
-- Component folders under `Implementation Plans/` — placeholders for desktop, extensions, local data, AI/document processing, distribution/updates, and system documentation.
+- [Implementation plans](<Implementation Plans/README.md>) — selected technical baseline, component plans, delivery order, and implementation gates.
+- Component folders under `Implementation Plans/` — implementation-ready plans for architecture/security/build, desktop, extensions/IPC, local data/migration, AI/document processing, and distribution/updates.
 - [Aesthetic planning](Aesthetic/README.md) — placeholder for branding, themes, component visuals, and document-template design.
 
 ## Recommended reading routes
@@ -94,13 +95,14 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 6. AI and import
 7. Release scope and open decisions
 
-### Implementation-planning handoff
+### Implementation handoff
 
 1. Read every product plan.
 2. Read the open-decisions register completely.
-3. Use the applicable component placeholder and implementation-plan template.
-4. Link each technical choice to the product requirements it satisfies.
-5. Record irreversible technical choices later as architecture decision records.
+3. Read the architecture, security, repository/build, and delivery-roadmap plans.
+4. Read the applicable component implementation plan.
+5. Link code and tests to the product requirement and technical completion criteria.
+6. Record major irreversible refinements as architecture decision records.
 
 ### Security and privacy review
 
