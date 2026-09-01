@@ -111,7 +111,7 @@ A resume regeneration request is a separate refinement operation whose schema re
 Alerts are extracted in the same tailoring response to minimize tokens and keep requirement analysis consistent with the generated document. The operation uses this pipeline:
 
 1. Identify statements explicitly expressed as mandatory (`required`, `must`, minimum, exact eligibility constraint) and exclude preferred/nice-to-have language.
-2. Classify only supported, directly comparable requirement categories.
+2. Classify only the versioned allowlist: `degree_level`, `field_of_study`, `graduation_date`, `certification_or_professional_license`, `named_skill_or_technology`, `language_proficiency`, `experience_duration`, and `portfolio_or_work_sample`, subject to the category-specific restrictions in the product plan.
 3. Map each mandatory requirement to structured resume fields/entries and their stable IDs.
 4. Emit `confirmed_mismatch` only when resume evidence directly contradicts the required value.
 5. Emit `not_found` when no relevant resume evidence can be located.
@@ -138,9 +138,11 @@ Example contract shape:
 
 Local validation requires the span to match normalized job text, verifies mandatory markers/classification, resolves all evidence IDs/value hashes against the operation snapshot, and ensures the explanation introduces no new fact. A `not_found` alert must have no fabricated evidence. Duplicate alerts collapse by normalized requirement span/category/type.
 
+Category validators are local and explicit. Degree/date/certification/language comparisons use typed canonical values. Experience duration merges overlapping month intervals before comparison, counts only entries whose stored content/evidence resolves to the named domain, and rejects the candidate if relevance or dates are ambiguous. `portfolio_or_work_sample` supports `not_found` only. A category without a deterministic validator is unsupported even if present in the provider schema.
+
 Personal or sensitive requirements are not inferred. If a resume literally contains a directly contradictory statement, the generic evidence rules may compare it; otherwise citizenship, sponsorship, authorization, disability, demographic status, security clearance, and similar unknowns are ignored rather than labeled `not_found`. This implements the approved “direct mismatch or resume-related not found; ignore unrelated/unverifiable” boundary.
 
-Output bounds cap the number and text length of alerts. Overflow produces a visible completeness note rather than unbounded output.
+Output bounds allow at most 10 validated alerts, a 500-character requirement excerpt, and a 500-character explanation per alert. Overflow produces a visible completeness note rather than unbounded output.
 
 ## Factual and safety validation
 
@@ -177,10 +179,11 @@ Use the official Codex app-server protocol over `stdio`, beginning with initiali
 
 ### Discovery and verification
 
-1. Check an explicitly user-selected executable first.
-2. Check documented platform install locations, then a sanitized PATH search.
-3. Resolve canonical path, reject writable/untrusted parent locations where possible, inspect platform signature/provenance, and run a bounded version probe.
-4. Require the version to fall within the release compatibility manifest and the advertised protocol capabilities to match.
+1. Check documented canonical platform install locations and package receipts. A sanitized PATH result or explicit user-selected path is only a locator candidate.
+2. Resolve the canonical file and parent chain; reject symlink/reparse substitution, a writable download/temp/project/app-data location, unexpected ownership, or parent permissions that permit replacement by a less-trusted principal.
+3. Match the strongest available official identity recorded in the signed compatibility manifest: expected platform signer/notarization requirement, package identity/receipt, and/or digest from an authenticated official release. A compatible filename, `--version` string, or protocol handshake is never sufficient.
+4. Run any necessary bounded version/capability probe inside the external sandbox with no resume files, user roots, inherited secrets, or unrestricted network.
+5. Require runtime and protocol versions to fall within the release compatibility manifest and advertised capabilities to match. A manual path cannot override identity, version, or containment failure.
 
 ### Isolated runtime
 
@@ -189,9 +192,10 @@ Use the official Codex app-server protocol over `stdio`, beginning with initiali
 - managed ChatGPT/device-code sign-in only for this product mode;
 - empty ORT-owned working directory, no resume paths, minimal environment and inherited handles;
 - approvals disabled and no tool/file/command/browser capability exposed;
+- experimental app-server capabilities disabled; no dynamic tools, MCP, apps, skills, collaboration, filesystem, command, shell-command, process, or permission-profile APIs configured;
 - child process tree tied to an OS job/lifecycle object and killed on timeout/cancel/app exit.
 
-Requests contain only the minimized prompt data through app-server messages. Parse JSON-RPC-like frames with a bounded codec and allowlist methods/events. Any unknown capability with side-effect potential, approval request, tool call, command execution, file operation, or patch event terminates the attempt and records `CODEX_CONTAINMENT_VIOLATION`.
+Requests contain only the minimized prompt data through app-server messages. Parse JSON-RPC-like frames with a bounded codec and an exact per-version allowlist for initialization, model/account reads, ephemeral thread/turn start, final structured output, cancellation, and shutdown. Reject method aliasing, duplicate IDs, unexpected direction, oversized/deep params, post-final messages, and unsupported additive events. Any unallowlisted request/notification or side-effect item—including `thread/shellCommand`, `command/*`, `process/*`, `fs/*`, tool, approval, permission, elicitation, MCP, app, skill, collaboration, web, file-change, or patch activity—kills the process tree and records `CODEX_CONTAINMENT_VIOLATION`; ORT never answers it.
 
 Account/rate-limit information from app-server is normalized into timestamped snapshots with source method, runtime version, bucket identity, reset time, and freshness. Local token totals are never presented as provider account quota.
 
@@ -199,18 +203,19 @@ Codex remains a runtime-disabled feature until the process-level network/filesys
 
 ## Import pipeline
 
-Supported initial inputs: text-based PDF, DOCX, and plain text.
+Supported initial file inputs: text-based PDF and DOCX. Plain text remains an export format and may be pasted into manual fields, but a standalone `.txt` importer is not part of the initial file-import promise.
 
 1. Native file dialog returns a one-use path token.
 2. Import service verifies size, magic bytes/container, permissions, and supported type.
-3. Parse in bounded staging with cancellation and time/page/decompression limits.
+3. Copy/open the input into private staging and parse it in a new disposable OS-sandboxed worker with cancellation plus memory/CPU/wall-time/page/decompression/object/handle limits. The worker has no network, subprocess, database, vault, native-IPC, or general filesystem access.
 4. Extract text plus structural hints; never execute macros, external relationships, scripts, or fetch remote content.
 5. Detect scanned/image-only PDF when text density is below the documented threshold and return an actionable unsupported state; OCR is deferred.
 6. Show extracted content plus the selected AI connection/provider/model and request confirmation before any transmission.
-7. The configured direct or Codex backend maps extracted text—not the original binary—into a structured proposal with warnings and confidence/evidence links.
-8. Show source and proposal together; only confirmed sections update the master draft. If AI mapping fails, keep extracted text in the current review so the user can assign it manually where feasible.
+7. The versioned deterministic local mapper first proposes existing field/entry types from recognized structure. Unknown headings become proposed custom sections and unclassified text becomes a simple text/list proposal; nothing is silently discarded.
+8. In No AI mode, show source and local proposal together for complete review with no network request. With a configured direct or Codex backend, offer a separate confirmed AI-mapping step that sends extracted text—not the original binary—and retains warnings and confidence/evidence links.
+9. Only confirmed sections update the master draft. If AI mapping fails, preserve the complete local proposal and extracted text.
 
-PDF extraction uses a pinned, hash-verified PDFium build behind a replaceable adapter after license/security review. DOCX reads the OPC/Open XML package with a constrained zip/XML parser. Import correctness must not depend on Microsoft Word being installed.
+PDF extraction uses a pinned, hash-verified PDFium build behind a replaceable worker adapter after license/security review. DOCX reads the OPC/Open XML package with a constrained zip/XML parser in the same worker boundary. A parser crash or exploit attempt can fail the import but must not gain the desktop process's user-data or secret authority. Import correctness must not depend on Microsoft Word being installed.
 
 ## Canonical document and renderer
 
@@ -262,10 +267,10 @@ A catalog/prompt/model change cannot promote to stable merely because it “look
 - adapter contract: fixture responses, streaming splits, usage variants, auth/rate-limit/retired-model errors;
 - integration: mocked HTTPS, vault, coordinator/database transactions, retries/cancellation/crash;
 - live probes: minimal synthetic calls under project-owned restricted credentials;
-- document: import corpus, golden semantic output, links, pagination, Unicode, scanned detection;
+- document: deterministic No-AI mapping, unknown-section preservation, import corpus, golden semantic output, links, pagination, Unicode, scanned detection;
 - adversarial: prompt injection, schema bombs, fabricated qualifications, sensitive inference, unsupported Codex events;
 - resource: maximum request/response/import/render limits;
-- platform: Codex version discovery/auth/kill/containment matrix.
+- platform: parser-worker sandbox/kill/access-denial matrix and Codex identity/version discovery/auth/kill/containment matrix.
 
 ## Completion criteria
 
@@ -273,5 +278,6 @@ A catalog/prompt/model change cannot promote to stable merely because it “look
 - Tailoring produces a structured proposal, change summary, and validated alert set in one logical result.
 - Alerts achieve the recorded false-positive gate and never manufacture sensitive-status conclusions.
 - Preview/PDF use the same renderer tuple and DOCX/text preserve required semantics.
+- No-AI PDF/DOCX import produces a complete reviewable local proposal, preserves unfamiliar extracted content, and never runs the parser in the desktop process or performs network I/O.
 - All three direct providers pass common contract tests.
 - Codex support is either backed by complete platform containment evidence or disabled in stable builds.

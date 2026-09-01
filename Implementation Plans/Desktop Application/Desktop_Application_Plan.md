@@ -85,6 +85,8 @@ Tauri command functions:
 
 Commands cannot accept raw SQL, arbitrary filesystem paths, shell commands, provider endpoints, or unbounded template/source text. User-chosen paths are returned by an approved dialog token that is consumed once by the associated import/export command.
 
+The frontend renders resume, job, import, provider, and error content only as escaped text/typed values. Production code forbids raw HTML insertion and string-to-code APIs. PDF preview receives a backend-created opaque resource handle for validated bytes; the internal protocol does not accept a filesystem path, remote host, user-controlled MIME type, traversal segment, or open-ended query. Each resource handle is scoped to a window/session/artifact and expires on replacement, Finish/discard, or bounded cleanup.
+
 ## Startup state machine
 
 ```text
@@ -111,6 +113,8 @@ A blocking startup state provides safe diagnostics and approved recovery actions
 - Publish invokes a backend transaction that validates the whole document and creates an immutable snapshot.
 - Preview requests are revision-addressed and cancellable. A late result for an older revision is discarded.
 - Import opens a separate review model; accepting chosen changes creates a normal draft revision with an audit summary.
+- Import parsing occurs outside the desktop process in the disposable document worker. The UI can receive only bounded extraction/proposal records and safe worker error codes; it never receives worker filesystem/process authority.
+- With No AI selected, the review model shows deterministic local mappings into known fields and proposed custom/simple sections for unfamiliar content. Every extracted block remains accounted for until the user accepts, moves, relabels, merges, keeps, or rejects it.
 
 The UI never directly edits rendered Typst, PDF, or DOCX source. Theme/template controls use known IDs and structured parameters. Document templates are isolated from ORT application branding; the default Technical template adapter implements the approved Jake's Resume-derived professional structure subject to the recorded source/license gate.
 
@@ -155,6 +159,7 @@ The selected connection mode is exactly one of `none`, `direct`, or `codex`.
 
 - Add/test/delete one credential per provider through a secret-entry dialog backed by the OS vault.
 - The UI receives only key presence, label, last test time, and safe error; it cannot read the secret back.
+- Settings explain that the vault protects against offline/other-user access, not malware or another person already controlling the same unlocked OS account. Optional user-presence protection is not promised until native-host, recovery, and accessibility behavior is proven.
 - Provider/model selection is derived from the verified catalog and adapter capability result.
 - Estimates, billing/privacy links, requested/effective model, spending caps, thresholds, and account caveats are presented before dispatch where required.
 

@@ -26,7 +26,7 @@ ORT provides one familiar structured resume editor rather than requiring users t
 The user can:
 
 1. Build a resume from scratch.
-2. Import a text-bearing PDF or DOCX and review an AI-assisted structured proposal when an AI provider is configured.
+2. Import a text-bearing PDF or DOCX, review deterministic local mappings into existing fields/custom sections without AI, and optionally request an AI-assisted structural proposal when a provider is configured.
 
 The formatted resume is the primary editor. A section navigator and focused editor allow users to add, rename, reorder, edit, duplicate, or delete sections, entries, fields, links, bullets, and skills. Common fields appear first; optional details appear on request. Blank optional values never produce empty labels or separators in the rendered document.
 

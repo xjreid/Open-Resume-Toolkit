@@ -53,12 +53,13 @@ These states are presented in the overlay, not as a main-window job workspace. T
 
 1. **File selected** — local file has not been parsed or transmitted.
 2. **Locally validating** — type, signature, size, page, compression, and parser-safety checks run.
-3. **Extracted for review** — usable text and structure hints are available locally.
-4. **Awaiting provider confirmation** — the user reviews connection mode, provider/model, extracted content scope, and expected direct charges or subscription usage.
-5. **Provider operation active** — the selected provider is mapping extracted content.
-6. **Proposal under review** — structured content, confidence indicators, uncertainties, and duplicates are presented beside the source.
-7. **Accepted** — selected proposal data merges into the draft atomically; publishing is still separate.
-8. **Rejected, cancelled, or failed** — the draft remains unchanged and temporary import content enters cleanup.
+3. **Local mapping active** — the deterministic mapper proposes existing fields/entries, custom sections for unfamiliar headings, and simple text/list blocks for otherwise unclassified content.
+4. **Local proposal under review** — the complete extracted source, mappings, uncertainties, duplicates, and unclassified blocks are available locally. In No AI mode the user may complete the import from this state without network access.
+5. **Awaiting optional provider confirmation** — when AI is configured and the user requests improved mapping, the user reviews connection mode, provider/model, extracted-text scope, and expected direct charges or subscription usage.
+6. **Provider operation active** — the selected provider is mapping extracted text; the original binary remains local.
+7. **AI proposal under review** — AI suggestions remain distinguishable from local mappings and user edits and appear beside the complete source.
+8. **Accepted** — selected local or AI proposal data merges into the draft atomically; publishing is still separate.
+9. **Rejected, cancelled, or failed** — the draft remains unchanged and temporary import content enters cleanup. A provider failure returns to the intact local proposal rather than discarding it.
 
 The original document is not retained as a permanent profile record.
 

@@ -33,6 +33,8 @@ Windows and macOS paths use separate stable, preview, and development applicatio
 
 Use SQLite through `rusqlite` and SQLCipher Community Edition. The bootstrap spike must pin an auditable SQLCipher build configuration and confirm its BSD-style attribution is present in the in-app/license materials.
 
+The format freeze records SQLCipher major/minor/build provenance, crypto provider, compile flags, compatibility level, page size, KDF and HMAC algorithms/iterations, plaintext-header size, and WAL/journal behavior. Per-page HMAC remains enabled, plaintext header size remains zero, and `cipher_memory_security` is enabled unless measured platform evidence shows an unacceptable regression and a focused security review approves an equivalent memory-sanitization strategy. Startup verifies the effective settings rather than assuming build defaults.
+
 On first profile creation:
 
 1. generate a 256-bit database key with the OS CSPRNG;
@@ -42,6 +44,13 @@ On first profile creation:
 5. commit `profile.json` only after the database and vault entry exist.
 
 The key is held in locked memory where practical and zeroized after use. It never appears in SQLite pragmas logged to diagnostics, the environment, command line, or backup. Opening a database without a matching vault key is a recoverable `VAULT_KEY_UNAVAILABLE`/`DATABASE_KEY_MISMATCH` state; ORT must not create a fresh database over it.
+
+### Vault implementations and boundary
+
+- Windows uses a dedicated Generic Credential target namespace per channel/install/profile. The design acknowledges that generic credentials can be read by processes running as the same user; ORT runs unelevated, prevents secret retrieval through its UI/IPC contracts, minimizes time in memory, and documents that same-user malware is outside the vault's protection.
+- macOS uses a non-synchronizing local Keychain item with the narrowest accessibility compatible with foreground desktop/native-host operation. Signed builds bind desktop and native-host access through reviewed trusted-application/code-requirement or access-group configuration. Preview, moved-app, update, and repair behavior is tested explicitly; failure never falls back to a file or a less restrictive Keychain item.
+- Database/provider secrets are desktop-only. The native host can access only the separately named IPC secret. Tests attempt cross-secret reads from each component and unrelated same-user/other-user fixtures.
+- Vault deletion verifies the exact channel/install/profile target and is idempotent. A missing or denied item blocks the dependent capability without replacing the encrypted database or silently creating a new identity.
 
 Use WAL mode after proving journal/WAL encryption and recovery on all targets. Apply foreign keys, busy timeout, secure-delete behavior where supported, and bounded cache settings on every connection. One writer connection is owned by the storage service; read connections are bounded.
 
@@ -148,7 +157,7 @@ magic "ORTB" | format major/minor | KDF id/parameters | salt | nonce |
 ciphertext length | XChaCha20-Poly1305 ciphertext+tag
 ```
 
-Argon2id derives a 256-bit key from the user passphrase. Parameters are stored in the header, meet a documented minimum, and are calibrated to approximately 500 ms on a reference supported machine without falling below the memory floor. XChaCha20-Poly1305 encrypts the entire payload so filenames and metadata are not exposed. Cryptographic choices require focused review and test vectors before format freeze.
+Argon2id version 1.3 derives a 256-bit key from the user passphrase using a 128-bit random salt. The v1 writer profile is RFC 9106's memory-constrained recommendation: 64 MiB memory, three iterations, and four lanes. The reader accepts only the documented v1 policy range of 64–256 MiB, 3–10 iterations, and exactly four lanes. The canonical clear header is at most 128 bytes; its integer encodings, version, KDF identifier, salt length, 24-byte XChaCha20 nonce, reserved bytes, and ciphertext length are validated before allocation or derivation. Out-of-policy values fail without attempting the KDF. XChaCha20-Poly1305 authenticates the complete canonical header as associated data and encrypts/authenticates the entire payload so filenames and metadata are not exposed. Cryptographic choices, nonce generation, library versions, and failure uniformity require focused review and published test vectors before format freeze.
 
 The decrypted payload is a deterministic archive containing:
 
@@ -159,7 +168,7 @@ The decrypted payload is a deterministic archive containing:
 
 Excluded: API keys, database key, native IPC secret, Codex auth/configuration, update state, derived indexes/cache, and diagnostics unless the user separately exports them.
 
-Restore validates authentication before decompression, then entry count, total size, hashes, schema versions, IDs/references, and domain invariants. It never uses archive paths. A successful device restore creates a fresh local database key/vault entry and imports the portable content into a newly encrypted database. The backup passphrase cannot be recovered by ORT. The initial release supports replace-restore only; merge restore is deferred until deterministic conflict semantics are designed.
+Restore validates the bounded header and KDF policy, derives into locked/zeroized memory where supported, and authenticates the entire ciphertext before decompression or parsing any archive entry. It then validates entry count, total size, hashes, schema versions, IDs/references, and domain invariants. It never uses archive paths. Wrong passphrase, authentication failure, and malformed ciphertext share a non-oracular invalid-backup result. A successful device restore creates a fresh local database key/vault entry and imports the portable content into a newly encrypted database. The backup passphrase cannot be recovered by ORT. The initial release supports replace-restore only; merge restore is deferred until deterministic conflict semantics are designed.
 
 ## Migration strategy
 

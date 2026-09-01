@@ -6,7 +6,7 @@ ORT operates no shared AI account and pays for no user inference. AI is optional
 
 1. **Direct API** — a user-supplied API key for OpenAI, Anthropic, or Google Gemini.
 2. **Codex subscription** — a user-authorized ChatGPT/Codex session reached through the local Codex app-server interface.
-3. **No AI** — manual editing, tracking, rendering, import review where possible, and export remain available.
+3. **No AI** — manual editing, tracking, rendering, deterministic local document import/review, and export remain available.
 
 Direct provider calls go from the desktop application to the selected provider over authenticated HTTPS. Codex subscription calls go through a locally launched, version-compatible Codex app-server process to OpenAI. ORT operates no AI gateway, relay, logging proxy, shared account, or fallback credential service.
 
@@ -50,6 +50,8 @@ The model selector shows the preset purpose, provider model name, tested ORT ope
 
 - The desktop app receives direct-provider API keys from the user.
 - Credentials are stored in Windows Credential Manager, macOS Keychain, or an equivalently protected OS facility.
+- Vault storage protects secrets from offline theft and other operating-system users; it is not represented as protection from malware already executing as the same unlocked user. Windows generic credentials remain inside that user-session boundary. On macOS, the implementation must use the narrowest workable Keychain accessibility and trusted-application/access-control policy for the desktop and native host, and must test how preview and signed identities behave across update, move, repair, and uninstall.
+- The vault adapter exposes only create, use, replace, and delete operations. Ordinary UI commands cannot enumerate secret values or read a credential back. Secret access is permitted only immediately before the specific database, IPC, or provider operation that needs it.
 - Credentials never appear in the local content database, logs, backups by default, browser-extension storage, native-messaging payloads, exports, crash reports, or diagnostic bundles.
 - The user can test, replace, and remove a credential.
 - A failed credential never causes silent fallback to another provider or key.
@@ -61,11 +63,13 @@ The model selector shows the preset purpose, provider model name, tested ORT ope
 
 Codex subscription mode is a separate choice from the direct API-key menu. The initial ORT package does not bundle Codex. When the user chooses this mode, ORT detects a separately installed compatible Codex runtime, validates its executable identity, version, app-server protocol, required methods, and model capabilities, and gives platform-appropriate installation or update guidance when it is absent or incompatible. ORT then launches `codex app-server` as an app-managed child process over local `stdio`; the user is not required to start or keep a server running independently. Initial production support does not use app-server WebSocket transport.
 
+An arbitrary user-selected executable is never launched merely because it reports a compatible version. Automatic discovery accepts only canonical, documented installation locations whose resolved file, parent directories, ownership, permissions, platform signature/notarization where available, and release provenance satisfy the compatibility manifest. A manual path is a way to locate the same verifiable official runtime, not an override of identity or containment checks. A runtime in a user-writable download, temporary, project, or application-data directory, with a mutable parent chain, an unexpected signer/hash/provenance result, or an unverifiable identity is rejected. If a supported platform cannot establish a trustworthy executable identity for an allowed installation form, Codex mode remains unavailable for that form.
+
 ORT starts the runtime with an ORT-specific configuration/authentication root, keyring namespace, and process environment, requests managed ChatGPT authentication, opens the returned browser sign-in page, and lets Codex own token persistence and refresh. Device-code login may be offered as a fallback. ORT must not scrape browser cookies, request a ChatGPT password, copy, inherit, or mutate the user's general Codex CLI/desktop configuration and authentication files, or route an OpenAI API key through this mode. An existing general Codex installation may provide the executable, but ORT still creates and owns its separate configuration and authentication boundary.
 
 After sign-in, ORT reads the minimum auth/plan state, current quota windows, token-activity summaries when available, and the account's current model list. An email address returned during connection may be masked for immediate confirmation but is not required or persisted. The Codex model picker displays only the intersection of picker-visible models returned by `model/list` and ORT's tested compatibility catalog. The initial compatibility candidates are the GPT-5.6 Luna, Terra, and Sol family; the service-recommended tested model is selected by default, and the user may choose another tested model and supported reasoning effort.
 
-Each ORT Codex operation uses an ephemeral thread and an ORT-owned empty scratch directory. ORT does not configure dynamic tools, MCP servers, apps, plugins, skills, collaboration, or web access. It starts the turn with `approvalPolicy: never`, a restricted read-only/external sandbox, no access to user files, and process-level network egress limited to the provider endpoints required by app-server. ORT sends only the reviewed operation content, accepts only the final structured response, validates it through the same gates as direct providers, and tears down the thread and scratch data after settlement. Any command, file-change, tool, web, connector, or permission event interrupts and fails the operation even if a future app-server version would otherwise allow it. ORT stops the app-server child process when the connection is closed and detects and recovers an orphaned or interrupted child on the next launch. Shipping requires adversarial proof that this effective containment works on every supported platform; the plan does not assume app-server is a tool-free inference API.
+Each ORT Codex operation uses an ephemeral thread and an ORT-owned empty scratch directory. ORT does not enable experimental APIs or configure dynamic tools, MCP servers, apps, plugins, skills, collaboration, web access, filesystem APIs, shell-command APIs, command execution, or process control. It starts the turn with `approvalPolicy: never` inside an external operating-system sandbox, with no readable user roots and process-level network egress limited to the provider endpoints required by app-server. ORT sends only the reviewed operation content, accepts only the final structured response, validates it through the same gates as direct providers, and tears down the thread and scratch data after settlement. The protocol client allowlists the initialization, ephemeral thread/turn, final-output, account/model, cancellation, and shutdown messages needed by the tested version. Any unallowlisted request or notification—including command, file-change, filesystem, shell, process, tool, web, connector, MCP, skill, collaboration, elicitation, approval, or permission activity—interrupts the child, kills its process tree, fails the operation, and records a safe containment code. ORT never answers an approval or permission request. Shipping requires adversarial proof that this effective containment works on every supported platform; the plan does not assume `approvalPolicy: never` or an app-server sandbox setting turns app-server into a tool-free inference API.
 
 The implementation plan must define supported minimum and maximum runtime/protocol versions, schema generation and negotiation, executable discovery and verification, installation guidance, child-process supervision, timeouts, health checks, incompatible-version behavior, and safe disablement. ORT never installs, upgrades, or modifies the external runtime silently. A future optional companion installer or bundled runtime requires a new product decision plus license, package-size, signing, update, SBOM, and user-consent review. The integration contract must be maintained against the official [Codex app-server documentation](https://developers.openai.com/codex/app-server), [Codex authentication documentation](https://developers.openai.com/codex/auth), and [Codex model guidance](https://developers.openai.com/codex/models).
 
@@ -177,6 +181,17 @@ Tailored resumes include no more than three concise change-summary points. ORT d
 
 Required Qualification Alert candidates use a separate versioned portion of the tailoring response schema. Before display, ORT verifies that each candidate points to an explicit mandatory requirement in the reviewed job text, maps to a supported resume-content category, and is either an explicit factual conflict or information not found in the published master. Preferred, ambiguous, non-resume, personal, protected, and legal-attestation requirements are dropped. A confirmed mismatch must cite resolvable conflicting resume evidence; absence alone can produce only **Not found in your published resume**. The model does not decide eligibility, calculate a fit score, or make application recommendations.
 
+The initial category allowlist is deliberately narrow:
+
+- `degree_level`, `field_of_study`, and `graduation_date`;
+- `certification_or_professional_license`, excluding driving, security-clearance, background-check, and legal-attestation requirements;
+- `named_skill_or_technology`;
+- `language_proficiency` only when the published resume explicitly states a level;
+- `experience_duration` only when the requirement names a domain and the validator can resolve dated, non-overlapping source entries under a documented local interval rule; and
+- `portfolio_or_work_sample` only as **Not found** when the requirement explicitly requires a link/sample and no matching published link or project evidence exists.
+
+`confirmed_mismatch` is enabled per category only when structured resume data provides an explicit, locally comparable contradictory value. A missing skill, degree, certification, duration, language, link, or other fact is never reframed as a contradiction. Requirements about citizenship, immigration/work authorization, sponsorship, disability, demographics, age, medical status, background checks, drug tests, security clearance, driving eligibility, location/relocation, travel, schedule, compensation, or willingness/intent are always excluded even if the model emits them. Adding a category requires a schema version, deterministic validator, synthetic evaluation fixtures, privacy review, and recorded precision/false-positive evidence.
+
 The qualification comparison is part of the existing tailoring request because the provider already receives the reviewed job description and published master. ORT does not issue a second provider request or resend those inputs solely to generate alerts. The compact alert schema and collection bounds count within the existing tailoring output limit and direct-API guardrail reservation.
 
 If a result cannot be validated, ORT preserves the previous local state, explains the failure, and allows retry or manual editing. A partially streamed or malformed response is never silently promoted to a selected final artifact.
@@ -194,10 +209,10 @@ If a result cannot be validated, ORT preserves the previous local state, explain
 1. The user selects a local document.
 2. ORT validates type and protective size/page limits.
 3. Local libraries extract text, links, headings, bullets, dates, and available layout hints without uploading the original binary.
-4. ORT shows the extracted content and identifies the selected AI connection mode, provider, and model before transmission.
-5. With confirmation, the selected direct provider or Codex connection maps the extracted content into ORT's structured schema.
-6. ORT displays the source alongside the proposal and highlights uncertain or unusual mappings.
-7. The user can edit, move, relabel, accept, or reject every proposed item.
+4. A deterministic local mapper normalizes recognizable headings, dates, bullets, links, contact fields, education, employment, projects, skills, achievements, and certifications into existing ORT field and entry types. An unfamiliar heading becomes a proposed custom section; unclassifiable text remains a proposed simple-text/list block rather than being discarded.
+5. In **No AI** mode, ORT displays the extracted source beside these local proposals, marks ambiguous mappings for review, and lets the user edit, move, relabel, merge, keep both, accept, or reject every proposed section, entry, and field. No network request occurs.
+6. In Direct API or Codex mode, ORT first displays the local extraction/proposal plus the selected provider and model. Only after explicit confirmation may the selected backend propose improved structure; the original binary is not transmitted.
+7. AI proposals remain visually distinguishable from deterministic local mappings and user edits, and pass the same schema, duplicate, evidence, and size validation before display.
 8. Accepted information enters the master-resume draft only after confirmation; publishing remains a separate action.
 9. Original files and temporary extracted content are removed from ORT working storage when no longer needed.
 
@@ -208,7 +223,8 @@ The original binary should not be sent when local extraction provides adequate c
 - Import never silently replaces the master draft.
 - Potential duplicates are presented for merge, keep-both, or discard decisions.
 - Low-confidence content remains visibly unconfirmed.
-- When AI structuring fails, extracted text remains available during the current import review so the user can manually assign it where feasible.
+- The local mapper never invents missing field values and never silently drops unrecognized text. Its heading aliases and mapping rules are versioned and tested with multilingual and unusual-section fixtures.
+- When AI structuring fails or is unavailable, the complete local proposal and extracted text remain available during the current import review.
 
 ## Reliability and cancellation
 

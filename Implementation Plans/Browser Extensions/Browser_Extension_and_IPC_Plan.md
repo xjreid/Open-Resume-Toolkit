@@ -105,6 +105,8 @@ Transport:
 
 Desktop generates a 256-bit installation secret stored in the OS credential vault. Installer/first-run host setup gives the host access through the same user vault entry; the secret never appears in the native-host manifest.
 
+The platform implementation must prove that only the intended desktop and native-host identities receive this IPC entry while database and provider entries remain desktop-only. On Windows, the HMAC secret supplements named-pipe ACL/origin/replay checks but does not claim to resist arbitrary malware already running as the same user, because Generic Credential data is available inside that user boundary. On macOS, signed builds authorize both code identities using a reviewed Keychain ACL/code requirement or access group. If an unsigned preview cannot share one Keychain item without a weaker fallback or misleading prompts, browser integration is disabled for that preview package; the secret is never copied into a plaintext permissions-only file.
+
 Handshake:
 
 1. host connects and sends protocol versions, installation ID, origin ID, request nonce, and client random;
@@ -158,6 +160,7 @@ Emergency desktop disablement is local capability-based; the extension itself st
 - oversized/truncated/negative-length/deep JSON frames;
 - unapproved extension origin and development/production ID mix-up;
 - forged HMAC, replay, expired request, wrong install ID, local cross-user connection;
+- unrelated same-user process and native-host attempts to read database/provider vault entries; other-user attempts to read the IPC entry;
 - symlink/reparse/registry path substitution;
 - desktop absent, slow start, crash mid-request, two simultaneous captures;
 - host/stdout contamination and seeded-data log scan;

@@ -55,7 +55,7 @@ Exact minimum versions are chosen during implementation and recorded centrally. 
 ## Critical end-to-end journeys
 
 1. First launch, local-profile creation, backup explanation, and manual resume creation without AI.
-2. Import a text-bearing resume, review provider transmission, correct the proposal, save the draft, and publish.
+2. Import a text-bearing resume in No AI mode, verify lossless local mapping/custom-section review with no network, correct the proposal, save the draft, and publish; repeat with a configured provider and separate transmission confirmation.
 3. Edit a published draft without those unpublished changes leaking into tailoring.
 4. From overlay Stage 1, capture and review/edit a job description through Chrome and Edge, capture again, and continue, including browser-gesture, desktop-not-running, and repair cases.
 5. In overlay Stage 2, tailor, inspect no more than three verified change points and Required Qualification Alerts, dismiss/ignore/reopen alerts, enlarge preview/edit, and require a correction prompt before resume regeneration.
@@ -117,6 +117,8 @@ A stable release requires:
 - The internal ledger records every ORT provider attempt without forbidden content and survives interruption; aggregate AI Monitoring graphs/totals export and delete correctly and never represent an estimate as an invoice or ORT-only Codex account statement.
 - Required Qualification Alerts are generated within the existing tailoring call, contain only validated explicit requirement/evidence references, use no fit score or eligibility claim, remain non-blocking and dismissible, and are removed with the workspace rather than retained in the tracker.
 - Direct spending caps cannot be bypassed by retry, concurrency, crash, activity deletion, clock change, or missing data; Codex caps block future operations based on freshly reported stable quota buckets and clearly disclose best-effort limits.
+- Hostile PDF/DOCX inputs cannot escape the disposable parser worker, reach secrets/user files/network, spawn surviving children, or mutate canonical data; No-AI import preserves every extracted block for review.
+- Vault tests demonstrate the documented Windows same-user boundary and macOS desktop/native-host access controls without plaintext fallback or cross-secret access.
 - Known limitations and deferred features are documented.
 
 ## Evidence

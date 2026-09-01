@@ -4,6 +4,7 @@ This folder owns cross-component technical decisions. Component plans may specia
 
 - [`Architecture.md`](Architecture.md) — processes, modules, dependency rules, data flows, and error boundaries.
 - [`Repository_and_Build.md`](Repository_and_Build.md) — repository structure, generated contracts, build tools, dependencies, and CI.
+- [`Development_and_Deployment_Outline.md`](Development_and_Deployment_Outline.md) — shared platform/browser ownership, build artifacts, environment identities, deployment order, release gates, rollback, and concrete M0 handoff.
 - [`Security_and_Threat_Model.md`](Security_and_Threat_Model.md) — trust boundaries, mitigations, and security evidence.
 - [`Delivery_Roadmap.md`](Delivery_Roadmap.md) — milestones, release gates, and completion evidence.
 - [`Requirement_Traceability.md`](Requirement_Traceability.md) — stable technical requirement IDs mapped to product authority, implementation owner, and evidence.

@@ -32,7 +32,8 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 
 - Restrictive per-user permissions protect application storage.
 - The operating-system user session is the primary access boundary. ORT must warn that people sharing the same unlocked OS account may be able to access the local profile.
-- Credentials use the operating-system vault.
+- Credentials use the operating-system vault with separate database, provider, IPC, and Codex namespaces. The implementation documents the exact Windows credential type/persistence and macOS accessibility/access-control settings and tests access from the desktop, native host, unrelated same-user process, other user, moved app, and upgraded app.
+- ORT does not claim that Windows generic credentials or an unlocked user Keychain defeat malware already running as that user. The desktop and native host run without elevation, minimize secret lifetime, zeroize copied buffers where supported, and never expose a secret-reading UI/IPC command. Optional user-presence protection may be added only if recovery, native-host startup, accessibility, and background-operation behavior remain understandable.
 - Logs and diagnostic exports exclude content and secrets by default.
 - Backups are encrypted and require a user-controlled passphrase.
 - Clipboard use, temporary preview files, drag-and-drop exports, and recent-file behavior receive explicit implementation review because they can create copies outside ORT.
@@ -56,7 +57,8 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 
 - PDF, DOCX, backup, and other imported files are untrusted.
 - Use operating-system quarantine, reputation, or malware-scanning facilities when available and appropriate, but never treat a missing alert as proof that a file is safe.
-- Parse with memory/time/size limits and isolated libraries or processes where justified.
+- PDF and DOCX parsing is performed in a dedicated, disposable, least-privileged worker process. The worker has no provider/database/IPC secrets, no network, no child-process authority, no writable path except its private staging/output directory, and read access only to the staged input. Operating-system sandboxing is mandatory for stable builds; resource limits and fuzzing supplement rather than replace process isolation.
+- The parent accepts only a bounded, versioned extraction result, validates it again, kills the full worker tree on completion/timeout/error, and treats a crash or sandbox violation as an import failure. A platform that cannot enforce the worker boundary does not advertise document import until an equivalent reviewed containment design exists.
 - Reject unsafe paths, archive traversal, excessive expansion, unsupported embedded content, malformed relationships, and executable payloads.
 - Do not run document macros, scripts, external links, or embedded objects.
 
@@ -64,6 +66,7 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 
 - Escape user and AI content before HTML, PDF, DOCX, and preview rendering.
 - Allow only explicitly approved web/email link schemes; block script, data, local-file, executable, and unsafe custom schemes.
+- Never place resume, job, provider, or imported strings into `innerHTML`, executable template source, CSS, script, custom-protocol paths, or webview navigation. The internal resource protocol serves only opaque, single-purpose handles for already validated bytes and cannot translate a URL path into an arbitrary filesystem read.
 - Generated documents contain no hidden prompts, credentials, internal identifiers, temporary paths, or unnecessary metadata.
 - Structured snapshots cannot select executable code, arbitrary local paths, unapproved templates, remote fonts, or unsafe renderer options.
 - Validate nesting, strings, collections, decompression ratio, schema version, integrity checksum, and renderer compatibility before opening historical material.
@@ -73,6 +76,7 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 - Protect repository and Store accounts with MFA; use hardware-backed or phishing-resistant factors for release maintainers where possible.
 - Restrict CI release permissions, pin or verify build actions/dependencies, review build-script changes carefully, and keep signing credentials outside the repository.
 - Verify update signatures and channel identity before installation.
+- Unsigned previews are not a stable trust channel. Checksums and provenance help expert verification but do not replace Windows code signing or macOS Developer ID/notarization; preview documentation must warn users that bypassing platform reputation controls increases installation risk.
 - Verify signed pricing/model-catalog source, schema, sequence/effective dates, and rollback resistance; catalog data cannot carry executable code or broaden model/tool permissions.
 - Generate software bills of materials and provenance when the implementation toolchain supports them.
 - Maintain an embargoed security-reporting path and a documented revocation/recovery procedure for compromised releases.

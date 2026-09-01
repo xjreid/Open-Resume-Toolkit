@@ -65,8 +65,18 @@ Limits protect rendering and parsing; they are not monetization quotas. When leg
 - Compressed-to-expanded safety ratio: 100:1 maximum.
 - Local extraction target: 60 seconds on supported reference hardware.
 - Scanned/image-only content and OCR: unsupported initially and detected before any provider call.
+- Parser execution: one disposable sandboxed worker per import, no network, no subprocesses, and no vault/database/IPC access.
+- Worker writable scope: one randomized private staging/output directory; the staged input is read-only after open.
+- Initial worker ceilings: 512 MiB memory, 60 seconds wall time, 30 seconds aggregate CPU target, 64 open handles/files, and no surviving child process. Platform testing may tighten these ceilings before release but cannot remove the sandbox boundary.
 
-The parser also has explicit memory, CPU/time, recursion, embedded-object, relationship, and archive-expansion limits selected during implementation.
+The parser also has format-specific recursion, object/image count, XML entity, relationship, archive-entry, and archive-expansion limits selected and frozen with the parser version during implementation.
+
+## Backup cryptography defaults
+
+- New `.ort-backup` files use Argon2id version 1.3 with a 16-byte random salt, 32-byte derived key, 64 MiB memory, three iterations, and four lanes, matching the memory-constrained recommendation in RFC 9106. XChaCha20-Poly1305 uses a fresh 24-byte nonce.
+- The canonical clear header is at most 128 bytes and is parsed before key derivation or allocation. Version, KDF identifier, salt/nonce lengths, ciphertext length, reserved bytes, and integer encodings must match exactly. The complete canonical header is authenticated as AEAD associated data.
+- Initial v1 Argon2id reader bounds are 64–256 MiB memory, 3–10 iterations, and exactly four lanes. Values outside the supported format policy fail before allocation; a future profile with different lane behavior requires a new format-policy version and compatibility tests.
+- Decryption authenticates the complete ciphertext before decompression or interpreting any archive entry. Failure returns one non-oracular invalid-backup result and retains the current database unchanged.
 
 ## Export and rendering defaults
 
@@ -88,6 +98,7 @@ Renderer failure is measured separately from an intentional validation rejection
 - Total provider input ceiling: 64,000 tokens or a lower provider/model limit.
 - Initial tailoring output: 5,000 tokens maximum.
 - Required Qualification Alert candidates share the initial tailoring operation, request, activity record, guardrail reservation, and 5,000-token output ceiling; ORT does not make a second qualification-analysis call.
+- Required Qualification Alerts: at most 10 validated alerts, with at most 500 characters of requirement excerpt and 500 characters of explanation each; overflow is disclosed and never silently converted into a fit score or eligibility conclusion.
 - Full-resume refinement output: 5,000 tokens maximum.
 - Patch refinement output: 2,000 tokens maximum.
 - Cover-letter output: 1,500 tokens maximum.

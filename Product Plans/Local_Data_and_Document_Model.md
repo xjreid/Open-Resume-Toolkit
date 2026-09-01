@@ -115,7 +115,7 @@ Because ORT has no cloud recovery, the application must provide a first-class po
 
 - A backup contains the local profile, master draft and published snapshot, tracker entries, retained structured materials, activity and guardrail settings safe to transfer, schema manifests, and integrity metadata.
 - Backups use a documented, versioned container such as `.ort-backup`.
-- Backups should be encrypted with a user-supplied passphrase using a current password-based key-derivation and authenticated-encryption design chosen during implementation.
+- Backups are encrypted with a user-supplied passphrase using the versioned Argon2id/XChaCha20-Poly1305 format and bounded reader policy in `Configuration_Limits_and_Defaults.md`; exact header/associated-data behavior is defined by the implementation plan and frozen with test vectors.
 - API keys, Codex sessions, and credential-vault secrets are excluded by default and must be reconfigured on the destination device. Imported guardrail policies remain inactive until the user binds and confirms them for a new credential or Codex connection; historical counters never silently attach to a different identity.
 - Restore validates format, integrity, schema compatibility, available disk space, and conflicts before replacing or merging data.
 - Before a destructive migration or restore, ORT creates or offers a recoverable safety copy.

@@ -12,11 +12,14 @@ These IDs provide stable anchors for code issues, tests, and release evidence. T
 | ORT-DATA-001 | Canonical local records use versioned structured schemas | Local data / Canonical records | Local data | schema drift and round-trip tests |
 | ORT-DATA-002 | At most one master draft, published master, and current workspace exist per profile | Configuration / Fixed product values | Local data | database constraint tests |
 | ORT-DATA-003 | Sensitive local records are encrypted at rest and keys remain in the OS vault | Security / Local data exposure | Local data, vault | database/WAL plaintext and vault tests |
+| ORT-DATA-007 | Vault behavior states and tests the Windows same-user boundary and macOS desktop/native-host access policy without plaintext fallback | Security / Local data exposure | Vault, IPC, distribution | cross-process/cross-user/move/update vault matrix |
 | ORT-DATA-004 | Writes, Finish Application, and guardrail reservations are atomic and crash recoverable | Product states / operation lifecycle | Local data | fault-injection transaction tests |
 | ORT-DATA-005 | Portable backup is encrypted, authenticated, versioned, cross-device, and excludes secrets | Retention / Backups | Local data | cross-platform restore and hostile archive suite |
 | ORT-DATA-006 | Activity deletion, cap reset, workspace deletion, and full profile deletion remain distinct | Retention / deletion sections | Local data, desktop | record-scope deletion tests |
 | ORT-RES-001 | Draft edits are autosaved but tailoring reads only the published snapshot | Core workflows / Draft and publish | Desktop, local data | critical draft/publish journey |
 | ORT-RES-002 | Import performs local extraction and requires confirmation before AI mapping/transmission | AI and import / Import flow | Documents, AI, desktop | import privacy and review tests |
+| ORT-RES-007 | No-AI import deterministically maps recognized content and preserves unfamiliar content as reviewable custom/simple sections without network access | AI and import / Import flow | Documents, desktop | offline mapping and losslessness corpus |
+| ORT-RES-008 | Untrusted PDF/DOCX parsing occurs only in a disposable OS-sandboxed worker with no secret/network/general-filesystem authority | Security / Malicious imports | Documents, platform | hostile-file sandbox and process-tree evidence |
 | ORT-RES-003 | Preview and PDF export use the same renderer tuple and structured source | Core workflows / Rendering and export | Documents | golden render/receipt comparison |
 | ORT-RES-004 | PDF, DOCX, and text are derived exports; structured JSON remains canonical | Local data / Structured documents | Documents, local data | round-trip/authority tests |
 | ORT-RES-005 | Document templates are visually independent of ORT branding; Technical defaults to the licensed/independently implemented Jake's Resume structure | Resume editor / Styles | Documents, aesthetic | license receipt and golden render comparison |
@@ -34,6 +37,7 @@ These IDs provide stable anchors for code issues, tests, and release evidence. T
 | ORT-CODEX-001 | Codex is separately installed, verified, and app-managed over stdio | AI and import / Codex | AI, distribution | absence/version/lifecycle matrix |
 | ORT-CODEX-002 | Codex uses isolated config/auth/keyring and does not inherit normal user Codex state | Configuration / Codex defaults | AI, platform | seeded-config isolation tests |
 | ORT-CODEX-003 | Codex cannot use tools/files/commands and has provider-only egress | Security / Codex containment | AI, security | per-platform containment report |
+| ORT-CODEX-005 | A manual or discovered Codex path cannot bypass official runtime identity/provenance checks or enable experimental/side-effect protocol surfaces | Security / Codex containment | AI, platform | counterfeit-runtime and method/event allowlist suite |
 | ORT-CODEX-004 | Codex quota data retains provider/account-wide provenance; no API-equivalent cost is shown | AI and import / Codex usage | AI, desktop | account snapshot/provenance tests |
 | ORT-IPC-001 | Extension captures selected text only after an explicit user action; the overlay owns review and Continue/Generate decisions | Desktop-extension / Capture | Extension, desktop | passive-browsing and overlay-review tests |
 | ORT-IPC-002 | Native messaging and desktop IPC are versioned, bounded, origin-checked, authenticated, and replay resistant | Desktop-extension / IPC | Extension, IPC | hostile protocol suite |

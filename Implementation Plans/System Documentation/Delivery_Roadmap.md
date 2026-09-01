@@ -6,7 +6,7 @@
 - Owner: maintainers
 - Planning unit: demonstrable vertical milestone, not percentage completion
 
-Visual design work is outside this roadmap until the aesthetic plans are approved. Functional UI in early milestones uses semantic, unstyled controls and a deliberately plain renderer fixture.
+The Quiet Navy/Open Frame application and website direction is approved under `../../Aesthetic/`. Early milestones still use semantic, minimally styled controls and a deliberately plain renderer fixture so security, contracts, accessibility, and data behavior stabilize first. Production component polish and the non-default document-template details may be tested and refined during development, but the three promised style categories must pass their functional, accessibility, licensing, and golden-render gates before release.
 
 ## M0 — architecture skeleton and contracts
 
@@ -17,6 +17,7 @@ Deliver:
 - CI for Windows/macOS build, tests, formatting, license/vulnerability scanning, and schema drift;
 - synthetic fixture policy and evidence layout;
 - initial architecture decision records for Tauri/Rust, SQLCipher, Typst, native messaging, and external Codex.
+- repository and CI skeleton matching `Development_and_Deployment_Outline.md`, including shared desktop source, shared Chrome/Edge extension source, and platform-specific packaging boundaries.
 
 Exit evidence:
 
@@ -30,6 +31,7 @@ Exit evidence:
 Deliver:
 
 - OS vault abstraction and database-key lifecycle;
+- platform vault-boundary matrix, including Windows same-user limitations and macOS desktop/native-host access behavior across preview, signed, moved, and updated builds;
 - SQLCipher schema v1, migrations, repositories, transactions, and startup recovery;
 - profile, master draft, published snapshot, settings, and diagnostic records;
 - structured resume domain validation and optimistic draft revisions;
@@ -38,6 +40,7 @@ Deliver:
 Exit evidence:
 
 - synthetic resume survives restart and cannot be read from the database/WAL without the key;
+- vault namespace/cross-user/cross-process tests match the documented Windows and macOS boundaries without plaintext fallback;
 - vault-unavailable and corrupt-database paths are safe and actionable;
 - migration and backup corruption suites pass.
 
@@ -46,7 +49,8 @@ Exit evidence:
 Deliver:
 
 - functional structured editor and publish lifecycle;
-- local PDF/DOCX extraction and temporary review staging; AI schema mapping is enabled with the configured backend in M3/M4;
+- local PDF/DOCX extraction, deterministic schema mapping, and temporary review staging; optional AI-assisted remapping is enabled with the configured backend in M3/M4;
+- disposable OS-sandboxed parser worker plus deterministic No-AI mapping that preserves unfamiliar content as reviewable custom/simple sections;
 - pinned Typst preview/PDF renderer and constrained DOCX/plain-text exporters;
 - accessible preview, save dialogs, atomic export, and historical renderer metadata;
 - storage usage, deletion, and full portable export.
@@ -54,6 +58,7 @@ Deliver:
 Exit evidence:
 
 - critical offline journey passes without network access;
+- hostile parser fixtures cannot read application data/secrets, access network, spawn children, or survive worker termination;
 - golden corpus passes semantic, link, pagination, Unicode, and accessibility checks;
 - local extraction never changes the master record; an AI-backed mapping remains unavailable until an AI connection is configured and the user confirms transmission.
 
@@ -80,7 +85,7 @@ Deliver:
 
 - tailoring, cover-letter, and application-answer prompt/schema versions;
 - factual-evidence validator and no more than three user-visible change points;
-- same-call Required Qualification Alert extraction, classification, evidence, persistence, dismissal/ignore/reopen behavior;
+- same-call Required Qualification Alert extraction, versioned category allowlist, deterministic per-category validation, evidence, bounds, persistence, dismissal/ignore/reopen behavior;
 - overlay Stage 2 Resume/Cover letter/Answers tabs, required resume-regeneration instruction, resettable question capture, expanded structured editing/PDF preview, and resume/cover-letter PDF Download/drag handoff;
 - adversarial AI evaluation corpus and preset-specific quality thresholds.
 
@@ -109,7 +114,7 @@ Exit evidence:
 
 Deliver only if the security gate passes:
 
-- executable discovery, user-selected path, version/capability negotiation, and isolated ORT Codex home;
+- strict official-runtime discovery/provenance verification (a user-selected path cannot waive identity checks), version/capability negotiation, and isolated ORT Codex home;
 - managed ChatGPT/device-code sign-in and keyring use through the external runtime;
 - app-server `stdio` adapter, lifecycle, cancellation, account/rate-limit snapshots, and quota threshold controls;
 - supported-version matrix, safe disablement, and update guidance;
@@ -119,6 +124,7 @@ Exit evidence:
 
 - all Codex security requirements in `Security_and_Threat_Model.md` pass on Windows and macOS;
 - no tool/file/command event is accepted;
+- experimental capabilities remain disabled and any command/process/filesystem/tool/permission/approval/elicitation surface kills the contained child;
 - unsupported versions and containment failures disable only Codex mode.
 
 If the gate fails, record the result and defer M6 without blocking M7.
@@ -161,7 +167,7 @@ The private website plan may be implemented once real release metadata exists. I
 - Safari/Firefox extensions;
 - automatic submission to job sites;
 - macOS signing/notarization until the approved traction trigger;
-- aesthetic system and product themes.
+- additional brand themes or dark mode; the approved single light aesthetic and three initial document style categories remain release scope.
 
 ## Work-item template
 

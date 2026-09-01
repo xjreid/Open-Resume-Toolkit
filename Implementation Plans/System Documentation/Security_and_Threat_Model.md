@@ -45,6 +45,10 @@ The product stores unusually sensitive employment material and user-supplied cre
 
 Provider keys, the database key, and the native-IPC secret use separate vault entries with an install/profile identifier. Secret values never enter the UI event log, SQLite, command-line arguments, environment variables, backup, crash diagnostics, or clipboard automatically.
 
+The vault is not treated as an application-identity sandbox on every platform. Windows Credential Manager generic secrets are protected from other accounts and offline access but are readable to processes in the same user context; tests and documentation state this limitation. On macOS, use the narrowest supported Keychain accessibility plus an explicit trusted-application/access-control design for the desktop and native host. Signed builds must bind access to the intended code requirements/access group. Unsigned previews must not silently fall back to plaintext or pretend to provide signed-app isolation; their move/update/repair prompts and limitations require a platform proof.
+
+Only the vault adapter can obtain secret bytes. Its public application ports expose presence, creation, replacement, operation-scoped use, and deletion—not general read or enumeration. Provider and database secrets never cross into the webview or native host. The native host can obtain only the IPC secret. Buffers are short-lived, excluded from core dumps where the platform permits, memory-locked where practical, and zeroized after use.
+
 Codex authentication is owned by the separately installed Codex runtime in an isolated ORT-specific configuration/keyring namespace. ORT stores only a connection record and safe account/status metadata.
 
 ### Application authority
@@ -52,6 +56,8 @@ Codex authentication is owned by the separately installed Codex runtime in an is
 Tauri capabilities are assigned per window and command. No window gets an unrestricted filesystem, HTTP, opener, process, or shell capability. Remote navigation and new-window creation are denied except for explicit, allowlisted links opened through the operating system after confirmation.
 
 The CSP permits only bundled scripts/styles/fonts/images and the app's internal protocol. Dynamic code evaluation and remote source maps are prohibited in production.
+
+All user/provider/imported text reaches React as text nodes or typed form values. Production lint/build policy rejects `dangerouslySetInnerHTML`, raw HTML rendering, string-to-code APIs, and unreviewed custom-protocol URLs. The internal document resource protocol accepts an opaque one-use or session-scoped handle plus a fixed operation; it never accepts a filesystem path, host, query-selected file, traversal segment, or arbitrary MIME type. A compromised webview therefore still cannot turn display data into filesystem, opener, shell, process, or network authority.
 
 ### Network
 
@@ -88,6 +94,10 @@ Application-level prompting is not sufficient containment. Before stable Codex s
 7. termination kills the full child process tree and removes temporary state;
 8. bypass attempts pass on supported Windows and macOS versions.
 
+The executable gate is independent of the protocol/version gate. Resolve the canonical file and every parent, reject symlink/reparse redirection and unsafe ownership/write permissions, and verify the expected official distribution provenance using the strongest stable platform evidence available (code-signing/notarization identity, package receipt, and/or release-manifest digest). A manual picker can locate a runtime but cannot waive these checks. Test a counterfeit executable that prints the expected version and protocol handshake; it must never be launched beyond a non-executing identity check, or—when a bounded version probe is unavoidable—must already be inside the external sandbox with no user-data access.
+
+The official app-server surface includes command, filesystem, process, tool, approval, permission, MCP, skill, collaboration, and experimental operations. ORT initializes without experimental capabilities, sends only an allowlisted method set, never calls `thread/shellCommand`, `command/*`, `process/*`, or `fs/*`, and terminates on any related server request, item, or notification. `approvalPolicy: never` is defense in depth, not the containment boundary. ORT never returns approval, elicitation, permission, or tool output.
+
 If supported public OS mechanisms cannot enforce these properties without administrative installation, unstable private APIs, or a misleading user promise, stable builds ship with Codex mode disabled. This outcome does not block No AI or Direct API modes.
 
 ## Native IPC protocol controls
@@ -104,12 +114,15 @@ If supported public OS mechanisms cannot enforce these properties without admini
 ## Import, rendering, and archive controls
 
 - File type is determined from magic bytes/container structure, not extension alone.
-- PDF/DOCX parsers run with page, relationship, nesting, decompression, image, and time limits.
+- PDF/DOCX parsing runs in a new disposable worker process for each import. The OS sandbox denies network, subprocess creation, vault/keychain/credential-manager access, database/application-data access, browser/native IPC, and reads outside the already-open staged input. The worker can write only to a randomized private result directory and returns a bounded versioned extraction message over an inherited pipe.
+- The parent opens and validates the staged file before worker launch, passes a handle rather than trusting a worker-supplied path where supported, revalidates all returned data, and kills the entire worker process tree after success, timeout, crash, protocol violation, or cancellation. Worker exit cannot commit or mutate canonical data.
+- PDF/DOCX parsers also enforce page, relationship, nesting, decompression, image, object, handle, memory, CPU, and wall-time limits. Fuzzing/resource limits do not substitute for the sandbox.
 - External DOCX relationships, macros, embedded packages, scripts, and active content are never executed or fetched.
 - Render templates are bundled and addressed by known IDs; user content cannot inject Typst source.
 - Resume/cover-letter file drags expose only validated PDFs materialized in a random private ORT session directory. Paths cannot be supplied by web content; Finish/discard and startup recovery remove only containment-verified ORT-owned files. Download uses a separate one-use native dialog token.
 - Links are parsed as data, allow only approved schemes, and are escaped by the renderer.
 - Backup payload entries use logical IDs rather than paths. Restore never joins an archive-provided path to disk.
+- Backup clear headers are bounded and canonicalized before any allocation or KDF work. Argon2id parameters outside the accepted memory/iteration/lane policy fail before derivation. Authentication succeeds before decompression, manifest parsing, or archive entry allocation.
 - Fuzzing covers parser panics, decompression bombs, malformed UTF-8, integer overflow, and partial files.
 
 ## Update and supply-chain controls
@@ -139,7 +152,7 @@ Automated tests intercept all process network destinations for critical offline 
 | Unit/property | URL sanitizer, cap arithmetic, schema references, HMAC expiry | every PR |
 | Fuzz | PDF/DOCX, backup, IPC, AI JSON, catalog parser | scheduled and release candidate |
 | Integration | vault unavailable, database tamper, replayed capture, invalid update signature | release candidate |
-| Platform | permissions, process-tree kill, native-host registration, updater rollback | every supported OS/channel |
+| Platform | vault access matrix, parser sandbox escape attempts, permissions, process-tree kill, native-host registration, updater rollback | every supported OS/channel |
 | Adversarial AI | page prompt injection, fabricated facts, required/preferred confusion | every prompt/schema release |
 | Manual review | CSP/capabilities, release permissions, Codex sandbox evidence | stable release |
 
@@ -157,7 +170,9 @@ Automated tests intercept all process network destinations for critical offline 
 
 - Which public Windows sandbox/network-control primitive can meet the Codex constraint without elevation?
 - Which supported macOS mechanism can meet the same constraint without relying on deprecated/private APIs?
+- Which supported public Windows and macOS primitives enforce the hostile-document worker boundary on every advertised OS version?
 - Does the selected SQLCipher build configuration produce the same encryption and recovery behavior on all architectures?
+- Can the unsigned macOS preview authorize both the desktop and native host to one IPC Keychain item without weakening access or creating misleading prompts? If not, browser integration remains disabled for that preview form.
 - Can the Microsoft Store fallback retain native-messaging registration under its final packaging identity?
 
 These are implementation gates, not permission to reduce the user-facing promise.

@@ -48,7 +48,11 @@ The website and GitHub Releases are separate distribution/documentation surfaces
 
 The Tauri process owns all authoritative state and privileged operations. Bundled web UI code can request typed commands but cannot directly access the filesystem, database, network, shell, credential vault, native-messaging registration, or updater.
 
-Long-running work runs as cancellable Rust tasks behind an operation coordinator. CPU-heavy parsing and rendering use a bounded worker pool so the window event loop remains responsive. A process-wide single-instance lock routes secondary launch intents to the existing process.
+Long-running work runs as cancellable Rust tasks behind an operation coordinator. Rendering and trusted CPU-heavy work may use a bounded internal worker pool. Untrusted PDF/DOCX parsing never runs in the desktop process: one disposable `ort-document-worker` process handles one staged input inside a platform sandbox and returns only a bounded versioned extraction record. A process-wide single-instance lock routes secondary launch intents to the existing process.
+
+### Hostile document worker
+
+`ort-document-worker` has no database, vault, provider, updater, browser, or native-IPC code dependency. The parent opens a validated staged input, launches the worker with an inherited handle or containment-verified path, and grants a single private output location. Platform policy denies all network, child processes, unrelated file reads/writes, application data, user documents, and secret stores. The parent enforces memory/CPU/wall-time/handle limits, validates the extraction result again, and kills the complete process tree after every outcome. A worker failure cannot commit canonical state.
 
 ### UI webviews
 
@@ -171,6 +175,15 @@ An optional overlay-initiated capture path is gated behind narrowly scoped optio
 4. A schema and factual-boundary validator accepts or rejects the response.
 5. Usage is normalized, the reservation is settled, and the attempt is finalized.
 6. Tailoring stores proposed material, change summaries, and Required Qualification Alerts together.
+
+### Local document import
+
+1. A one-use native dialog token selects the source; the parent validates size, type, permissions, and containment before staging.
+2. The disposable document worker extracts bounded text and structural hints under the hostile-input sandbox.
+3. The parent validates the extraction message and runs the versioned deterministic mapper.
+4. Recognized content maps to existing fields/entry types; unfamiliar headings become proposed custom sections and unclassified text becomes proposed simple text/list blocks.
+5. No-AI mode proceeds directly to complete user review with no network. Direct/Codex mode may offer a separately confirmed AI mapping of the extracted text.
+6. Only explicitly accepted proposals create a normal draft revision; cleanup follows settlement.
 
 ### Codex operation
 

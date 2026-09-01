@@ -16,8 +16,13 @@ apps/
   desktop/                    React/TypeScript UI and Tauri configuration
     src/features/             feature-owned views, view models, and tests
     src/shared/               typed command client and accessible primitives
-    src-tauri/                Tauri entry point, commands, capabilities, packaging
+    src/platform/             narrow UI-only platform presentation adapters
+    src-tauri/                shared entry point, commands, capabilities, packaging
+      platform/windows/       Windows composition and packaging hooks
+      platform/macos/         macOS composition and packaging hooks
   extension/                  shared Manifest V3 Chrome/Edge source
+    src/                      shared capture, messaging, status, and validation
+    manifest/                 Chrome/Edge and channel-specific manifest templates
 crates/
   ort-domain/                 entities, value objects, policies, state machines
   ort-application/            use cases, coordinator, ports, error model
@@ -25,6 +30,7 @@ crates/
   ort-vault/                  OS credential-vault adapter
   ort-ai/                     provider and Codex adapters, accounting, guardrails
   ort-documents/              import, normalization, Typst/DOCX/plain-text output
+  ort-document-worker/        disposable sandboxed PDF/DOCX extraction executable
   ort-ipc/                    authenticated local protocol and framing
   ort-native-host/            browser native-messaging executable
   ort-platform/               paths, permissions, process, update, single-instance
@@ -39,10 +45,11 @@ fixtures/
   ai/                         synthetic provider and prompt-injection fixtures
   ipc/                        valid and hostile protocol corpus
 tools/                        generation, verification, and release helper commands
+packaging/                    Windows/macOS/Chrome/Edge package configuration
 .github/workflows/            CI, preview packaging, and protected release workflows
 ```
 
-Until the visual plan is approved, `templates/resume/` contains only a deliberately plain functional fixture used to prove layout and accessibility. It is not a product theme.
+Early milestones keep a deliberately plain functional fixture in `templates/resume/` to prove layout and accessibility before the approved document styles are finalized through development testing. The fixture is not a shipped product theme.
 
 ## Workspace tooling
 
@@ -110,6 +117,7 @@ Development uses an app-data suffix such as `OpenResumeToolkit-Dev`; it must nev
 | stable-store | fallback Windows Store | Store identity and update ownership; direct updater disabled |
 
 Feature flags cannot weaken encryption, validation, or permission checks. Codex, browser bridge, and updater can be compiled or runtime-disabled when their platform gate has not passed.
+Document import is runtime-disabled on a platform/package whose parser-worker sandbox or termination proof has not passed; it never falls back to in-process parsing.
 
 ## CI layers
 

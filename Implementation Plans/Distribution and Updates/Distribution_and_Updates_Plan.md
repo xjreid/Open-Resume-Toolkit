@@ -9,6 +9,8 @@
 
 Codex is not included in any ORT installer. Users who select Codex mode install a supported Codex runtime independently.
 
+Cross-platform source ownership, build targets, environment identities, CI stages, desktop-before-extension deployment order, and the M0 handoff are centralized in `../System Documentation/Development_and_Deployment_Outline.md`. This plan remains authoritative for packaging, signing, update trust, publication, and rollback mechanics.
+
 ## Channel identities
 
 | Channel | Application identity | Package/update owner |

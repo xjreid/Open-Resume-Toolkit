@@ -28,8 +28,8 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - `NOTICE` identifies the canonical source repository and copyright attribution. `TRADEMARKS.md` requires modified and third-party distributions to avoid implying that they are official releases; it does not restrict GPL rights in the code.
 - The desktop application is the primary product. Chrome and Edge extensions are narrow capture companions, not replacements for the desktop experience.
 - User content is local-first and remains on the user's computer. ORT operates no account service, ORT subscription, product database, cloud document store, provider quota, admin portal, or centrally funded AI key. Optional local guardrails govern only future ORT calls.
-- The desktop app remains useful without AI for manual resume editing, local document rendering, application tracking, and exports.
-- AI features use exactly one active mode: a deliberately configured OpenAI, Anthropic, or Gemini API key; a managed ChatGPT/Codex subscription connection; or No AI. API keys and Codex tokens use the operating-system credential vault and are never exposed to the browser extension.
+- The desktop app remains useful without AI for manual resume editing, deterministic reviewed PDF/DOCX import into existing/custom sections, local document rendering, application tracking, and exports.
+- AI features use exactly one active mode: a deliberately configured OpenAI, Anthropic, or Gemini API key; a managed ChatGPT/Codex subscription connection; or No AI. API keys and Codex tokens use the operating-system credential vault and are never exposed to the browser extension. Vault storage protects the documented OS-user boundary and is not claimed to defeat malware already executing as the same unlocked user.
 - Direct API models use curated Economy/Balanced/Quality presets. Codex models are the tested intersection of the account's current app-server model list and ORT compatibility catalog; no adapter silently falls back or enables an untested model.
 - A private local ledger records every provider call initiated by ORT. The user-facing AI Monitoring view shows aggregate token/direct-cost graphs and totals for Week/Month/Year/All time plus secondary breakdowns; it is not an individual-call feed. Direct totals cannot claim to show calls made by other applications using the key; Codex account summaries are visibly account-wide and have no invented dollar cost.
 - Users may configure optional direct estimated-spend caps for calendar week/month/year/all-time periods or Codex provider-quota percentage thresholds. Guardrail state is durable and separate from activity-history deletion, while provider billing and quota controls remain authoritative.
@@ -82,6 +82,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 ### Technical implementation and future aesthetic work
 
 - [Implementation plans](<Implementation Plans/README.md>) — selected technical baseline, component plans, delivery order, and implementation gates.
+- [Development and deployment outline](<Implementation Plans/System Documentation/Development_and_Deployment_Outline.md>) — shared desktop/extension source ownership, platform and Store artifacts, environments, CI/release sequence, mandatory gates, rollback, and M0 readiness.
 - Component folders under `Implementation Plans/` — implementation-ready plans for architecture/security/build, desktop, extensions/IPC, local data/migration, AI/document processing, and distribution/updates.
 - [Aesthetic planning](Aesthetic/README.md) — approved Quiet Navy/Open Frame direction, surface responsibilities, document independence, and remaining visual deliverables.
 
@@ -102,9 +103,10 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 1. Read every product plan.
 2. Read the open-decisions register completely.
 3. Read the architecture, security, repository/build, and delivery-roadmap plans.
-4. Read the applicable component implementation plan.
-5. Link code and tests to the product requirement and technical completion criteria.
-6. Record major irreversible refinements as architecture decision records.
+4. Read the development and deployment outline.
+5. Read the applicable component implementation plan.
+6. Link code and tests to the product requirement and technical completion criteria.
+7. Record major irreversible refinements as architecture decision records.
 
 ### Security and privacy review
 

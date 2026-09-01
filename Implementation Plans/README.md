@@ -2,7 +2,7 @@
 
 ## Status
 
-These plans are **implementation-ready for the first development milestone**. They select the initial architecture, module boundaries, durable records, protocols, security controls, test strategy, and release workflow. Visual language, styling, layout polish, iconography, and other aesthetic decisions are deliberately excluded and remain owned by `../Aesthetic/`.
+These plans are **implementation-ready for the first development milestone**. They select the initial architecture, module boundaries, durable records, protocols, security controls, test strategy, and release workflow. The approved visual direction remains owned by `../Aesthetic/`; exact component polish and the two non-default document-template layouts may be tested and refined during development without weakening their release gates.
 
 Implementation may refine library versions and internal names without changing product behavior. Any change to privacy promises, supported AI modes, data ownership, release channels, or the user-visible lifecycle must first be approved in `../Product Plans/`.
 
@@ -33,6 +33,7 @@ Exact dependency versions are chosen and locked when the workspace is bootstrapp
 
 - [`System Documentation/Architecture.md`](System%20Documentation/Architecture.md) — component boundaries, execution model, dependency direction, data flows, and failure domains.
 - [`System Documentation/Repository_and_Build.md`](System%20Documentation/Repository_and_Build.md) — proposed source tree, contracts, local development, dependency policy, and CI layers.
+- [`System Documentation/Development_and_Deployment_Outline.md`](System%20Documentation/Development_and_Deployment_Outline.md) — shared-code ownership, build targets, environments, artifact matrix, CI/deployment flow, gates, rollback, and M0 readiness checklist.
 - [`System Documentation/Security_and_Threat_Model.md`](System%20Documentation/Security_and_Threat_Model.md) — trust boundaries, controls, abuse cases, and release-blocking security gates.
 - [`System Documentation/Delivery_Roadmap.md`](System%20Documentation/Delivery_Roadmap.md) — vertical milestones, dependencies, evidence, and explicit deferrals.
 - [`System Documentation/Requirement_Traceability.md`](System%20Documentation/Requirement_Traceability.md) — stable requirement IDs for issues, tests, and release evidence.
@@ -61,6 +62,8 @@ Exact dependency versions are chosen and locked when the workspace is bootstrapp
 The following are not invitations to silently weaken the product requirements. If a gate fails, the affected feature remains disabled or the release channel changes as already allowed by the product plans.
 
 - **SQLCipher packaging:** reproducible Windows/macOS builds, encrypted WAL/temp behavior, and license attribution must pass before real user data is stored.
+- **Vault boundary:** exact Windows and macOS credential behavior, desktop/native-host access separation, signed/preview identity, move/update/repair behavior, and no-plaintext fallback must pass before real secrets are stored.
+- **Hostile-document isolation:** PDF/DOCX import must run only in the disposable OS-sandboxed worker. If a platform/package cannot deny user files, secrets, network, and subprocesses and kill the worker tree reliably, import remains disabled there.
 - **Codex containment:** ORT must prove that an app-server child cannot use tools, read arbitrary files, execute commands, or make network requests outside the approved Codex service path. Codex mode remains disabled in stable builds until this is demonstrated on both platforms.
 - **SignPath approval:** signed GitHub distribution is the preferred Windows stable channel. Until approval, Windows artifacts are clearly labeled preview; the Microsoft Store path remains the fallback.
 - **Native host registration:** direct and Store-style Windows installation paths must each prove install, repair, update, and uninstall behavior before their extension integration is advertised.

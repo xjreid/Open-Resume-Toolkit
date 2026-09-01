@@ -24,6 +24,7 @@ Every local data category has a purpose, location, access rule, cleanup trigger,
 - After proposal acceptance, rejection, cancellation, or unrecoverable failure, remove the original working copy and extraction data as soon as the review/recovery flow no longer needs them.
 - Completed operation working files have a one-hour maximum cleanup window; abandoned pre-processing files have a 24-hour maximum.
 - Accepted structured information becomes part of the master draft; the original document does not become a retained profile file.
+- No-AI import performs extraction and deterministic mapping locally and creates no provider-side copy. A provider receives extracted text only after the separate optional AI-mapping confirmation.
 - Provider-side copies and retention are governed by the chosen provider, not ORT. Documentation links to provider controls where practical.
 
 ## Current application workspace
