@@ -1,31 +1,23 @@
-# Aesthetic and theme planning — reserved
+# Open Resume Toolkit aesthetic direction
 
-## Status
+## Approved direction
 
-Visual design is intentionally deferred until product behavior and technical structure are ready. This folder preserves a dedicated place for aesthetic work without making premature design commitments.
+The approved universal application, overlay, extension, and website direction is **Precision Workbench**, expressed through the **Quiet Navy** palette and the **Offset Open Frame** logo.
 
-## Future content
+Precision Workbench is a calm, compact, highly structured visual system for a serious local-first desktop tool. It should feel precise and dependable without becoming clinical, crowded, promotional, or ornamental. The design direction governs visual character and behavior; it does not freeze individual controls into positions that may later conflict with accessibility, platform conventions, responsive behavior, or implementation findings.
 
-- Open Resume Toolkit brand identity, logo, icon, voice, and naming usage
-- Color, typography, spacing, shape, elevation, and motion tokens
-- Light, dark, high-contrast, reduced-motion, and platform-adaptive behavior
-- Desktop window, overlay, resume editor, non-blocking Required Qualification Alert side area/popover and evidence states, tracker, AI Activity model/provider dashboards, pricing comparisons, spend/quota-cap progress and blocked states, direct/Codex settings, and extension component appearance
-- Resume and cover-letter template appearance, font licensing/embedding, print behavior, and document accessibility
-- Icons, illustrations, empty states, loading/progress, errors, updates, repair, backups, and destructive confirmations
-- Asset sources, licenses, attribution, source formats, export formats, and ownership
-- Visual regression references and accessibility/contrast QA
+## Aesthetic package
+
+- [Precision Workbench visual direction](Precision_Workbench_Visual_Direction.md) - detailed design character, visual rules, surface guidance, accessibility expectations, and implementation freedom.
+- [Original Precision Workbench reference](Reference/precision-workbench-original.png) - the original option-two collage showing the desktop application, overlay, and website. It is a visual reference only, not a functional specification or placement requirement.
+- [Offset Open Frame logo system](Logo/README.md) - source SVGs, usage rules, export matrix, and generated sizes for website, favicon, extension, and desktop contexts.
+
+No alternative theme or rejected logo exploration belongs in this folder. New visual work should refine Precision Workbench rather than introduce parallel directions without an explicit product decision.
 
 ## Authority boundary
 
-Aesthetic plans choose presentation within approved product, accessibility, platform, privacy, rendering, and licensing requirements. They must not introduce feature tiers, data collection, cloud dependencies, browser permissions, provider transmission, or a different workflow.
+Aesthetic documentation decides visual character within approved product, accessibility, platform, privacy, security, rendering, and licensing requirements. It may not introduce feature tiers, data collection, cloud dependencies, browser permissions, automatic submission, a dark theme, or a second product workflow.
 
-## Suggested future documents
+Product plans remain authoritative for functionality and surface responsibilities. Implementation may change component placement, grouping, responsive behavior, or platform-specific presentation when necessary, provided the result preserves the Precision Workbench character and approved product boundaries.
 
-1. `Brand_and_Voice.md`
-2. `Design_Principles.md`
-3. `Tokens_and_Themes.md`
-4. `Desktop_and_Overlay_Visual_System.md`
-5. `Extension_Visual_System.md`
-6. `Document_Template_System.md`
-7. `Assets_Licensing_and_Attribution.md`
-8. `Visual_Accessibility_and_QA.md`
+Resume and cover-letter documents remain a separate professional document system. They must not inherit Quiet Navy branding, the Offset Open Frame mark, application icons, or website components.

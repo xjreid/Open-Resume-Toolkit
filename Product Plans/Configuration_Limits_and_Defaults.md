@@ -16,6 +16,8 @@ Every implemented value should have a stable name, unit, scope, default, rationa
 - No plan-based usage or retained-record quotas.
 - No automatic expiry of the canonical current application workspace merely because it has been inactive; clearing requires explicit Finish Application, discard, replacement confirmation, or user data deletion.
 - Required Qualification Alerts have exactly two user-visible classifications: **Confirmed mismatch** and **Not found in your published resume**. They are non-blocking temporary workspace data and are never retained automatically in the tracker.
+- The application workflow has two overlay stages: capture/review, then materials. Stage 2 has exactly three primary tabs: Resume, Cover letter, and Answers.
+- Tailoring returns no more than three concise change-summary points.
 
 ## Platform compatibility defaults
 
@@ -108,6 +110,7 @@ Provider limits may be lower. ORT reports those errors without silently changing
 - Completed AI request working buffers and temporary response files: remove as soon as safely committed or no later than one hour after operation completion.
 - Abandoned import working files that never enter active review: remove within 24 hours.
 - Stale ORT-owned preview/export temporary files: sweep at startup and at least daily; files outside ORT-controlled temporary directories are never deleted automatically.
+- Materialized PDF drag files: private ORT-controlled temporary paths, deleted on Finish Application/discard and swept after an interrupted session; the user-selected Download destination is never deleted automatically.
 - Content-free local diagnostic logs: disabled by default where practical or retained no longer than 30 days when enabled. Size rotation provides an additional cap.
 
 ## AI activity and pricing defaults
@@ -116,12 +119,12 @@ Provider limits may be lower. ORT reports those errors without silently changing
 - Activity timestamps: stored in a stable UTC representation and displayed in the user's current local time zone.
 - Cost display: disabled for an attempt when the applicable model, usage category, currency, or price cannot be mapped reliably; ORT shows **unavailable** rather than zero.
 - Historical estimates: preserve the currency and pricing-catalog version/effective date used when the attempt finalized; never silently recalculate after a catalog update.
-- Usage aggregation: logical-operation totals and provider-call-attempt totals remain separately available so retries do not appear to be new user operations.
-- Activity export: CSV and JSON are supported and contain non-content fields only.
+- Usage aggregation: the primary UI offers Week, Month, Year, and All time. Week/month graph daily buckets; year/all-time graph monthly buckets unless all-time density requires a documented adaptive bucket. Logical-operation totals and provider-call-attempt accounting remain distinct so retries do not appear to be new user operations.
+- Activity export: CSV and JSON exports contain selected aggregate buckets and non-content breakdowns. Scrubbed attempt metadata is available only through a deliberate diagnostic/support export.
 - Pricing catalog: versioned with each supported provider/model preset; signed independently for content-only updates through canonical GitHub release infrastructure; and reviewed whenever a preset/provider price changes and before each release that advertises cost estimates. Entries carry official source, verification, and effective/expiry metadata.
 - Initial direct providers: OpenAI, Anthropic, and Google Gemini only. Curated Economy, Balanced, and Quality presets are selected from the dated research baseline in `AI_and_Import.md`; Balanced is the initial direct-API default after provider configuration.
 - Model discovery: provider availability may hide a preset, but never enables an untested model. A selected model that becomes unavailable blocks with an explicit replacement choice and never silently reroutes.
-- Provider/model summaries: show logical operations, attempts, reported input, cached/cache-write, output, reasoning, total and other supported token categories, estimated cost, and missing/unpriced counts. Cross-currency totals are not computed.
+- Provider/model summaries: secondary aggregate breakdowns show logical operations, attempts, reported input, cached/cache-write, output, reasoning, total and other supported token categories, estimated cost, and missing/unpriced counts. Cross-currency totals are not computed.
 
 ## Direct-API guardrail defaults
 
@@ -144,7 +147,7 @@ Provider limits may be lower. ORT reports those errors without silently changing
 - Model selection: intersect picker-visible `model/list` results with ORT-tested models; prefer the service-recommended tested model. The initial compatibility candidates are GPT-5.6 Luna, Terra, and Sol.
 - Reasoning: use the returned model default initially; expose only supported efforts that ORT has evaluated. Ultra/subagent operation is unsupported.
 - Execution: one ephemeral thread per ORT operation in an empty ORT scratch directory; `approvalPolicy: never`; restricted read-only/external process sandbox; provider-only network egress; no configured dynamic tools, MCP, apps, plugins, skills, collaboration, or web access; fail on any tool/command/file event; and cleanup immediately after the activity record settles.
-- Quota refresh: on connection, when AI Activity opens, immediately before dispatch when a cap is enabled, after an operation, and on provider update notifications. Background polling is bounded and does not create ORT telemetry.
+- Quota refresh: on connection, when AI Monitoring opens, immediately before dispatch when a cap is enabled, after an operation, and on provider update notifications. Background polling is bounded and does not create ORT telemetry.
 - Usage caps: disabled until enabled. A threshold from 1% through 100% may apply to an individual stable quota-bucket identifier or all currently returned buckets. Failure to refresh an enabled cap blocks dispatch.
 - Codex costs: do not show API-equivalent currency estimates. Show provider-reported quota windows and token activity with account-wide versus ORT-only provenance.
 

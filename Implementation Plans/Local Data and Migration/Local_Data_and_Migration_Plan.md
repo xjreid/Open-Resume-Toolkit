@@ -56,8 +56,8 @@ All IDs are UUIDv7 strings generated locally. Every mutable row includes `create
 | `profiles` | local profile metadata | id, schema payload, revision |
 | `resume_drafts` | current editable master | profile id unique, document JSON, revision |
 | `published_resume` | zero-or-one immutable current master snapshot | profile id unique, revision id, document JSON, published_at, renderer tuple |
-| `workspaces` | active/captured application work | state, source kind, job text, sanitized URL, company/title, revision |
-| `workspace_artifacts` | tailored resume, letter, answer proposals | workspace id, kind, content JSON, origin operation, accepted state |
+| `workspaces` | overlay-owned active/captured application work | stage, active tab, source kind, job text, sanitized URL, company/title, revision |
+| `workspace_artifacts` | tailored resume, letter, answer proposals | workspace id, kind, content JSON, origin operation, accepted/current state, render receipt |
 | `qualification_alerts` | confirmed mismatch/not-found alerts | workspace/operation id, type, requirement/evidence JSON, state |
 | `tracker_entries` | application status and searchable summary | status, company/title, dates, workspace reference, revision |
 | `material_snapshots` | immutable structured content at tracker save | tracker id, kind, content JSON, source artifact id |
@@ -90,7 +90,8 @@ All IDs are UUIDv7 strings generated locally. Every mutable row includes `create
 - The published master is immutable in place but zero-or-one per profile. Publishing creates a new row/value and replaces the previous association atomically; it does not create a hidden master-history library. A workspace temporarily copies the published baseline it needs and records its revision so later publishing cannot change an in-progress application silently. Tracker material snapshots remain append-only.
 - Qualification alerts store requirement text/span, mandatory-classification evidence, mapped resume field IDs/evidence, result type, confidence metadata for diagnostics, and presentation state. They do not store inferred sensitive personal status.
 - A partial unique constraint permits at most one non-finished current workspace per profile. Finishing/discarding it removes temporary qualification alerts rather than copying them into tracker snapshots.
-- Activity clearing deletes display/history rows according to retention rules but never deletes guardrail periods/reservations or changes cap arithmetic.
+- Stage/tab values use constrained codes: Stage 1 capture/review; Stage 2 `resume`, `cover_letter`, or `answers`. A current answer capture/draft may reset independently without changing job text or other artifacts.
+- Activity clearing deletes ledger rows by approved date range according to retention rules but never deletes guardrail periods/reservations or changes cap arithmetic.
 
 ## Transactions and concurrency
 
@@ -133,6 +134,7 @@ Prefix/wildcard query features are constrained and parameterized. Returned snipp
 - Never modify the source.
 - Delete staging on success/cancel/failure; startup cleanup removes expired entries after verifying ownership and containment.
 - Derived previews use content-addressed cache keys over document/template/font/renderer versions, bounded by LRU size and age.
+- Resume and cover-letter drag-out copies live only under a random private session directory with recorded owner/workspace/artifact IDs. Finish/discard removes them after commit; startup cleanup removes abandoned owned directories after containment checks.
 - User exports and intentionally retained tracker snapshots are not treated as cache.
 
 ## Backup container v1
@@ -174,7 +176,7 @@ Downgrades that cannot read the current schema are blocked. The supported rollba
 
 - Full portable export: canonical JSON plus manifest and optionally user-selected rendered documents; no secrets.
 - Tracker CSV: documented columns, UTF-8 with spreadsheet-injection escaping, locale-independent dates.
-- AI Activity CSV/JSON: current filter set, normalized usage/cost, completeness/provenance, no raw prompts/responses unless the product plan later explicitly adds them.
+- AI Monitoring CSV/JSON: selected Week/Month/Year/All time bucket series and aggregate breakdowns with normalized usage/cost and completeness/provenance. Attempt rows remain internal and enter only a separately requested scrubbed diagnostic export; raw prompts/responses never enter either export.
 - Diagnostic bundle: separate, reviewable, redacted export; never silently included in backup.
 
 ## Deletion, uninstall, and repair

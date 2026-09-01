@@ -31,26 +31,37 @@ The service worker is the authority. Content scripts are treated as exposed to h
 Target permissions:
 
 - `nativeMessaging` for the native host;
-- `activeTab` and `scripting` for explicit selection capture;
+- `activeTab` and `scripting` for explicit selection capture after the extension action/shortcut supplies the browser user gesture;
 - `contextMenus` only if the approved capture UX uses it;
 - no broad host permissions;
 - no browsing-history, tabs history, clipboard, downloads, identity, or persistent storage permission beyond small non-content settings.
 
-Use `optional_permissions` where browser behavior permits. Store disclosures describe the exact selected-text flow. A permission expansion requires product/security review.
+Use `optional_host_permissions` only for an explicitly enabled overlay-initiated convenience path and scope the grant to sites the user approves. Do not request `<all_urls>` by default. Store disclosures describe the exact selected-text flow. A permission expansion requires product/security review.
 
 ## Capture flow
 
-1. User invokes the toolbar or context-menu action on the active tab.
+1. From overlay Stage 1 or the Answers tab, the user selects page text. The overlay's Capture control arms/explains the request; in the default least-permission path the user invokes the extension toolbar action or registered keyboard shortcut to provide the browser-required gesture.
 2. Service worker requests the current selection from a minimal content script.
 3. Content script returns plain text and the current document URL/title; HTML is discarded.
 4. Service worker normalizes line endings/Unicode, enforces the 128 KiB captured-text limit, and sanitizes the URL by removing credentials, fragments, and known tracking parameters.
-5. Popup/confirmation shows editable text and URL with explicit Send/Cancel.
-6. Only Send opens a native-messaging connection and transmits the capture.
-7. Desktop responds with accepted/rejected/version status; the extension shows it and clears content from memory.
+5. Service worker opens a native-messaging connection and transmits the bounded capture immediately to the authenticated desktop recipient. The extension has no competing editable review or tailoring UI.
+6. The overlay shows editable text/URL with Capture again and Continue for job text, or review and Generate answer for question text.
+7. Desktop returns accepted/rejected/version status; the extension shows only compact bridge status/error feedback and clears content from memory.
 
 No content is written to extension local/sync storage. If the desktop is unavailable, the extension may keep the current payload only while the confirmation/native-call page is alive; it does not queue it for later.
 
 Restricted browser pages, empty selections, over-limit content, invalid URLs, and unsupported encodings produce local actionable errors.
+
+### Optional overlay-initiated capture feasibility gate
+
+An optional direct response to the overlay Capture button may use a bounded `runtime.connectNative()` session so desktop can signal the extension, but only when all of the following are proven in Chrome and Edge:
+
+- the user explicitly granted a narrow optional site permission that permits script access without a fresh extension action;
+- the native session is authenticated, short-lived, reconnectable, and does not keep the Manifest V3 service worker alive indefinitely;
+- no default broad host access is added and store disclosures remain accurate;
+- failures fall back to the extension action/shortcut flow without losing reviewed overlay state.
+
+Until those gates pass, the toolbar/shortcut gesture flow is the shipped behavior even though capture is initiated conceptually from the overlay workflow.
 
 ## Native-messaging contract
 
@@ -75,7 +86,7 @@ Request envelope v1:
 
 Response is the common `ok/value` or `ok/error` shape with desktop/host/protocol versions and retryability. Unknown fields are tolerated only for additive minor versions. Unsupported major versions return `PROTOCOL_INCOMPATIBLE` and a repair/update action.
 
-Limits are lower than browser maximums: 256 KiB total envelope, 128 KiB captured text, 4 KiB URL, bounded JSON depth/fields, one capture request per host process, a five-second capability-acknowledgement target, and one desktop-launch attempt of up to 15 seconds.
+Limits are lower than browser maximums: 256 KiB total envelope, 128 KiB captured text, 4 KiB URL, bounded JSON depth/fields, one request/response in the default host process, a five-second capability-acknowledgement target, and one desktop-launch attempt of up to 15 seconds. A separately negotiated bounded session is allowed only for the optional overlay-initiated feasibility path.
 
 ## Native host
 
@@ -106,9 +117,9 @@ Message length precedes each authenticated frame. Failed authentication receives
 
 ## Desktop delivery behavior
 
-Desktop copies accepted capture data into a new or user-selected workspace and returns its ID. It raises/focuses the main window according to OS policy and shows the capture review. AI does not start automatically.
+Desktop copies accepted capture data into the sole current overlay workspace and returns its ID. It raises/focuses the overlay according to OS policy and shows Stage 1 job review or Answers-tab question review. AI does not start automatically.
 
-If another capture arrives while review is active, desktop creates a separate pending intent or asks the user which workspace to use; it never silently overwrites job text. Pending intents are encrypted in the database only after authenticated receipt and are subject to the workspace retention rules.
+If another capture arrives while review is active, the overlay asks whether to replace the pending capture; it never silently overwrites accepted job text or another tab's work. Pending intents are encrypted only after authenticated receipt and remain subject to the one-workspace retention rules.
 
 ## Installation and registration
 
@@ -154,7 +165,7 @@ Emergency desktop disablement is local capability-based; the extension itself st
 
 ## Accessibility and privacy tests
 
-Popup confirmation and errors are keyboard/screen-reader operable at 200% scaling. Selection, URL, and Send/Cancel have explicit labels; status changes are announced without trapping focus. Privacy tests inspect browser storage after success/failure/restart and verify no captured content remains.
+Extension action/status and errors are keyboard/screen-reader operable at 200% scaling. The overlay review owns the labeled edit/accept controls and announces receipt without trapping focus. Privacy tests inspect browser storage after success/failure/restart and verify no captured content remains.
 
 ## Completion criteria
 

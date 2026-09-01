@@ -175,11 +175,11 @@ Only the name is needed to identify the entry. Empty technologies, links, dates,
 
 Initial style categories are:
 
-1. **Technical/Engineering** — compact, familiar, ATS-conscious single-column direction.
+1. **Technical/Engineering** — the default; a compact, ATS-conscious single-column direction based on the supplied Jake's Resume reference and intended to match that familiar professional structure as closely as licensing permits.
 2. **Professional/Business** — polished and spacious professional direction.
 3. **Modern/Marketing and Sales** — more visual personality while preserving readability and export quality.
 
-Changing style changes presentation only. It never flattens, deletes, rewrites, or requires re-entry of structured content. Exact typography, spacing, colors, assets, and template layouts belong in the aesthetic workspace.
+Changing style changes presentation only. It never flattens, deletes, rewrites, or requires re-entry of structured content. Resume and cover-letter exports never inherit the ORT application/website color theme, logo, iconography, or brand language. Exact typography, spacing, colors, assets, and template layouts belong in the aesthetic workspace. Exact reuse of Jake's Resume source or assets requires a documented compatible upstream license; otherwise ORT independently implements the common professional structure without copying protected source or branding.
 
 ## Import review
 
@@ -199,4 +199,3 @@ The import flow follows `AI_and_Import.md` and uses the same schema as manual en
 - Tailored results use the same structured primitives wherever possible, remain directly editable, and record their source published revision.
 - The deterministic local renderer controls typography, alignment, spacing, headings, links, bullets, and page breaks.
 - Renderer layout changes never alter stored factual content.
-

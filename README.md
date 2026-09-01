@@ -26,13 +26,13 @@ For implementation, continue with [Technical implementation plans](<Implementati
 
 - Approved product behavior belongs in `Product Plans/`.
 - Code-level design belongs in `Implementation Plans/`; working code may refine internal details without changing approved product behavior.
-- Future visual identity, themes, and document-template styling belong in `Aesthetic/`.
+- The approved universal visual direction and future component/template work belong in `Aesthetic/`; application branding and professional document templates remain separate systems.
 - Unresolved choices and validation work belong only in `Product Plans/Release_Scope_and_Open_Decisions.md`.
 - Technical or aesthetic documents may implement approved behavior but may not silently redefine it.
 
 ## Product summary
 
-Open Resume Toolkit helps a person maintain one master resume, tailor it to a deliberately captured job description, create optional cover letters and application answers, use a personal OpenAI/Anthropic/Gemini API key or eligible ChatGPT/Codex subscription, compare models and local usage, set optional spend/quota guardrails, export documents locally, and track completed applications. User content, AI activity, and guardrail records remain on the user's computer. The project operates no ORT-owned account system or subscription, hosted database, cloud document store, or centrally funded AI service.
+Open Resume Toolkit is a free, open-source desktop tool for maintaining one master resume. Its overlay captures and reviews job descriptions, tailors resumes, generates optional cover letters and application answers, presents required-qualification alerts, and provides PDF preview/edit, Download, and drag-out controls. Users may configure a personal OpenAI/Anthropic/Gemini API key or eligible ChatGPT/Codex subscription, inspect aggregate local usage, set optional spend/quota guardrails, and track completed applications. User content, AI accounting, and guardrail records remain on the user's computer. The project operates no ORT-owned account system or subscription, hosted database, cloud document store, or centrally funded AI service.
 
 ## License, attribution, and official releases
 

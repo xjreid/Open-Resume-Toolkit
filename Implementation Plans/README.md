@@ -51,7 +51,7 @@ Exact dependency versions are chosen and locked when the workspace is bootstrapp
 2. Implement encrypted storage, schema migrations, backup primitives, and the structured resume model.
 3. Deliver the offline editor/publish/preview/export path before connecting any AI service.
 4. Add direct-provider adapters, operation accounting, guardrails, tailoring, and Required Qualification Alerts.
-5. Add tracker/workspace workflows and browser native messaging.
+5. Add the overlay-owned Stage 1/Stage 2 application workflow, tracker, PDF Download/drag handoff, and browser native messaging.
 6. Add external Codex support only after the containment proof passes on both supported operating systems.
 7. Harden packaging, signing, update, recovery, accessibility, and release evidence.
 8. Build and publish the static project website after download channels have real artifacts.

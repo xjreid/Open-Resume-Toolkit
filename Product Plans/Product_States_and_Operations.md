@@ -18,18 +18,19 @@ This file defines canonical user-visible record states and recoverable local ope
 One local profile has zero or one current application workspace:
 
 1. **Empty**
-   - Ready for a deliberate job-description capture or manual workspace start.
+   - The overlay is at Stage 1 and ready for a deliberate job-description capture.
 
 2. **Capture under review**
    - Contains proposed job text and an optional sanitized URL.
-   - No AI request begins until the user accepts the content.
+   - The overlay permits editing, Capture again, and Continue. No AI request begins until the user accepts the content and selects Continue.
 
 3. **Active**
-   - Contains one reviewed job context and may contain temporary tailored-resume versions, Required Qualification Alerts with active/dismissed/ignored presentation state, cover-letter drafts, application-question drafts, user edits, and exports-in-progress.
+   - The overlay is at Stage 2, opens on the Resume tab, and also exposes Cover letter and Answers tabs without discarding inactive-tab work.
+   - Contains one reviewed job context and may contain temporary tailored-resume versions, Required Qualification Alerts with active/dismissed/ignored presentation state, cover-letter drafts, application-question drafts, user edits, PDF render versions, and exports-in-progress.
    - Another job cannot be merged or substituted without explicit finish, discard, or replace confirmation.
 
 4. **Final resume selected**
-   - One reviewed tailored resume is selected for export or optional tracker retention. Active or dismissed Required Qualification Alerts remain advisory and do not block this transition.
+   - One reviewed tailored resume is selected for preview/edit, download, operating-system drag-out, or optional tracker retention. Active or dismissed Required Qualification Alerts remain advisory and do not block this transition.
    - A reviewed cover letter and approved ordered answer set may also be selected.
    - The user can continue editing, change selections, or return to Active.
 
@@ -39,12 +40,14 @@ One local profile has zero or one current application workspace:
 
 6. **Resetting**
    - The selected tracker entry and artifacts committed successfully, or the user deliberately chose finish without saving.
-   - Unselected temporary content and ORT-owned preview files are removed.
+   - Unselected temporary content and ORT-owned preview/drag files are removed.
 
 7. **Empty**
    - Reset completes and a new application can begin.
 
 A failed tracker save returns to Final resume selected or Active with all workspace content intact. Explicit discard may transition from any non-finishing state to a confirmed destructive reset.
+
+These states are presented in the overlay, not as a main-window job workspace. The main window remains responsible for the master resume and supporting tracker, AI monitoring, connection, backup, update, and settings surfaces.
 
 ## Resume-import states
 
@@ -91,7 +94,7 @@ Transitions are monotonic for one attempt. Retrying creates a new attempt under 
 
 ## AI activity-record lifecycle
 
-The AI activity ledger is user-facing product data, not centralized telemetry or an ordinary diagnostic log.
+The AI activity ledger is local product data, not centralized telemetry or an ordinary diagnostic log. It is the accounting source for the user-facing aggregate AI Monitoring view; attempt rows are not the primary monitoring interface.
 
 1. **Prepared locally** — the logical operation exists, but no provider call is counted or priced yet.
 2. **Dispatch recorded** — immediately before network transmission, ORT commits an attempt record with provider/model, operation type, time, and locally estimated input size.
@@ -101,7 +104,7 @@ The AI activity ledger is user-facing product data, not centralized telemetry or
 6. **Estimate settled** — direct-API reservations settle to the contemporaneous cost estimate, currency, price components, and pricing-catalog version, or remain visibly unresolved. Codex records no invented currency estimate.
 7. **Finalized** — success, failure, cancellation, timeout, blocked-before-dispatch, or unknown outcome is stored. An interrupted finalization is recovered at startup and never guessed to be unbilled or quota-free.
 
-A provider call begins only after the dispatch record commits. If the network outcome is ambiguous, the attempt is marked accordingly and retained because billing may still have occurred. Clearing an activity record never changes the operation result, deletes generated content, or represents a provider-side billing deletion.
+A provider call begins only after the dispatch record commits. If the network outcome is ambiguous, the attempt is marked accordingly and retained because billing may still have occurred. Clearing an activity date range never changes an operation result, deletes generated content, resets guardrails, or represents a provider-side billing deletion.
 
 ## AI connection-mode lifecycle
 

@@ -1,0 +1,47 @@
+{
+  "source": {
+    "icon": "../open-frame-icon.svg",
+    "iconReversed": "../open-frame-icon-reversed.svg",
+    "horizontal": "../open-frame-lockup-horizontal.svg",
+    "horizontalReversed": "../open-frame-lockup-horizontal-reversed.svg",
+    "stacked": "../open-frame-lockup-stacked.svg"
+  },
+  "icons": [
+    16,
+    20,
+    24,
+    32,
+    48,
+    64,
+    128,
+    256,
+    512,
+    1024
+  ],
+  "reversedIcons": [
+    16,
+    24,
+    32,
+    48,
+    64,
+    128,
+    256,
+    512
+  ],
+  "horizontalWidths": [
+    160,
+    240,
+    320,
+    480,
+    640,
+    960
+  ],
+  "stackedWidths": [
+    128,
+    256,
+    512,
+    1024
+  ],
+  "color": "#102A4C",
+  "generatedBy": "export-logo-assets.mjs"
+}

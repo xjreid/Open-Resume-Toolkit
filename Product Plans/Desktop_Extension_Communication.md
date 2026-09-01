@@ -7,7 +7,7 @@ Chrome and Edge extensions send only user-reviewed captures to the locally insta
 ## Components and authority
 
 1. **Content script** — reads only the text selected after an explicit user action and sends it to the extension service worker.
-2. **Extension service worker** — validates type and size, sanitizes the current URL, presents review, and communicates with the registered native host.
+2. **Extension service worker** — validates type and size, sanitizes the current URL, and communicates with the registered native host. It does not present a parallel job-review or tailoring workflow.
 3. **Native-messaging host** — a minimal executable installed with the desktop app that validates browser messages and relays them through protected local IPC.
 4. **Desktop app and overlay** — decide whether to accept the capture, own the application workspace, access credentials, call providers, store content, and display results.
 
@@ -17,7 +17,7 @@ Browser content can never directly read local records, access credentials, chang
 
 - Initial actions are job-description capture, application-question capture, capability check, acknowledgement, and user-facing error.
 - Capture requires explicit user activation. Continuous page scanning, browsing-history collection, automatic form reading, and automatic submission are prohibited.
-- The user reviews and may edit captured text and the sanitized URL before sending it.
+- The overlay is the sole review surface: it shows the returned text and sanitized URL and lets the user edit, remove the URL, capture again, or continue.
 - URL fragments and known sensitive/tracking query parameters are removed; the user may remove the URL entirely.
 - A new capture cannot silently merge with a different active application workspace.
 
@@ -56,6 +56,9 @@ It must not repeatedly spawn processes or silently discard the reviewed capture.
 ## Permissions
 
 - Prefer `activeTab`, `scripting`, `nativeMessaging`, and the narrowest permissions that implement deliberate capture.
+- In the default least-permission flow, the overlay can arm or explain a capture request, but the browser extension action or registered keyboard shortcut supplies the browser-required user gesture before selected text is read.
+- An overlay-initiated capture may be offered only after the user explicitly grants a narrowly scoped optional site permission and the browser/native bridge proves a bounded authenticated session. It is an optional convenience, not a prerequisite for capture.
+- Do not request `<all_urls>` by default merely to make the overlay button appear to initiate capture directly.
 - Broad host permissions require a documented product need, explicit store disclosure, and security review.
 - Extension storage contains only non-sensitive preferences and pending non-content state when necessary.
 - Extension source is published with the desktop source, and store packages must be traceable to repository revisions.
@@ -70,4 +73,3 @@ The extensions should share one codebase where practical while retaining distinc
 - Oversized, stale, malformed, unrecognized, or unauthorized messages are rejected before desktop processing.
 - If the desktop rejects a capture, the extension keeps the reviewed text only long enough to let the user retry or copy it, then clears it.
 - No extension failure may expose local database paths, secrets, stack traces, or unrelated application content.
-

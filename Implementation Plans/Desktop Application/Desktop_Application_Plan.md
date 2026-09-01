@@ -27,11 +27,11 @@ The tradeoff is platform WebView variance. Supported Windows builds require WebV
 
 ### Main window
 
-Owns all creation/editing, connection setup, activity, tracker, settings, backup, update, and repair workflows. A single-instance guard routes file-open and browser-capture intents to this window. Closing behavior follows the OS convention; the app does not stay resident merely to collect browsing data.
+Owns master-resume creation/import/editing/publishing plus tracker, aggregate AI Monitoring, connection setup, settings, backup, update, and repair. It contains no current-job tailoring/editor route. A single-instance guard routes file-open intents to this window and browser-capture intents to the overlay. Closing behavior follows the OS convention; the app does not stay resident merely to collect browsing data.
 
 ### Overlay window
 
-A real Tauri always-on-top window that can be opened from an active workspace. It shows the current task context, output/change summary, and Required Qualification Alerts. It is never injected into a job site. It receives no greater backend capability than the minimum workspace queries and presentation-state commands.
+A real Tauri always-on-top window that owns the complete current-application workflow. Stage 1 captures and reviews job text. Stage 2 supplies Resume, Cover letter, and Answers tabs; PDF preview/edit/download/drag controls; change summaries and alerts; answer copy/reset; and persistent Finish Application. It is never injected into a job site and receives only the backend commands needed for that workflow.
 
 Overlay state is durable where user intent matters (`dismissed`, `ignored`) and ephemeral for window position/open state unless the product setting says to remember it. Closing the overlay does not mark an alert ignored and does not cancel work.
 
@@ -46,11 +46,9 @@ The initial routes/views are:
 ```text
 /start                    local profile and recovery/startup states
 /resume                   master draft editor and publish state
-/workspace/:id            captured job, tailored materials, changes, alerts
 /tracker                  application tracker and filters
 /tracker/:id              saved application and immutable snapshots
-/activity                 AI logical operations and aggregates
-/activity/:operationId    attempts, usage/cost/quota provenance, safe errors
+/monitoring               aggregate tokens and direct cost by Week/Month/Year/All time
 /settings/ai              No AI / Direct API / Codex connection and controls
 /settings/data            storage, backup, restore, export, deletion
 /settings/browser         extension/host status and repair
@@ -114,22 +112,21 @@ A blocking startup state provides safe diagnostics and approved recovery actions
 - Preview requests are revision-addressed and cancellable. A late result for an older revision is discarded.
 - Import opens a separate review model; accepting chosen changes creates a normal draft revision with an audit summary.
 
-The UI never directly edits rendered Typst or DOCX source. Theme/template controls use known IDs and structured parameters, to be defined later by the aesthetic plan.
+The UI never directly edits rendered Typst, PDF, or DOCX source. Theme/template controls use known IDs and structured parameters. Document templates are isolated from ORT application branding; the default Technical template adapter implements the approved Jake's Resume-derived professional structure subject to the recorded source/license gate.
 
 ## Workspace and application flow
 
-Workspace view composes independently persisted panels for:
+The overlay implements an explicit state machine:
 
-- reviewed job description and source metadata;
-- selected published master snapshot;
-- tailoring controls and current operation status;
-- tailored resume proposal and user edits;
-- change summary;
-- Required Qualification Alerts;
-- cover letter and application answers;
-- finish/save-to-tracker action.
+- **Stage 1 / capture:** Capture job description; receive selected text; review/edit/remove URL; Capture again; Continue. Continue is disabled for empty text and is the only action that starts initial tailoring.
+- **Stage 2 / Resume:** show the current PDF card, no more than three sharp change points, qualification alerts, Preview and edit, Download, drag handle, and Regenerate resume. Regeneration requires a nonempty correction instruction.
+- **Stage 2 / Cover letter:** begin with Generate cover letter; after success show the same PDF-card controls and expanded structured editor/PDF preview.
+- **Stage 2 / Answers:** Capture question; review/edit; Generate answer; edit/copy output; Reset and capture new question.
+- **Persistent Stage 2 action:** Finish Application remains visible independent of the selected tab and optionally commits selected materials to the tracker before resetting to Stage 1.
 
-The UI always distinguishes source facts, AI proposals, and user-accepted content. Navigating away during an active operation does not destroy it; the activity record remains authoritative and the workspace can reconnect.
+Expanded preview/edit grows the overlay substantially and places the structured editor beside a large PDF preview. The PDF binary is never edited directly. Resume and cover-letter PDF cards each expose both a keyboard-accessible Download action and a pointer drag source; drag materializes a private temporary file. If a browser rejects a drop, the UI keeps Download and save/open-folder guidance available.
+
+The UI always distinguishes source facts, AI proposals, and user-accepted content. Switching tabs or closing/reopening the overlay does not destroy work; the activity record and local workspace reconnect it.
 
 `Finish Application` first validates current artifacts, then submits one transaction command. It does not claim success until tracker entry and immutable snapshots commit. Export can occur before or after finishing but is not itself tracker persistence.
 
@@ -170,21 +167,13 @@ The selected connection mode is exactly one of `none`, `direct`, or `codex`.
 
 Switching modes cancels no active request silently. If an operation is running, require it to complete/cancel before the new mode becomes active.
 
-## AI Activity
+## AI Monitoring
 
-The activity list queries the local ledger with pagination and filters. Logical operations expand into attempts. UI calculations never recompute authoritative costs/caps; they format backend-normalized records.
+The primary view queries backend-computed aggregates, not a paginated call list. A Week/Month/Year/All time period control drives a token time series, a direct estimated-cost time series, and selected-period totals. Week/month use daily buckets; year/all-time use monthly buckets unless the backend returns a documented adaptive all-time bucket. Graphs have accessible tabular/text equivalents.
 
-Required representations include:
+Secondary breakdowns can group by provider, effective model/preset, operation type, and status. Completeness, currency, catalog version, estimate provenance, retries, missing usage, and Codex account/quota provenance remain visible in aggregate explanations. Codex activity is never assigned an invented dollar amount or added to direct cost.
 
-- operation, time, status, connection mode, requested/effective provider/model;
-- input/output/cache/reasoning token components when reported;
-- estimate versus actual and completeness status;
-- direct cost by currency/catalog/provenance;
-- Codex account/rate-limit snapshot and age where available;
-- retry, cancellation, interrupted/unknown outcome, validation failure;
-- change-summary/alert counts without duplicating full resume content.
-
-Clearing activity and resetting direct/Codex guardrails are separate commands with separate confirmations and explanations.
+Attempt records remain backend accounting/recovery data and may enter an explicitly requested scrubbed diagnostic export; no individual-call route or primary call table ships. Ordinary CSV/JSON export contains selected aggregate buckets and breakdowns. Clearing by date range and resetting direct/Codex guardrails use separate commands and confirmations.
 
 ## Progress, cancellation, and errors
 
@@ -197,10 +186,10 @@ Errors show a plain-language summary, safe support code, retry eligibility, and 
 - Native keyboard order follows the functional reading order; every action is reachable without pointer or drag.
 - Drag reorder has move-up/down and position controls with announcements.
 - Form fields have programmatic labels, descriptions, error association, and status regions.
-- Headings/landmarks identify workspace, editor, alerts, preview, activity, and settings regions.
+- Headings/landmarks identify overlay stage, tabs, editor, alerts, preview, monitoring, and settings regions.
 - Focus is restored after dialogs/popovers and intentionally placed after route-changing actions.
 - Screen-reader output does not expose hidden resume sections or repeat streaming tokens continuously.
-- OS scaling, text zoom, high-contrast/forced-colors, reduced motion, and light/dark preference are supported structurally; final palette/theme remains an aesthetic decision.
+- OS scaling, text zoom, high-contrast/forced-colors, and reduced motion are supported structurally. ORT ships one light color scheme; forced-colors support is an accessibility behavior, not a second theme.
 - Minimum target size and non-color status indicators are enforced by automated component tests later, independent of the final visual theme.
 
 Manual release coverage includes NVDA with Windows WebView2 and VoiceOver with WKWebView, keyboard-only use, 200% text scaling, and reduced motion.

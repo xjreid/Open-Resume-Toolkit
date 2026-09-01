@@ -33,7 +33,7 @@ Every local data category has a purpose, location, access rule, cleanup trigger,
 - Successful Finish Application retains only the selected structured artifacts and confirmed tracker data; unselected workspace content is removed.
 - Required Qualification Alerts are never copied into tracker entries or retained structured-material snapshots during Finish Application.
 - A failed tracker save preserves the complete workspace.
-- Temporary preview/render files are separate from the canonical workspace and follow the short cleanup defaults.
+- Temporary preview/render/drag files are separate from the canonical workspace and follow the short cleanup defaults. Finish Application and discard remove them after the canonical transition commits.
 
 ## Tracker and structured snapshots
 
@@ -61,10 +61,10 @@ Every local data category has a purpose, location, access rule, cleanup trigger,
 
 - AI activity records are durable, content-free user data and remain locally available until the user clears them, enables an age-based retention policy, or deletes all local ORT data.
 - The default is to retain activity history without automatic age-based deletion so totals do not disappear unexpectedly. The interface offers 30-day, 90-day, one-year, and retain-until-cleared choices and states the active policy.
-- A user can clear one record, a filtered selection, a date range, or all activity history without deleting generated content, tracker records, credentials, or provider-side records.
+- A user can clear a date range or all activity history without deleting generated content, tracker records, credentials, guardrail counters, or provider-side records. Individual attempts are not the primary user-facing deletion unit.
 - Removing or replacing an API key does not remove historical activity records.
 - Signing out of Codex does not remove historical ORT activity or last-known non-secret quota/token snapshots; the user can clear those through their own data controls.
-- Encrypted backup and full structured export include AI activity records by default. Filtered CSV/JSON export contains only the visible non-content fields and never includes keys, prompts, responses, resume/job content, or full URLs.
+- Encrypted backup and full structured export include AI activity records by default. Ordinary CSV/JSON export contains the selected aggregate time buckets and non-content breakdowns; it never includes keys, prompts, responses, resume/job content, or full URLs.
 - Ordinary diagnostic bundles exclude the full activity ledger by default. If the user deliberately includes relevant activity metadata, the preview names the included fields and applies the same content/secret exclusions.
 
 ## AI guardrail state
@@ -73,7 +73,7 @@ Every local data category has a purpose, location, access rule, cleanup trigger,
 - Activity-history clearing and age-based retention never reset or reduce guardrail state. The UI states this before clearing history.
 - Calendar period detail may be compacted after reset, but enough non-content state remains to prevent duplicate resets and explain the current counter. All-time state remains until its separately confirmed baseline reset.
 - Backups may include policy configuration and historical counters, but restored policies remain inactive until the user binds them to a newly authenticated credential/session. Secrets are never included and counters never silently transfer to another identity.
-- Full-data export identifies guardrail records separately from AI Activity. Ordinary activity CSV/JSON does not include security-sensitive internal reservation state.
+- Full-data export identifies guardrail records separately from AI Monitoring history. Ordinary monitoring CSV/JSON does not include security-sensitive internal reservation state.
 
 ## Browser-extension content
 

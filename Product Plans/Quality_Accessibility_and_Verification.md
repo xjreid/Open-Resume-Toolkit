@@ -36,7 +36,7 @@ Required coverage includes:
 - High contrast, scalable text, zoom, and reduced-motion behavior
 - No color-only meaning
 - Accessible dialogs for destructive, provider-transmission, update, and Finish Application decisions
-- Accessible AI Activity summaries, provider/model token and cost tables, mode/model controls, spending/quota-cap forms, progress warnings, blocked states, exports, and clearing/reset confirmations without color-only cost, quota, or error meaning
+- Accessible AI Monitoring period controls, token/cost graphs with equivalent textual summaries, aggregate breakdowns, mode/model controls, spending/quota-cap forms, progress warnings, blocked states, exports, and clearing/reset confirmations without color-only cost, quota, or error meaning
 - Readable exported documents with selectable text, meaningful ordering, links, and appropriate tagging where supported
 - Overlay behavior that does not trap focus or obstruct essential browser/OS controls
 - Required Qualification Alerts that are keyboard and screen-reader accessible, do not rely on color alone, expose the requirement and evidence relationship clearly, can be dismissed/ignored/reopened, and never seize focus or block the workflow
@@ -57,15 +57,15 @@ Exact minimum versions are chosen during implementation and recorded centrally. 
 1. First launch, local-profile creation, backup explanation, and manual resume creation without AI.
 2. Import a text-bearing resume, review provider transmission, correct the proposal, save the draft, and publish.
 3. Edit a published draft without those unpublished changes leaking into tailoring.
-4. Capture a job description through Chrome and Edge, including desktop-not-running and repair cases.
-5. Tailor, inspect verified change summaries and Required Qualification Alerts, dismiss/ignore/reopen alerts, edit, refine, and select a final resume without alerts blocking progress.
-6. Generate and review a cover letter and permitted application answer; refuse a prohibited attestation.
-7. Render and validate PDF, DOCX, and text exports across representative content lengths and templates.
+4. From overlay Stage 1, capture and review/edit a job description through Chrome and Edge, capture again, and continue, including browser-gesture, desktop-not-running, and repair cases.
+5. In overlay Stage 2, tailor, inspect no more than three verified change points and Required Qualification Alerts, dismiss/ignore/reopen alerts, enlarge preview/edit, and require a correction prompt before resume regeneration.
+6. Generate and preview/edit a cover-letter PDF; capture/review an application question, generate and edit an answer, copy it, then reset and capture another; refuse a prohibited attestation.
+7. Download and drag the current resume and cover-letter PDFs from their overlay cards, verify the browser-rejected-drop fallback, and render/validate PDF, DOCX, and text outputs across representative content lengths and templates.
 8. Finish with selected structured materials, recover safely from a failed save, and reset temporary content.
 9. Open a historical structured snapshot and render it after application and renderer upgrades.
 10. Create an encrypted backup, restore on a clean profile, handle the missing AI credential, and verify integrity.
 11. Delete selected data and all local data without affecting unrelated files.
-12. Configure each OpenAI, Anthropic, and Gemini direct adapter; compare tested models/prices; complete successful, failed, retried, cancelled, ambiguous, and interrupted calls; verify attempt-level activity, per-model/provider totals, usage provenance, cost-estimate labeling, export, retention, and selective clearing.
+12. Configure each OpenAI, Anthropic, and Gemini direct adapter; complete successful, failed, retried, cancelled, ambiguous, and interrupted calls; verify Week/Month/Year/All time token and estimated-cost graphs/totals, aggregate breakdowns, accessible text equivalents, internal attempt accounting, provenance, export, retention, and date-range clearing.
 13. Enable weekly/monthly/yearly/all-time direct spending caps and prove warnings, atomic reservation, boundary reset, fail-closed unknown pricing/usage, crash recovery, credential replacement, and the separation between clearing activity and resetting a cap.
 14. Connect and sign out of Codex through browser and device-code paths; discover tested account models; verify isolated no-tool execution, ORT thread tokens where available, account-wide daily/lifetime tokens, exact quota windows, delayed/rounded updates, quota thresholds, bucket changes, and missing telemetry labels.
 15. Switch between Direct API, Codex subscription, and No AI without leaking credentials, changing an active operation, or silently falling back.
@@ -114,7 +114,7 @@ A stable release requires:
 - No known critical security vulnerability or secret exposure remains.
 - License and distributed-asset review is complete.
 - Privacy, provider-transmission, backup, unsigned-build, and local-only limitations are truthful in the application and its distributed documentation.
-- AI Activity records every ORT provider attempt without storing forbidden content, survives interruption, exports and deletes correctly, and never represents an estimate as an invoice or account-wide usage statement.
+- The internal ledger records every ORT provider attempt without forbidden content and survives interruption; aggregate AI Monitoring graphs/totals export and delete correctly and never represent an estimate as an invoice or ORT-only Codex account statement.
 - Required Qualification Alerts are generated within the existing tailoring call, contain only validated explicit requirement/evidence references, use no fit score or eligibility claim, remain non-blocking and dismissible, and are removed with the workspace rather than retained in the tracker.
 - Direct spending caps cannot be bypassed by retry, concurrency, crash, activity deletion, clock change, or missing data; Codex caps block future operations based on freshly reported stable quota buckets and clearly disclose best-effort limits.
 - Known limitations and deferred features are documented.

@@ -34,7 +34,7 @@ Contains local preferences, schema version, installation identity, backup prefer
 ### Application workspace
 
 - Zero or one current workspace per profile.
-- Contains reviewed job text, sanitized URL, workflow state, temporary tailored versions, Required Qualification Alerts and their dismissed/ignored presentation state, cover-letter drafts, question/answer drafts, user edits, and selected final materials.
+- Contains the overlay stage/tab state, reviewed job text, sanitized URL, temporary tailored versions, Required Qualification Alerts and their dismissed/ignored presentation state, cover-letter drafts, question/answer drafts, user edits, PDF render references, and selected final materials.
 - Each alert stores a stable workspace-local identifier, classification, normalized mandatory requirement, bounded job-text evidence reference, optional published-resume conflict evidence reference, source published-master revision, generation/validation version, and presentation state. It stores no inferred personal qualification or eligibility decision.
 - Stored locally with a bounded recovery policy so crashes and restarts do not destroy current work.
 - Cleared by successful Finish Application, explicit finish without saving, or explicit discard.
@@ -53,7 +53,7 @@ Contains local preferences, schema version, installation identity, backup prefer
 
 ### AI activity ledger
 
-- Durable, user-visible local records for logical AI operations and their individual provider-call attempts.
+- Durable local accounting records for logical AI operations and their individual provider-call attempts. The user-facing AI Monitoring surface queries aggregate time buckets and breakdowns from this source; it does not expose the attempt table as its primary interface.
 - Stores opaque local identifiers, operation type, connection mode, provider, credential identity where applicable, requested and effective model, preset version, timestamps, duration, status, retry relationship, coarse error category, provider-reported usage categories, local size estimates, contemporaneous cost estimate where applicable, currency, estimate completeness, and pricing-catalog version/effective date.
 - Does not store API keys, prompt or response bodies, resume/job/question content, full URLs, filenames, or provider-account credentials.
 - Preserves raw provider-reported usage separately from locally derived estimates so later code or pricing changes do not obscure provenance.
@@ -65,7 +65,7 @@ Contains local preferences, schema version, installation identity, backup prefer
 - Direct-API records contain the opaque credential identity, enabled calendar/all-time periods, configured currency caps, fixed time zone and boundaries, warning thresholds, counted estimated spend, active reservations, unresolved outcomes, next reset, and explicit policy/baseline-change audit facts.
 - Codex records contain stable provider quota-bucket identifiers, user thresholds, last provider-reported used percentage/window duration/reset time, refresh status, and the mapping/review state when provider buckets change.
 - Stores no API key, Codex access/refresh token, prompt, response, resume/job content, or provider cookie.
-- Clearing or expiring AI Activity cannot mutate this state. Changing or resetting it is a separate, explicit operation.
+- Clearing or expiring AI Monitoring history cannot mutate this state. Changing or resetting it is a separate, explicit operation.
 
 ### Codex account-usage snapshot
 
@@ -75,7 +75,7 @@ Contains local preferences, schema version, installation identity, backup prefer
 
 ### Operational diagnostics
 
-Contains bounded non-content troubleshooting facts needed beyond the durable AI activity ledger. Diagnostic data must remain separable from resume, job, answer, credential, and activity-history records when a user creates a diagnostic report. Short-lived diagnostic logs do not replace, silently add content to, or become the authoritative source for AI Activity.
+Contains bounded non-content troubleshooting facts needed beyond the durable AI accounting ledger. Diagnostic data must remain separable from resume, job, answer, credential, and monitoring-history records when a user creates a diagnostic report. Short-lived diagnostic logs do not replace, silently add content to, or become the authoritative source for AI Monitoring.
 
 ## Local storage requirements
 
@@ -102,6 +102,8 @@ Contains bounded non-content troubleshooting facts needed beyond the durable AI 
 ## Rendering and retained artifacts
 
 - PDF, DOCX, and plain text are generated locally from structured data.
+- The overlay materializes each current resume/cover-letter PDF in a private temporary location for preview and operating-system drag-out. Its PDF card also provides Download to a user-selected durable location.
+- Temporary drag files are derived artifacts and are deleted on Finish Application/discard or recovery cleanup; downloaded files remain under user control.
 - The tracker retains structured snapshots rather than generated binaries by default.
 - A render manifest makes historical material reproducible within reasonable compatibility bounds.
 - ORT may state that a document is semantically reproducible; it must not promise byte-identical output after renderer, font, or operating-system changes unless that property is specifically implemented and tested.

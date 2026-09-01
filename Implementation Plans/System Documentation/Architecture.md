@@ -52,7 +52,7 @@ Long-running work runs as cancellable Rust tasks behind an operation coordinator
 
 ### UI webviews
 
-There are two application windows: the main window and an optional always-on-top overlay. Both load only bundled assets under a restrictive content-security policy. They share a typed client library but have separate view state. Closing the overlay never cancels or mutates the underlying workspace.
+There are two application windows: the main window and an always-on-top application overlay. Both load only bundled assets under a restrictive content-security policy and share a typed client library with separate view state. The main window owns master-resume authoring and supporting tracker/monitoring/settings functions; it has no job-specific workspace route. The overlay owns the complete two-stage application workflow. Closing it never cancels or mutates the underlying workspace.
 
 ### Native host
 
@@ -95,7 +95,7 @@ Rules:
 |---|---|---|
 | Profile | local database | one active local profile in v1; no remote identity |
 | Master resume | one draft plus zero-or-one immutable published snapshot | tailoring reads/copies the published snapshot, never a mutable draft |
-| Workspace | captured job input and generated artifacts | one active tailoring operation per workspace; user edits remain distinct from AI proposals |
+| Workspace | overlay stage/tab state, captured job input, generated artifacts, and PDF materializations | one current workspace; one active tailoring operation; user edits remain distinct from AI proposals |
 | Tracker entry | application status and structured snapshots | `Finish Application` commits workspace and tracker changes atomically |
 | AI operation | logical user request with one or more attempts | every dispatched attempt is persisted before network I/O |
 | Guardrail policy | cap configuration, reservations, settlements | direct calls fail closed when cost cannot be bounded under an enabled cap |
@@ -108,9 +108,11 @@ UI calls use namespaced commands such as:
 
 - `profile.get`, `profile.update`
 - `resume.draft.get`, `resume.draft.save`, `resume.publish`
-- `workspace.capture`, `workspace.get`, `workspace.finish`
+- `workspace.capture`, `workspace.review`, `workspace.continue`, `workspace.get`, `workspace.finish`
+- `workspace.resume.regenerate`, `workspace.letter.generate`, `workspace.answer.capture`, `workspace.answer.generate`, `workspace.answer.reset`
+- `document.preview`, `document.download`, `document.drag.materialize`
 - `ai.operation.estimate`, `ai.operation.start`, `ai.operation.cancel`
-- `ai.activity.query`, `ai.activity.export`
+- `ai.monitoring.summary`, `ai.monitoring.series`, `ai.monitoring.breakdown`, `ai.monitoring.export`
 - `guardrail.get`, `guardrail.update`, `guardrail.reset`
 - `backup.create`, `backup.inspect`, `backup.restore`
 - `extension.status`, `extension.repair`
@@ -145,11 +147,21 @@ Long tasks emit ordered events with `operationId`, monotonic `sequence`, lifecyc
 
 ### Browser capture
 
-1. A user selects text and invokes the extension.
+1. In overlay Stage 1, a user selects job text and invokes the extension action/shortcut; the overlay may first arm and explain this step.
 2. The content script returns selection and page metadata only to the extension service worker.
-3. The extension shows a confirmation, removes fragments/credentials from the URL, enforces size limits, and sends a versioned native message.
+3. The extension removes fragments/credentials from the URL, enforces size limits, and sends a versioned native message. It has no parallel review UI.
 4. The host authenticates local IPC and delivers a capture intent.
-5. Desktop creates or updates a workspace and shows the received text for user review. No AI call starts automatically.
+5. The overlay creates or updates Stage 1 and shows the received text for review/edit, Capture again, or Continue. No AI call starts automatically.
+
+An optional overlay-initiated capture path is gated behind narrowly scoped optional site permission and a bounded authenticated `connectNative` session. It is disabled unless feasibility and store-review testing prove that it does not require default broad host access or an indefinitely persistent extension service worker.
+
+### Overlay PDF handoff
+
+1. Resume or cover-letter structured content is validated and rendered to PDF locally.
+2. Preview streams/reads the derived bytes through an application-owned resource path; expanded editing changes structured content and requests a new render.
+3. Download consumes a native save-dialog token and writes atomically to the selected destination.
+4. Drag-out materializes the same validated bytes under a private session temporary directory and exposes a platform file-drag payload from the overlay card.
+5. Finish/discard removes ORT-owned drag files after the state transition commits. Startup cleanup removes interrupted-session remnants; user downloads are never deleted.
 
 ### Direct-provider operation
 

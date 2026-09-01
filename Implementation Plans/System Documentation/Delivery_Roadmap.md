@@ -66,7 +66,7 @@ Deliver:
 - versioned model/preset/pricing catalog with independent signature verification;
 - operation/attempt ledger, streaming, cancellation, one retry, crash recovery;
 - token/cost normalization and transactional direct-spend reservations/caps;
-- AI Activity queries, details, CSV/JSON export, clearing, and cap resets.
+- aggregate AI Monitoring queries, Week/Month/Year/All time token/direct-cost series and totals, secondary breakdowns, CSV/JSON export, date-range clearing, and separate cap resets; attempt rows remain internal accounting/recovery data.
 
 Exit evidence:
 
@@ -79,9 +79,9 @@ Exit evidence:
 Deliver:
 
 - tailoring, cover-letter, and application-answer prompt/schema versions;
-- factual-evidence validator and user-visible change summaries;
+- factual-evidence validator and no more than three user-visible change points;
 - same-call Required Qualification Alert extraction, classification, evidence, persistence, dismissal/ignore/reopen behavior;
-- workspace artifact editing and explicit acceptance;
+- overlay Stage 2 Resume/Cover letter/Answers tabs, required resume-regeneration instruction, resettable question capture, expanded structured editing/PDF preview, and resume/cover-letter PDF Download/drag handoff;
 - adversarial AI evaluation corpus and preset-specific quality thresholds.
 
 Exit evidence:
@@ -94,10 +94,10 @@ Exit evidence:
 
 Deliver:
 
-- workspace/tracker state machine and atomic `Finish Application` transaction;
+- overlay Stage 1 capture/review, workspace/tracker state machine, and atomic persistent `Finish Application` transaction;
 - application snapshots, search/filter, and reopen behavior;
 - Chrome/Edge MV3 extension, native host, authenticated IPC, install/repair/status UI;
-- desktop launch and capture review with version-skew handling.
+- overlay launch and capture review with version-skew handling, default extension-action/shortcut gesture flow, and separately gated optional-permission overlay-initiation experiment.
 
 Exit evidence:
 

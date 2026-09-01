@@ -14,11 +14,11 @@ This is the central register for implementation gates, unresolved validation/rel
 1. Free open-source Windows and macOS desktop application with one local profile per operating-system user.
 2. One autosaved master-resume draft and one deliberately published master resume.
 3. Manual structured resume creation plus reviewed AI-assisted import of text-bearing PDF/DOCX when a user provider is configured.
-4. Three initial ATS-conscious resume style directions with local preview and rendering.
+4. Three initial ATS-conscious resume style directions with local preview and rendering. The default Technical/Engineering style follows the supplied Jake's Resume reference as closely as compatible licensing permits and remains visually separate from ORT branding.
 5. Chrome and Edge deliberate capture through an installed native-messaging host.
-6. One locally recoverable application workspace with resume tailoring, approximately three verified change-summary bullets, non-blocking Required Qualification Alerts for explicit resume-relevant mandatory requirements, cover-letter drafting, and permitted application-answer drafting.
+6. One locally recoverable overlay-owned application workspace with Stage 1 capture/review and Stage 2 Resume/Cover letter/Answers tabs; no more than three verified change-summary points; non-blocking Required Qualification Alerts; expanded structured editing with PDF preview; resume/cover-letter PDF drag and Download controls; prompted resume regeneration; and resettable question capture/answer drafting.
 7. Exactly one active AI mode: a user-supplied OpenAI, Anthropic, or Gemini API key; a user-authorized ChatGPT/Codex subscription connection; or No AI. Secrets use the OS credential vault and ORT funds no inference.
-8. Curated, adaptable Economy/Balanced/Quality model choices; local AI Activity with per-model and per-provider token/cost totals; optional direct-API weekly, monthly, yearly, and all-time estimated-spend caps; and optional Codex provider-quota thresholds.
+8. Curated, adaptable Economy/Balanced/Quality model choices; aggregate local AI Monitoring with Week/Month/Year/All time token and direct-cost graphs/totals plus secondary breakdowns; optional direct-API weekly, monthly, yearly, and all-time estimated-spend caps; and optional Codex provider-quota thresholds.
 9. Direct structured editing and local PDF, DOCX, and text export.
 10. Finish Application and a local tracker retaining selected resume, cover-letter, and answer JSON snapshots.
 11. Encrypted portable backup/restore and full structured data export.
@@ -56,6 +56,8 @@ The current selections and module-level acceptance criteria are documented under
 15. **[IMPLEMENTATION]** Define safe local diagnostic bundles without centralized telemetry.
 16. **[IMPLEMENTATION]** Freeze protective limits for import size/pages, extracted text, native messages, document pages, collections, backups, provider requests, and exports.
 17. **[IMPLEMENTATION]** Implement a user-visible About/Legal view containing GPL, copyright, canonical-source attribution, third-party notices, trademark-policy links, build provenance, and official/preview status without exposing secrets or local identifiers.
+18. **[IMPLEMENTATION]** Implement the main-window/overlay capability split, Stage 1/Stage 2 state machine and tabs, expanded structured editors with PDF preview, safe Download and OS drag materialization/cleanup, required regeneration instruction, and aggregate Week/Month/Year/All time AI Monitoring queries.
+19. **[IMPLEMENTATION]** Record the Quiet Navy/Open Frame light-only tokens/assets and verify the Jake's Resume source/license or independent template implementation before shipping any related asset or template code.
 
 ## Validation and release work
 
@@ -70,12 +72,13 @@ The current selections and module-level acceptance criteria are documented under
 9. **[VALIDATION]** Prove direct-API caps under boundaries, concurrent dispatch, retries, crashes, time-zone/clock changes, price changes, missing usage, activity clearing, credential replacement, and all-time reset. No request may dispatch without a committed reservation when a cap is active.
 10. **[VALIDATION]** Prove external Codex-runtime absence, discovery, compatible/incompatible version handling, app-managed `stdio` launch and termination, browser/device login, isolated configuration/authentication, model discovery, no-tool containment, token/quota provenance, delayed/rounded quota updates, provider bucket changes, cap blocking, sign-out, protocol mismatch, orphan recovery, and cleanup on every supported OS/package channel.
 11. **[VALIDATION]** Test Chrome/Edge permissions, profiles, native messaging, IPC impersonation resistance, app launch, update skew, repair, and uninstall across the compatibility matrix.
-12. **[VALIDATION]** Verify that provider calls, AI Activity, guardrail state, Codex account snapshots, update checks, diagnostics, and logs match the application's privacy explanations.
+12. **[VALIDATION]** Verify that provider calls, internal accounting, aggregate AI Monitoring, guardrail state, Codex account snapshots, update checks, diagnostics, and logs match the application's privacy explanations.
 13. **[RELEASE]** Obtain qualified review and finalize the exact `GPL-3.0-only` dependency/asset compatibility, Section 7 attribution term, contributor inbound-license treatment, SPDX approach, Store/signing-program eligibility, and trademark policy; add the remaining repository governance files.
 14. **[RELEASE]** Complete security review of imports, local storage, direct and Codex credential handling, app-server containment, guardrail transactions, extensions, native IPC, updater, release CI, and diagnostic export.
 15. **[RELEASE]** Complete accessibility testing and document-export readability checks.
 16. **[RELEASE]** Confirm current Store policies, signing requirements, API/Codex integration terms, provider model availability and pricing, and platform rules immediately before distribution.
 17. **[RELEASE]** Before accepting nontrivial external code contributions, decide whether hosted-service risk justifies changing future releases from GPLv3 to AGPLv3. The default remains `GPL-3.0-only`; any change requires copyright authority, compatibility review, a documented transition, and updates to every license and public claim.
+18. **[VALIDATION]** Prove the complete overlay journey, resume/cover-letter PDF drag and Download behavior/fallback/cleanup, main-window route exclusion, single light visual scheme, document-brand separation, and aggregate monitoring accessibility on every supported platform.
 
 ## Later possibilities
 

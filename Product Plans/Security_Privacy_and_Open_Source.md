@@ -87,7 +87,7 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 
 - No resume, job, answer, credential, full URL, filename, or document content is collected automatically.
 - Initial releases should operate without centralized telemetry.
-- AI Activity is encrypted local product data recording calls made by ORT; it is not maintainer telemetry and is never uploaded automatically.
+- The AI accounting ledger is encrypted local product data recording calls made by ORT and supplying aggregate AI Monitoring; it is not maintainer telemetry and is never uploaded automatically.
 - Activity records exclude prompts, responses, document content, API keys, provider-account credentials, and full URLs. Raw provider-reported measurements remain distinguishable from ORT estimates.
 - Codex account-level token/quota snapshots remain local, are labeled separately from ORT-only activity, and are never used as maintainer analytics.
 - The application may generate a local diagnostic bundle that the user previews and deliberately attaches to a GitHub issue or support request.
@@ -148,7 +148,7 @@ Contributors certify that they have the right to submit their work. A Developer 
 
 ## Distributed documentation and claim boundaries
 
-- Distributed application documentation must explain local storage, update checks, extension communication, AI-provider transmission, local AI Activity and estimate limitations, diagnostics, backup limits, and deletion behavior.
+- Distributed application documentation must explain local storage, update checks, extension communication, AI-provider transmission, aggregate local AI Monitoring and estimate limitations, diagnostics, backup limits, and deletion behavior.
 - Do not claim legal, ATS, hiring, accuracy, or security guarantees.
 - Verify all third-party names, logos, templates, fonts, and icons before distribution.
 - Review encryption export and software-distribution obligations applicable to official releases.

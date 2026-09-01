@@ -107,6 +107,7 @@ If supported public OS mechanisms cannot enforce these properties without admini
 - PDF/DOCX parsers run with page, relationship, nesting, decompression, image, and time limits.
 - External DOCX relationships, macros, embedded packages, scripts, and active content are never executed or fetched.
 - Render templates are bundled and addressed by known IDs; user content cannot inject Typst source.
+- Resume/cover-letter file drags expose only validated PDFs materialized in a random private ORT session directory. Paths cannot be supplied by web content; Finish/discard and startup recovery remove only containment-verified ORT-owned files. Download uses a separate one-use native dialog token.
 - Links are parsed as data, allow only approved schemes, and are escaped by the renderer.
 - Backup payload entries use logical IDs rather than paths. Restore never joins an archive-provided path to disk.
 - Fuzzing covers parser panics, decompression bombs, malformed UTF-8, integer overflow, and partial files.
@@ -127,7 +128,7 @@ Automated tests intercept all process network destinations for critical offline 
 - offline authoring/import/render/export causes no network request;
 - the website and extension receive no desktop content;
 - API calls contain only the fields declared by the operation minimizer;
-- clearing AI Activity does not reset guardrails;
+- clearing AI Monitoring history does not reset guardrails;
 - backups exclude credentials and device-bound secrets;
 - diagnostic bundles contain none of the seeded marker strings from synthetic content/credentials.
 

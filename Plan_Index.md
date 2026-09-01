@@ -31,13 +31,15 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - The desktop app remains useful without AI for manual resume editing, local document rendering, application tracking, and exports.
 - AI features use exactly one active mode: a deliberately configured OpenAI, Anthropic, or Gemini API key; a managed ChatGPT/Codex subscription connection; or No AI. API keys and Codex tokens use the operating-system credential vault and are never exposed to the browser extension.
 - Direct API models use curated Economy/Balanced/Quality presets. Codex models are the tested intersection of the account's current app-server model list and ORT compatibility catalog; no adapter silently falls back or enables an untested model.
-- A local AI Activity view records every provider call initiated by ORT, including attempts, status, requested/effective model, provider-reported usage, per-model/provider token totals, and a clearly labeled direct-API cost estimate when calculable. Direct totals cannot claim to show calls made by other applications using the key; Codex account summaries are visibly account-wide.
+- A private local ledger records every provider call initiated by ORT. The user-facing AI Monitoring view shows aggregate token/direct-cost graphs and totals for Week/Month/Year/All time plus secondary breakdowns; it is not an individual-call feed. Direct totals cannot claim to show calls made by other applications using the key; Codex account summaries are visibly account-wide and have no invented dollar cost.
 - Users may configure optional direct estimated-spend caps for calendar week/month/year/all-time periods or Codex provider-quota percentage thresholds. Guardrail state is durable and separate from activity-history deletion, while provider billing and quota controls remain authoritative.
 - AI requests require internet access unless a later local-model adapter is installed. Ordinary editing, tracking, rendering, and local search should work offline.
 - There is exactly one autosaved master-resume draft and at most one deliberately published master-resume snapshot in a local profile.
 - Tailoring uses the published master, never unpublished draft changes.
 - The tailoring operation also produces optional Required Qualification Alerts for explicit mandatory job requirements that map to resume content. Alerts distinguish a confirmed conflict from a qualification not found in the published master, ignore preferred/ambiguous/personal-or-legal requirements, never become a fit score, and never block the user from continuing.
-- One active application workspace holds one reviewed job description, temporary tailored versions, optional cover-letter drafts, and optional application-answer drafts.
+- One active overlay-owned application workspace has Stage 1 capture/review and Stage 2 Resume/Cover letter/Answers tabs. The main window has no job-specific route.
+- Resume and cover-letter PDF cards provide both Download and temporary operating-system drag-out; expanded preview edits structured source, not PDF bytes.
+- Quiet Navy/Open Frame is the approved universal light-only application/website direction. Resume and cover-letter documents remain visually independent; the default Technical template follows the supplied Jake's Resume reference as licensing permits.
 - Finish Application optionally creates a local tracker entry with the selected final resume, cover letter, and approved answer set as structured snapshots, then deletes unselected temporary material and resets the workspace.
 - Structured JSON is the canonical document format. PDF, DOCX, and plain text are locally rendered derived artifacts and are not retained by default.
 - There are no ORT plan-based application, import, AI, or storage quotas. Practical safety limits prevent malformed or excessively large inputs, and optional user-defined AI guardrails protect the user's provider budget or subscription quota.
@@ -66,7 +68,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 
 - [Product scope and principles](<Product Plans/Product_Scope_and_Principles.md>) — mission, audience, surfaces, terminology, goals, and non-goals.
 - [Resume editor and schema](<Product Plans/Resume_Editor_and_Schema.md>) — detailed editor layout, section and entry types, fields, ordering, optional-value rendering, and draft/publish experience.
-- [Core workflows](<Product Plans/Core_Workflows.md>) — master resume, capture, tailoring, supporting generation, AI Activity, Finish Application, and tracker behavior.
+- [Core workflows](<Product Plans/Core_Workflows.md>) — master resume, overlay capture/tailoring/material generation, AI Monitoring, Finish Application, and tracker behavior.
 - [Local data and document model](<Product Plans/Local_Data_and_Document_Model.md>) — local records, ownership, draft/publish rules, structured snapshots, AI activity/guardrails, Codex usage cache, backup, deletion, rendering, and migration.
 - [Product states and operations](<Product Plans/Product_States_and_Operations.md>) — canonical resume, workspace, import, AI connection/operation/activity/guardrail, tracker-save, and update states.
 - [Configuration limits and defaults](<Product Plans/Configuration_Limits_and_Defaults.md>) — centralized compatibility, payload, document, AI model, spend/quota guardrail, timeout, retention, and performance defaults.
@@ -81,7 +83,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 
 - [Implementation plans](<Implementation Plans/README.md>) — selected technical baseline, component plans, delivery order, and implementation gates.
 - Component folders under `Implementation Plans/` — implementation-ready plans for architecture/security/build, desktop, extensions/IPC, local data/migration, AI/document processing, and distribution/updates.
-- [Aesthetic planning](Aesthetic/README.md) — placeholder for branding, themes, component visuals, and document-template design.
+- [Aesthetic planning](Aesthetic/README.md) — approved Quiet Navy/Open Frame direction, surface responsibilities, document independence, and remaining visual deliverables.
 
 ## Recommended reading routes
 

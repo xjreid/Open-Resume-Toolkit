@@ -82,7 +82,7 @@ The application estimates input size before dispatch and surfaces provider-repor
 
 ## Local usage and cost accounting
 
-Every remote provider call made by ORT passes through one standardized local accounting boundary, regardless of the provider adapter or product workflow. Before network dispatch, ORT durably creates an attempt record so that a crash, cancellation, timeout, or ambiguous response cannot make a potentially billable or quota-consuming call disappear from AI Activity.
+Every remote provider call made by ORT passes through one standardized local accounting boundary, regardless of the provider adapter or product workflow. Before network dispatch, ORT durably creates an attempt record so that a crash, cancellation, timeout, or ambiguous response cannot make a potentially billable or quota-consuming call disappear from aggregate AI Monitoring/accounting.
 
 For each logical operation and provider-call attempt, ORT records only the non-content metadata defined in the local data model, including:
 
@@ -96,16 +96,20 @@ For each logical operation and provider-call attempt, ORT records only the non-c
 
 Provider-reported usage values remain distinguishable from local estimates. A versioned local pricing catalog uses documented public provider prices that are verified during preset maintenance and bundled with application releases. Between application releases, ORT may check a signature-verified, content-only catalog published through the canonical GitHub release infrastructure; the request contains no user content, credential, or stable profile identifier, and the user may trigger it manually. A catalog update may change pricing/lifecycle metadata but cannot install code or automatically enable an untested model. A historical record preserves the estimate and catalog version used at the time; a later price update does not silently rewrite earlier history. Providers may apply account tiers, cached-input rules, batch discounts, credits, taxes, minimums, tool/image charges, or later adjustments that ORT cannot know, so all calculated currency values are labeled **estimated**.
 
-AI Activity provides two levels of direct-API aggregation:
+AI Monitoring presents aggregate direct-API activity rather than an individual-call feed:
 
-- **Per model** — logical operations, attempts, input, cached/cache-write, output, reasoning, total and other provider-reported token categories, plus contemporaneous estimated cost.
-- **Per provider** — the same totals across that provider's models, with historical model identifiers retained.
+- A period control switches between **Week**, **Month**, **Year**, and **All time**.
+- Token usage and estimated cost are graphed over time with totals for the selected period. Week and month use daily buckets; year and all time use monthly buckets unless an adaptive all-time bucket is needed for legibility.
+- Secondary aggregate breakdowns may group by provider, effective model/preset, operation type, or status without exposing prompt or document content.
+- Codex views show available token and quota provenance but do not invent or combine a dollar cost. Mixed-mode totals keep Codex quota/token activity visibly separate from direct-API estimated cost.
 
-Aggregates never silently add unlike currencies or incompatible pricing bases. If any attempt in a group is missing reportable usage or price data, the group is marked **partial** and shows the excluded/unknown count. Users can switch between logical-operation and provider-attempt views so retries are not mistaken for unique work.
+Aggregates never silently add unlike currencies or incompatible pricing bases. If any attempt in a group is missing reportable usage or price data, the group is marked **partial** and shows the excluded/unknown count. Logical operations and provider attempts remain distinct in accounting and aggregate labels so retries are not mistaken for unique work.
 
-AI Activity describes only calls routed through the local ORT installation. ORT does not claim to inspect all use of an API key, reconcile a complete provider account, or replace the provider's usage and billing tools. Removing a provider credential does not erase existing content-free activity history; those records have separate export, retention, and deletion controls.
+Attempt-level rows remain internal for crash recovery, settlement, guardrails, and diagnostics. They are not a primary browsable call table. A deliberate diagnostic export may include scrubbed attempt metadata, while ordinary user export contains selected aggregate buckets and breakdowns only.
 
-Changing a provider/model from AI Activity uses the same validated presets, disclosure, connection testing, and no-silent-fallback rules as Settings. A change applies to future attempts only and cannot alter an active or historical operation.
+AI Monitoring describes only calls routed through the local ORT installation. ORT does not claim to inspect all use of an API key, reconcile a complete provider account, or replace the provider's usage and billing tools. Removing a provider credential does not erase existing content-free activity history; those records have separate aggregate export, retention, and deletion controls.
+
+Changing a provider/model from AI Monitoring uses the same validated presets, disclosure, connection testing, and no-silent-fallback rules as Settings. A change applies to future attempts only and cannot alter an active or historical operation.
 
 If a provider reports that it rerouted or substituted the requested model, ORT records both identifiers and does not promote the result unless the effective model is in the compatible tested catalog and the applicable pricing/guardrail decision remains safe. Otherwise the operation fails visibly; rerouting is never treated as permission to bypass model selection or a cap.
 
@@ -115,13 +119,13 @@ A user may leave spending limits disabled or configure independent estimated-cos
 
 Before dispatch, the accounting boundary atomically reserves a conservative maximum for the attempt using counted spend, unresolved reservations, the provider's preflight input count or a safe local estimate, the configured maximum output, and all applicable catalog price dimensions. Dispatch occurs only if the reservation fits every enabled cap. On completion, the reservation settles to the best supported provider-reported estimate. Ambiguous or missing usage remains conservatively reserved and visibly unresolved; it is never assumed to cost zero. When an applicable price is missing, expired, unverified, or cannot be converted under the configured policy, a hard currency cap fails closed and explains how to refresh the signed catalog, update the application, change the model, lower the output bound, disable the cap, or verify the provider bill.
 
-Guardrail counters are durable accounting state separate from the user-cleared activity table. Clearing or age-expiring AI Activity does not reset a cap or its period total. Disabling a cap, changing its amount, or deliberately resetting an all-time baseline requires a separate confirmation that shows the effect. ORT notifications default to local warnings at 50% and 80% and a blocking notice at 100%; warning thresholds may be adjusted without weakening the hard cap.
+Guardrail counters are durable accounting state separate from user-cleared monitoring history. Clearing or age-expiring AI Monitoring data does not reset a cap or its period total. Disabling a cap, changing its amount, or deliberately resetting an all-time baseline requires a separate confirmation that shows the effect. ORT notifications default to local warnings at 50% and 80% and a blocking notice at 100%; warning thresholds may be adjusted without weakening the hard cap.
 
 These limits govern only requests routed through this ORT installation and credential identity. They cannot see other applications using the same key, delayed provider adjustments, taxes, credits, negotiated rates, exchange rates, or a compromised key used elsewhere. The provider's own billing controls remain the authoritative protection and should be linked prominently.
 
 ## Codex usage visibility and guardrails
 
-Codex subscription mode stores no estimated dollar spend. AI Activity may show:
+Codex subscription mode stores no estimated dollar spend. AI Monitoring may show:
 
 - ORT operation/thread token totals from `thread/tokenUsage/updated` when the compatible app-server reports them.
 - Account-level lifetime and daily token activity returned by `account/usage/read`, clearly separated from ORT-only operations because it may include other Codex clients.
@@ -169,7 +173,7 @@ Before display, ORT validates:
 - Requested word/character limits where applicable
 - Structural integrity required by the renderer
 
-Tailored resumes include approximately three change-summary bullets. ORT verifies these using a deterministic structural comparison rather than trusting only the model's self-description.
+Tailored resumes include no more than three concise change-summary points. ORT derives and verifies these using a deterministic structural comparison rather than trusting only the model's self-description.
 
 Required Qualification Alert candidates use a separate versioned portion of the tailoring response schema. Before display, ORT verifies that each candidate points to an explicit mandatory requirement in the reviewed job text, maps to a supported resume-content category, and is either an explicit factual conflict or information not found in the published master. Preferred, ambiguous, non-resume, personal, protected, and legal-attestation requirements are dropped. A confirmed mismatch must cite resolvable conflicting resume evidence; absence alone can produce only **Not found in your published resume**. The model does not decide eligibility, calculate a fit score, or make application recommendations.
 

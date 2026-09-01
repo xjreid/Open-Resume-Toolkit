@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 392" role="img" aria-labelledby="title">
+  <title id="title">Open Resume Toolkit stacked logo</title>
+  <g transform="translate(160 20) scale(1.5)">
+    <path
+      d="M54 20H20V92H54 M74 36H108V108H74"
+      fill="none"
+      stroke="#102A4C"
+      stroke-width="14"
+      stroke-linecap="square"
+      stroke-linejoin="miter"
+    />
+  </g>
+  <text
+    x="256"
+    y="318"
+    fill="#102A4C"
+    font-family="Inter, Arial, sans-serif"
+    font-size="42"
+    font-weight="600"
+    letter-spacing="-0.8"
+    text-anchor="middle"
+  >Open Resume Toolkit</text>
+</svg>
