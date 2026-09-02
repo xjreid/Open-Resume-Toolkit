@@ -84,9 +84,19 @@ Current development status:
   failure never changes resume revisions or pauses autosave. Existing-file
   replacement is intentionally unavailable in this checkpoint. Evidence and
   limitations: `../../evidence/0.0.0-dev/m2-text-export-smoke.md`;
+- added locally: the backend-only No-AI import-review foundation. A bounded,
+  versioned extraction decoder, conservative multilingual heading/explicit
+  contact-label mapping, and source-indexed proposals preserve every extracted
+  block. In-memory review requires a decision for each block, supports explicit
+  section merge/keep-both and contact conflict choices, and prepares a validated
+  revision-bound save without modifying storage. Synthetic encrypted-storage
+  tests cover commit races, replay refusal, published-snapshot isolation, and
+  restart. Evidence: `../../evidence/0.0.0-dev/m2-import-core.md`. No import UI,
+  file picker, parser, or worker launch was enabled by this checkpoint;
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
-  staging, Typst preview/PDF rendering, DOCX export, confirmed replacement and
+  UI/session integration, private binary staging, richer entry/date/link mapping,
+  Typst preview/PDF rendering, DOCX export, confirmed replacement and
   crash-cleanup policy for exports, historical render metadata, Windows native
   Save-dialog/ACL/filesystem proof, storage management, and complete offline
   journey evidence. M2 is not complete; do not enable hostile-file parsing or

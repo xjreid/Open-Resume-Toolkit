@@ -8,6 +8,14 @@ repository.workspace = true
 
 [dependencies]
 ort-domain = { path = "../ort-domain" }
+ort-documents = { path = "../ort-documents" }
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+ort-storage = { path = "../ort-storage" }
+ort-vault = { path = "../ort-vault", features = ["test-support"] }
+tempfile.workspace = true
 
 [lints]
 workspace = true

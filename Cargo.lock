@@ -2671,7 +2671,13 @@ version = "0.0.0-dev"
 name = "ort-application"
 version = "0.0.0-dev"
 dependencies = [
+ "ort-documents",
  "ort-domain",
+ "ort-storage",
+ "ort-vault",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -2724,6 +2730,9 @@ name = "ort-documents"
 version = "0.0.0-dev"
 dependencies = [
  "ort-domain",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

@@ -97,5 +97,5 @@ jobs:
       - name: Build frontend and Rust desktop shell
         run: pnpm --filter @ort/desktop build && cargo check --locked -p ort-desktop
 
-      - name: Test text output and filesystem safety on the target OS
-        run: cargo test --locked -p ort-domain -p ort-documents -p ort-platform
+      - name: Test import review, text output, and filesystem safety on the target OS
+        run: cargo test --locked -p ort-domain -p ort-documents -p ort-document-worker -p ort-application -p ort-platform

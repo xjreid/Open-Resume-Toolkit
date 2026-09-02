@@ -91,6 +91,29 @@ a failed export. Windows Save-dialog, ACL, and filesystem behavior still require
 native VM verification; CI compilation alone does not prove those behaviors.
 See `evidence/0.0.0-dev/m2-text-export-smoke.md` for checkpoint evidence.
 
+## No-AI import core (backend-only checkpoint)
+
+The deterministic mapper and in-memory review engine now have synthetic tests,
+including an encrypted database commit/restart test. They do not enable a new
+button or file import in the app yet. No PDF/DOCX parser is running: the worker
+remains disabled until native containment is proven. No standalone `.txt`
+importer or AI transmission was added.
+
+Run this checkpoint without starting the desktop or accessing an OS vault:
+
+```sh
+cargo test --locked -p ort-documents -p ort-application -p ort-document-worker
+```
+
+The storage integration test uses temporary synthetic profiles and an in-memory
+vault. It checks explicit review, preservation of published snapshots, stale
+commit/replay refusal, and restart. Mapping tests preserve unknown/multilingual
+source text and reject malformed/oversized worker responses. Review changes are
+not automatically written: the prepared result must use the existing storage
+revision check. See `evidence/0.0.0-dev/m2-import-core.md` for limits and remaining
+UI/parser integration work. No new installer or preview package is needed to
+exercise this backend checkpoint.
+
 **Current limitations:** macOS Dock Quit and system shutdown are not protected
 by this guard because the pinned runtime does not expose those termination
 requests through its usual exit callback. Wait for **Saved** before using them.

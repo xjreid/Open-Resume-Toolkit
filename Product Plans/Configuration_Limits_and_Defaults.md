@@ -62,6 +62,14 @@ Limits protect rendering and parsing; they are not monetization quotas. When leg
 - File size: 10 MiB maximum.
 - Document length: 10 pages maximum.
 - Extracted text: 50,000 characters maximum.
+- Extraction-result wire v1: 512 KiB maximum before JSON decoding, at most 1,000
+  ordered blocks, and at most 30,000 Unicode scalar values in one block. The
+  native pipe reader must enforce the byte limit while collecting output; the
+  parent-side decoder independently enforces it again. These do not relax the
+  50,000-character extraction or 30,000-character canonical draft limits.
+- In-memory import-review decisions: 100,000 Unicode scalar values across all
+  retained edited values/headings/destination labels. Final acceptance still
+  enforces every canonical document limit; excess source is never truncated.
 - Compressed-to-expanded safety ratio: 100:1 maximum.
 - Local extraction target: 60 seconds on supported reference hardware.
 - Scanned/image-only content and OCR: unsupported initially and detected before any provider call.

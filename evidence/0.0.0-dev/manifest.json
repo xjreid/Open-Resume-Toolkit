@@ -37,10 +37,15 @@
     "m2TextExportNativeSaveCancelAndOverwriteDenial": "passed-local-synthetic-macos-arm64",
     "m2TextExportWindowsNative": "pending",
     "m2TextExportCrashCleanup": "pending",
+    "m2ImportExtractionMappingCore": "passed-local-synthetic-macos-arm64",
+    "m2ImportReviewAndStorageCommit": "passed-local-synthetic-memory-vault-macos-arm64",
+    "m2ImportWorkerDisabledRegression": "passed-local-macos-arm64",
+    "m2ImportNativeParserContainment": "pending",
+    "m2ImportReviewUi": "pending",
     "javascriptProductionAudit": "passed-local-no-known-vulnerabilities",
     "rustAdvisoryAudit": "pending-tool-unavailable",
-    "macosPreviewPackage": "passed-local-adhoc-app-macos-arm64-dmg-refresh-pending",
-    "platformBuilds": "pending"
+    "macosPreviewPackage": "previous-text-export-checkpoint-not-rebuilt-for-import-core",
+    "platformBuilds": "previous-checkpoint-reported-passed-current-checkpoint-pending"
   },
   "releaseEligible": false
 }

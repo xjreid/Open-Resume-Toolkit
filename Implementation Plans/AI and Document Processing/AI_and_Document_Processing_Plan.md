@@ -217,6 +217,74 @@ Supported initial file inputs: text-based PDF and DOCX. Plain text remains an ex
 
 PDF extraction uses a pinned, hash-verified PDFium build behind a replaceable worker adapter after license/security review. DOCX reads the OPC/Open XML package with a constrained zip/XML parser in the same worker boundary. A parser crash or exploit attempt can fail the import but must not gain the desktop process's user-data or secret authority. Import correctness must not depend on Microsoft Word being installed.
 
+### No-AI import core checkpoint (2026-09-02)
+
+The import core is implemented in `ort-documents::import` and
+`ort-application::import_review`, but is not connected to a desktop command or
+file picker. The disposable worker remains inert and exits with code 78 even
+when given an input argument. Passing these core tests is not sandbox evidence.
+
+Extraction wire v1 contains only `version`, `format` (`pdf`/`docx`), `pageCount`,
+and ordered `blocks` containing `page`, `kind` (`heading`/`paragraph`/`list_item`),
+and `text`. The native parent supplies the expected format from its independently
+validated input. Unknown/duplicate fields, malformed UTF-8/JSON, wrong versions,
+format mismatch, invalid/out-of-order pages, and unsupported control characters
+are rejected. Bounds are 512 KiB encoded result, 1,000 blocks, 30,000 characters
+per block, 50,000 total characters, and 10 pages. Character limits count Unicode
+scalar values; byte limits are separate. All-whitespace/empty extraction produces
+an actionable no-readable-text result. This does not yet implement PDF text
+density, partial-scan detection, or trustworthy DOCX pagination: parser adapters
+must prove those independently, along with magic/container/resource checks.
+
+Mapper v1 uses exact versioned heading aliases in English, Spanish, French,
+German, and Chinese as review hints, not a claim of full language coverage.
+Recognized headings retain their original spelling and receive a section-kind
+hint. Explicit contact labels before the first section propose name/email/phone/
+location values. Unlabeled names, employers, dates, skills, and URLs are not
+guessed. Unknown heading hints become custom sections; other content remains
+literal paragraph/list proposals. Richer entry/date/link normalization remains
+unfinished. A list hint may remove one displayed bullet marker from the proposed
+value, but the original block—including whitespace, marker, and line endings—
+always remains intact. Oversized-for-draft blocks are retained and flagged for
+editing/splitting, never silently truncated.
+
+Each immutable source block has exactly one proposal identified by a locally
+assigned source index. Review starts with no decisions and prepares nothing
+until every block, including blank blocks, has an explicit disposition. Users
+may edit/reclassify values, create custom sections, move text, merge into an
+existing section by its stable ID, keep both sections, keep/replace conflicting
+contact values, or reject content. Existing section names/IDs/content are not
+implicitly renamed or replaced. Rejecting a heading with accepted children
+requires explicitly moving or rejecting those children. Possible section
+duplicates are hints only; semantic entry-level duplicate detection is pending.
+
+`ImportReview::prepare` compares the complete base draft and revision with the
+current saved value, builds a separate candidate, and validates all canonical
+document limits before returning `SaveResumePayload`. It never writes a draft.
+The caller must save with that expected revision in the existing storage CAS
+transaction; a concurrent edit or replay cannot be overwritten by that save.
+The caller retains review/source after any preparation or storage failure and
+retires the review only after confirmed save success or explicit cancellation.
+Publication remains separate. Pending source and decisions are memory-only;
+debug output/errors do not contain extracted text or edited values. Retained
+decision strings have a separate aggregate 100,000-character ceiling.
+
+Next integration gates, in order:
+
+1. Prove supported native worker containment and supervision on macOS/Windows
+   without credentials or real documents; do not replace it with a protocol-only
+   check or an uncontained parser subprocess.
+2. Add the native input capability, private staging, pinned parser adapters,
+   and bounded pipe reader. It must stop/kill the worker on size overflow before
+   collecting an unbounded result; `decode` is a second boundary, not the pipe
+   reader. Data validation does not prove a worker's page/format claims.
+3. Bind extraction to an app-owned review session/window and saved revision;
+   add generated IPC records and the source/proposal review UI. The renderer
+   must never supply raw worker responses or a file path as extraction authority.
+4. Add finer-grained entry/date/link mapping, editable split/merge review,
+   cancellation/expiry and source cleanup, real format fixtures, accessibility,
+   native fault injection, and the complete offline import journey.
+
 ## Canonical document and renderer
 
 The canonical resume contains ordered typed sections and stable IDs as specified in the product plan. It stores content and semantic style/template selections—not mutable PDF/DOCX layout fragments.

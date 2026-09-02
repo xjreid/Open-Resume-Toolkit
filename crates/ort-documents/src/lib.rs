@@ -2,6 +2,8 @@
 
 use ort_domain::{DocumentLimits, Link, ResumeDocument};
 
+pub mod import;
+
 pub const IMPORT_ENABLED: bool = false;
 pub const TEXT_FORMAT_VERSION: u16 = 1;
 pub const MAX_TEXT_BYTES: usize = 256 * 1024;
