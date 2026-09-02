@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExportTextResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "cancelled"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "byteCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "cleanupPending": {
+          "type": "boolean"
+        },
+        "durabilityUnconfirmed": {
+          "type": "boolean"
+        },
+        "formatVersion": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "revision": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "source": {
+          "$ref": "#/$defs/ExportSource"
+        },
+        "status": {
+          "type": "string",
+          "const": "exported"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "source",
+        "revision",
+        "byteCount",
+        "formatVersion",
+        "cleanupPending",
+        "durabilityUnconfirmed"
+      ]
+    }
+  ],
+  "$defs": {
+    "ExportSource": {
+      "type": "string",
+      "enum": [
+        "saved_draft",
+        "published_snapshot"
+      ]
+    }
+  }
+}

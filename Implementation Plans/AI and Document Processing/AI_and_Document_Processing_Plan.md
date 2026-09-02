@@ -239,6 +239,45 @@ Preview editing always mutates canonical structured content and re-renders; it n
 
 ## DOCX and plain-text export
 
+### Implemented M2 plain-text checkpoint (2026-09-02)
+
+`export_resume_text` is a main-window-only command whose payload contains only
+`source` (`saved_draft` or `published_snapshot`) and `expectedRevision`. Native
+code loads that exact saved revision, validates it, and renders literal UTF-8
+text. A newer revision requires explicit reload/reselection; renderer text is
+never accepted as export input. The latest published snapshot and saved draft
+are separate sources. This additive command remains on development contract v2.
+
+Format v1 preserves canonical section/entry/field/bullet order and Unicode,
+normalizes line endings to LF with one terminal newline, emits readable bullet
+and link text, and omits empty fields, internal title/IDs, and app branding.
+Other control characters cause an explicit error. Empty output is refused and
+output is capped at 256 KiB. Formatting does not interpret HTML, Markdown, shell
+text, or document directives, and does not invoke a parser or external renderer.
+
+The Rust-owned Save dialog runs off the UI thread and yields a single-use
+destination capability consumed inside that operation. No path/token is sent
+through renderer IPC. One export may run at a time. The frontend has no dialog,
+filesystem, shell, or process plugin permission. A held directory capability
+anchors staging and publication after selection; a synced sibling payload is
+published with a no-clobber hard link. Existing files, directories, and symlinks
+are refused even after a target race. Filesystems without this primitive fail
+closed. This checkpoint supports only new `.txt` files: confirmed replacement,
+alternate-filesystem adapters, and historical render records remain future work.
+
+Users must be warned that exported files and temporary staging are unencrypted
+and may be visible to destination-folder users/sync services. Unix staging is
+mode 0700 and output mode 0600; Windows currently inherits selected-folder ACLs
+and requires native verification before release. Normal completion removes only
+the exact operation-owned staging entries. Failed/crashed writes can leave a
+hidden `.ort-export-*` sibling; cleanup recovery is not implemented and must not
+later scan/delete arbitrary matching user directories. A committed-file receipt
+separately reports cleanup failure and unconfirmed directory durability. No
+automatic retry occurs after an uncertain IPC result. Export does not mutate
+resume revisions or clear save errors; guarded quit waits for an active export.
+
+### Remaining output implementation
+
 DOCX output is a constrained Open XML generator/adapter supporting the semantic elements ORT owns: paragraphs, headings, lists, tables only where approved, links, page breaks, and bundled/standard font references. It does not automate Word. A library such as `docx-rs` may be used only after golden tests prove relationship safety, accessibility semantics, stable packaging, and license acceptability; otherwise `ort-documents` writes the constrained OPC parts directly.
 
 Plain text is generated from the same canonical ordering with deterministic whitespace and Unicode. Export writes atomically and never overwrites without user confirmation.

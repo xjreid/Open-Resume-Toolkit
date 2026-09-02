@@ -15,11 +15,14 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build.workspace = true
 
 [dependencies]
+ort-documents = { path = "../../../crates/ort-documents" }
+ort-platform = { path = "../../../crates/ort-platform" }
 ort-domain = { path = "../../../crates/ort-domain" }
 ort-storage = { path = "../../../crates/ort-storage" }
 ort-vault = { path = "../../../crates/ort-vault" }
 serde.workspace = true
 tauri.workspace = true
+tauri-plugin-dialog.workspace = true
 
 [lints]
 workspace = true

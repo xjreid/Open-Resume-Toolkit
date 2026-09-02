@@ -9,7 +9,7 @@ export interface EditorState {
   document: ResumeDocument | null;
   saved: VersionedResume | null;
   published: VersionedResume | null;
-  status: "loading" | "idle" | "saving" | "publishing";
+  status: "loading" | "idle" | "saving" | "publishing" | "exporting";
   editEpoch: number;
   errorCode: string | null;
   autosavePaused: boolean;
@@ -41,6 +41,8 @@ type EditorAction =
   | { type: "saved"; value: VersionedResume; submittedEpoch: number }
   | { type: "publishing" }
   | { type: "published"; value: VersionedResume }
+  | { type: "exporting" }
+  | { type: "export-finished"; notice: string }
   | { type: "failed"; code: string };
 
 export function isDirty(state: EditorState): boolean {
@@ -138,6 +140,12 @@ export function editorReducer(
         published: action.value,
         notice: `Published immutable snapshot ${action.value.revision}.`,
       };
+    case "exporting":
+      return { ...state, status: "exporting", notice: null };
+    case "export-finished":
+      // Export never mutates stored revisions or the editor. In particular,
+      // an uncertain file result must not pause autosave or clear save errors.
+      return { ...state, status: "idle", notice: action.notice };
     case "failed":
       return {
         ...state,

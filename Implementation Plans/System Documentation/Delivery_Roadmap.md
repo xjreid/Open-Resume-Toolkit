@@ -77,10 +77,20 @@ Current development status:
   for the main close button and application Quit menu/shortcut, with pending
   operation waits and save-failure recovery. Verified macOS paths and the
   upstream termination gap are in `../../evidence/0.0.0-dev/m2-close-guard-smoke.md`;
+- added locally: deterministic bounded UTF-8 text export from an exact saved
+  draft revision or latest immutable published snapshot, a Rust-only native Save
+  dialog, single-use held-directory destination authority, and no-clobber atomic
+  publication. The UI warns that exports are unencrypted; cancellation/export
+  failure never changes resume revisions or pauses autosave. Existing-file
+  replacement is intentionally unavailable in this checkpoint. Evidence and
+  limitations: `../../evidence/0.0.0-dev/m2-text-export-smoke.md`;
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
-  staging, Typst preview/PDF rendering, DOCX/plain-text export, save dialogs,
-  storage management, and complete offline journey evidence.
+  staging, Typst preview/PDF rendering, DOCX export, confirmed replacement and
+  crash-cleanup policy for exports, historical render metadata, Windows native
+  Save-dialog/ACL/filesystem proof, storage management, and complete offline
+  journey evidence. M2 is not complete; do not enable hostile-file parsing or
+  advance to public release based on the text-export checkpoint alone.
 
 Deliver:
 

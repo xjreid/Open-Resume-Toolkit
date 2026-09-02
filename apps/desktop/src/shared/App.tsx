@@ -10,6 +10,8 @@ import {
   useState,
 } from "react";
 import type { HealthResponse } from "@ort/contracts/health";
+import type { ExportSource } from "@ort/contracts/export";
+import { exportFeedback } from "./text-export";
 import type {
   Link,
   ResumeDocument,
@@ -35,6 +37,7 @@ import {
   requestHealth,
   requestResumeWorkspace,
   saveResume,
+  exportResumeText,
 } from "./command-client";
 import {
   createBullet,
@@ -187,6 +190,25 @@ function ResumeEditor() {
     ioBusy.current = false;
   }
 
+  async function exportText(source: ExportSource) {
+    const selected = source === "saved_draft" ? editor.saved : editor.published;
+    if (
+      !selected ||
+      busy ||
+      ioBusy.current ||
+      mustReload ||
+      confirmReload ||
+      close.pending ||
+      (source === "saved_draft" && dirty)
+    )
+      return;
+    ioBusy.current = true;
+    dispatch({ type: "exporting" });
+    const result = await exportResumeText(source, selected.revision);
+    dispatch({ type: "export-finished", notice: exportFeedback(result) });
+    ioBusy.current = false;
+  }
+
   const storageReady =
     health.kind === "ready" && health.health.storageStatus === "ready";
   const alreadyPublished =
@@ -290,6 +312,53 @@ function ResumeEditor() {
             Publish snapshot
           </button>
         </div>
+      </section>
+
+      <section className="editor-tools" aria-label="Plain-text export">
+        <p>
+          Text exports are unencrypted and can be read by anyone with access to
+          the destination, including synced-folder services. Choose a private
+          local folder and a new .txt filename. Export uses the selected saved
+          revision, not unsaved edits. Existing files are never replaced.
+        </p>
+        <div className="move-controls">
+          <button
+            type="button"
+            className="button--secondary"
+            onClick={() => void exportText("saved_draft")}
+            disabled={
+              !storageReady ||
+              !editor.saved ||
+              dirty ||
+              busy ||
+              mustReload ||
+              confirmReload ||
+              close.pending
+            }
+          >
+            Export saved draft (.txt)
+          </button>
+          <button
+            type="button"
+            className="button--secondary"
+            onClick={() => void exportText("published_snapshot")}
+            disabled={
+              !storageReady ||
+              !editor.published ||
+              busy ||
+              mustReload ||
+              confirmReload ||
+              close.pending
+            }
+          >
+            Export published snapshot (.txt)
+          </button>
+        </div>
+        {editor.status === "exporting" ? (
+          <p role="status">
+            Export in progress — finish or cancel the native Save dialog.
+          </p>
+        ) : null}
       </section>
 
       <div className="editor-tools">
@@ -557,8 +626,8 @@ function ResumeEditor() {
       ) : null}
 
       <footer className="development-gates">
-        This is a structured text review, not a PDF preview. Document import and
-        exports remain gated in M2; AI and browser integration arrive in later
+        This is a structured text review, not a PDF preview. PDF/DOCX import and
+        export remain gated in M2; AI and browser integration arrive in later
         milestones.
       </footer>
     </main>

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExportTextRequest",
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "payload": {
+      "$ref": "#/$defs/ExportTextPayload"
+    },
+    "requestId": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "requestId",
+    "payload"
+  ],
+  "$defs": {
+    "ExportSource": {
+      "type": "string",
+      "enum": [
+        "saved_draft",
+        "published_snapshot"
+      ]
+    },
+    "ExportTextPayload": {
+      "type": "object",
+      "properties": {
+        "expectedRevision": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "source": {
+          "$ref": "#/$defs/ExportSource"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "expectedRevision"
+      ]
+    }
+  }
+}

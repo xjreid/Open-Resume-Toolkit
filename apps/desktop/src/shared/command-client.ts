@@ -1,5 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  isExportTextCommandResponse,
+  type ExportSource,
+  type ExportTextCommandResponse,
+  type ExportTextRequest,
+} from "@ort/contracts/export";
+import {
   isCloseCommandResponse,
   type CloseCommandResponse,
   type CloseDecision,
@@ -107,6 +113,31 @@ export async function requestCloseStatus(): Promise<CloseCommandResponse> {
     return isCloseCommandResponse(response)
       ? response
       : invalidCommandResponse();
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function exportResumeText(
+  source: ExportSource,
+  expectedRevision: number,
+): Promise<ExportTextCommandResponse> {
+  try {
+    const request: ExportTextRequest = requestEnvelope({
+      source,
+      expectedRevision,
+    });
+    const response: unknown = await invoke("export_resume_text", { request });
+    if (!isExportTextCommandResponse(response)) return invalidCommandResponse();
+    if (
+      response.ok &&
+      response.value.status === "exported" &&
+      (response.value.source !== source ||
+        response.value.revision !== expectedRevision)
+    ) {
+      return invalidCommandResponse();
+    }
+    return response;
   } catch {
     return commandUnavailable();
   }

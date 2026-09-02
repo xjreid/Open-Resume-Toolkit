@@ -12,6 +12,7 @@ use tauri::{
 
 mod close_guard;
 mod menu;
+mod text_export;
 use close_guard::CloseGuard;
 
 #[tauri::command]
@@ -38,6 +39,7 @@ fn close_status(
 fn resolve_close(
     window: WebviewWindow,
     state: State<'_, CloseGuard>,
+    exports: State<'_, text_export::ExportState>,
     request: ResolveCloseRequest,
 ) -> CommandResponse<CloseStatusResponse> {
     if window.label() != "main" {
@@ -45,6 +47,9 @@ fn resolve_close(
     }
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };
+    }
+    if request.payload.decision == CloseDecision::Quit && exports.is_active() {
+        return CommandResponse::failure("EXPORT_BUSY", "errors.closeUnavailable", true);
     }
     if let Err(code) = state.resolve(
         window.label(),
@@ -254,6 +259,8 @@ fn initialize_storage(app: &tauri::App) -> DesktopStorage {
 pub fn run() {
     tauri::Builder::default()
         .manage(CloseGuard::default())
+        .manage(text_export::ExportState::default())
+        .plugin(tauri_plugin_dialog::init())
         .menu(menu::editor_menu)
         .on_menu_event(|app, event| {
             if event.id().as_ref() == menu::QUIT_ID {
@@ -271,6 +278,7 @@ pub fn run() {
             load_resume,
             save_resume,
             publish_resume,
+            text_export::export_resume_text,
             close_status,
             resolve_close
         ])

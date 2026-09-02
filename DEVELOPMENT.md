@@ -3,8 +3,9 @@
 Open Resume Toolkit implements the M0 architecture skeleton, the local M1
 encrypted-storage slice, and an M2 offline editor checkpoint. The development
 app can autosave synthetic resume drafts and publish immutable snapshots through
-its OS-vault-backed encrypted database. Import, rendering/export, AI, updater,
-and browser-native messaging remain gated or unimplemented.
+its OS-vault-backed encrypted database, and export a saved draft or published
+snapshot as unencrypted UTF-8 text through a native Save dialog. PDF/DOCX import
+and output, AI, updater, and browser-native messaging remain gated or unimplemented.
 
 ## Prerequisites
 
@@ -59,10 +60,36 @@ For the M2 quit-safety check, change the synthetic title and immediately use
 Command-Q on macOS (Ctrl-Q on Windows), the application's Quit menu item, or the
 main window's close button. Choose **Keep editing**, **Save and quit**, or
 **Discard unsaved edits and quit**. Invalid edits disable Save and quit. Escape
-keeps editing. A running save/publication is allowed to finish before quit;
+keeps editing. A running save/publication/text export is allowed to finish before quit;
 failed saves keep the editor open. Closing the main window currently quits the
 whole development workspace; closing the overlay alone does not quit the editor.
 See `evidence/0.0.0-dev/m2-close-guard-smoke.md` for verified paths and limitations.
+
+For the M2 text-export check:
+
+1. Wait for **Saved**, then choose **Export saved draft (.txt)**. Alternatively,
+   choose **Export published snapshot (.txt)** to export the latest immutable
+   snapshot; unsaved editor changes are never included in either choice.
+2. Choose a private local folder and a **new** `.txt` filename. The file is
+   unencrypted, outside the encrypted database, and may be uploaded by any sync
+   service managing that folder. Only synthetic data is allowed in development.
+3. Check the success notice and inspect the text. The internal title, IDs,
+   revision metadata, empty fields, and app branding must not appear. Ordering,
+   Unicode, custom field values, bullets, and link destinations must be preserved.
+4. Cancel a second export: no file should be written and the editor should remain
+   usable. Select an existing test filename: even if the OS offers **Replace**,
+   this checkpoint refuses replacement and asks for a new filename.
+
+Text output is bounded to 256 KiB and requires a filesystem supporting hard
+links (for example APFS/NTFS); unsupported destinations fail closed, not through
+an unsafe overwrite fallback. Normal completion removes its hidden sibling
+`.ort-export-*` staging directory. Interruptions or filesystem errors can leave
+staging plaintext in the chosen folder; automatic crash cleanup is not yet
+implemented. Inspect the chosen folder before retrying an uncertain result.
+Post-write cleanup/durability warnings distinguish an already-written file from
+a failed export. Windows Save-dialog, ACL, and filesystem behavior still require
+native VM verification; CI compilation alone does not prove those behaviors.
+See `evidence/0.0.0-dev/m2-text-export-smoke.md` for checkpoint evidence.
 
 **Current limitations:** macOS Dock Quit and system shutdown are not protected
 by this guard because the pinned runtime does not expose those termination

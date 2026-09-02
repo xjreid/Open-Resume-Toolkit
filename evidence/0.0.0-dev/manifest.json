@@ -11,7 +11,7 @@
       "architecture": "arm64",
       "bundleIdentifier": "com.openresumetoolkit.dev",
       "signing": "adhoc-runtime",
-      "executableSha256": "b32257142138387a2c7e8f00d508a97d5140a1c8755fb58e74abc3c8b7437b4d",
+      "executableSha256": "4f3e8f37955d6e166a0040d3516a18dc83f9f66d42c08de4fde0e1ca22506527",
       "verification": "codesign-deep-strict"
     }
   ],
@@ -33,6 +33,12 @@
     "m2NativeUnsavedCloseProtection": "partial-main-close-and-app-menu-shortcut-passed-macos-arm64",
     "m2NativeSystemQuitProtection": "pending-macos-dock-and-system-termination",
     "m2CloseGuardContractsAndPolicy": "passed-local",
+    "m2TextExportContractsFormatterAndWriter": "passed-local-macos-arm64",
+    "m2TextExportNativeSaveCancelAndOverwriteDenial": "passed-local-synthetic-macos-arm64",
+    "m2TextExportWindowsNative": "pending",
+    "m2TextExportCrashCleanup": "pending",
+    "javascriptProductionAudit": "passed-local-no-known-vulnerabilities",
+    "rustAdvisoryAudit": "pending-tool-unavailable",
     "macosPreviewPackage": "passed-local-adhoc-app-macos-arm64-dmg-refresh-pending",
     "platformBuilds": "pending"
   },

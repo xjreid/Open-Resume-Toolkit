@@ -6,7 +6,8 @@
   "exports": {
     "./health": "./generated/health.ts",
     "./resume": "./generated/resume.ts",
-    "./lifecycle": "./generated/lifecycle.ts"
+    "./lifecycle": "./generated/lifecycle.ts",
+    "./export": "./generated/export.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
