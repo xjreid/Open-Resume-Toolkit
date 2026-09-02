@@ -66,9 +66,14 @@ Current development status:
 
 - implemented locally: generated load/save/publish contracts, a main-window-only
   encrypted command boundary, fail-closed OS-vault startup, optimistic draft
-  saves, immutable published snapshots, and the first accessible structured
-  editor slice for contact details, ordered sections, entries, and bullets;
-- still gated: local PDF/DOCX parsing, hostile-worker containment, review
+  saves, idempotent immutable publication, a structured editor for contact
+  details, sections, entries, bullets, links, and named custom/skill fields,
+  race-safe debounced autosave, shared-limit inline validation, keyboard
+  reordering, bounded session undo/redo, explicit reload/discard recovery, and
+  read-only published text review. Native macOS synthetic save/publish/restart
+  checks are recorded under `../../evidence/0.0.0-dev/m2-editor-smoke.md`;
+- still gated: unsaved native close/quit protection, Windows native editor
+  verification, local PDF/DOCX parsing, hostile-worker containment, review
   staging, Typst preview/PDF rendering, DOCX/plain-text export, save dialogs,
   storage management, and complete offline journey evidence.
 

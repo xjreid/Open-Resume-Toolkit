@@ -404,6 +404,7 @@ impl EncryptedStore {
     }
 
     /// Publishes an immutable snapshot of one exact draft revision.
+    /// Repeating a publication of the same revision returns its existing snapshot.
     ///
     /// # Errors
     /// Returns `RevisionConflict` if the draft changed before publication.
@@ -437,6 +438,27 @@ impl EncryptedStore {
         if row.0 != expected_draft_revision {
             return Err(StorageError::RevisionConflict);
         }
+        // Validate before any INSERT or COMMIT, including data loaded from disk.
+        let document = parse_document(&row.2)?;
+        if i64::from(document.schema_version) != row.1 {
+            return Err(StorageError::InvalidData);
+        }
+        let existing = transaction
+            .query_row(
+                "SELECT published_revision, document_json FROM published_resumes \
+                 WHERE profile_id = ?1 AND draft_revision = ?2 ORDER BY published_revision DESC LIMIT 1",
+                params![self.manifest.profile_id.to_string(), expected_draft_revision],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?)),
+            )
+            .optional()
+            .map_err(|_| StorageError::Unavailable)?;
+        if let Some((revision, json)) = existing {
+            let published = parse_versioned_resume(revision, &json)?;
+            if published.document != document {
+                return Err(StorageError::IntegrityFailure);
+            }
+            return Ok(published);
+        }
 
         let published_revision: i64 = transaction
             .query_row(
@@ -466,7 +488,6 @@ impl EncryptedStore {
             .map_err(|_| StorageError::Unavailable)?;
         set_private_database_permissions(&self.database_path)?;
 
-        let document = parse_document(&row.2)?;
         Ok(VersionedResume {
             revision: published_revision,
             document,
@@ -1738,6 +1759,52 @@ mod tests {
             .expect("load published")
             .expect("published exists");
         assert_eq!(published.document.title, "Published");
+    }
+
+    #[test]
+    fn publishing_the_same_revision_is_idempotent() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store =
+            EncryptedStore::open_or_initialize(temporary.path(), "test", &vault).expect("store");
+        store
+            .create_draft(&ResumeDocument::empty("Synthetic"))
+            .expect("draft");
+        let first = store.publish_draft(1).expect("first publication");
+        let repeated = store.publish_draft(1).expect("repeated publication");
+        assert_eq!(first, repeated);
+        let connection = store.connection.lock().expect("connection");
+        let count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM published_resumes", [], |row| {
+                row.get(0)
+            })
+            .expect("count");
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn invalid_persisted_draft_cannot_create_a_published_snapshot() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store =
+            EncryptedStore::open_or_initialize(temporary.path(), "test", &vault).expect("store");
+        store
+            .create_draft(&ResumeDocument::empty("Synthetic"))
+            .expect("draft");
+        {
+            let connection = store.connection.lock().expect("connection");
+            connection
+                .execute(
+                    "UPDATE resume_drafts SET document_json = ?1",
+                    [b"{}".as_slice()],
+                )
+                .expect("seed malformed draft");
+        }
+        assert!(store.publish_draft(1).is_err());
+        assert_eq!(
+            store.load_latest_published().expect("published query"),
+            None
+        );
     }
 
     #[test]

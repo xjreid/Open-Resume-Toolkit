@@ -1,10 +1,10 @@
 # Development
 
 Open Resume Toolkit implements the M0 architecture skeleton, the local M1
-encrypted-storage slice, and the first M2 offline editor slice. The development
-app can save synthetic resume drafts and publish immutable snapshots through its
-OS-vault-backed encrypted database. Import, rendering/export, AI, updater, and
-browser-native messaging remain gated or unimplemented.
+encrypted-storage slice, and an M2 offline editor checkpoint. The development
+app can autosave synthetic resume drafts and publish immutable snapshots through
+its OS-vault-backed encrypted database. Import, rendering/export, AI, updater,
+and browser-native messaging remain gated or unimplemented.
 
 ## Prerequisites
 
@@ -38,10 +38,29 @@ macOS Keychain or Windows Credential Manager. A vault or database failure leaves
 the editor unavailable rather than creating a plaintext fallback or silently
 replacing a key.
 
-For the initial M2 manual check, enter synthetic contact information, add a
-section, entry, and bullet, then choose **Save draft** followed by **Publish
-snapshot**. Restart the app and confirm the saved draft and published revision
-return. Publishing is disabled while edits remain unsaved.
+For the M2 editor manual check:
+
+1. Enter synthetic contact information, add sections, entries, bullets, links,
+   and custom fields; a custom field can be marked as a skill.
+2. Pause for about 1.2 seconds and wait for **Saved**, or choose **Save draft**.
+   Invalid content blocks both autosave and manual save; correct the inline
+   errors before proceeding. Limits come from the generated Rust contracts.
+3. Reorder sections/entries/bullets/fields with their up/down buttons (also
+   available through Tab and Space). Verify **Undo edit** and **Redo edit**;
+   history holds up to 30 document states in memory for this session only.
+4. Choose **Publish snapshot**, then expand its read-only text review. Editing
+   the draft must not change that review. Publishing is disabled for unsaved
+   changes or content already matching the latest published snapshot.
+5. Restart only after **Saved** and verify the draft, ordering, custom fields,
+   and published snapshot return. See the recorded native smoke check in
+   `evidence/0.0.0-dev/m2-editor-smoke.md`.
+
+**Current limitation:** native close/quit protection is not implemented yet.
+Unsaved or invalid edits can be lost if the app closes before a successful save.
+Keep using synthetic data and wait for **Saved** before closing. Undo history is
+not crash recovery. On a failed save, autosave pauses; revision conflicts or
+uncertain transport results require an explicit reload. Reloading asks before
+discarding edited unsaved content, so copy anything needed before confirming.
 
 The native vault proof is opt-in because it writes one randomized temporary
 credential to macOS Keychain or Windows Credential Manager and then deletes it:

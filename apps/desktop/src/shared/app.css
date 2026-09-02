@@ -232,6 +232,98 @@ h2 {
   gap: 18px;
 }
 
+.editor-fields {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.editor-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.editor-tools p {
+  margin: 0;
+  color: #4d5968;
+  font-size: 13px;
+}
+.move-controls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.field-error {
+  color: #7a2525;
+  font-weight: 500;
+}
+[aria-invalid="true"] {
+  border-color: #9a3434;
+}
+.link-list,
+.custom-fields {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+.link-list h3,
+.custom-fields h3 {
+  font-size: 15px;
+  margin: 0;
+}
+.link-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 8px;
+  align-items: end;
+}
+.custom-field {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d7dee5;
+  border-radius: 7px;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.checkbox-label input {
+  width: 18px;
+  min-height: 18px;
+}
+.published-review {
+  margin-top: 18px;
+}
+.published-review summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.published-review summary:focus-visible {
+  outline: 3px solid #cc8b35;
+  outline-offset: 3px;
+}
+.published-content {
+  padding-top: 20px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.published-content h3 {
+  margin-top: 22px;
+}
+.published-content h4 {
+  margin-bottom: 8px;
+}
+.published-content dd {
+  margin-left: 0;
+}
+
 .editor-panel,
 .status-card {
   padding: 24px;
@@ -335,7 +427,7 @@ textarea {
 
 .bullet-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 8px;
   align-items: end;
 }
@@ -375,6 +467,10 @@ textarea {
 }
 
 @media (max-width: 620px) {
+  .link-row,
+  .custom-field {
+    grid-template-columns: 1fr;
+  }
   .shell {
     padding: 22px 14px 36px;
   }

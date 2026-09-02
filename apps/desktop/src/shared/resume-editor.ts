@@ -3,6 +3,7 @@ import type {
   ResumeDocument,
   ResumeEntry,
   ResumeSection,
+  NamedField,
 } from "@ort/contracts/resume";
 
 export function createResumeDocument(): ResumeDocument {
@@ -46,6 +47,23 @@ export function createEntry(order: number): ResumeEntry {
 
 export function createBullet(order: number): Bullet {
   return { id: createEntityId(), order, text: "" };
+}
+
+export function createNamedField(order: number): NamedField {
+  return { id: createEntityId(), order, label: "", value: "", isSkill: false };
+}
+
+export function moveItem<T extends { id: string }>(
+  items: T[],
+  id: string,
+  direction: -1 | 1,
+): T[] {
+  const index = items.findIndex((item) => item.id === id);
+  const destination = index + direction;
+  if (index < 0 || destination < 0 || destination >= items.length) return items;
+  const result = [...items];
+  [result[index], result[destination]] = [result[destination], result[index]];
+  return result;
 }
 
 export function normalizeDocument(document: ResumeDocument): ResumeDocument {

@@ -21,13 +21,13 @@ import {
 } from "@ort/contracts/resume";
 
 export async function requestHealth(): Promise<HealthCommandResponse> {
-  const request: HealthRequest = {
-    contractVersion: CONTRACT_VERSION,
-    requestId: crypto.randomUUID(),
-    payload: {},
-  };
-
   try {
+    const request: HealthRequest = {
+      contractVersion: CONTRACT_VERSION,
+      requestId: crypto.randomUUID(),
+      payload: {},
+    };
+
     const response: unknown = await invoke("health", { request });
     if (!isHealthCommandResponse(response)) {
       return invalidResponse();
@@ -63,11 +63,11 @@ export async function saveResume(
   expectedRevision: number | null,
   document: ResumeDocument,
 ): Promise<VersionedResumeCommandResponse> {
-  const request: SaveResumeRequest = requestEnvelope({
-    expectedRevision,
-    document,
-  });
   try {
+    const request: SaveResumeRequest = requestEnvelope({
+      expectedRevision,
+      document,
+    });
     const response: unknown = await invoke("save_resume", { request });
     return isVersionedResumeCommandResponse(response)
       ? response
@@ -80,10 +80,10 @@ export async function saveResume(
 export async function publishResume(
   expectedDraftRevision: number,
 ): Promise<PublishResumeCommandResponse> {
-  const request: PublishResumeRequest = requestEnvelope({
-    expectedDraftRevision,
-  });
   try {
+    const request: PublishResumeRequest = requestEnvelope({
+      expectedDraftRevision,
+    });
     const response: unknown = await invoke("publish_resume", { request });
     return isPublishResumeCommandResponse(response)
       ? response

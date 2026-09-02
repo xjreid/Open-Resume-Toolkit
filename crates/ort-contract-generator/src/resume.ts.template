@@ -3,6 +3,7 @@
 import { CONTRACT_VERSION, type ErrorEnvelope } from "./health";
 
 export { CONTRACT_VERSION };
+export { DOCUMENT_LIMITS } from "./limits";
 
 export interface Link {
   label: string;

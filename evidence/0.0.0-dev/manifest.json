@@ -11,7 +11,7 @@
       "architecture": "arm64",
       "bundleIdentifier": "com.openresumetoolkit.dev",
       "signing": "adhoc-runtime",
-      "executableSha256": "284b60f6cb23c9a1f1cf59f4d3ea9cedb5324862875d22d4dcf584dff9aa06f5",
+      "executableSha256": "41bfd2bfb960e55d4979ffba052ea706ff288acac72e24353a0d90e905549bd3",
       "verification": "codesign-deep-strict"
     }
   ],
@@ -28,7 +28,9 @@
     "portableBackup": "passed-local-synthetic-macos-arm64",
     "m2EditorContracts": "passed-local",
     "m2DraftPublishFlow": "passed-local-synthetic-macos-arm64",
-    "m2NativeUiInteraction": "pending-macos-screen-capture-restart",
+    "m2NativeUiInteraction": "passed-local-synthetic-macos-arm64",
+    "m2EditorAutosaveRecovery": "passed-local-unit-and-native-macos-arm64",
+    "m2NativeUnsavedCloseProtection": "pending",
     "macosPreviewPackage": "passed-local-adhoc-app-macos-arm64-dmg-refresh-pending",
     "platformBuilds": "pending"
   },
