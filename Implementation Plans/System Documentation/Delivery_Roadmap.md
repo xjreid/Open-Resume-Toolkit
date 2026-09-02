@@ -72,7 +72,12 @@ Current development status:
   reordering, bounded session undo/redo, explicit reload/discard recovery, and
   read-only published text review. Native macOS synthetic save/publish/restart
   checks are recorded under `../../evidence/0.0.0-dev/m2-editor-smoke.md`;
-- still gated: unsaved native close/quit protection, Windows native editor
+- added locally: native-owned single-use quit attempts, main-window-only
+  lifecycle commands, and accessible Save/Discard/Keep editing confirmation
+  for the main close button and application Quit menu/shortcut, with pending
+  operation waits and save-failure recovery. Verified macOS paths and the
+  upstream termination gap are in `../../evidence/0.0.0-dev/m2-close-guard-smoke.md`;
+- still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
   staging, Typst preview/PDF rendering, DOCX/plain-text export, save dialogs,
   storage management, and complete offline journey evidence.

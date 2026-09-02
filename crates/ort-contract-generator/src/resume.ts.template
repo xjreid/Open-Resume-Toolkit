@@ -122,7 +122,7 @@ export function isPublishResumeCommandResponse(
   return isCommandResponse(value, isPublishResumeResponse);
 }
 
-function isCommandResponse<T>(
+export function isCommandResponse<T>(
   value: unknown,
   isValue: (candidate: unknown) => candidate is T,
 ): value is CommandResponse<T> {

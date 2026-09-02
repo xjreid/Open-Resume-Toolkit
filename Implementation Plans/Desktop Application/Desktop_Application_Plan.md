@@ -76,6 +76,21 @@ Use a small explicit client-state store for window/session state and TanStack Qu
 
 ## Backend command surface
 
+The M2 local close-guard checkpoint uses native-owned, single-use attempt IDs
+instead of a cached renderer dirty flag. Window close and the app-owned Quit
+menu/shortcut pause for the editor's Save/Discard/Keep editing decision. Only the
+main window may read or resolve an attempt; an event merely asks it to reread
+native state. In-flight mutations must finish before quit, and save failure must
+not implicitly discard edits. Missed listener events are reconciled on startup.
+
+The pinned macOS runtime's system termination path (Dock Quit/logout/shutdown)
+does not yet expose a cancellable callback. This remains a release gate, not a
+claim of complete close protection. The UI warns users to wait for Saved on
+these paths. Avoid unsafe runtime method replacement or widening frontend
+process privileges to work around it. Follow-up must prove an OS-supported
+termination hook or bounded encrypted recovery of unfinished edits, including
+invalid forms. Windows needs native close/quit/logoff verification separately.
+
 Tauri command functions:
 
 1. deserialize a generated request type;

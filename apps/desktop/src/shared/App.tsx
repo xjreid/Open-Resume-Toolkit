@@ -17,6 +17,8 @@ import type {
   ResumeSection,
 } from "@ort/contracts/resume";
 import { DOCUMENT_LIMITS } from "@ort/contracts/resume";
+import { CloseDialog } from "./CloseDialog";
+import { useCloseGuard } from "./use-close-guard";
 import {
   editorReducer,
   initialEditorState,
@@ -59,6 +61,7 @@ export function App({ surface }: { surface: Surface }) {
 function ResumeEditor() {
   const [health, setHealth] = useState<HealthState>({ kind: "checking" });
   const [editor, dispatch] = useReducer(editorReducer, initialEditorState);
+  const close = useCloseGuard(editor);
   const [confirmReload, setConfirmReload] = useState(false);
   const ioBusy = useRef(false);
   const loadGeneration = useRef(0);
@@ -153,7 +156,8 @@ function ResumeEditor() {
       !editor.editEpoch ||
       editor.autosavePaused ||
       issues.length ||
-      confirmReload
+      confirmReload ||
+      close.pending
     )
       return;
     const timer = window.setTimeout(() => void save(), 1200);
@@ -165,6 +169,7 @@ function ResumeEditor() {
     editor.autosavePaused,
     issues.length,
     confirmReload,
+    close.pending,
     save,
   ]);
 
@@ -192,6 +197,26 @@ function ResumeEditor() {
 
   return (
     <main className="shell shell--editor">
+      <CloseDialog
+        open={close.pending}
+        busy={busy}
+        resolving={close.resolving}
+        canSave={!!document && dirty && !mustReload && issues.length === 0}
+        error={close.error}
+        saveError={editor.errorCode ? friendlyError(editor.errorCode) : null}
+        onCancel={close.cancel}
+        onSave={() => void save()}
+        onDiscard={close.discard}
+        onRetry={close.retry}
+      />
+      {close.error && !close.pending ? (
+        <p className="notice" role="alert">
+          {close.error}{" "}
+          <button type="button" onClick={close.retry}>
+            Retry quit connection
+          </button>
+        </p>
+      ) : null}
       <header className="masthead masthead--workspace">
         <div className="brand-lockup">
           <div className="mark" aria-hidden="true">
@@ -239,6 +264,7 @@ function ResumeEditor() {
               !document ||
               busy ||
               confirmReload ||
+              close.pending ||
               mustReload ||
               issues.length > 0 ||
               (!dirty && revision !== null)
@@ -256,6 +282,7 @@ function ResumeEditor() {
               dirty ||
               busy ||
               confirmReload ||
+              close.pending ||
               mustReload ||
               alreadyPublished
             }
@@ -267,8 +294,11 @@ function ResumeEditor() {
 
       <div className="editor-tools">
         <p>
-          Valid changes autosave after a short pause. Wait for Saved before
-          closing; invalid edits are not saved. Use synthetic data only.
+          Valid changes autosave after a short pause. Closing checks for unsaved
+          edits; invalid edits must be corrected or explicitly discarded. Use
+          the app menu or window close button. macOS Dock Quit and system
+          shutdown are not yet protected; wait for Saved first. Use synthetic
+          data only.
         </p>
         <div className="move-controls">
           <button
@@ -277,7 +307,8 @@ function ResumeEditor() {
             disabled={
               !editor.undo.length ||
               editor.status === "loading" ||
-              confirmReload
+              confirmReload ||
+              close.pending
             }
             onClick={() => dispatch({ type: "undo" })}
           >
@@ -289,7 +320,8 @@ function ResumeEditor() {
             disabled={
               !editor.redo.length ||
               editor.status === "loading" ||
-              confirmReload
+              confirmReload ||
+              close.pending
             }
             onClick={() => dispatch({ type: "redo" })}
           >
@@ -299,7 +331,7 @@ function ResumeEditor() {
         <button
           type="button"
           className="button--secondary button--compact"
-          disabled={busy}
+          disabled={busy || close.pending}
           onClick={() =>
             dirty && editor.editEpoch > 0
               ? setConfirmReload(true)
@@ -361,7 +393,9 @@ function ResumeEditor() {
       {document ? (
         <fieldset
           className="editor-layout editor-fields"
-          disabled={editor.status === "loading" || confirmReload}
+          disabled={
+            editor.status === "loading" || confirmReload || close.pending
+          }
         >
           <section className="editor-panel" aria-labelledby="identity-heading">
             <div className="section-heading">

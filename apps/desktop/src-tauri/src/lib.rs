@@ -1,12 +1,85 @@
 use ort_domain::{
-    CONTRACT_VERSION, CommandResponse, HealthRequest, HealthResponse, HealthStatus,
-    LoadResumeRequest, PublishResumeRequest, PublishResumeResponse, ResumeWorkspaceResponse,
-    RuntimeProfile, SaveResumeRequest, StorageStatus, VersionedResumeResponse,
-    validate_health_request,
+    CONTRACT_VERSION, CloseDecision, CloseStatusRequest, CloseStatusResponse, CommandResponse,
+    HealthRequest, HealthResponse, HealthStatus, LoadResumeRequest, PublishResumeRequest,
+    PublishResumeResponse, ResolveCloseRequest, ResumeWorkspaceResponse, RuntimeProfile,
+    SaveResumeRequest, StorageStatus, VersionedResumeResponse, validate_health_request,
 };
 use ort_storage::{EncryptedStore, StorageError, VersionedResume};
 use ort_vault::OsDatabaseKeyVault;
-use tauri::{Manager, State, WebviewWindow};
+use tauri::{
+    AppHandle, Emitter, EventTarget, Manager, RunEvent, State, WebviewWindow, WindowEvent,
+};
+
+mod close_guard;
+mod menu;
+use close_guard::CloseGuard;
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+fn close_status(
+    window: WebviewWindow,
+    state: State<'_, CloseGuard>,
+    request: CloseStatusRequest,
+) -> CommandResponse<CloseStatusResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    match state.status(window.label()) {
+        Ok(value) => CommandResponse::success(value),
+        Err(code) => CommandResponse::failure(code, "errors.closeUnavailable", true),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+fn resolve_close(
+    window: WebviewWindow,
+    state: State<'_, CloseGuard>,
+    request: ResolveCloseRequest,
+) -> CommandResponse<CloseStatusResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    if let Err(code) = state.resolve(
+        window.label(),
+        &request.payload.attempt,
+        request.payload.decision,
+    ) {
+        return CommandResponse::failure(code, "errors.closeUnavailable", true);
+    }
+    if request.payload.decision == CloseDecision::Quit {
+        window.app_handle().exit(0);
+    }
+    CommandResponse::success(CloseStatusResponse {
+        pending_attempt: None,
+    })
+}
+
+fn request_native_close(app: &AppHandle) {
+    let guard = app.state::<CloseGuard>();
+    if guard.request().is_err() {
+        return;
+    } // Poisoned state never authorizes exit.
+    if let Some(main) = app.get_webview_window("main") {
+        // Quit from the overlay/Dock must surface the editor's confirmation.
+        let _ = main.show();
+        let _ = main.unminimize();
+        let _ = main.set_focus();
+        // The event is only a wakeup. The renderer fetches native state through
+        // close_status; it never trusts an event's payload as exit authority.
+        let _ = app.emit_to(
+            EventTarget::webview_window("main"),
+            "ort:close-requested",
+            (),
+        );
+    }
+}
 
 enum DesktopStorage {
     Ready(EncryptedStore),
@@ -180,6 +253,13 @@ fn initialize_storage(app: &tauri::App) -> DesktopStorage {
 /// initialization itself fails closed and leaves the UI available for recovery.
 pub fn run() {
     tauri::Builder::default()
+        .manage(CloseGuard::default())
+        .menu(menu::editor_menu)
+        .on_menu_event(|app, event| {
+            if event.id().as_ref() == menu::QUIT_ID {
+                request_native_close(app);
+            }
+        })
         .setup(|app| {
             app.manage(DesktopState {
                 storage: initialize_storage(app),
@@ -190,10 +270,27 @@ pub fn run() {
             health,
             load_resume,
             save_resume,
-            publish_resume
+            publish_resume,
+            close_status,
+            resolve_close
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run Open Resume Toolkit development shell");
+        .build(tauri::generate_context!())
+        .expect("failed to build Open Resume Toolkit development shell")
+        .run(|app, event| match event {
+            RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::CloseRequested { api, .. },
+                ..
+            } if label == "main" => {
+                api.prevent_close();
+                request_native_close(app);
+            }
+            RunEvent::ExitRequested { api, .. } if !app.state::<CloseGuard>().approved() => {
+                api.prevent_exit();
+                request_native_close(app);
+            }
+            _ => {}
+        });
 }
 
 #[cfg(test)]

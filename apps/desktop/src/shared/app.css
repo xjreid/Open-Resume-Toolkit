@@ -506,3 +506,17 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+.close-dialog {
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 24px;
+  color: #172033;
+  background: #fff;
+}
+
+.close-dialog::backdrop {
+  background: rgb(16 42 76 / 40%);
+}

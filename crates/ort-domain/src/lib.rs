@@ -2,8 +2,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+mod lifecycle;
 mod resume;
 mod resume_commands;
+
+pub use lifecycle::{
+    CloseDecision, CloseStatusRequest, CloseStatusResponse, ResolveClosePayload,
+    ResolveCloseRequest,
+};
 
 pub use resume::{
     Bullet, ContactDetails, DocumentLimits, EntityId, Link, NamedField, ResumeDocument,

@@ -1,5 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  isCloseCommandResponse,
+  type CloseCommandResponse,
+  type CloseDecision,
+  type ResolveCloseRequest,
+} from "@ort/contracts/lifecycle";
+import {
   CONTRACT_VERSION,
   isHealthCommandResponse,
   type HealthCommandResponse,
@@ -86,6 +92,34 @@ export async function publishResume(
     });
     const response: unknown = await invoke("publish_resume", { request });
     return isPublishResumeCommandResponse(response)
+      ? response
+      : invalidCommandResponse();
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function requestCloseStatus(): Promise<CloseCommandResponse> {
+  try {
+    const response: unknown = await invoke("close_status", {
+      request: requestEnvelope({}),
+    });
+    return isCloseCommandResponse(response)
+      ? response
+      : invalidCommandResponse();
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function resolveClose(
+  attempt: string,
+  decision: CloseDecision,
+): Promise<CloseCommandResponse> {
+  try {
+    const request: ResolveCloseRequest = requestEnvelope({ attempt, decision });
+    const response: unknown = await invoke("resolve_close", { request });
+    return isCloseCommandResponse(response)
       ? response
       : invalidCommandResponse();
   } catch {

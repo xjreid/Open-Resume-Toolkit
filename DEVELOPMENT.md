@@ -55,12 +55,25 @@ For the M2 editor manual check:
    and published snapshot return. See the recorded native smoke check in
    `evidence/0.0.0-dev/m2-editor-smoke.md`.
 
-**Current limitation:** native close/quit protection is not implemented yet.
-Unsaved or invalid edits can be lost if the app closes before a successful save.
-Keep using synthetic data and wait for **Saved** before closing. Undo history is
-not crash recovery. On a failed save, autosave pauses; revision conflicts or
+For the M2 quit-safety check, change the synthetic title and immediately use
+Command-Q on macOS (Ctrl-Q on Windows), the application's Quit menu item, or the
+main window's close button. Choose **Keep editing**, **Save and quit**, or
+**Discard unsaved edits and quit**. Invalid edits disable Save and quit. Escape
+keeps editing. A running save/publication is allowed to finish before quit;
+failed saves keep the editor open. Closing the main window currently quits the
+whole development workspace; closing the overlay alone does not quit the editor.
+See `evidence/0.0.0-dev/m2-close-guard-smoke.md` for verified paths and limitations.
+
+**Current limitations:** macOS Dock Quit and system shutdown are not protected
+by this guard because the pinned runtime does not expose those termination
+requests through its usual exit callback. Wait for **Saved** before using them.
+Force Quit, crashes, renderer reloads, and power loss can also lose unsaved edits;
+undo history is not crash recovery. Windows native interaction still needs VM
+testing. Keep using synthetic data. On a failed save, autosave pauses; revision conflicts or
 uncertain transport results require an explicit reload. Reloading asks before
 discarding edited unsaved content, so copy anything needed before confirming.
+If the quit connection fails, Keep editing leaves the editor available to copy
+unsaved text while reconnecting. No missing response authorizes native quit.
 
 The native vault proof is opt-in because it writes one randomized temporary
 credential to macOS Keychain or Windows Credential Manager and then deletes it:

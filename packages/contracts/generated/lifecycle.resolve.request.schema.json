@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResolveCloseRequest",
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "payload": {
+      "$ref": "#/$defs/ResolveClosePayload"
+    },
+    "requestId": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "requestId",
+    "payload"
+  ],
+  "$defs": {
+    "CloseDecision": {
+      "type": "string",
+      "enum": [
+        "cancel",
+        "quit"
+      ]
+    },
+    "ResolveClosePayload": {
+      "type": "object",
+      "properties": {
+        "attempt": {
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/$defs/CloseDecision"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt",
+        "decision"
+      ]
+    }
+  }
+}

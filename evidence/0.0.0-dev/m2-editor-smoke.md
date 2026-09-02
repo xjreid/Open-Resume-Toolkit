@@ -1,5 +1,9 @@
 # M2 editor checkpoint — native macOS smoke check
 
+Historical editor checkpoint: `b1605b8`. The later close-guard checkpoint and
+current preview artifact are recorded in `m2-close-guard-smoke.md` and the manifest.
+The limitations below describe this earlier checkpoint, not the latest code.
+
 Date: 2026-09-02. Platform: macOS arm64. Identity:
 `com.openresumetoolkit.dev`. Artifact: the local ad-hoc-signed preview `.app`
 listed in `manifest.json`, not a stable release or refreshed DMG.

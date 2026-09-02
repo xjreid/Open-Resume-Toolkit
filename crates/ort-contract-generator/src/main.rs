@@ -1,8 +1,9 @@
 use std::{fs, path::PathBuf};
 
 use ort_domain::{
-    DocumentLimits, HealthRequest, HealthResponse, LoadResumeRequest, PublishResumeRequest,
-    PublishResumeResponse, ResumeWorkspaceResponse, SaveResumeRequest, VersionedResumeResponse,
+    CloseStatusRequest, CloseStatusResponse, DocumentLimits, HealthRequest, HealthResponse,
+    LoadResumeRequest, PublishResumeRequest, PublishResumeResponse, ResolveCloseRequest,
+    ResumeWorkspaceResponse, SaveResumeRequest, VersionedResumeResponse,
 };
 use schemars::schema_for;
 
@@ -23,6 +24,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_schema::<ResumeWorkspaceResponse>(&output.join("resume.workspace.response.schema.json"))?;
     write_schema::<VersionedResumeResponse>(&output.join("resume.versioned.response.schema.json"))?;
     write_schema::<PublishResumeResponse>(&output.join("resume.publish.response.schema.json"))?;
+    write_schema::<CloseStatusRequest>(&output.join("lifecycle.status.request.schema.json"))?;
+    write_schema::<CloseStatusResponse>(&output.join("lifecycle.status.response.schema.json"))?;
+    write_schema::<ResolveCloseRequest>(&output.join("lifecycle.resolve.request.schema.json"))?;
+    fs::write(
+        output.join("lifecycle.ts"),
+        include_str!("lifecycle.ts.template"),
+    )?;
     fs::write(output.join("health.ts"), TYPESCRIPT)?;
     fs::write(output.join("resume.ts"), RESUME_TYPESCRIPT)?;
     let limits = DocumentLimits::default();
