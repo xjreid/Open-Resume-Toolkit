@@ -1,0 +1,8 @@
+# SQLCipher 4.14's Windows stderr logger allocates through SQLite while logging
+# memory-lock failures, recursively re-entering that logger with memory security
+# enabled. Omit raw native logging for privacy and to remove that recursion path.
+# Keep cipher_memory_security ON; application errors/diagnostics remain active.
+# libsqlite3-sys tracks this variable and rebuilds when it changes. Apply to every
+# local/CI/package build, not merely a Windows test invocation.
+[env]
+LIBSQLITE3_FLAGS = { value = "-DSQLCIPHER_OMIT_LOG -DSQLCIPHER_OMIT_DEFAULT_LOGGING", force = true }

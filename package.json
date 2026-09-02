@@ -19,7 +19,7 @@
     "format:check": "prettier --check . --ignore-unknown",
     "generate": "cargo run --locked -p ort-contract-generator",
     "lint": "pnpm --recursive --if-present lint",
-    "test": "pnpm --recursive --if-present test"
+    "test": "node --test tools/tests/*.test.mjs && pnpm --recursive --if-present test"
   },
   "devDependencies": {
     "prettier": "3.6.2"

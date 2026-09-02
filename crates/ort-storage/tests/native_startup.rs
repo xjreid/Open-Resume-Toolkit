@@ -15,6 +15,13 @@ fn native_cipher_startup_and_encrypted_profile_round_trip() {
         .query_row("PRAGMA cipher_version", [], |row| row.get(0))
         .unwrap();
     assert!(!version.trim().is_empty());
+    eprintln!("native-startup: verifying raw native logging is compiled out");
+    // A runtime request cannot reactivate the allocation-recursive Windows
+    // logger. Failure here means Cargo's native build policy was not applied.
+    let log_status: String = connection
+        .query_row("PRAGMA cipher_log = 'stderr'", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(log_status, "1", "native logging must be unavailable");
     drop(connection);
 
     eprintln!("native-startup: allocating synthetic profile and memory vault");

@@ -120,7 +120,12 @@ If supported public OS mechanisms cannot enforce these properties without admini
 - Native implementation candidates and the required positive-control/access-denial
   test matrix are in `Document_Worker_Containment.md`. The implemented bounded
   transport policy has only synthetic-event evidence; it cannot enforce OS
-  isolation, wake blocked I/O, kill a process or prove cleanup. Import stays disabled.
+  isolation, wake blocked I/O, kill a process or prove cleanup. A separate native
+  macOS probe verifies read-only descriptor transfer, seeded sibling/symlink
+  restrictions and loopback denial locally, but **allows child creation** and
+  observes only cooperative disconnect. It does not establish credential/broker
+  isolation, resource ceilings or forced process-tree cleanup. Windows containment
+  is unproven. Import stays disabled; probe completion is not full containment.
 - External DOCX relationships, macros, embedded packages, scripts, and active content are never executed or fetched.
 - Render templates are bundled and addressed by known IDs; user content cannot inject Typst source.
 - Resume/cover-letter file drags expose only validated PDFs materialized in a random private ORT session directory. Paths cannot be supplied by web content; Finish/discard and startup recovery remove only containment-verified ORT-owned files. Download uses a separate one-use native dialog token.

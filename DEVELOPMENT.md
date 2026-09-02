@@ -120,10 +120,37 @@ gating. It does not yet implement native pipes, process termination or a sandbox
 See `evidence/0.0.0-dev/m2-import-transport.md` and
 `Implementation Plans/System Documentation/Document_Worker_Containment.md`.
 
-The last Windows push failed with a stack overflow in `import_storage`; this is
-not considered resolved. CI now adds a separate native-startup probe and static
-stage labels to narrow the failure without suppressing the original test.
-On Windows, run both commands and retain the last stage label if one crashes:
+The next checkpoint adds a separate synthetic macOS App Sandbox/XPC test:
+
+```sh
+just probe-document-sandbox-macos
+```
+
+Run from an ordinary macOS terminal with Command Line Tools, outside an enclosing
+agent sandbox so its restrictions cannot contaminate the unsandboxed positive
+control. It builds and ad-hoc signs only a test bundle, uses temporary synthetic
+files and its own loopback listener, and never reads your profile or Keychain.
+Generated bundles and reports remain in `target/native-probes`; the runner
+removes its fresh fixture directory. `--build-only` can be passed to the Node
+script to compile/sign without executing the probe.
+
+Locally, read-only input transfer, seeded sibling/symlink restrictions and
+loopback denial passed, but direct child creation was allowed. The helper exits
+cooperatively; forced cleanup and resource/credential/broker limits are unproven.
+A green probe invocation or CI job is **not** a full containment pass. Import is
+still disabled. See `evidence/0.0.0-dev/m2-native-sandbox-probe.md`.
+
+The new Windows log shows both isolated startup and import-storage tests crash
+while opening the encrypted profile. A matching pinned SQLCipher logging defect
+is now mitigated by `.cargo/config.toml`: its native diagnostic logger is compiled
+out for local, CI and package builds. Run Cargo from the repository root (or a
+subdirectory) so this policy is loaded; profile opening fails closed if the
+required native configuration is missing. A clean/rebuilt native dependency is
+expected the first time. App-level sanitized errors remain available, and memory
+security/encryption remain on. Windows is **not confirmed fixed until CI passes**.
+Details: `evidence/0.0.0-dev/windows-sqlcipher-logging.md`.
+
+On Windows, retain the last stage label if either command crashes:
 
 ```sh
 cargo test --locked -p ort-storage --test native_startup -- --nocapture

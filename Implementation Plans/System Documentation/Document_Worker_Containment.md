@@ -1,7 +1,7 @@
 # Document worker containment implementation gate
 
-Status: research and transport-policy checkpoint, 2026-09-02. **Not a sandbox
-implementation or permission to enable import.** The worker still exits 78.
+Status: transport policy plus partial native macOS probe, 2026-09-02. **Not a
+production sandbox or permission to enable import.** The parser worker still exits 78.
 This refines M2; it does not introduce an additional milestone.
 
 ## Implemented parent transport policy
@@ -86,7 +86,37 @@ error-path tests. Do not relax workspace-wide `unsafe_code = "forbid"` merely
 to make a prototype compile. A proposed isolated binding/bridge must explicitly
 document its safety obligations before integration.
 
-## Next executable proof checkpoint
+## Implemented macOS probe: partial evidence, not a passed gate
+
+`just probe-document-sandbox-macos` builds a separate ad-hoc hardened-runtime
+test app and embedded XPC helper from `tools/native/macos-document-probe`.
+The helper has only the App Sandbox entitlement; neither executable is packaged
+in ORT. The runner verifies signatures and the helper checks its entitlement.
+Only freshly generated synthetic fixtures and a parent-owned IPv4 loopback
+listener are used. No personal document, profile or credential is opened.
+
+Local macOS 26.6.2 arm64 results:
+
+- transferred read-only descriptor: exact marker read succeeded; writing failed;
+- seeded sibling read/write-open and symlink-follow: denied;
+- connection to the parent's local TCP listener: denied;
+- direct `/usr/bin/true` child creation: **allowed**, contrary to the no-child gate;
+- cooperative helper exit: XPC disconnect observed, not forced-kill proof.
+
+The same probes run in the unsandboxed parent first to prove the targets are
+accessible. Only permission errors count as denials; missing targets and other
+OS errors reject evidence. A child being created does not establish that it
+escaped the sandbox, but this candidate still fails the specified prohibition.
+Do not enable parsing or weaken that requirement based on these results.
+
+The runner saves a bounded report and helper/host hashes under
+`target/native-probes`. A retained measurement and limitations are recorded in
+`../../evidence/0.0.0-dev/m2-native-sandbox-probe.md`. Both macOS CI jobs now run
+this subset check. A green probe job asserts only descriptor, seeded filesystem,
+loopback and cooperative-disconnect checks; it never asserts full containment.
+Child creation remains an explicit reported failure of the larger design gate.
+
+## Remaining executable proof
 
 Build synthetic probe helpers, not PDF/DOCX parsers. Use only temporary seeded
 files and disposable test credentials; never probe a real browser profile,
@@ -112,6 +142,10 @@ effective policy, allow/deny outcomes, and supervisor cleanup outcome:
 - Verify no source bytes, handles, result files or runnable processes leak into
   a later operation; no profile mutation occurs on any failed import.
 
-The Rust transport tests are deterministic event simulations, **not** these
-native access-denial tests. Input staging, real pipe drivers, sandbox adapters,
-PDFium/DOCX parsers and the import-review UI remain unimplemented.
+The Rust transport tests remain deterministic event simulations. The separate
+macOS probe adds only the native subset above. Forced process-tree termination,
+parent-death handling, resource ceilings, credentials/brokers, broader filesystem
+and network denial, hostile-code cleanup, release signing and supported OS/CPU
+matrices remain unproven. Windows has no native containment evidence yet.
+Production input staging, real pipe drivers, sandbox adapters, PDFium/DOCX
+parsers and the import-review UI remain unimplemented.

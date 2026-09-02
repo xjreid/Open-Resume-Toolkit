@@ -101,8 +101,12 @@ jobs:
       - name: Diagnose native SQLCipher startup on the target OS
         run: cargo test --locked -p ort-storage --test native_startup -- --nocapture
 
-      - name: Test import review, text output, and filesystem safety on the target OS
+      - name: Measure macOS sandbox candidate (import remains disabled)
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.desktop-build.outcome == 'success' }}
+        run: node tools/probe-document-sandbox-macos.mjs
+
+      - name: Test storage, import review, text output, and filesystem safety on the target OS
         # Keep the original cold-start/concurrent test process even if the
         # separate startup probe crashes. Neither failure is ignored or masked.
         if: ${{ !cancelled() && steps.desktop-build.outcome == 'success' }}
-        run: cargo test --locked -p ort-domain -p ort-documents -p ort-document-worker -p ort-application -p ort-platform -- --nocapture
+        run: cargo test --locked -p ort-domain -p ort-documents -p ort-document-worker -p ort-application -p ort-platform -p ort-storage -- --nocapture

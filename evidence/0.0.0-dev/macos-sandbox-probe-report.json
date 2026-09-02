@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-02T23:05:26.190Z",
+  "platform": "macos",
+  "architecture": "arm64",
+  "osVersion": "26.6.2",
+  "signing": "ad-hoc-hardened-runtime-separate-app-sandbox-helper",
+  "signatureVerified": true,
+  "helperSha256": "1ea3a2dfa0ea168f348a38b159aff5b079de10db959d1111e9921f6957f5c2f7",
+  "hostSha256": "691f7bc1f80c7dbe04436983c809ad875b3a46c9e199b6b4317ccf7285c8080d",
+  "measurement": {
+    "schemaVersion": 1,
+    "control": {
+      "descriptorRead": true,
+      "descriptorReadOnly": true,
+      "sandboxEntitlement": false,
+      "siblingRead": 0,
+      "siblingWrite": 0,
+      "symlinkRead": 0,
+      "loopbackConnect": 0,
+      "childCreation": 0
+    },
+    "sandboxed": {
+      "descriptorRead": true,
+      "descriptorReadOnly": true,
+      "sandboxEntitlement": true,
+      "siblingRead": 1,
+      "siblingWrite": 1,
+      "symlinkRead": 1,
+      "loopbackConnect": 1,
+      "childCreation": 0
+    },
+    "cooperativeDisconnectObserved": true
+  },
+  "conclusions": {
+    "descriptorBoundaryPassed": true,
+    "filesystemIsolationPassed": true,
+    "loopbackConnectDenied": true,
+    "childCreationDenied": false,
+    "cooperativeDisconnectObserved": true,
+    "fullContainmentProven": false,
+    "importEnabled": false,
+    "untested": [
+      "forced-process-tree-termination-and-parent-death",
+      "memory-cpu-handle-ceilings",
+      "credential-and-broker-access",
+      "udp-dns-and-non-loopback-network",
+      "filesystem-outside-the-synthetic-fixtures",
+      "hostile-code-and-crash-cleanup",
+      "signed-release-and-supported-os-matrix"
+    ]
+  }
+}

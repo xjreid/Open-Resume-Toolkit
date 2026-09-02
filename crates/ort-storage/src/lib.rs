@@ -1193,6 +1193,16 @@ fn open_encrypted_connection(
     }
     let connection =
         Connection::open_with_flags(path, flags).map_err(|_| StorageError::Unavailable)?;
+    // Reject builds that lost the repository's SQLCIPHER_OMIT_LOG policy before
+    // applying a key or enabling memory security. In the pinned native source,
+    // this fixed target returns SQLITE_ERROR only when logging is compiled out.
+    // Never pass a path here: other strings can create a native log file.
+    let logging_status: String = connection
+        .query_row("PRAGMA cipher_log = 'stderr'", [], |row| row.get(0))
+        .map_err(|_| StorageError::CipherUnavailable)?;
+    if logging_status != "1" {
+        return Err(StorageError::CipherUnavailable);
+    }
     connection
         .busy_timeout(Duration::from_secs(5))
         .map_err(|_| StorageError::Unavailable)?;
@@ -1460,6 +1470,17 @@ mod tests {
         let vault = MemoryDatabaseKeyVault::new();
         let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("initialize encrypted store");
+        {
+            // Removing native logging must not turn off memory protection or
+            // keying. Assert the effective native values, not just our setters.
+            let connection = store.connection.lock().expect("storage lock");
+            for pragma in ["cipher_memory_security", "cipher_status"] {
+                let enabled: String = connection
+                    .pragma_query_value(None, pragma, |row| row.get(0))
+                    .expect("effective cipher protection");
+                assert_eq!(enabled, "1", "{pragma} must remain enabled");
+            }
+        }
         let document = ResumeDocument::empty(PLAINTEXT_MARKER);
         let created = store.create_draft(&document).expect("create draft");
         assert_eq!(created.revision, 1);

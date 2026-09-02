@@ -2,6 +2,11 @@
 
 Date: 2026-09-02. Base commit: `1554540`. Verification platform: macOS arm64.
 
+Historical checkpoint. The subsequent diagnostic result and targeted mitigation
+are in [Windows SQLCipher logging](windows-sqlcipher-logging.md); partial native
+macOS measurements are in [the sandbox probe record](m2-native-sandbox-probe.md).
+The unresolved-diagnosis statements below describe this earlier checkpoint.
+
 ## Windows failure
 
 The supplied windows-2025 log ends with a stack overflow in

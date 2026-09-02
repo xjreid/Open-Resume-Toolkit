@@ -98,9 +98,20 @@ Current development status:
   and both-EOF/successful-exit validation. These are event simulations, not native
   pipe/process/sandbox proof. The implementation candidates and access-denial
   checklist are in `Document_Worker_Containment.md`; evidence is in
-  `../../evidence/0.0.0-dev/m2-import-transport.md`. The preceding Windows CI
-  stack overflow remains unresolved; separate startup and import stage probes
-  were added without skipping or weakening the failing test;
+  `../../evidence/0.0.0-dev/m2-import-transport.md`;
+- added locally: a separately signed synthetic macOS App Sandbox/XPC probe.
+  Read-only descriptor transfer, seeded sibling/symlink restrictions and loopback
+  denial passed on local arm64. Direct child creation was allowed; cooperative
+  disconnect is not forced process-tree cleanup. This is partial evidence, not
+  a production sandbox or an import-enablement gate. Both macOS CI jobs run the
+  measured subset. See `../../evidence/0.0.0-dev/m2-native-sandbox-probe.md`;
+- Windows CI repair awaiting native verification: new stage logs narrowed the
+  stack overflow to encrypted-profile opening. A matching upstream SQLCipher
+  Windows logging-recursion defect is mitigated by compiling out its native
+  diagnostic logger, with a fail-closed build-policy check. Encryption and
+  allocation memory protection remain enabled; no test is skipped or given a
+  larger stack. Local storage/import tests pass; the next Windows CI run must
+  confirm the repair. See `../../evidence/0.0.0-dev/windows-sqlcipher-logging.md`;
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
   UI/session integration, private binary staging, richer entry/date/link mapping,

@@ -278,7 +278,10 @@ with synthetic events only; actual native I/O, enforced resource ceilings,
 termination and cleanup remain absent. `finish` is not a sandbox proof or an
 import-enablement flag. See
 `../System Documentation/Document_Worker_Containment.md` for platform research
-and the required native probe matrix. The gates below remain in force:
+and the required native probe matrix. A subsequent separate macOS XPC/App Sandbox
+probe passed local descriptor, seeded filesystem and loopback checks, but allowed
+child creation. Cooperative disconnect does not prove forced cleanup. No parser,
+production sandbox adapter or UI was enabled; the gates below remain in force:
 
 1. Prove supported native worker containment and supervision on macOS/Windows
    without credentials or real documents; do not replace it with a protocol-only

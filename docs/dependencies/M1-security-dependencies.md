@@ -1,6 +1,6 @@
 # M1 security dependency review
 
-- Reviewed: 2026-09-01
+- Reviewed: 2026-09-01; native logging configuration amended 2026-09-02
 - Scope: encrypted local database and operating-system database-key storage
 - Release state: approved for development; Windows/macOS platform proof still required
 
@@ -33,6 +33,33 @@ checks.
 
 No plaintext SQLite fallback exists. A missing, corrupt, or inaccessible vault
 key stops profile opening and never creates a replacement database or identity.
+
+## SQLCipher Windows logging mitigation (2026-09-02)
+
+The lockfile selects `libsqlite3-sys 0.38.2`, whose bundled SQLCipher is 4.14.0.
+Its Windows diagnostic logger allocates through SQLite while reporting a failed
+memory lock. With allocation memory security enabled this can recursively enter
+the same logger. This matches the new Windows encrypted-profile startup failure;
+SQLCipher's [4.18.0 changelog](https://github.com/sqlcipher/sqlcipher/blob/master/CHANGELOG.md)
+records an allocation-related Windows logging crash fix, and 4.16.0 removed the
+extra warn-level lock-failure log. Native Windows confirmation remains pending.
+
+Repository `.cargo/config.toml` forces `SQLCIPHER_OMIT_LOG` and
+`SQLCIPHER_OMIT_DEFAULT_LOGGING` through the native dependency's supported
+`LIBSQLITE3_FLAGS` input. This removes SQLCipher diagnostic logging from all builds,
+not ORT's sanitized error reporting. It does not disable `cipher_memory_security`,
+memory-lock attempts, keying, per-page authentication or integrity checks.
+Memory-lock attempts are still best-effort OS operations, not proof that every
+page is locked. No cryptographic format or dependency version changed.
+
+Profile opening checks that `PRAGMA cipher_log = 'stderr'` returns the pinned
+implementation's disabled-logger status before applying a key. It fails closed
+if the policy is missing. Native startup tests assert that runtime configuration
+cannot reactivate the logger; storage tests assert effective memory security and
+keying remain enabled. CI now runs the full storage suite on all desktop targets.
+Future SQLCipher upgrades must review these macros and status semantics again;
+the mitigation is not a substitute for reviewing newer dependency releases.
+See `../../evidence/0.0.0-dev/windows-sqlcipher-logging.md`.
 
 ## Vault boundary and remaining proof
 
