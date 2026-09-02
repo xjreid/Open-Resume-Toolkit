@@ -117,6 +117,10 @@ If supported public OS mechanisms cannot enforce these properties without admini
 - PDF/DOCX parsing runs in a new disposable worker process for each import. The OS sandbox denies network, subprocess creation, vault/keychain/credential-manager access, database/application-data access, browser/native IPC, and reads outside the already-open staged input. The worker can write only to a randomized private result directory and returns a bounded versioned extraction message over an inherited pipe.
 - The parent opens and validates the staged file before worker launch, passes a handle rather than trusting a worker-supplied path where supported, revalidates all returned data, and kills the entire worker process tree after success, timeout, crash, protocol violation, or cancellation. Worker exit cannot commit or mutate canonical data.
 - PDF/DOCX parsers also enforce page, relationship, nesting, decompression, image, object, handle, memory, CPU, and wall-time limits. Fuzzing/resource limits do not substitute for the sandbox.
+- Native implementation candidates and the required positive-control/access-denial
+  test matrix are in `Document_Worker_Containment.md`. The implemented bounded
+  transport policy has only synthetic-event evidence; it cannot enforce OS
+  isolation, wake blocked I/O, kill a process or prove cleanup. Import stays disabled.
 - External DOCX relationships, macros, embedded packages, scripts, and active content are never executed or fetched.
 - Render templates are bundled and addressed by known IDs; user content cannot inject Typst source.
 - Resume/cover-letter file drags expose only validated PDFs materialized in a random private ORT session directory. Paths cannot be supplied by web content; Finish/discard and startup recovery remove only containment-verified ORT-owned files. Download uses a separate one-use native dialog token.

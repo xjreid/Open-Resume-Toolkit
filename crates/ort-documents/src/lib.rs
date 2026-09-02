@@ -3,6 +3,7 @@
 use ort_domain::{DocumentLimits, Link, ResumeDocument};
 
 pub mod import;
+pub mod import_transport;
 
 pub const IMPORT_ENABLED: bool = false;
 pub const TEXT_FORMAT_VERSION: u16 = 1;

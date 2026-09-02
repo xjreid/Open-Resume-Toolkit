@@ -61,6 +61,12 @@ The macOS arm64/Intel and Windows CI jobs now include these core and inert-worke
 tests. The user reported all tests passed for the previous push; the current
 changes have not yet run remotely.
 
+Follow-up 2026-09-02: the user reported only windows-2025 failed on the subsequent
+push. Its `import_storage` executable aborted with `STATUS_STACK_OVERFLOW`.
+See `m2-import-transport.md` for diagnosis and follow-up probes; no Windows fix
+is claimed yet. The later bounded transport policy also supersedes the absence
+of collection policy below, but there is still no native pipe driver/supervisor.
+
 ## Remaining gates and limitations
 
 - PDF/DOCX import is still unavailable in the desktop app. Native file picking,

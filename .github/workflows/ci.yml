@@ -95,7 +95,14 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build frontend and Rust desktop shell
+        id: desktop-build
         run: pnpm --filter @ort/desktop build && cargo check --locked -p ort-desktop
 
+      - name: Diagnose native SQLCipher startup on the target OS
+        run: cargo test --locked -p ort-storage --test native_startup -- --nocapture
+
       - name: Test import review, text output, and filesystem safety on the target OS
-        run: cargo test --locked -p ort-domain -p ort-documents -p ort-document-worker -p ort-application -p ort-platform
+        # Keep the original cold-start/concurrent test process even if the
+        # separate startup probe crashes. Neither failure is ignored or masked.
+        if: ${{ !cancelled() && steps.desktop-build.outcome == 'success' }}
+        run: cargo test --locked -p ort-domain -p ort-documents -p ort-document-worker -p ort-application -p ort-platform -- --nocapture

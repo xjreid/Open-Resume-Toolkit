@@ -39,19 +39,24 @@ fn review(base: VersionedResumeResponse) -> ImportReview {
 
 #[test]
 fn confirmed_candidate_saves_once_without_changing_published_snapshot_and_survives_restart() {
+    eprintln!("import-round-trip: allocating synthetic profile and memory vault");
     let root = TempDir::new().unwrap();
     let vault = MemoryDatabaseKeyVault::new();
+    eprintln!("import-round-trip: opening encrypted profile");
     let store = EncryptedStore::open_or_initialize(root.path(), "test", &vault).unwrap();
+    eprintln!("import-round-trip: creating and publishing draft");
     let mut document = ResumeDocument::empty("Synthetic import");
     "Synthetic Person".clone_into(&mut document.contact.full_name);
     let original = store.create_draft(&document).unwrap();
     let published = store.publish_draft(original.revision).unwrap();
     let base = versioned(original);
+    eprintln!("import-round-trip: mapping and preparing review");
     let review = review(base.clone());
     let candidate = review.prepare(&base).unwrap();
     // Merely constructing/reviewing/preparing a candidate has no side effects.
     assert_eq!(store.load_draft().unwrap().unwrap().document, document);
     let expected = candidate.expected_revision.unwrap();
+    eprintln!("import-round-trip: committing candidate and checking replay");
     let saved = store.save_draft(expected, &candidate.document).unwrap();
     assert!(matches!(
         store.save_draft(expected, &candidate.document),
@@ -65,11 +70,13 @@ fn confirmed_candidate_saves_once_without_changing_published_snapshot_and_surviv
         review.proposal().source().blocks()[0].text,
         "Synthetic reviewed contribution — 示例"
     );
+    eprintln!("import-round-trip: closing and reopening profile");
     drop(store);
     let reopened = EncryptedStore::open_or_initialize(root.path(), "test", &vault).unwrap();
     let loaded = reopened.load_draft().unwrap().unwrap();
     assert_eq!(loaded.revision, saved.revision);
     assert_eq!(loaded.document, saved.document);
+    eprintln!("import-round-trip: rendering saved document");
     assert!(
         render_plain_text(&loaded.document)
             .unwrap()
@@ -83,9 +90,12 @@ fn confirmed_candidate_saves_once_without_changing_published_snapshot_and_surviv
 
 #[test]
 fn edit_racing_after_preparation_is_not_overwritten_by_import_commit() {
+    eprintln!("import-commit-race: allocating synthetic profile and memory vault");
     let root = TempDir::new().unwrap();
     let vault = MemoryDatabaseKeyVault::new();
+    eprintln!("import-commit-race: opening encrypted profile");
     let store = EncryptedStore::open_or_initialize(root.path(), "test", &vault).unwrap();
+    eprintln!("import-commit-race: preparing import and racing a saved edit");
     let document = ResumeDocument::empty("Synthetic concurrent draft");
     let base = versioned(store.create_draft(&document).unwrap());
     let review = review(base.clone());

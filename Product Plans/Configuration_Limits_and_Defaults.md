@@ -67,6 +67,12 @@ Limits protect rendering and parsing; they are not monetization quotas. When leg
   native pipe reader must enforce the byte limit while collecting output; the
   parent-side decoder independently enforces it again. These do not relax the
   50,000-character extraction or 30,000-character canonical draft limits.
+- Parent worker transport: 8 KiB maximum read chunk; 16 KiB total stderr before
+  rejection, counted and discarded without logging contents. Stdout must contain
+  exactly one extraction JSON value. Both pipe EOFs and successful OS-observed
+  exit are required; no partial result is accepted after cancellation/failure.
+  The 60-second monotonic deadline starts before launch and is never renewed by
+  output. Native cancellation/termination/cleanup remain implementation gates.
 - In-memory import-review decisions: 100,000 Unicode scalar values across all
   retained edited values/headings/destination labels. Final acceptance still
   enforces every canonical document limit; excess source is never truncated.

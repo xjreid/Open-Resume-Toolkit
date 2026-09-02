@@ -114,6 +114,25 @@ revision check. See `evidence/0.0.0-dev/m2-import-core.md` for limits and remain
 UI/parser integration work. No new installer or preview package is needed to
 exercise this backend checkpoint.
 
+The following transport-policy checkpoint adds bounded output collection,
+discarded/capped stderr, deadline/cancellation checks and successful-exit/EOF
+gating. It does not yet implement native pipes, process termination or a sandbox.
+See `evidence/0.0.0-dev/m2-import-transport.md` and
+`Implementation Plans/System Documentation/Document_Worker_Containment.md`.
+
+The last Windows push failed with a stack overflow in `import_storage`; this is
+not considered resolved. CI now adds a separate native-startup probe and static
+stage labels to narrow the failure without suppressing the original test.
+On Windows, run both commands and retain the last stage label if one crashes:
+
+```sh
+cargo test --locked -p ort-storage --test native_startup -- --nocapture
+cargo test --locked -p ort-application --test import_storage -- --nocapture
+```
+
+These probes use only temporary synthetic profiles and an in-memory vault.
+No installer or Keychain/Credential Manager approval is required.
+
 **Current limitations:** macOS Dock Quit and system shutdown are not protected
 by this guard because the pinned runtime does not expose those termination
 requests through its usual exit callback. Wait for **Saved** before using them.

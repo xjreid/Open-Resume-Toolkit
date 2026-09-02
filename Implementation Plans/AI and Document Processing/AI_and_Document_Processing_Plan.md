@@ -271,6 +271,15 @@ decision strings have a separate aggregate 100,000-character ceiling.
 
 Next integration gates, in order:
 
+The subsequent transport-policy checkpoint implements 8 KiB chunks, a 512 KiB
+stdout cap, 16 KiB discarded-stderr cap, both-EOF/successful-OS-exit gating,
+sticky failures, cancellation and a 60-second monotonic deadline. It is tested
+with synthetic events only; actual native I/O, enforced resource ceilings,
+termination and cleanup remain absent. `finish` is not a sandbox proof or an
+import-enablement flag. See
+`../System Documentation/Document_Worker_Containment.md` for platform research
+and the required native probe matrix. The gates below remain in force:
+
 1. Prove supported native worker containment and supervision on macOS/Windows
    without credentials or real documents; do not replace it with a protocol-only
    check or an uncontained parser subprocess.

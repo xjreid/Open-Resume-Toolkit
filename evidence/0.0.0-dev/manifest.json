@@ -40,12 +40,15 @@
     "m2ImportExtractionMappingCore": "passed-local-synthetic-macos-arm64",
     "m2ImportReviewAndStorageCommit": "passed-local-synthetic-memory-vault-macos-arm64",
     "m2ImportWorkerDisabledRegression": "passed-local-macos-arm64",
+    "m2ImportTransportPolicy": "passed-local-nine-synthetic-event-tests-macos-arm64",
+    "nativeCipherStartupProbe": "passed-local-macos-arm64-windows-pending",
+    "windowsImportStorageStackOverflow": "unresolved-diagnostic-stages-added-awaiting-native-ci",
     "m2ImportNativeParserContainment": "pending",
     "m2ImportReviewUi": "pending",
     "javascriptProductionAudit": "passed-local-no-known-vulnerabilities",
     "rustAdvisoryAudit": "pending-tool-unavailable",
-    "macosPreviewPackage": "previous-text-export-checkpoint-not-rebuilt-for-import-core",
-    "platformBuilds": "previous-checkpoint-reported-passed-current-checkpoint-pending"
+    "macosPreviewPackage": "previous-text-export-checkpoint-not-rebuilt-for-import-transport",
+    "platformBuilds": "previous-push-macos-reported-passed-windows-failed-current-checkpoint-pending"
   },
   "releaseEligible": false
 }

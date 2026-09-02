@@ -93,6 +93,14 @@ Current development status:
   tests cover commit races, replay refusal, published-snapshot isolation, and
   restart. Evidence: `../../evidence/0.0.0-dev/m2-import-core.md`. No import UI,
   file picker, parser, or worker launch was enabled by this checkpoint;
+- added locally: bounded parent-side worker transport policy with capped stdout
+  and discarded stderr, monotonic wall deadline, cancellation, terminal failures,
+  and both-EOF/successful-exit validation. These are event simulations, not native
+  pipe/process/sandbox proof. The implementation candidates and access-denial
+  checklist are in `Document_Worker_Containment.md`; evidence is in
+  `../../evidence/0.0.0-dev/m2-import-transport.md`. The preceding Windows CI
+  stack overflow remains unresolved; separate startup and import stage probes
+  were added without skipping or weakening the failing test;
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
   UI/session integration, private binary staging, richer entry/date/link mapping,
