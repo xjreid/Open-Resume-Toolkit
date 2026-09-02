@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PublishResumeRequest",
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "payload": {
+      "$ref": "#/$defs/PublishResumePayload"
+    },
+    "requestId": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "requestId",
+    "payload"
+  ],
+  "$defs": {
+    "PublishResumePayload": {
+      "type": "object",
+      "properties": {
+        "expectedDraftRevision": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "expectedDraftRevision"
+      ]
+    }
+  }
+}

@@ -16,6 +16,9 @@ tauri-build.workspace = true
 
 [dependencies]
 ort-domain = { path = "../../../crates/ort-domain" }
+ort-storage = { path = "../../../crates/ort-storage" }
+ort-vault = { path = "../../../crates/ort-vault" }
+serde.workspace = true
 tauri.workspace = true
 
 [lints]

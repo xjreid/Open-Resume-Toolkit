@@ -3,10 +3,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 mod resume;
+mod resume_commands;
 
 pub use resume::{
     Bullet, ContactDetails, DocumentLimits, EntityId, Link, NamedField, ResumeDocument,
     ResumeEntry, ResumeSection, ValidationError,
+};
+pub use resume_commands::{
+    EmptyPayload, LoadResumeRequest, PublishResumePayload, PublishResumeRequest,
+    PublishResumeResponse, ResumeWorkspaceResponse, SaveResumePayload, SaveResumeRequest,
+    VersionedResumeResponse,
 };
 
 pub const CONTRACT_VERSION: u16 = 2;
@@ -48,7 +54,9 @@ pub enum RuntimeProfile {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum StorageStatus {
+    Ready,
     DevelopmentGated,
+    Unavailable,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
@@ -79,15 +87,53 @@ impl<T: Serialize> CommandResponse<T> {
     pub fn failure(code: &str, message_key: &str, retryable: bool) -> Self {
         Self::Failure {
             ok: false,
-            error: ErrorEnvelope {
-                code: code.to_owned(),
-                message_key: message_key.to_owned(),
-                retryable,
-                operation_id: None,
-                details: Map::new(),
-            },
+            error: ErrorEnvelope::new(code, message_key, retryable),
         }
     }
+}
+
+impl ErrorEnvelope {
+    #[must_use]
+    pub fn new(code: &str, message_key: &str, retryable: bool) -> Self {
+        Self {
+            code: code.to_owned(),
+            message_key: message_key.to_owned(),
+            retryable,
+            operation_id: None,
+            details: Map::new(),
+        }
+    }
+}
+
+/// Validates metadata shared by every desktop command.
+///
+/// # Errors
+/// Returns a bounded, non-sensitive contract error.
+pub fn validate_request_metadata(
+    contract_version: u16,
+    request_id: &str,
+) -> Result<(), ErrorEnvelope> {
+    if contract_version != CONTRACT_VERSION {
+        return Err(ErrorEnvelope::new(
+            "UNSUPPORTED_CONTRACT_VERSION",
+            "errors.unsupportedContractVersion",
+            false,
+        ));
+    }
+
+    if !(8..=64).contains(&request_id.len())
+        || !request_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    {
+        return Err(ErrorEnvelope::new(
+            "INVALID_REQUEST_ID",
+            "errors.invalidRequestId",
+            false,
+        ));
+    }
+
+    Ok(())
 }
 
 /// Validates the bounded fields shared by every health request.
@@ -97,32 +143,7 @@ impl<T: Serialize> CommandResponse<T> {
 /// Returns a safe error envelope when the contract version is unsupported or
 /// the request identifier is outside the accepted character and length bounds.
 pub fn validate_health_request(request: &HealthRequest) -> Result<(), ErrorEnvelope> {
-    if request.contract_version != CONTRACT_VERSION {
-        return Err(ErrorEnvelope {
-            code: "UNSUPPORTED_CONTRACT_VERSION".to_owned(),
-            message_key: "errors.unsupportedContractVersion".to_owned(),
-            retryable: false,
-            operation_id: None,
-            details: Map::new(),
-        });
-    }
-
-    if !(8..=64).contains(&request.request_id.len())
-        || !request
-            .request_id
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-    {
-        return Err(ErrorEnvelope {
-            code: "INVALID_REQUEST_ID".to_owned(),
-            message_key: "errors.invalidRequestId".to_owned(),
-            retryable: false,
-            operation_id: None,
-            details: Map::new(),
-        });
-    }
-
-    Ok(())
+    validate_request_metadata(request.contract_version, &request.request_id)
 }
 
 #[cfg(test)]

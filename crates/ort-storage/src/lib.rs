@@ -237,6 +237,7 @@ impl EncryptedStore {
                 .map_err(|error| map_vault_load_error(&error))?;
             let connection = open_encrypted_connection(&database_path, &key, false)?;
             verify_schema(&connection)?;
+            set_private_database_permissions(&database_path)?;
             return Ok(Self {
                 connection: Mutex::new(connection),
                 manifest,
@@ -268,7 +269,7 @@ impl EncryptedStore {
             let connection = open_encrypted_connection(&database_path, &key, true)?;
             initialize_schema(&connection, &manifest)?;
             verify_integrity(&connection)?;
-            set_private_file_permissions(&database_path)?;
+            set_private_database_permissions(&database_path)?;
             write_manifest_atomically(root, &manifest_path, &manifest)?;
             Ok(connection)
         })();
@@ -345,10 +346,13 @@ impl EncryptedStore {
             ],
         );
         match result {
-            Ok(1) => Ok(VersionedResume {
-                revision: 1,
-                document: document.clone(),
-            }),
+            Ok(1) => {
+                set_private_database_permissions(&self.database_path)?;
+                Ok(VersionedResume {
+                    revision: 1,
+                    document: document.clone(),
+                })
+            }
             Err(error) if is_constraint_error(&error) => Err(StorageError::RevisionConflict),
             Ok(_) | Err(_) => Err(StorageError::Unavailable),
         }
@@ -392,6 +396,7 @@ impl EncryptedStore {
         if changed != 1 {
             return Err(StorageError::RevisionConflict);
         }
+        set_private_database_permissions(&self.database_path)?;
         Ok(VersionedResume {
             revision: next_revision,
             document: document.clone(),
@@ -459,6 +464,7 @@ impl EncryptedStore {
         transaction
             .commit()
             .map_err(|_| StorageError::Unavailable)?;
+        set_private_database_permissions(&self.database_path)?;
 
         let document = parse_document(&row.2)?;
         Ok(VersionedResume {
@@ -952,7 +958,7 @@ impl EncryptedStore {
                     .map_err(|_| StorageError::Unavailable)?;
             }
             verify_schema(&destination)?;
-            set_private_file_permissions(&destination_database)?;
+            set_private_database_permissions(&destination_database)?;
             drop(destination);
             write_manifest_atomically(destination_root, &destination_manifest, &self.manifest)?;
             Ok(())
@@ -1083,6 +1089,20 @@ fn set_private_file_permissions(path: &Path) -> Result<(), StorageError> {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(0o600))
             .map_err(|_| StorageError::Unavailable)?;
+    }
+    Ok(())
+}
+
+fn set_private_database_permissions(database_path: &Path) -> Result<(), StorageError> {
+    set_private_file_permissions(database_path)?;
+    let database_name = database_path.file_name().ok_or(StorageError::Unavailable)?;
+    for suffix in ["-wal", "-shm", "-journal"] {
+        let mut sidecar_name = database_name.to_os_string();
+        sidecar_name.push(suffix);
+        let sidecar = database_path.with_file_name(sidecar_name);
+        if sidecar.exists() {
+            set_private_file_permissions(&sidecar)?;
+        }
     }
     Ok(())
 }
@@ -1425,6 +1445,26 @@ mod tests {
         store.verify_integrity().expect("integrity");
         let wal_path = store.database_path().with_file_name("profile.db-wal");
         assert!(wal_path.is_file(), "the write must exercise encrypted WAL");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(store.database_path())
+                    .expect("database metadata")
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
+            );
+            assert_eq!(
+                fs::metadata(&wal_path)
+                    .expect("WAL metadata")
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
+            );
+        }
         assert_no_marker_in_files(temporary.path());
         drop(store);
 

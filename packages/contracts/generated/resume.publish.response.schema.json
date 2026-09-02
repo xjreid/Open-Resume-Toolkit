@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PublishResumeResponse",
+  "type": "object",
+  "properties": {
+    "draftRevision": {
+      "type": "integer",
+      "format": "int64"
+    },
+    "published": {
+      "$ref": "#/$defs/VersionedResumeResponse"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "draftRevision",
+    "published"
+  ],
+  "$defs": {
+    "Bullet": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "text"
+      ]
+    },
+    "ContactDetails": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Link"
+          }
+        },
+        "location": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fullName",
+        "email",
+        "phone",
+        "location",
+        "links"
+      ]
+    },
+    "Link": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "url"
+      ]
+    },
+    "NamedField": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "isSkill": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "label",
+        "value",
+        "isSkill"
+      ]
+    },
+    "ResumeDocument": {
+      "type": "object",
+      "properties": {
+        "contact": {
+          "$ref": "#/$defs/ContactDetails"
+        },
+        "documentId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResumeSection"
+          }
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "documentId",
+        "title",
+        "contact",
+        "sections"
+      ]
+    },
+    "ResumeEntry": {
+      "type": "object",
+      "properties": {
+        "bullets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Bullet"
+          }
+        },
+        "dateRange": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NamedField"
+          }
+        },
+        "heading": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Link"
+          }
+        },
+        "location": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "subheading": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "heading",
+        "subheading",
+        "dateRange",
+        "location",
+        "fields",
+        "bullets",
+        "links"
+      ]
+    },
+    "ResumeSection": {
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResumeEntry"
+          }
+        },
+        "heading": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "heading",
+        "entries"
+      ]
+    },
+    "VersionedResumeResponse": {
+      "type": "object",
+      "properties": {
+        "document": {
+          "$ref": "#/$defs/ResumeDocument"
+        },
+        "revision": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "document"
+      ]
+    }
+  }
+}

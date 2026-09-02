@@ -12,7 +12,7 @@ export interface HealthResponse {
   status: "ok";
   appVersion: string;
   profile: "development";
-  storageStatus: "development_gated";
+  storageStatus: "ready" | "development_gated" | "unavailable";
   contractVersion: typeof CONTRACT_VERSION;
 }
 
@@ -46,7 +46,9 @@ export function isHealthCommandResponse(
       value.value.status === "ok" &&
       typeof value.value.appVersion === "string" &&
       value.value.profile === "development" &&
-      value.value.storageStatus === "development_gated" &&
+      ["ready", "development_gated", "unavailable"].includes(
+        value.value.storageStatus as string,
+      ) &&
       value.value.contractVersion === CONTRACT_VERSION
     );
   }

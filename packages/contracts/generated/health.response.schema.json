@@ -46,7 +46,9 @@
     "StorageStatus": {
       "type": "string",
       "enum": [
-        "development_gated"
+        "ready",
+        "development_gated",
+        "unavailable"
       ]
     }
   }

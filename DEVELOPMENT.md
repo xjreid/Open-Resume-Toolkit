@@ -1,10 +1,10 @@
 # Development
 
-Open Resume Toolkit implements the M0 architecture skeleton and the first M1
-encrypted-storage slice. The storage core is exercised only with synthetic test
-profiles; real runtime persistence remains gated pending native Keychain,
-Windows Credential Manager, recovery, and cross-platform evidence. Import, AI,
-updater, and browser-native messaging are not implemented.
+Open Resume Toolkit implements the M0 architecture skeleton, the local M1
+encrypted-storage slice, and the first M2 offline editor slice. The development
+app can save synthetic resume drafts and publish immutable snapshots through its
+OS-vault-backed encrypted database. Import, rendering/export, AI, updater, and
+browser-native messaging remain gated or unimplemented.
 
 ## Prerequisites
 
@@ -32,10 +32,16 @@ just dev
 
 `just dev` always verifies the `com.openresumetoolkit.dev` identity before it starts. Development and test builds must use only synthetic data.
 
-The development shell reports `development_gated` for storage. This is an
-intentional safety state, not a setup error. Core storage tests use a temporary
-database and in-memory test vault, so they do not add credentials to your
-Keychain or touch your normal application data.
+The main window reports `ready` after it opens the isolated development profile
+under the platform application-data directory. Its database key is stored in
+macOS Keychain or Windows Credential Manager. A vault or database failure leaves
+the editor unavailable rather than creating a plaintext fallback or silently
+replacing a key.
+
+For the initial M2 manual check, enter synthetic contact information, add a
+section, entry, and bullet, then choose **Save draft** followed by **Publish
+snapshot**. Restart the app and confirm the saved draft and published revision
+return. Publishing is disabled while edits remain unsaved.
 
 The native vault proof is opt-in because it writes one randomized temporary
 credential to macOS Keychain or Windows Credential Manager and then deletes it:

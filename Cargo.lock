@@ -2628,6 +2628,9 @@ name = "ort-desktop"
 version = "0.0.0-dev"
 dependencies = [
  "ort-domain",
+ "ort-storage",
+ "ort-vault",
+ "serde",
  "tauri",
  "tauri-build",
 ]

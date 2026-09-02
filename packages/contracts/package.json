@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./health": "./generated/health.ts"
+    "./health": "./generated/health.ts",
+    "./resume": "./generated/resume.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

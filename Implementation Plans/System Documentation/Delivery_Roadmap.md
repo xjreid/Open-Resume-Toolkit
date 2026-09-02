@@ -62,6 +62,16 @@ Exit evidence:
 
 ## M2 — complete offline resume path
 
+Current development status:
+
+- implemented locally: generated load/save/publish contracts, a main-window-only
+  encrypted command boundary, fail-closed OS-vault startup, optimistic draft
+  saves, immutable published snapshots, and the first accessible structured
+  editor slice for contact details, ordered sections, entries, and bullets;
+- still gated: local PDF/DOCX parsing, hostile-worker containment, review
+  staging, Typst preview/PDF rendering, DOCX/plain-text export, save dialogs,
+  storage management, and complete offline journey evidence.
+
 Deliver:
 
 - functional structured editor and publish lifecycle;
