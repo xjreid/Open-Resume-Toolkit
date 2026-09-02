@@ -13,6 +13,9 @@
 | Random keys | `getrandom 0.4.3` | OS random source | Generates a local 256-bit database key without command-line or environment transport |
 | Secret clearing | `zeroize 1.9.0` | key wrapper and temporary encodings | Clears owned key buffers and temporary raw-key strings on drop/use |
 | Stable identifiers | `uuid 1.24.1` | UUIDv7 | Time-sortable, non-semantic identifiers for install, profile, document, and record identities |
+| Backup KDF | `argon2 0.6.0` | Argon2id v1.3; `alloc`, `zeroize` | Memory-hard derivation with explicit format parameters |
+| Backup AEAD | `chacha20poly1305 0.11.0` | XChaCha20-Poly1305; `alloc`, `zeroize` | Authenticated payload encryption with a 192-bit random nonce |
+| Backup hashes | `sha2 0.11.0` | SHA-256 | Canonical content inventory and published format-vector verification |
 
 The lockfile is the final transitive version authority. Security updates require a
 new review, full storage suite, cross-platform build, and encrypted-format
@@ -43,6 +46,10 @@ key stops profile opening and never creates a replacement database or identity.
   cross-user, update, uninstall, and denial behavior.
 - Ordinary unit/integration tests use an in-memory vault and synthetic content;
   they never create OS credentials.
+- `just test-platform-vault` is the explicit opt-in native proof. It creates one
+  randomized credential in the platform-test namespace, verifies round-trip and
+  overwrite denial, then deletes the credential through an idempotent cleanup
+  guard.
 
 ## References
 
@@ -50,4 +57,5 @@ key stops profile opening and never creates a replacement database or identity.
 - [keyring platform stores](https://docs.rs/keyring/4.2.0/keyring/)
 - [SQLCipher API](https://www.zetetic.net/sqlcipher/sqlcipher-api/)
 - [SQLCipher design](https://www.zetetic.net/sqlcipher/design/)
-
+- [RustCrypto Argon2](https://docs.rs/argon2/0.6.0/argon2/)
+- [RustCrypto XChaCha20-Poly1305](https://docs.rs/chacha20poly1305/0.11.0/chacha20poly1305/)

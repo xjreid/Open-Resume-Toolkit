@@ -34,10 +34,13 @@ Current development status:
   lifecycle, pinned SQLCipher build, schema v1, structured resume validation,
   optimistic draft revisions, immutable published snapshots, settings, integrity
   checks, bounded non-sensitive diagnostics, encrypted WAL crash recovery,
-  corruption/newer-schema refusal, and verified encrypted same-device checkpoints;
+  corruption/newer-schema refusal, checksummed migration v1, verified encrypted
+  same-device checkpoints, and a password-protected portable backup/restore
+  prototype that creates a fresh device key, plus a verified arm64 macOS local
+  preview `.app`/DMG with an isolated identity and explicit ad-hoc signing;
 - still release-gated: native macOS and Windows vault matrices, signed-build
-  access behavior, platform crash/migration/low-disk suites, and the
-  password-protected portable backup container with hostile restore tests.
+  access behavior, platform crash/migration/low-disk suites, cross-platform
+  backup files, and expanded hostile restore/fuzz tests.
 
 Deliver:
 

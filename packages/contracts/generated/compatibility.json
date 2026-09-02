@@ -4,7 +4,7 @@
   "commandContract": 2,
   "extensionProtocol": 0,
   "databaseSchema": 1,
-  "backupContainer": 0,
+  "backupContainer": 1,
   "documentSchema": 1,
   "rendererBundle": 0,
   "updateSecurityFloor": 0

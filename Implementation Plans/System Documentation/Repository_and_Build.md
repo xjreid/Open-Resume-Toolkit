@@ -26,6 +26,7 @@ apps/
 crates/
   ort-domain/                 entities, value objects, policies, state machines
   ort-application/            use cases, coordinator, ports, error model
+  ort-backup/                 portable authenticated backup format and validation
   ort-storage/                SQLCipher repositories and migrations
   ort-vault/                  OS credential-vault adapter
   ort-ai/                     provider and Codex adapters, accounting, guardrails
@@ -101,7 +102,7 @@ just generate        regenerate schemas and bindings
 just check           format, lint, unit test, license and contract drift checks
 just dev             run desktop with an isolated synthetic-data profile
 just test-integration run storage, renderer, IPC, and mocked-provider tests
-just package-preview build unsigned local preview packages
+just package-preview build local preview packages (explicitly ad-hoc signed on macOS)
 ```
 
 Development uses an app-data suffix such as `OpenResumeToolkit-Dev`; it must never open a stable user database. Test profiles live in per-test temporary directories. Networked tests are opt-in and never use personal provider credentials in CI.
@@ -112,7 +113,7 @@ Development uses an app-data suffix such as `OpenResumeToolkit-Dev`; it must nev
 |---|---|---|
 | test | unit/integration | test-only adapters, temporary vault/database, no real update/signing |
 | development | local UI work | dev identity, verbose local logs, extension dev IDs |
-| preview | public pre-release | production optimizations, preview identity/channel, unsigned where documented |
+| preview | public pre-release | production optimizations and preview identity/channel; local macOS artifacts are ad-hoc signed, while distributed previews require the milestone's trusted-signing policy |
 | stable-direct | GitHub distribution | production identity, direct updater, signed Windows requirement |
 | stable-store | fallback Windows Store | Store identity and update ownership; direct updater disabled |
 

@@ -47,6 +47,7 @@ apps/
 crates/
   ort-domain/                     records, validation, policies, state machines
   ort-application/                use cases, ports, operations, recovery
+  ort-backup/                     portable authenticated backup format and validation
   ort-storage/                    SQLCipher repositories and migrations
   ort-vault/                      shared interface plus Windows/macOS adapters
   ort-documents/                  mapping, rendering, DOCX/text output

@@ -4,7 +4,25 @@
   "commit": null,
   "channel": "development",
   "profileIdentity": "com.openresumetoolkit.dev",
-  "artifacts": [],
+  "artifacts": [
+    {
+      "kind": "macos-app",
+      "path": "target/release/bundle/macos/Open Resume Toolkit Dev.app",
+      "architecture": "arm64",
+      "bundleIdentifier": "com.openresumetoolkit.dev",
+      "signing": "adhoc-runtime",
+      "executableSha256": "b7a281dd8aac12ef0d5518adba6b33083c33b8dd277812a0f22929a508f34ca6",
+      "verification": "codesign-deep-strict"
+    },
+    {
+      "kind": "macos-dmg",
+      "path": "target/release/bundle/dmg/Open Resume Toolkit Dev_0.0.0-dev_aarch64.dmg",
+      "architecture": "arm64",
+      "sizeBytes": 2191268,
+      "sha256": "868dde5a80abe47f890e02776f9251d8c0a6e2ede026db07128530330f54f3d8",
+      "verification": "hdiutil-checksum-and-contained-app-codesign-deep-strict"
+    }
+  ],
   "checks": {
     "contracts": "passed-local",
     "typescript": "passed-local",
@@ -12,8 +30,11 @@
     "security": "passed-local-static",
     "encryptedStorage": "passed-local-synthetic-macos-arm64",
     "storageRecovery": "passed-local-synthetic-macos-arm64",
-    "nativeVaultMatrix": "pending",
-    "portableBackup": "pending",
+    "nativeVaultMacosUnsigned": "passed-local-macos-arm64",
+    "nativeVaultWindows": "pending",
+    "nativeVaultSignedPackages": "pending",
+    "portableBackup": "passed-local-synthetic-macos-arm64",
+    "macosPreviewPackage": "passed-local-adhoc-macos-arm64",
     "platformBuilds": "pending"
   },
   "releaseEligible": false

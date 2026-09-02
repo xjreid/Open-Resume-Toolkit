@@ -66,6 +66,18 @@ impl EntityId {
         Self(Uuid::now_v7())
     }
 
+    /// Parses a `UUIDv7` entity identifier at an import boundary.
+    ///
+    /// # Errors
+    /// Returns `InvalidEntityId` for malformed or non-v7 UUIDs.
+    pub fn parse(value: &str) -> Result<Self, ValidationError> {
+        let uuid = Uuid::parse_str(value).map_err(|_| ValidationError::InvalidEntityId)?;
+        if uuid.get_version_num() != 7 {
+            return Err(ValidationError::InvalidEntityId);
+        }
+        Ok(Self(uuid))
+    }
+
     #[must_use]
     pub const fn as_uuid(self) -> Uuid {
         self.0

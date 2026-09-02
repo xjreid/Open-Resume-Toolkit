@@ -30,9 +30,12 @@ test-integration:
 test-platform:
 	@echo "M1 native vault suites are intentionally gated pending signed macOS and Windows VM harnesses."
 
+test-platform-vault:
+	ORT_RUN_OS_VAULT_TESTS=1 cargo test -p ort-vault --test os_vault native_database_key_round_trip_and_overwrite_denial -- --ignored --exact --nocapture
+
 package-preview:
 	@node tools/assert-dev-profile.mjs
-	pnpm --filter @ort/desktop tauri build
+	pnpm --filter @ort/desktop tauri build --config src-tauri/tauri.preview.conf.json
 
 verify-artifacts:
 	@echo "Artifact verification becomes active with the M7 packaging pipeline."

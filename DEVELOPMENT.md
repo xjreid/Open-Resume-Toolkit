@@ -19,7 +19,7 @@ On macOS with Homebrew, install missing developer tools with:
 ```sh
 brew install rustup just
 export PATH="$(brew --prefix rustup)/bin:$PATH"
-rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt
+rustup toolchain install 1.98.0 --profile minimal --component clippy,llvm-tools,rustfmt
 ```
 
 Add the Rust path export to your shell profile for future terminals, then run:
@@ -36,6 +36,17 @@ The development shell reports `development_gated` for storage. This is an
 intentional safety state, not a setup error. Core storage tests use a temporary
 database and in-memory test vault, so they do not add credentials to your
 Keychain or touch your normal application data.
+
+The native vault proof is opt-in because it writes one randomized temporary
+credential to macOS Keychain or Windows Credential Manager and then deletes it:
+
+```sh
+just test-platform-vault
+```
+
+An interruption can leave only a credential in the
+`com.openresumetoolkit.platform-test.database` service namespace; no application
+profile or real database key is used.
 
 ## Browser extension skeleton
 

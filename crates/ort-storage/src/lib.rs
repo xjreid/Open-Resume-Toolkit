@@ -4,6 +4,7 @@
 //! non-secret manifest locates that key; the SQLite database is always opened
 //! through `SQLCipher` before any schema access is attempted.
 
+use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -11,11 +12,17 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use jiff::Timestamp;
+use ort_backup::{
+    BackupError, BackupExportRequestV1, BackupPassphrase, PortableProfileV1,
+    PortablePublishedResumeV1, PortableResumeRevisionV1, PortableSettingV1, create_backup,
+    restore_backup,
+};
 use ort_domain::{DocumentLimits, ResumeDocument};
 use ort_vault::{DatabaseKey, DatabaseKeyVault, VaultError, VaultReference};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, backup, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 use zeroize::Zeroize;
 
@@ -25,6 +32,57 @@ const DATABASE_FORMAT_VERSION: u16 = 1;
 const SCHEMA_VERSION: i64 = 1;
 const MAX_MANIFEST_BYTES: u64 = 16 * 1_024;
 const MAX_SETTING_BYTES: usize = 64 * 1_024;
+const MIGRATION_V1_SQL: &str = "CREATE TABLE schema_migrations (
+         version INTEGER PRIMARY KEY,
+         checksum_sha256 TEXT NOT NULL,
+         minimum_app_version TEXT NOT NULL,
+         estimated_disk_bytes INTEGER NOT NULL CHECK (estimated_disk_bytes >= 0),
+         requires_safety_copy INTEGER NOT NULL CHECK (requires_safety_copy IN (0, 1)),
+         applied_at TEXT NOT NULL
+     ) STRICT;
+     CREATE TABLE app_metadata (
+         metadata_key TEXT PRIMARY KEY,
+         metadata_value TEXT NOT NULL
+     ) STRICT;
+     CREATE TABLE profiles (
+         profile_id TEXT PRIMARY KEY,
+         revision INTEGER NOT NULL CHECK (revision >= 1),
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL
+     ) STRICT;
+     CREATE TABLE resume_drafts (
+         profile_id TEXT PRIMARY KEY REFERENCES profiles(profile_id) ON DELETE CASCADE,
+         revision INTEGER NOT NULL CHECK (revision >= 1),
+         schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
+         document_json BLOB NOT NULL,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL
+     ) STRICT;
+     CREATE TABLE published_resumes (
+         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+         published_revision INTEGER NOT NULL CHECK (published_revision >= 1),
+         draft_revision INTEGER NOT NULL CHECK (draft_revision >= 1),
+         schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
+         document_json BLOB NOT NULL,
+         published_at TEXT NOT NULL,
+         PRIMARY KEY (profile_id, published_revision)
+     ) STRICT;
+     CREATE TABLE settings (
+         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+         setting_key TEXT NOT NULL,
+         revision INTEGER NOT NULL CHECK (revision >= 1),
+         value_json BLOB NOT NULL,
+         updated_at TEXT NOT NULL,
+         PRIMARY KEY (profile_id, setting_key)
+     ) STRICT;
+     CREATE TABLE diagnostic_events (
+         event_id TEXT PRIMARY KEY,
+         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+         event_code TEXT NOT NULL,
+         severity TEXT NOT NULL CHECK (severity IN ('info', 'warning', 'error')),
+         safe_context_json BLOB NOT NULL,
+         created_at TEXT NOT NULL
+     ) STRICT;";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum StorageError {
@@ -632,6 +690,216 @@ impl EncryptedStore {
         .collect()
     }
 
+    /// Creates a password-protected portable backup containing canonical
+    /// records but no database key, vault reference, or diagnostics.
+    ///
+    /// # Errors
+    /// Returns an error when records are invalid or encryption is unavailable.
+    pub fn create_portable_backup(
+        &self,
+        passphrase: &BackupPassphrase,
+        app_version: &str,
+    ) -> Result<Vec<u8>, StorageError> {
+        let profile = self.read_portable_profile()?;
+        create_backup(
+            passphrase,
+            BackupExportRequestV1 {
+                app_version: app_version.to_owned(),
+                created_at: now_string(),
+                profile,
+            },
+        )
+        .map_err(|error| map_backup_write_error(&error))
+    }
+
+    /// Restores a portable backup into an otherwise empty, newly encrypted
+    /// profile. The destination retains its independently generated local
+    /// database key and vault identity.
+    ///
+    /// # Errors
+    /// Returns `RevisionConflict` if the destination already contains portable
+    /// records, or `InvalidData` for every untrusted backup failure.
+    pub fn restore_portable_backup(
+        &self,
+        bytes: &[u8],
+        passphrase: &BackupPassphrase,
+    ) -> Result<(), StorageError> {
+        let backup =
+            restore_backup(bytes, passphrase).map_err(|error| map_backup_read_error(&error))?;
+        let mut connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|_| StorageError::Unavailable)?;
+        let existing: i64 = transaction
+            .query_row(
+                "SELECT \
+                 (SELECT COUNT(*) FROM resume_drafts WHERE profile_id = ?1) + \
+                 (SELECT COUNT(*) FROM published_resumes WHERE profile_id = ?1) + \
+                 (SELECT COUNT(*) FROM settings WHERE profile_id = ?1)",
+                [self.manifest.profile_id.to_string()],
+                |row| row.get(0),
+            )
+            .map_err(|_| StorageError::Unavailable)?;
+        if existing != 0 {
+            return Err(StorageError::RevisionConflict);
+        }
+
+        let now = now_string();
+        if let Some(draft) = &backup.profile.master_draft {
+            let document_json = serialize_document(&draft.document)?;
+            transaction
+                .execute(
+                    "INSERT INTO resume_drafts \
+                     (profile_id, revision, schema_version, document_json, created_at, updated_at) \
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
+                    params![
+                        self.manifest.profile_id.to_string(),
+                        draft.revision,
+                        i64::from(draft.document.schema_version),
+                        document_json,
+                        now
+                    ],
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+        }
+        for published in &backup.profile.published_resumes {
+            let document_json = serialize_document(&published.document)?;
+            transaction
+                .execute(
+                    "INSERT INTO published_resumes \
+                     (profile_id, published_revision, draft_revision, schema_version, document_json, published_at) \
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![
+                        self.manifest.profile_id.to_string(),
+                        published.published_revision,
+                        published.draft_revision,
+                        i64::from(published.document.schema_version),
+                        document_json,
+                        now
+                    ],
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+        }
+        for (key, setting) in &backup.profile.settings {
+            validate_setting_key(key)?;
+            let value_json =
+                serde_json::to_vec(&setting.value).map_err(|_| StorageError::InvalidData)?;
+            if value_json.len() > MAX_SETTING_BYTES {
+                return Err(StorageError::InvalidData);
+            }
+            transaction
+                .execute(
+                    "INSERT INTO settings \
+                     (profile_id, setting_key, revision, value_json, updated_at) \
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![
+                        self.manifest.profile_id.to_string(),
+                        key,
+                        setting.revision,
+                        value_json,
+                        now
+                    ],
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+        }
+        transaction
+            .commit()
+            .map_err(|_| StorageError::Unavailable)?;
+        drop(connection);
+        self.verify_integrity()
+    }
+
+    fn read_portable_profile(&self) -> Result<PortableProfileV1, StorageError> {
+        let mut connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(|_| StorageError::Unavailable)?;
+        let master_draft = transaction
+            .query_row(
+                "SELECT revision, document_json FROM resume_drafts WHERE profile_id = ?1",
+                [self.manifest.profile_id.to_string()],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?)),
+            )
+            .optional()
+            .map_err(|_| StorageError::Unavailable)?
+            .map(|(revision, json)| {
+                Ok(PortableResumeRevisionV1 {
+                    revision,
+                    document: parse_document(&json)?,
+                })
+            })
+            .transpose()?;
+
+        let published_resumes = {
+            let mut statement = transaction
+                .prepare(
+                    "SELECT published_revision, draft_revision, document_json \
+                     FROM published_resumes WHERE profile_id = ?1 \
+                     ORDER BY published_revision",
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+            statement
+                .query_map([self.manifest.profile_id.to_string()], |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, Vec<u8>>(2)?,
+                    ))
+                })
+                .map_err(|_| StorageError::Unavailable)?
+                .map(|row| {
+                    let (published_revision, draft_revision, json) =
+                        row.map_err(|_| StorageError::Unavailable)?;
+                    Ok(PortablePublishedResumeV1 {
+                        published_revision,
+                        draft_revision,
+                        document: parse_document(&json)?,
+                    })
+                })
+                .collect::<Result<Vec<_>, StorageError>>()?
+        };
+
+        let settings = {
+            let mut statement = transaction
+                .prepare(
+                    "SELECT setting_key, revision, value_json FROM settings \
+                     WHERE profile_id = ?1 ORDER BY setting_key",
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+            statement
+                .query_map([self.manifest.profile_id.to_string()], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, Vec<u8>>(2)?,
+                    ))
+                })
+                .map_err(|_| StorageError::Unavailable)?
+                .map(|row| {
+                    let (key, revision, json) = row.map_err(|_| StorageError::Unavailable)?;
+                    validate_setting_key(&key)?;
+                    let value =
+                        serde_json::from_slice(&json).map_err(|_| StorageError::InvalidData)?;
+                    Ok((key, PortableSettingV1 { revision, value }))
+                })
+                .collect::<Result<BTreeMap<_, _>, StorageError>>()?
+        };
+        transaction
+            .commit()
+            .map_err(|_| StorageError::Unavailable)?;
+        Ok(PortableProfileV1 {
+            master_draft,
+            published_resumes,
+            settings,
+        })
+    }
+
     /// Runs both `SQLCipher` authentication and SQLite structural checks.
     ///
     /// # Errors
@@ -955,95 +1223,66 @@ fn initialize_schema(
     manifest: &ProfileManifest,
 ) -> Result<(), StorageError> {
     connection
-        .execute_batch(
-            "BEGIN IMMEDIATE;
-             CREATE TABLE schema_migrations (
-                 version INTEGER PRIMARY KEY,
-                 applied_at TEXT NOT NULL
-             ) STRICT;
-             CREATE TABLE app_metadata (
-                 metadata_key TEXT PRIMARY KEY,
-                 metadata_value TEXT NOT NULL
-             ) STRICT;
-             CREATE TABLE profiles (
-                 profile_id TEXT PRIMARY KEY,
-                 revision INTEGER NOT NULL CHECK (revision >= 1),
-                 created_at TEXT NOT NULL,
-                 updated_at TEXT NOT NULL
-             ) STRICT;
-             CREATE TABLE resume_drafts (
-                 profile_id TEXT PRIMARY KEY REFERENCES profiles(profile_id) ON DELETE CASCADE,
-                 revision INTEGER NOT NULL CHECK (revision >= 1),
-                 schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
-                 document_json BLOB NOT NULL,
-                 created_at TEXT NOT NULL,
-                 updated_at TEXT NOT NULL
-             ) STRICT;
-             CREATE TABLE published_resumes (
-                 profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-                 published_revision INTEGER NOT NULL CHECK (published_revision >= 1),
-                 draft_revision INTEGER NOT NULL CHECK (draft_revision >= 1),
-                 schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
-                 document_json BLOB NOT NULL,
-                 published_at TEXT NOT NULL,
-                 PRIMARY KEY (profile_id, published_revision)
-             ) STRICT;
-             CREATE TABLE settings (
-                 profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-                 setting_key TEXT NOT NULL,
-                 revision INTEGER NOT NULL CHECK (revision >= 1),
-                 value_json BLOB NOT NULL,
-                 updated_at TEXT NOT NULL,
-                 PRIMARY KEY (profile_id, setting_key)
-             ) STRICT;
-             CREATE TABLE diagnostic_events (
-                 event_id TEXT PRIMARY KEY,
-                 profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-                 event_code TEXT NOT NULL,
-                 severity TEXT NOT NULL CHECK (severity IN ('info', 'warning', 'error')),
-                 safe_context_json BLOB NOT NULL,
-                 created_at TEXT NOT NULL
-             ) STRICT;
-             COMMIT;",
-        )
+        .execute_batch("BEGIN IMMEDIATE")
         .map_err(|_| StorageError::Unavailable)?;
-    let now = now_string();
-    connection
-        .execute(
-            "INSERT INTO schema_migrations (version, applied_at) VALUES (?1, ?2)",
-            params![SCHEMA_VERSION, now],
-        )
-        .and_then(|_| {
-            connection.execute(
-                "INSERT INTO app_metadata (metadata_key, metadata_value) VALUES ('database_format_version', ?1)",
-                [DATABASE_FORMAT_VERSION.to_string()],
+    let result = (|| {
+        connection
+            .execute_batch(MIGRATION_V1_SQL)
+            .map_err(|_| StorageError::Unavailable)?;
+        let now = now_string();
+        connection
+            .execute(
+                "INSERT INTO schema_migrations \
+                 (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
+                  requires_safety_copy, applied_at) \
+                 VALUES (?1, ?2, ?3, 0, 0, ?4)",
+                params![SCHEMA_VERSION, migration_v1_checksum(), "0.0.0-dev", now],
             )
-        })
-        .and_then(|_| {
-            connection.execute(
-                "INSERT INTO profiles (profile_id, revision, created_at, updated_at) VALUES (?1, 1, ?2, ?2)",
-                params![manifest.profile_id.to_string(), now],
-            )
-        })
-        .map_err(|_| StorageError::Unavailable)?;
-    Ok(())
+            .and_then(|_| {
+                connection.execute(
+                    "INSERT INTO app_metadata (metadata_key, metadata_value) \
+                     VALUES ('database_format_version', ?1)",
+                    [DATABASE_FORMAT_VERSION.to_string()],
+                )
+            })
+            .and_then(|_| {
+                connection.execute(
+                    "INSERT INTO profiles (profile_id, revision, created_at, updated_at) \
+                     VALUES (?1, 1, ?2, ?2)",
+                    params![manifest.profile_id.to_string(), now],
+                )
+            })
+            .map_err(|_| StorageError::Unavailable)?;
+        connection
+            .execute_batch("COMMIT")
+            .map_err(|_| StorageError::Unavailable)
+    })();
+    if result.is_err() {
+        let _ = connection.execute_batch("ROLLBACK");
+    }
+    result
 }
 
 fn verify_schema(connection: &Connection) -> Result<(), StorageError> {
-    let version = connection
+    let (version, checksum) = connection
         .query_row(
-            "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+            "SELECT version, checksum_sha256 FROM schema_migrations \
+             ORDER BY version DESC LIMIT 1",
             [],
-            |row| row.get::<_, i64>(0),
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )
         .map_err(|_| StorageError::IntegrityFailure)?;
     if version > SCHEMA_VERSION {
         return Err(StorageError::NewerSchema);
     }
-    if version != SCHEMA_VERSION {
+    if version != SCHEMA_VERSION || checksum != migration_v1_checksum() {
         return Err(StorageError::IntegrityFailure);
     }
     verify_integrity(connection)
+}
+
+fn migration_v1_checksum() -> String {
+    hex::encode(Sha256::digest(MIGRATION_V1_SQL.as_bytes()))
 }
 
 fn verify_integrity(connection: &Connection) -> Result<(), StorageError> {
@@ -1116,6 +1355,22 @@ fn map_vault_creation_error(error: &VaultError) -> StorageError {
     }
 }
 
+fn map_backup_write_error(error: &BackupError) -> StorageError {
+    match error {
+        BackupError::InvalidPassphrase | BackupError::InvalidContent => StorageError::InvalidData,
+        BackupError::InvalidBackup | BackupError::CryptoUnavailable => StorageError::Unavailable,
+    }
+}
+
+fn map_backup_read_error(error: &BackupError) -> StorageError {
+    match error {
+        BackupError::InvalidBackup
+        | BackupError::InvalidPassphrase
+        | BackupError::InvalidContent => StorageError::InvalidData,
+        BackupError::CryptoUnavailable => StorageError::Unavailable,
+    }
+}
+
 fn is_constraint_error(error: &rusqlite::Error) -> bool {
     matches!(
         error,
@@ -1147,6 +1402,7 @@ fn remove_exact_database_files(database_path: &Path) -> Result<(), StorageError>
 mod tests {
     use std::fs;
 
+    use ort_backup::BackupPassphrase;
     use ort_domain::ResumeDocument;
     use ort_vault::DatabaseKeyVault;
     use ort_vault::testing::MemoryDatabaseKeyVault;
@@ -1310,7 +1566,10 @@ mod tests {
             let connection = store.connection.lock().expect("lock test connection");
             connection
                 .execute(
-                    "INSERT INTO schema_migrations (version, applied_at) VALUES (2, ?1)",
+                    "INSERT INTO schema_migrations \
+                     (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
+                      requires_safety_copy, applied_at) \
+                     VALUES (2, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
                     [super::now_string()],
                 )
                 .expect("seed newer schema marker");
@@ -1326,6 +1585,52 @@ mod tests {
             StorageError::NewerSchema
         );
         assert_eq!(fs::read(database_path).expect("read after refusal"), before);
+    }
+
+    #[test]
+    fn migration_checksum_tampering_is_rejected() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("initialize encrypted store");
+        {
+            let connection = store.connection.lock().expect("lock test connection");
+            connection
+                .execute(
+                    "UPDATE schema_migrations SET checksum_sha256 = 'tampered' WHERE version = 1",
+                    [],
+                )
+                .expect("tamper migration checksum");
+        }
+        let database_path = store.database_path().to_path_buf();
+        drop(store);
+        let before = fs::read(&database_path).expect("read before");
+        assert_eq!(
+            EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+                .err()
+                .expect("checksum mismatch must fail"),
+            StorageError::IntegrityFailure
+        );
+        assert_eq!(fs::read(database_path).expect("read after refusal"), before);
+    }
+
+    #[test]
+    fn orphan_database_is_preserved_as_incomplete_initialization() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let database_path = temporary.path().join("profile.db");
+        let marker = b"synthetic incomplete initialization";
+        fs::write(&database_path, marker).expect("seed orphan database");
+        let vault = MemoryDatabaseKeyVault::new();
+        assert_eq!(
+            EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+                .err()
+                .expect("orphan database must fail"),
+            StorageError::IncompleteInitialization
+        );
+        assert_eq!(
+            fs::read(database_path).expect("read preserved database"),
+            marker
+        );
     }
 
     #[test]
@@ -1422,6 +1727,92 @@ mod tests {
 
         let database = fs::read(checkpoint_root.join("profile.db")).expect("read checkpoint");
         assert!(!contains_subslice(&database, PLAINTEXT_MARKER.as_bytes()));
+    }
+
+    #[test]
+    fn portable_backup_restores_into_a_fresh_keyed_profile() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let source_root = temporary.path().join("source");
+        let destination_root = temporary.path().join("destination");
+        let vault = MemoryDatabaseKeyVault::new();
+        let source = EncryptedStore::open_or_initialize(&source_root, "test", &vault)
+            .expect("initialize source");
+        source
+            .create_draft(&ResumeDocument::empty(PLAINTEXT_MARKER))
+            .expect("create draft");
+        source.publish_draft(1).expect("publish draft");
+        source
+            .save_draft(1, &ResumeDocument::empty("Current synthetic draft"))
+            .expect("advance draft");
+        source
+            .save_setting(
+                "appearance.theme",
+                None,
+                &Value::String("system".to_owned()),
+            )
+            .expect("save setting");
+        let passphrase = BackupPassphrase::new("synthetic portable backup passphrase".to_owned())
+            .expect("valid passphrase");
+        let backup = source
+            .create_portable_backup(&passphrase, "0.0.0-dev")
+            .expect("create portable backup");
+        assert!(!contains_subslice(&backup, PLAINTEXT_MARKER.as_bytes()));
+
+        let destination = EncryptedStore::open_or_initialize(&destination_root, "test", &vault)
+            .expect("initialize destination");
+        assert_ne!(
+            source
+                .manifest()
+                .vault_reference()
+                .expect("source reference"),
+            destination
+                .manifest()
+                .vault_reference()
+                .expect("destination reference")
+        );
+        let wrong = BackupPassphrase::new("wrong synthetic passphrase".to_owned())
+            .expect("valid passphrase");
+        assert_eq!(
+            destination.restore_portable_backup(&backup, &wrong),
+            Err(StorageError::InvalidData)
+        );
+        assert!(
+            destination
+                .load_draft()
+                .expect("load empty draft")
+                .is_none()
+        );
+
+        destination
+            .restore_portable_backup(&backup, &passphrase)
+            .expect("restore portable backup");
+        assert_eq!(
+            destination
+                .load_draft()
+                .expect("load restored draft")
+                .expect("draft exists")
+                .document
+                .title,
+            "Current synthetic draft"
+        );
+        assert_eq!(
+            destination
+                .load_latest_published()
+                .expect("load restored published")
+                .expect("published exists")
+                .document
+                .title,
+            PLAINTEXT_MARKER
+        );
+        assert_eq!(
+            destination
+                .load_setting("appearance.theme")
+                .expect("load restored setting")
+                .expect("setting exists")
+                .value,
+            Value::String("system".to_owned())
+        );
+        destination.verify_integrity().expect("restored integrity");
     }
 
     #[test]
