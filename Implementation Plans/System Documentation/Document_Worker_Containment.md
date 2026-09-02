@@ -1,6 +1,6 @@
 # Document worker containment implementation gate
 
-Status: transport policy plus partial native macOS probe, 2026-09-02. **Not a
+Status: transport policy plus macOS sandbox/hard-limit probe, 2026-09-02. **Not a
 production sandbox or permission to enable import.** The parser worker still exits 78.
 This refines M2; it does not introduce an additional milestone.
 
@@ -74,8 +74,9 @@ user-selected-file entitlement, profile storage or general application IPC.
 Give the helper only required descriptors plus unavoidable verified runtime
 resources. Determine the exact filesystem and broker access left by App Sandbox.
 
-Unresolved: a supported way to deny subprocess creation, enforce the resource
-ceilings, guarantee a fresh process for each operation, and forcibly end the
+Local direct `fork`/`posix_spawn` denial now has a hard-limit candidate (below).
+Unresolved: broker-mediated launches and executable replacement, remaining resource
+ceilings, guaranteeing a fresh process for each operation, and forcibly ending the
 whole job on cancellation/parent death. XPC invalidation/idle termination must
 not be assumed to kill a currently compromised or busy service. No deprecated
 custom sandbox profile is accepted as the shipping solution without a separate
@@ -95,7 +96,7 @@ in ORT. The runner verifies signatures and the helper checks its entitlement.
 Only freshly generated synthetic fixtures and a parent-owned IPv4 loopback
 listener are used. No personal document, profile or credential is opened.
 
-Local macOS 26.6.2 arm64 results:
+Plain App Sandbox baseline on local macOS 26.6.2 arm64:
 
 - transferred read-only descriptor: exact marker read succeeded; writing failed;
 - seeded sibling read/write-open and symlink-follow: denied;
@@ -104,17 +105,53 @@ Local macOS 26.6.2 arm64 results:
 - cooperative helper exit: XPC disconnect observed, not forced-kill proof.
 
 The same probes run in the unsandboxed parent first to prove the targets are
-accessible. Only permission errors count as denials; missing targets and other
-OS errors reject evidence. A child being created does not establish that it
+accessible. Filesystem/network denials require permission errors; missing targets
+and other OS errors reject evidence. A child being created does not establish that it
 escaped the sandbox, but this candidate still fails the specified prohibition.
 Do not enable parsing or weaken that requirement based on these results.
 
-The runner saves a bounded report and helper/host hashes under
-`target/native-probes`. A retained measurement and limitations are recorded in
-`../../evidence/0.0.0-dev/m2-native-sandbox-probe.md`. Both macOS CI jobs now run
-this subset check. A green probe job asserts only descriptor, seeded filesystem,
-loopback and cooperative-disconnect checks; it never asserts full containment.
-Child creation remains an explicit reported failure of the larger design gate.
+### Helper-only hard-limit extension
+
+After retaining the baseline, the same synthetic helper sets both soft and hard
+`RLIMIT_NPROC` to zero, `RLIMIT_NOFILE` to 64 and `RLIMIT_CORE` to zero. The root
+user is explicitly refused. Only this helper calls `setrlimit`; no shell,
+desktop, launchd, account-wide or system settings change. The parent's original
+limits are compared afterwards and it must still be able to spawn a child.
+
+Two local runs passed direct `posix_spawn` and `fork` denial after those limits.
+The same helper must successfully create/reap both baseline children first.
+For these child tests only, `EAGAIN` counts as denial if the non-root helper's
+zero soft/hard NPROC limit is verified; `EAGAIN` alone is never sufficient.
+Opening paths and network sockets retains the stricter permission-error rule.
+Attempts to raise each hard limit must fail with `EPERM` without changing it.
+
+Descriptor exhaustion duplicates the preopened synthetic input at most 65 times,
+expects `EMFILE`, closes only those duplicates, and verifies another duplication
+succeeds afterwards. This is a small process-local test, not machine-wide resource
+exhaustion. The zero core-file limit is read back; it does not prove the absence
+of every crash/diagnostic artifact. Mach ports, threads, memory and CPU are not
+bounded by the descriptor test.
+Lowering NOFILE does not revoke existing descriptors. Production must separately
+verify its inherited/received descriptor allowlist and reject unexpected handles;
+this duplication test is not an audit of every inherited or broker-supplied handle.
+
+Apple documents the per-process hard-limit API and privileged-only increases in
+[setrlimit](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/setrlimit.2.html).
+Its published [XNU process-creation source](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_fork.c)
+checks the non-root caller's NPROC limit for direct creation. This supports the
+candidate, not a claim that it covers every broker or advertised OS version.
+The synthetic baseline intentionally runs before tightening limits; a production
+adapter must establish all boundaries before parser code/input processing and
+must never expose such an unrestricted phase to untrusted content.
+
+The runner saves a version-2 report and helper/host hashes under
+`target/native-probes` and prints the content-free metadata in CI logs. The old
+baseline record remains in `../../evidence/0.0.0-dev/m2-native-sandbox-probe.md`;
+new evidence is in `../../evidence/0.0.0-dev/m2-macos-hard-limits.md`.
+Both macOS CI jobs now require the descriptor, seeded filesystem, loopback,
+direct spawn/fork denial, hard-limit raise denial, descriptor-exhaustion/recovery,
+parent-unaffected and cooperative-disconnect checks. A green step still does
+not assert full containment. New cross-runner results are pending.
 
 ## Remaining executable proof
 
@@ -144,7 +181,7 @@ effective policy, allow/deny outcomes, and supervisor cleanup outcome:
 
 The Rust transport tests remain deterministic event simulations. The separate
 macOS probe adds only the native subset above. Forced process-tree termination,
-parent-death handling, resource ceilings, credentials/brokers, broader filesystem
+parent-death handling, memory/CPU/thread/Mach-port ceilings, credentials/brokers, broader filesystem
 and network denial, hostile-code cleanup, release signing and supported OS/CPU
 matrices remain unproven. Windows has no native containment evidence yet.
 Production input staging, real pipe drivers, sandbox adapters, PDFium/DOCX

@@ -6,6 +6,20 @@ const outcomes = [
   "symlinkRead",
   "loopbackConnect",
   "childCreation",
+  "childFork",
+];
+const expectedLimits = {
+  nprocSoft: 0,
+  nprocHard: 0,
+  nofileSoft: 64,
+  nofileHard: 64,
+  coreSoft: 0,
+  coreHard: 0,
+};
+const limitChecks = [
+  "raiseDenied",
+  "descriptorCeilingDenied",
+  "descriptorRecovery",
 ];
 
 function exactKeys(value, keys) {
@@ -25,15 +39,23 @@ export function interpretProbe(measurement) {
     "schemaVersion",
     "control",
     "sandboxed",
+    "hardened",
+    "hardLimits",
+    "parentUnaffected",
     "cooperativeDisconnectObserved",
   ]);
   if (
-    measurement.schemaVersion !== 1 ||
-    measurement.cooperativeDisconnectObserved !== true
+    measurement.schemaVersion !== 2 ||
+    measurement.cooperativeDisconnectObserved !== true ||
+    measurement.parentUnaffected !== true
   ) {
     throw new Error("Probe version or cooperative lifecycle check failed.");
   }
-  for (const result of [measurement.control, measurement.sandboxed]) {
+  for (const result of [
+    measurement.control,
+    measurement.sandboxed,
+    measurement.hardened,
+  ]) {
     exactKeys(result, [...booleans, ...outcomes]);
     if (
       booleans.some((key) => typeof result[key] !== "boolean") ||
@@ -49,22 +71,53 @@ export function interpretProbe(measurement) {
   if (
     measurement.control.sandboxEntitlement ||
     !measurement.sandboxed.sandboxEntitlement ||
+    !measurement.hardened.sandboxEntitlement ||
     outcomes.some((key) => measurement.control[key] !== 0)
   ) {
     throw new Error(
       "Unsandboxed positive control or helper entitlement check failed.",
     );
   }
-  const observed = measurement.sandboxed;
+  // Require same-helper positive controls before interpreting the EAGAIN-based
+  // hard-limit denials. A baseline already unable to fork is not proof of NPROC.
+  if (
+    measurement.sandboxed.childCreation !== 0 ||
+    measurement.sandboxed.childFork !== 0
+  ) {
+    throw new Error("Same-helper child-creation positive control failed.");
+  }
+  exactKeys(measurement.hardLimits, [
+    ...Object.keys(expectedLimits),
+    ...limitChecks,
+  ]);
+  if (
+    Object.entries(expectedLimits).some(
+      ([key, value]) => measurement.hardLimits[key] !== value,
+    ) ||
+    limitChecks.some((key) => typeof measurement.hardLimits[key] !== "boolean")
+  ) {
+    throw new Error("Unexpected or invalid hard-limit policy.");
+  }
+  const observed = measurement.hardened;
   return {
     descriptorBoundaryPassed: true,
     filesystemIsolationPassed: [
       "siblingRead",
       "siblingWrite",
       "symlinkRead",
-    ].every((key) => observed[key] === 1),
-    loopbackConnectDenied: observed.loopbackConnect === 1,
-    childCreationDenied: observed.childCreation === 1,
+    ].every((key) => observed[key] === 1 && measurement.sandboxed[key] === 1),
+    loopbackConnectDenied:
+      observed.loopbackConnect === 1 &&
+      measurement.sandboxed.loopbackConnect === 1,
+    baselineChildCreationDenied: false,
+    directChildCreationDenied:
+      observed.childCreation === 1 && observed.childFork === 1,
+    hardLimitRaiseDenied: measurement.hardLimits.raiseDenied,
+    descriptorCeilingEnforced:
+      measurement.hardLimits.descriptorCeilingDenied &&
+      measurement.hardLimits.descriptorRecovery,
+    coreDumpLimitZero: true,
+    parentUnaffected: true,
     cooperativeDisconnectObserved: true,
     // Even every measured denial leaves resource/credential/broker/forced-kill
     // tests missing. Never equate this subset or a green probe job to full proof.
@@ -72,7 +125,9 @@ export function interpretProbe(measurement) {
     importEnabled: false,
     untested: [
       "forced-process-tree-termination-and-parent-death",
-      "memory-cpu-handle-ceilings",
+      "memory-cpu-thread-and-mach-port-ceilings",
+      "broker-mediated-process-creation-and-exec-replacement",
+      "hostile-code-core-dump-and-diagnostic-artifact-verification",
       "credential-and-broker-access",
       "udp-dns-and-non-loopback-network",
       "filesystem-outside-the-synthetic-fixtures",

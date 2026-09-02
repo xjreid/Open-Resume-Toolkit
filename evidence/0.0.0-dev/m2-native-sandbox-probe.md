@@ -3,6 +3,11 @@
 Date: 2026-09-02. Base commit: `e643574`. macOS 26.6.2, arm64.
 Status: synthetic native subset measured; full containment gate not satisfied.
 
+Historical plain App Sandbox baseline. The subsequent helper-only hard-limit
+extension and direct child-denial results are recorded in
+[M2 macOS hard limits](m2-macos-hard-limits.md). The original report is retained
+unchanged so the earlier allowed-child result remains auditable.
+
 ## Implementation and scope
 
 `just probe-document-sandbox-macos` builds a separate test app and embedded XPC

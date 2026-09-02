@@ -105,13 +105,20 @@ Current development status:
   disconnect is not forced process-tree cleanup. This is partial evidence, not
   a production sandbox or an import-enablement gate. Both macOS CI jobs run the
   measured subset. See `../../evidence/0.0.0-dev/m2-native-sandbox-probe.md`;
-- Windows CI repair awaiting native verification: new stage logs narrowed the
+- added locally: helper-only hard limits now deny direct `fork`/`posix_spawn`
+  in the macOS probe, enforce a 64-descriptor ceiling with recovery and reject
+  raising the hard limits. The parent is unaffected; the plain App Sandbox
+  baseline is retained. Memory/CPU/broker/forced-cleanup and Windows containment
+  remain unproven. Both macOS jobs require this expanded subset on the next push.
+  See `../../evidence/0.0.0-dev/m2-macos-hard-limits.md`;
+- Windows CI repair passed per user report after `bdc3e10`: stage logs narrowed the
   stack overflow to encrypted-profile opening. A matching upstream SQLCipher
   Windows logging-recursion defect is mitigated by compiling out its native
   diagnostic logger, with a fail-closed build-policy check. Encryption and
   allocation memory protection remain enabled; no test is skipped or given a
-  larger stack. Local storage/import tests pass; the next Windows CI run must
-  confirm the repair. See `../../evidence/0.0.0-dev/windows-sqlcipher-logging.md`;
+  larger stack. All four CI jobs were reported passing; the run URL/log has not
+  been independently retrieved. This does not prove Windows vault/UI or parser
+  containment. See `../../evidence/0.0.0-dev/windows-sqlcipher-logging.md`;
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
   UI/session integration, private binary staging, richer entry/date/link mapping,

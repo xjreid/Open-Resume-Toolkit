@@ -124,7 +124,7 @@ try {
   const measurement = JSON.parse(output);
   const conclusions = interpretProbe(measurement);
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     createdAt: new Date().toISOString(),
     platform: "macos",
     architecture: process.arch,
@@ -145,17 +145,22 @@ try {
     flag: "wx",
     mode: 0o600,
   });
-  console.log(JSON.stringify(conclusions, null, 2));
+  // All fields are synthetic metadata. Retain the measurements and hashes in
+  // CI logs too, since runner-local target/ directories are otherwise ephemeral.
+  console.log(JSON.stringify(report, null, 2));
   console.log(`Synthetic measurements saved: ${reportPath}`);
   console.log(
     "Probe completion is not full containment proof. Document import remains disabled.",
   );
   if (
     !conclusions.filesystemIsolationPassed ||
-    !conclusions.loopbackConnectDenied
+    !conclusions.loopbackConnectDenied ||
+    !conclusions.directChildCreationDenied ||
+    !conclusions.hardLimitRaiseDenied ||
+    !conclusions.descriptorCeilingEnforced
   ) {
     throw new Error(
-      "The measured filesystem/loopback subset failed; inspect the saved report.",
+      "The measured sandbox/hard-limit subset failed; inspect the saved report.",
     );
   }
 } finally {

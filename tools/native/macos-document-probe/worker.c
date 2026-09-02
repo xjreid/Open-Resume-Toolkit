@@ -1,5 +1,6 @@
 // This is a cooperative, synthetic probe, NOT the hostile-document worker.
 #include "probe.h"
+#include "limits.h"
 #include <dispatch/dispatch.h>
 #include <stdlib.h>
 #include <stdatomic.h>
@@ -15,13 +16,22 @@ static void accept_peer(xpc_connection_t peer) {
         int input = xpc_dictionary_dup_fd(request, "input");
         if (!sibling || !alias || input < 0 || port == 0 || port > UINT16_MAX
             || strlen(sibling) > 1024 || strlen(alias) > 1024) _exit(65);
-        xpc_object_t result = run_probes(input, sibling, alias, (uint16_t)port);
+        // First retain the plain App Sandbox baseline. No parser or untrusted
+        // code is present in either phase of this synthetic experiment.
+        xpc_object_t result = run_probes(input, sibling, alias, (uint16_t)port, false);
+        if (!install_limits()) _exit(65);
+        xpc_object_t hardened = run_probes(input, sibling, alias, (uint16_t)port, true);
+        xpc_object_t limits = probe_limits(input);
         close(input);
         xpc_object_t reply = xpc_dictionary_create_reply(request);
         if (!reply) _exit(65);
         xpc_dictionary_set_value(reply, "result", result);
+        xpc_dictionary_set_value(reply, "hardened", hardened);
+        xpc_dictionary_set_value(reply, "hardLimits", limits);
         xpc_connection_send_message(peer, reply);
         xpc_release(result);
+        xpc_release(hardened);
+        xpc_release(limits);
         xpc_release(reply);
         // Let the reply drain, then terminate this specific probe process.
         // Parent observes connection interruption; it never kills an XPC PID.
@@ -32,6 +42,7 @@ static void accept_peer(xpc_connection_t peer) {
 }
 
 int main(void) {
+    if (getuid() == 0 || geteuid() == 0) _exit(65);
     // Cooperative failsafe only, not a production CPU/wall-time boundary.
     alarm(10);
     xpc_main(accept_peer);

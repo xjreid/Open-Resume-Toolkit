@@ -122,9 +122,11 @@ If supported public OS mechanisms cannot enforce these properties without admini
   transport policy has only synthetic-event evidence; it cannot enforce OS
   isolation, wake blocked I/O, kill a process or prove cleanup. A separate native
   macOS probe verifies read-only descriptor transfer, seeded sibling/symlink
-  restrictions and loopback denial locally, but **allows child creation** and
-  observes only cooperative disconnect. It does not establish credential/broker
-  isolation, resource ceilings or forced process-tree cleanup. Windows containment
+  restrictions and loopback denial locally. Plain App Sandbox allows children;
+  the helper-only zero hard NPROC limit additionally denied direct spawn/fork
+  locally. A hard 64-descriptor cap, rejected limit increases and parent-unaffected
+  checks pass. This still observes only cooperative disconnect, not credential/broker
+  isolation, memory/CPU/thread/Mach-port ceilings or forced process-tree cleanup. Windows containment
   is unproven. Import stays disabled; probe completion is not full containment.
 - External DOCX relationships, macros, embedded packages, scripts, and active content are never executed or fetched.
 - Render templates are bundled and addressed by known IDs; user content cannot inject Typst source.

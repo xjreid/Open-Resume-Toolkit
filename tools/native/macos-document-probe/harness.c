@@ -7,8 +7,14 @@
 
 static xpc_object_t control = NULL;
 static xpc_object_t measured = NULL;
+static xpc_object_t hardened = NULL;
+static xpc_object_t hard_limits = NULL;
 static const char *boolean_keys[] = {"descriptorRead", "descriptorReadOnly", "sandboxEntitlement"};
-static const char *outcome_keys[] = {"siblingRead", "siblingWrite", "symlinkRead", "loopbackConnect", "childCreation"};
+static const char *outcome_keys[] = {"siblingRead", "siblingWrite", "symlinkRead", "loopbackConnect", "childCreation", "childFork"};
+static const char *limit_keys[] = {"nprocSoft", "nprocHard", "nofileSoft", "nofileHard", "coreSoft", "coreHard"};
+static const char *limit_boolean_keys[] = {"raiseDenied", "descriptorCeilingDenied", "descriptorRecovery"};
+static const int parent_resources[] = {RLIMIT_NPROC, RLIMIT_NOFILE, RLIMIT_CORE};
+static struct rlimit parent_limits[3];
 
 static void fail(void) {
     fputs("Synthetic sandbox probe failed; no containment evidence was accepted.\n", stderr);
@@ -21,12 +27,12 @@ static void fixture_path(char *output, size_t capacity, const char *root, const 
 }
 
 static bool valid_result(xpc_object_t result) {
-    if (!result || xpc_get_type(result) != XPC_TYPE_DICTIONARY || xpc_dictionary_get_count(result) != 8) return false;
+    if (!result || xpc_get_type(result) != XPC_TYPE_DICTIONARY || xpc_dictionary_get_count(result) != 9) return false;
     for (size_t i = 0; i < 3; i++) {
         xpc_object_t value = xpc_dictionary_get_value(result, boolean_keys[i]);
         if (!value || xpc_get_type(value) != XPC_TYPE_BOOL) return false;
     }
-    for (size_t i = 0; i < 5; i++) {
+    for (size_t i = 0; i < 6; i++) {
         xpc_object_t value = xpc_dictionary_get_value(result, outcome_keys[i]);
         if (!value || xpc_get_type(value) != XPC_TYPE_INT64) return false;
         int64_t number = xpc_int64_get_value(value);
@@ -35,13 +41,40 @@ static bool valid_result(xpc_object_t result) {
     return true;
 }
 
+static bool valid_limits(xpc_object_t result) {
+    if (!result || xpc_get_type(result) != XPC_TYPE_DICTIONARY || xpc_dictionary_get_count(result) != 9) return false;
+    for (size_t i = 0; i < 6; i++) {
+        xpc_object_t value = xpc_dictionary_get_value(result, limit_keys[i]);
+        if (!value || xpc_get_type(value) != XPC_TYPE_UINT64) return false;
+        if (xpc_uint64_get_value(value) > PROBE_FD_LIMIT) return false;
+    }
+    for (size_t i = 0; i < 3; i++) {
+        xpc_object_t value = xpc_dictionary_get_value(result, limit_boolean_keys[i]);
+        if (!value || xpc_get_type(value) != XPC_TYPE_BOOL) return false;
+    }
+    return true;
+}
+
+static void print_limits(xpc_object_t result) {
+    putchar('{');
+    for (size_t i = 0; i < 6; i++) {
+        printf("%s\"%s\":%llu", i ? "," : "", limit_keys[i],
+            (unsigned long long)xpc_dictionary_get_uint64(result, limit_keys[i]));
+    }
+    for (size_t i = 0; i < 3; i++) {
+        printf(",\"%s\":%s", limit_boolean_keys[i],
+            xpc_dictionary_get_bool(result, limit_boolean_keys[i]) ? "true" : "false");
+    }
+    putchar('}');
+}
+
 static void print_result(xpc_object_t result) {
     putchar('{');
     for (size_t i = 0; i < 3; i++) {
         printf("%s\"%s\":%s", i ? "," : "", boolean_keys[i],
             xpc_dictionary_get_bool(result, boolean_keys[i]) ? "true" : "false");
     }
-    for (size_t i = 0; i < 5; i++) {
+    for (size_t i = 0; i < 6; i++) {
         printf(",\"%s\":%lld", outcome_keys[i], (long long)xpc_dictionary_get_int64(result, outcome_keys[i]));
     }
     putchar('}');
@@ -50,7 +83,10 @@ static void print_result(xpc_object_t result) {
 int main(int argc, char **argv) {
     // The runner creates exactly this private synthetic fixture layout. No
     // arbitrary document/profile target or externally supplied network address.
-    if (argc != 2) fail();
+    if (argc != 2 || getuid() == 0 || geteuid() == 0) fail();
+    for (size_t i = 0; i < 3; i++) {
+        if (getrlimit(parent_resources[i], &parent_limits[i]) != 0) fail();
+    }
     char root[PATH_MAX];
     struct stat metadata;
     const char prefix[] = "/private/tmp/ort-document-sandbox-";
@@ -75,7 +111,7 @@ int main(int argc, char **argv) {
     if (bind(listener, (struct sockaddr *)&address, sizeof(address)) != 0
         || listen(listener, 8) != 0 || getsockname(listener, (struct sockaddr *)&address, &length) != 0) fail();
     uint16_t port = ntohs(address.sin_port);
-    control = run_probes(input, sibling, alias, port);
+    control = run_probes(input, sibling, alias, port, false);
     if (!valid_result(control)) fail();
     fputs("sandbox-probe: positive-control measurements collected\n", stderr);
 
@@ -84,13 +120,26 @@ int main(int argc, char **argv) {
     if (!connection) fail();
     xpc_connection_set_event_handler(connection, ^(xpc_object_t event) {
         if (event == XPC_ERROR_CONNECTION_INTERRUPTED) {
-            if (!measured) fail();
+            if (!measured || !hardened || !hard_limits) fail();
+            bool parent_unchanged = true;
+            for (size_t i = 0; i < 3; i++) {
+                struct rlimit current;
+                if (getrlimit(parent_resources[i], &current) != 0
+                    || current.rlim_cur != parent_limits[i].rlim_cur
+                    || current.rlim_max != parent_limits[i].rlim_max) parent_unchanged = false;
+            }
+            parent_unchanged = parent_unchanged && probe_child(false) == PROBE_ALLOWED;
             fputs("sandbox-probe: cooperative helper disconnect observed\n", stderr);
-            printf("{\"schemaVersion\":1,\"control\":");
+            printf("{\"schemaVersion\":2,\"control\":");
             print_result(control);
             printf(",\"sandboxed\":");
             print_result(measured);
-            puts(",\"cooperativeDisconnectObserved\":true}");
+            printf(",\"hardened\":");
+            print_result(hardened);
+            printf(",\"hardLimits\":");
+            print_limits(hard_limits);
+            printf(",\"parentUnaffected\":%s,\"cooperativeDisconnectObserved\":true}\n",
+                parent_unchanged ? "true" : "false");
             close(input);
             close(listener);
             exit(0);
@@ -106,8 +155,12 @@ int main(int argc, char **argv) {
     xpc_connection_send_message_with_reply(connection, request, dispatch_get_main_queue(), ^(xpc_object_t reply) {
         if (xpc_get_type(reply) != XPC_TYPE_DICTIONARY || measured) fail();
         xpc_object_t result = xpc_dictionary_get_value(reply, "result");
-        if (!valid_result(result)) fail();
+        xpc_object_t limited = xpc_dictionary_get_value(reply, "hardened");
+        xpc_object_t limits = xpc_dictionary_get_value(reply, "hardLimits");
+        if (!valid_result(result) || !valid_result(limited) || !valid_limits(limits)) fail();
         measured = xpc_retain(result);
+        hardened = xpc_retain(limited);
+        hard_limits = xpc_retain(limits);
         fputs("sandbox-probe: helper measurements collected\n", stderr);
     });
     xpc_release(request);

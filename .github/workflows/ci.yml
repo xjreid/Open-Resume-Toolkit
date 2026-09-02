@@ -101,7 +101,7 @@ jobs:
       - name: Diagnose native SQLCipher startup on the target OS
         run: cargo test --locked -p ort-storage --test native_startup -- --nocapture
 
-      - name: Measure macOS sandbox candidate (import remains disabled)
+      - name: Measure macOS sandbox and hard limits (import remains disabled)
         if: ${{ !cancelled() && runner.os == 'macOS' && steps.desktop-build.outcome == 'success' }}
         run: node tools/probe-document-sandbox-macos.mjs
 

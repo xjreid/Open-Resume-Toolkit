@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -19,9 +20,11 @@
 
 #define PROBE_SERVICE "com.openresumetoolkit.document-sandbox-probe.worker"
 #define PROBE_MARKER "ORT_SYNTHETIC_DESCRIPTOR_V1\n"
+#define PROBE_FD_LIMIT 64
 
-// Only an actual access-denied error counts as denial. Missing files, dead
-// listeners and other environmental errors must never produce false evidence.
+// Filesystem/network denials require permission errors. Child probes additionally
+// accept EAGAIN only under a verified zero NPROC limit (see child_outcome).
+// Missing files, dead listeners and arbitrary errors never produce evidence.
 enum probe_outcome { PROBE_ALLOWED = 0, PROBE_DENIED = 1, PROBE_ERROR = 2 };
 
 static int access_outcome(int error) {
@@ -56,18 +59,45 @@ static int probe_loopback(uint16_t port) {
     return rc == 0 ? PROBE_ALLOWED : access_outcome(error);
 }
 
-static int probe_child(void) {
+static bool exact_limit(int resource, rlim_t value) {
+    struct rlimit limit;
+    return getrlimit(resource, &limit) == 0
+        && limit.rlim_cur == value && limit.rlim_max == value;
+}
+
+static int child_outcome(int error, bool limited) {
+    // EAGAIN alone is ambiguous. Accept it only for a non-root process whose
+    // zero soft AND hard NPROC limits have just been verified. The same helper
+    // must also pass an unrestricted positive control before applying limits.
+    if (error == EAGAIN && limited && getuid() != 0 && geteuid() != 0
+        && exact_limit(RLIMIT_NPROC, 0)) return PROBE_DENIED;
+    return access_outcome(error);
+}
+
+static int probe_child(bool limited) {
     // Fixed, harmless command; no shell, user arguments or inherited secrets.
     char *const args[] = {"/usr/bin/true", NULL};
     char *const environment[] = {"PATH=/usr/bin:/bin", NULL};
     pid_t child;
     int rc = posix_spawn(&child, args[0], NULL, NULL, args, environment);
-    if (rc != 0) return access_outcome(rc);
+    if (rc != 0) return child_outcome(rc, limited);
     int status = 0;
     pid_t waited;
     do { waited = waitpid(child, &status, 0); } while (waited < 0 && errno == EINTR);
     // Creation itself violates the planned no-child boundary, even if the
     // child subsequently crashes or is denied a resource. Always reap it.
+    return waited == child ? PROBE_ALLOWED : PROBE_ERROR;
+}
+
+static int probe_fork(bool limited) {
+    pid_t child = fork();
+    // XPC is multithreaded: the child only uses async-signal-safe _exit. Never
+    // touch Foundation, malloc, XPC or logging in a post-fork child.
+    if (child == 0) _exit(0);
+    if (child < 0) return child_outcome(errno, limited);
+    int status = 0;
+    pid_t waited;
+    do { waited = waitpid(child, &status, 0); } while (waited < 0 && errno == EINTR);
     return waited == child ? PROBE_ALLOWED : PROBE_ERROR;
 }
 
@@ -82,7 +112,7 @@ static bool has_sandbox_entitlement(void) {
     return enabled;
 }
 
-static xpc_object_t run_probes(int input, const char *sibling, const char *alias, uint16_t port) {
+static xpc_object_t run_probes(int input, const char *sibling, const char *alias, uint16_t port, bool limited) {
     xpc_object_t result = xpc_dictionary_create(NULL, NULL, 0);
     char buffer[sizeof(PROBE_MARKER)] = {0};
     struct stat metadata;
@@ -100,7 +130,8 @@ static xpc_object_t run_probes(int input, const char *sibling, const char *alias
     xpc_dictionary_set_int64(result, "siblingWrite", probe_path(sibling, O_WRONLY));
     xpc_dictionary_set_int64(result, "symlinkRead", probe_path(alias, O_RDONLY));
     xpc_dictionary_set_int64(result, "loopbackConnect", probe_loopback(port));
-    xpc_dictionary_set_int64(result, "childCreation", probe_child());
+    xpc_dictionary_set_int64(result, "childCreation", probe_child(limited));
+    xpc_dictionary_set_int64(result, "childFork", probe_fork(limited));
     return result;
 }
 

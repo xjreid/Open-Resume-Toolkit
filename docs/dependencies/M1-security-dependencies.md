@@ -42,7 +42,9 @@ memory lock. With allocation memory security enabled this can recursively enter
 the same logger. This matches the new Windows encrypted-profile startup failure;
 SQLCipher's [4.18.0 changelog](https://github.com/sqlcipher/sqlcipher/blob/master/CHANGELOG.md)
 records an allocation-related Windows logging crash fix, and 4.16.0 removed the
-extra warn-level lock-failure log. Native Windows confirmation remains pending.
+extra warn-level lock-failure log. The user subsequently reported all CI checks
+passed after `bdc3e10`, including Windows; the run log was not independently
+retrieved. Native vault/UI/installer proof remains separate.
 
 Repository `.cargo/config.toml` forces `SQLCIPHER_OMIT_LOG` and
 `SQLCIPHER_OMIT_DEFAULT_LOGGING` through the native dependency's supported

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 2,
+  "createdAt": "2026-09-02T23:38:18.832Z",
+  "platform": "macos",
+  "architecture": "arm64",
+  "osVersion": "26.6.2",
+  "signing": "ad-hoc-hardened-runtime-separate-app-sandbox-helper",
+  "signatureVerified": true,
+  "helperSha256": "fff6bcf96481dedffb1027138169861a72b39231c460210ea0a6c299c04dba93",
+  "hostSha256": "a878c121ae9b85f725de8696a4526d6f00022fd8f79953e6e728bcb072ec1096",
+  "measurement": {
+    "schemaVersion": 2,
+    "control": {
+      "descriptorRead": true,
+      "descriptorReadOnly": true,
+      "sandboxEntitlement": false,
+      "siblingRead": 0,
+      "siblingWrite": 0,
+      "symlinkRead": 0,
+      "loopbackConnect": 0,
+      "childCreation": 0,
+      "childFork": 0
+    },
+    "sandboxed": {
+      "descriptorRead": true,
+      "descriptorReadOnly": true,
+      "sandboxEntitlement": true,
+      "siblingRead": 1,
+      "siblingWrite": 1,
+      "symlinkRead": 1,
+      "loopbackConnect": 1,
+      "childCreation": 0,
+      "childFork": 0
+    },
+    "hardened": {
+      "descriptorRead": true,
+      "descriptorReadOnly": true,
+      "sandboxEntitlement": true,
+      "siblingRead": 1,
+      "siblingWrite": 1,
+      "symlinkRead": 1,
+      "loopbackConnect": 1,
+      "childCreation": 1,
+      "childFork": 1
+    },
+    "hardLimits": {
+      "nprocSoft": 0,
+      "nprocHard": 0,
+      "nofileSoft": 64,
+      "nofileHard": 64,
+      "coreSoft": 0,
+      "coreHard": 0,
+      "raiseDenied": true,
+      "descriptorCeilingDenied": true,
+      "descriptorRecovery": true
+    },
+    "parentUnaffected": true,
+    "cooperativeDisconnectObserved": true
+  },
+  "conclusions": {
+    "descriptorBoundaryPassed": true,
+    "filesystemIsolationPassed": true,
+    "loopbackConnectDenied": true,
+    "baselineChildCreationDenied": false,
+    "directChildCreationDenied": true,
+    "hardLimitRaiseDenied": true,
+    "descriptorCeilingEnforced": true,
+    "coreDumpLimitZero": true,
+    "parentUnaffected": true,
+    "cooperativeDisconnectObserved": true,
+    "fullContainmentProven": false,
+    "importEnabled": false,
+    "untested": [
+      "forced-process-tree-termination-and-parent-death",
+      "memory-cpu-thread-and-mach-port-ceilings",
+      "broker-mediated-process-creation-and-exec-replacement",
+      "hostile-code-core-dump-and-diagnostic-artifact-verification",
+      "credential-and-broker-access",
+      "udp-dns-and-non-loopback-network",
+      "filesystem-outside-the-synthetic-fixtures",
+      "hostile-code-and-crash-cleanup",
+      "signed-release-and-supported-os-matrix"
+    ]
+  }
+}

@@ -1,7 +1,9 @@
 # Windows SQLCipher logging mitigation
 
 Date: 2026-09-02. Base commit: `e643574`. Local verification: macOS arm64.
-Status: targeted mitigation implemented; Windows CI confirmation pending.
+Status: targeted mitigation implemented; user subsequently reported all CI
+checks passing after `bdc3e10`, including windows-2025. The successful run URL/log
+was not independently retrieved. Native UI/vault/installer proof remains separate.
 
 ## Diagnostic evidence
 
@@ -29,7 +31,8 @@ can attempt another memory lock and recursively log its failure.
 Upstream's [SQLCipher changelog](https://github.com/sqlcipher/sqlcipher/blob/master/CHANGELOG.md)
 documents a Windows logging-allocation crash repair in 4.18.0; 4.16.0 separately
 removed the warn-level lock-failure message. Our pinned source predates both.
-This is a strong match to the observed failure, not yet proof the CI crash is fixed.
+This is a strong match to the observed failure. The subsequently reported green
+Windows run supports the mitigation, but no native crash backtrace was captured.
 
 `.cargo/config.toml` supplies `SQLCIPHER_OMIT_LOG` and
 `SQLCIPHER_OMIT_DEFAULT_LOGGING` through `LIBSQLITE3_FLAGS` with `force = true`.
@@ -60,9 +63,9 @@ not permitted to silently open profiles. Recheck these semantics on upgrades.
 - Full local verification is recorded in `manifest.json`.
 - All three desktop CI targets now run the full storage suite as well as the
   separate startup and original import tests. No failing tests are skipped.
-- Next acceptance step: push and inspect native windows-2025 execution. If it
-  still fails, retain the new last stage and obtain a native debugger backtrace;
-  do not mark it fixed or weaken encryption based only on macOS success.
+- User-reported follow-up: all CI jobs passed after the mitigation. Preserve
+  these tests for regression detection. If the crash recurs, retain the new last
+  stage and obtain a native debugger backtrace; never weaken encryption to pass.
 
 Only temporary synthetic profiles and an in-memory vault were used. No personal
 profile or Keychain/Credential Manager access was needed. The previous packaged
