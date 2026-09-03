@@ -2,12 +2,19 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+mod backup;
 mod lifecycle;
 mod pdf;
 mod resume;
 mod resume_commands;
+mod storage_usage;
 mod text_export;
 
+pub use backup::{
+    ExportBackupPayload, ExportBackupRequest, ExportBackupResponse, MAX_BACKUP_BYTES,
+    MAX_BACKUP_PASSPHRASE_BYTES, ValidateBackupPayload, ValidateBackupRequest,
+    ValidateBackupResponse,
+};
 pub use pdf::{
     MAX_PDF_BYTES, MAX_PDF_PAGES, MAX_PDF_RENDER_HISTORY, PDF_PREVIEW_TTL_SECONDS,
     PdfExportResponse, PdfPreviewResponse, PdfReleaseResponse, PdfRenderHistoryRequest,
@@ -34,6 +41,7 @@ pub use resume_commands::{
     PublishResumeResponse, ResumeWorkspaceResponse, SaveResumePayload, SaveResumeRequest,
     VersionedResumeResponse,
 };
+pub use storage_usage::{StorageUsagePayload, StorageUsageRequest, StorageUsageResponse};
 
 pub const CONTRACT_VERSION: u16 = 2;
 

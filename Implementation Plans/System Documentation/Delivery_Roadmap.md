@@ -64,6 +64,19 @@ Exit evidence:
 
 Current development status:
 
+As of 2026-09-03, the working stage-gate estimate is **about 52% complete**.
+This estimate weights end-to-end deliverables and mandatory security, recovery,
+accessibility, cross-platform and offline-journey evidence rather than counting
+implemented code or checkpoints equally. The underlying implementation foundation
+is approximately 65–70% present, end-to-end M2 functionality is approximately
+50–55% present, and release/exit evidence is approximately 35–40% complete. Major
+gates such as production parser containment, import/review integration,
+replace-restore, destructive profile deletion and the complete offline journey
+remain substantial incomplete capabilities, not polish. The latest three local
+checkpoints—portable-backup export, encrypted-profile storage usage, and read-only
+authenticated backup validation—are verified together in the current uncommitted
+working tree based on `a3ad66e`; they advance M2 but do not make it release-ready.
+
 - implemented locally: generated load/save/publish contracts, a main-window-only
   encrypted command boundary, fail-closed OS-vault startup, optimistic draft
   saves, idempotent immutable publication, a structured editor for contact
@@ -160,7 +173,8 @@ Current development status:
   handoff recovery preserve existing records. Portable backup format 1.1 now
   includes the same bounded, content-free manifests, restores them atomically
   into a separately keyed profile, and retains format-1.0 read compatibility.
-  Historical renderer replay and native backup/export UX remain pending. See
+  Historical renderer replay and native backup/export UX remained pending at
+  that checkpoint. See
   `../../evidence/0.0.0-dev/m2-render-history.md` and
   `../../evidence/0.0.0-dev/m2-portable-render-history.md`;
 - Windows CI repair passed per user report after `bdc3e10`: stage logs narrowed the
@@ -171,17 +185,64 @@ Current development status:
   larger stack. All four CI jobs were reported passing; the run URL/log has not
   been independently retrieved. This does not prove Windows vault/UI or parser
   containment. See `../../evidence/0.0.0-dev/windows-sqlcipher-logging.md`;
+- added locally: main-window encrypted portable-backup export. A generated,
+  bounded passphrase-only request creates the existing format-1.1 archive from
+  canonical saved records on a blocking native worker; the request types avoid
+  accidental debug/clone support and Rust zeroizes its owned passphrase. An
+  accessible confirmation form clears both visible fields at dispatch and states
+  the unrecoverable-passphrase, credential-exclusion, sync-provider, saved-only,
+  and restore limitations. The native Save dialog issues held-directory,
+  single-use authority for a new `.ort-backup` file; private staging, exact byte
+  bounds, mode 0600 on Unix and no-clobber publication share the reviewed export
+  boundary. Cancellation and failure do not modify the profile, the response
+  exposes no path/content/passphrase/native error, and quit waits on the shared
+  file-operation gate. Synthetic storage-to-file-to-separately-keyed-profile
+  integration and the full local check pass; native dialog/ACL/filesystem,
+  cancellation timing, low-disk/crash cleanup, cross-platform CI and replace-
+  restore safety-copy/profile-swap verification remain pending. See
+  `../../evidence/0.0.0-dev/m2-portable-backup-export.md`;
+- added locally: a main-window, content-free encrypted-profile storage inventory.
+  One generated empty request returns the verified database schema, bounded
+  counts for drafts, published snapshots, settings, PDF render manifests and
+  diagnostic events, plus exact byte sizes for the SQLCipher database, encrypted
+  WAL, SQLite shared-memory file, non-secret manifest and transient recovery
+  metadata. The total is checked arithmetically and every byte value is
+  JavaScript-safe. The storage layer reads only fixed known filenames, rejects
+  symlink/unexpected file types, exposes no paths/IDs/content, and does not scan
+  external exports, backups or vault entries. The accessible UI distinguishes
+  those exclusions, exact bytes and transient file behavior, refreshes after
+  completed editor operations, and performs no cleanup or mutation. Contract,
+  encrypted-storage, symlink, formatting and UI tests accompany the full local
+  check; cross-platform CI and native assistive-technology inspection remain
+  pending. See `../../evidence/0.0.0-dev/m2-storage-usage.md`;
+- added locally: read-only authenticated portable-backup intake and validation.
+  A generated passphrase-only request opens a native `.ort-backup` picker on the
+  shared file-operation worker; no renderer-supplied path or replacement flag is
+  accepted. The platform boundary holds the selected parent directory, requires
+  an absolute regular final entry with the fixed extension, disables final
+  symlink following, bounds file length before allocation and rejects empty,
+  oversized, short or growing reads. The existing reader validates the bounded
+  header/KDF policy, authenticates and decrypts the whole container, then checks
+  schemas, hashes, inventory and domain invariants. Wrong passphrases, tampering
+  and malformed authenticated content share one response. The accessible preview
+  exposes only authenticated format/schema/time/version/byte and record-count
+  metadata—never a path, filename, passphrase, content, setting value, hash or
+  native error—and does not write, close or replace the active profile. Focused
+  contract/UI/native-input/crypto tests and the full local check pass; native
+  Open-dialog/reparse/accessibility inspection, parser-memory hardening,
+  cross-platform CI and crash-safe replace-restore remain pending. See
+  `../../evidence/0.0.0-dev/m2-backup-validation.md`;
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
   UI/session integration, private binary staging, richer entry/date/link mapping,
   remaining native PDF preview/export verification, final PDF/DOCX templates
   and reader verification, confirmed replacement and crash-cleanup policy for
   exports, historical renderer replay, Windows native Save-dialog/ACL/filesystem
-  proof, storage management, and complete offline
+  proof, destructive storage deletion/cleanup, and complete offline
   journey evidence. Portable render-manifest backup is implemented, but native
-  full-backup export/restore UX and its release verification remain gated. M2 is
-  not complete; do not enable hostile-file parsing or
-  advance to public release based on the text-export checkpoint alone.
+  full-backup replace-restore UX and its release verification remain gated. M2 is
+  not complete; do not enable hostile-file parsing or advance to public release
+  based on these local checkpoints alone.
 
 Deliver:
 

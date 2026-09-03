@@ -456,6 +456,108 @@ textarea {
   line-height: 1.5;
 }
 
+.backup-panel,
+.storage-panel {
+  margin-top: 18px;
+}
+
+.storage-total {
+  margin: 18px 0;
+  font-size: 15px;
+}
+
+.storage-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.storage-columns h3 {
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.storage-list {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid #d7dee5;
+  border-radius: 8px;
+  background: #d7dee5;
+}
+
+.storage-list > div {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 9px 11px;
+  background: #f8fafb;
+}
+
+.storage-list dt {
+  color: #4d5968;
+}
+
+.storage-list dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+
+.storage-guidance {
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.backup-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  margin-top: 18px;
+}
+
+.backup-form > p,
+.backup-form > button {
+  grid-column: 1 / -1;
+}
+
+.backup-form > button {
+  justify-self: start;
+}
+
+.backup-guidance {
+  font-size: 13px;
+}
+
+.backup-validation {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid #d8dee8;
+}
+
+.backup-validation > h3,
+.backup-summary > h3 {
+  margin-bottom: 8px;
+}
+
+.backup-validation__passphrase {
+  grid-column: 1 / -1;
+  max-width: 520px;
+}
+
+.backup-summary {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #a8cdbd;
+  border-radius: 10px;
+  background: #f0faf5;
+}
+
+.backup-summary .storage-list {
+  margin-bottom: 14px;
+}
+
 @media (max-width: 820px) {
   .workspace-summary {
     grid-template-columns: repeat(3, 1fr);
@@ -483,7 +585,9 @@ textarea {
   }
 
   .field-grid,
-  .workspace-summary {
+  .workspace-summary,
+  .backup-form,
+  .storage-columns {
     grid-template-columns: 1fr;
   }
 

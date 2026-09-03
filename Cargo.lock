@@ -3512,6 +3512,7 @@ version = "0.0.0-dev"
 name = "ort-application"
 version = "0.0.0-dev"
 dependencies = [
+ "ort-backup",
  "ort-documents",
  "ort-domain",
  "ort-platform",
@@ -3554,6 +3555,7 @@ name = "ort-desktop"
 version = "0.0.0-dev"
 dependencies = [
  "base64 0.22.1",
+ "ort-backup",
  "ort-documents",
  "ort-domain",
  "ort-platform",
@@ -3607,6 +3609,7 @@ version = "0.0.0-dev"
 name = "ort-platform"
 version = "0.0.0-dev"
 dependencies = [
+ "cap-primitives",
  "cap-std",
  "ort-domain",
  "tempfile",

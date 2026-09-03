@@ -20,7 +20,9 @@ import type {
 } from "@ort/contracts/resume";
 import { DOCUMENT_LIMITS } from "@ort/contracts/resume";
 import { CloseDialog } from "./CloseDialog";
+import { BackupPanel } from "./BackupPanel";
 import { PdfPreviewPanel } from "./PdfPreview";
+import { StoragePanel } from "./StoragePanel";
 import { useCloseGuard } from "./use-close-guard";
 import {
   editorReducer,
@@ -419,6 +421,46 @@ function ResumeEditor() {
         semantic={(document) => <PublishedResume document={document} pdf />}
       />
 
+      <BackupPanel
+        dirty={dirty}
+        blocked={
+          !storageReady ||
+          dirty ||
+          busy ||
+          mustReload ||
+          confirmReload ||
+          close.pending
+        }
+        onBegin={() => {
+          if (
+            ioBusy.current ||
+            dirty ||
+            busy ||
+            mustReload ||
+            confirmReload ||
+            close.pending
+          )
+            return false;
+          ioBusy.current = true;
+          dispatch({ type: "exporting" });
+          return true;
+        }}
+        onFinish={(message) => {
+          dispatch({ type: "export-finished", notice: message });
+          ioBusy.current = false;
+        }}
+      />
+
+      <StoragePanel
+        enabled={
+          storageReady &&
+          !busy &&
+          !mustReload &&
+          !confirmReload &&
+          !close.pending
+        }
+      />
+
       <div className="editor-tools">
         <p>
           Valid changes autosave after a short pause. Closing checks for unsaved
@@ -685,7 +727,8 @@ function ResumeEditor() {
 
       <footer className="development-gates">
         PDF preview, PDF, DOCX and text export use saved revisions. PDF/DOCX
-        import, export replacement and crash recovery remain gated in M2; AI and
+        import, backup replacement, export replacement and crash recovery remain
+        gated in M2; authenticated backup validation is read-only. AI and
         browser integration arrive in later milestones. Use synthetic data only.
       </footer>
     </main>

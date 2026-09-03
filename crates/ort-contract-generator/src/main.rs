@@ -1,10 +1,12 @@
 use std::{fs, path::PathBuf};
 
 use ort_domain::{
-    CloseStatusRequest, CloseStatusResponse, DocumentLimits, ExportDocxRequest, ExportDocxResponse,
-    ExportTextRequest, ExportTextResponse, HealthRequest, HealthResponse, LoadResumeRequest,
-    PublishResumeRequest, PublishResumeResponse, ResolveCloseRequest, ResumeWorkspaceResponse,
-    SaveResumeRequest, VersionedResumeResponse,
+    CloseStatusRequest, CloseStatusResponse, DocumentLimits, ExportBackupRequest,
+    ExportBackupResponse, ExportDocxRequest, ExportDocxResponse, ExportTextRequest,
+    ExportTextResponse, HealthRequest, HealthResponse, LoadResumeRequest, PublishResumeRequest,
+    PublishResumeResponse, ResolveCloseRequest, ResumeWorkspaceResponse, SaveResumeRequest,
+    StorageUsageRequest, StorageUsageResponse, ValidateBackupRequest, ValidateBackupResponse,
+    VersionedResumeResponse,
 };
 use schemars::schema_for;
 
@@ -16,6 +18,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = workspace_root()?;
     let output = root.join("packages/contracts/generated");
     fs::create_dir_all(&output)?;
+    write_schema::<ExportBackupRequest>(&output.join("backup.export.request.schema.json"))?;
+    write_schema::<ExportBackupResponse>(&output.join("backup.export.response.schema.json"))?;
+    write_schema::<ValidateBackupRequest>(&output.join("backup.validate.request.schema.json"))?;
+    write_schema::<ValidateBackupResponse>(&output.join("backup.validate.response.schema.json"))?;
+    fs::write(
+        output.join("backup.ts"),
+        include_str!("backup.ts.template")
+            .replace(
+                "__MAX_BACKUP_BYTES__",
+                &ort_domain::MAX_BACKUP_BYTES.to_string(),
+            )
+            .replace(
+                "__MAX_BACKUP_PASSPHRASE_BYTES__",
+                &ort_domain::MAX_BACKUP_PASSPHRASE_BYTES.to_string(),
+            ),
+    )?;
     write_schema::<ExportTextRequest>(&output.join("export.text.request.schema.json"))?;
     write_schema::<ExportTextResponse>(&output.join("export.text.response.schema.json"))?;
     write_schema::<ExportDocxRequest>(&output.join("export.docx.request.schema.json"))?;
@@ -68,6 +86,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     fs::write(output.join("health.ts"), TYPESCRIPT)?;
     fs::write(output.join("resume.ts"), RESUME_TYPESCRIPT)?;
+    write_schema::<StorageUsageRequest>(&output.join("storage.usage.request.schema.json"))?;
+    write_schema::<StorageUsageResponse>(&output.join("storage.usage.response.schema.json"))?;
+    fs::write(
+        output.join("storage.ts"),
+        include_str!("storage.ts.template"),
+    )?;
     let limits = DocumentLimits::default();
     fs::write(
         output.join("limits.ts"),

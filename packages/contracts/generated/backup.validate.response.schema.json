@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ValidateBackupResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "cancelled"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "appVersion": {
+          "type": "string"
+        },
+        "byteCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "databaseSchema": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "documentSchema": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "formatMajor": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "formatMinor": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "masterDrafts": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "publishedResumes": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "renderManifests": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "settings": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "status": {
+          "type": "string",
+          "const": "validated"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "byteCount",
+        "formatMajor",
+        "formatMinor",
+        "appVersion",
+        "databaseSchema",
+        "documentSchema",
+        "createdAt",
+        "masterDrafts",
+        "publishedResumes",
+        "settings",
+        "renderManifests"
+      ]
+    }
+  ]
+}

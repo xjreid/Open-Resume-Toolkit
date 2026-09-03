@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExportBackupResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "cancelled"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "byteCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "cleanupPending": {
+          "type": "boolean"
+        },
+        "durabilityUnconfirmed": {
+          "type": "boolean"
+        },
+        "formatMajor": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "formatMinor": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "status": {
+          "type": "string",
+          "const": "exported"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "byteCount",
+        "formatMajor",
+        "formatMinor",
+        "cleanupPending",
+        "durabilityUnconfirmed"
+      ]
+    }
+  ]
+}

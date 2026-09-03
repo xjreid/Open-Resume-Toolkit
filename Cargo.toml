@@ -26,6 +26,7 @@ repository = "https://github.com/xjreid/Open-Resume-Toolkit"
 
 [workspace.dependencies]
 cap-std = "=4.0.3"
+cap-primitives = "=4.0.3"
 crc32fast = "=1.5.1"
 argon2 = { version = "=0.6.0", default-features = false, features = ["alloc", "zeroize"] }
 chacha20poly1305 = { version = "=0.11.0", default-features = false, features = ["alloc", "zeroize"] }

@@ -11,8 +11,8 @@ use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 use jiff::Timestamp;
 use ort_domain::{
-    DocumentLimits, EntityId, ExportSource, MAX_PDF_BYTES, MAX_PDF_PAGES, PdfRenderReceipt,
-    ResumeDocument,
+    DocumentLimits, EntityId, ExportSource, MAX_BACKUP_PASSPHRASE_BYTES, MAX_PDF_BYTES,
+    MAX_PDF_PAGES, PdfRenderReceipt, ResumeDocument,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -42,7 +42,6 @@ const MAX_PUBLISHED_RESUMES: usize = 100;
 const MAX_RENDER_MANIFESTS: usize = 100;
 const MAX_SETTINGS: usize = 128;
 const MAX_SETTING_BYTES: usize = 64 * 1_024;
-const MAX_PASSPHRASE_BYTES: usize = 1_024;
 const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -66,7 +65,7 @@ impl BackupPassphrase {
     /// # Errors
     /// Returns `InvalidPassphrase` for empty values or values over 1024 bytes.
     pub fn new(mut passphrase: String) -> Result<Self, BackupError> {
-        if passphrase.is_empty() || passphrase.len() > MAX_PASSPHRASE_BYTES {
+        if passphrase.is_empty() || passphrase.len() > MAX_BACKUP_PASSPHRASE_BYTES {
             passphrase.zeroize();
             return Err(BackupError::InvalidPassphrase);
         }

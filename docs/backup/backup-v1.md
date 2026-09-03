@@ -2,7 +2,9 @@
 
 - Extension: `.ort-backup`
 - Writer format: 1.1 (reader also accepts 1.0)
-- Status: development prototype; cross-platform file and hostile-input suites remain release gates
+- Status: native export and read-only authenticated validation commands integrated;
+  native cross-platform dialog, replace-restore, and hostile-input suites remain
+  release gates
 
 ## Fixed header
 
@@ -60,3 +62,40 @@ category.
 The vector is generated and verified in the `ort-backup` unit suite. Any format
 change must intentionally update the format version or explain and review a
 vector change.
+
+## Native export boundary
+
+The M2 desktop command creates format 1.1 only from the already-open encrypted
+profile. Its generated IPC request contains bounded request metadata and the
+user-entered passphrase, but no path, profile records, overwrite flag, key, or
+vault reference. The request types deliberately do not implement `Debug` or
+`Clone`. Rust owns and zeroizes the passphrase after the one operation; the
+frontend clears both controlled passphrase fields when dispatch begins.
+
+A native Save dialog selects a new `.ort-backup` destination. The backend converts
+that selection directly to a held-directory, single-use capability and publishes
+the exact encrypted bytes with the shared private-stage/no-clobber writer. The
+renderer receives only cancellation or bounded format/byte/cleanup/durability
+metadata. Current-profile replacement is not implemented by this command.
+
+## Native validation boundary
+
+The M2 desktop can select one existing `.ort-backup` through a native Open dialog.
+The generated request contains only bounded request metadata and the passphrase;
+it cannot carry a path, replacement flag, destination profile, or content. Rust
+clears its owned passphrase after the operation. The shared file-operation lease
+prevents concurrent dialog work and makes normal quit wait for completion.
+
+The platform adapter opens the native-selected parent as a held capability,
+requires a regular `.ort-backup` final entry, disables final-component symlink
+following, and checks the fixed maximum length before allocation. It reads at most
+one byte beyond that limit and rejects empty or oversized files and any short or
+growing read. The container reader then enforces the full validation order above,
+and authentication rejects changed bytes. Wrong passphrases and authenticated-
+content failures remain deliberately indistinguishable.
+
+Only a content-free authenticated summary returns to the main window: container
+bytes/version, application/schema versions, creation time, and bounded draft,
+published, setting, and render-manifest counts. No file path, filename, resume
+content, setting value, hash, passphrase, or native error crosses the command
+response. Validation does not open, close, copy, or replace the active profile.

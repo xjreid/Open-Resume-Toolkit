@@ -242,6 +242,23 @@ pub struct StoredRenderManifest {
     pub receipt: PdfRenderReceipt,
 }
 
+/// Content-free inventory and exact known-file sizes for the active profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StorageUsage {
+    pub database_schema: u16,
+    pub drafts: u32,
+    pub published_snapshots: u32,
+    pub settings: u32,
+    pub render_manifests: u32,
+    pub diagnostic_events: u32,
+    pub database_bytes: u64,
+    pub wal_bytes: u64,
+    pub shared_memory_bytes: u64,
+    pub manifest_bytes: u64,
+    pub recovery_metadata_bytes: u64,
+    pub total_profile_bytes: u64,
+}
+
 pub struct EncryptedStore {
     connection: Mutex<Connection>,
     manifest: ProfileManifest,
@@ -346,6 +363,86 @@ impl EncryptedStore {
     #[must_use]
     pub fn database_path(&self) -> &Path {
         &self.database_path
+    }
+
+    /// Returns a content-free record inventory and exact sizes for known files
+    /// in the active encrypted profile. External exports, backups, vault items,
+    /// and in-memory preview bytes are intentionally outside this measurement.
+    ///
+    /// # Errors
+    /// Returns a safe storage error for unavailable SQL/file metadata, unexpected
+    /// entry types, integer overflow, or values unsafe to serialize to JavaScript.
+    pub fn storage_usage(&self) -> Result<StorageUsage, StorageError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let counts = connection
+            .query_row(
+                "SELECT \
+                 (SELECT COUNT(*) FROM resume_drafts WHERE profile_id = ?1), \
+                 (SELECT COUNT(*) FROM published_resumes WHERE profile_id = ?1), \
+                 (SELECT COUNT(*) FROM settings WHERE profile_id = ?1), \
+                 (SELECT COUNT(*) FROM render_manifests WHERE profile_id = ?1), \
+                 (SELECT COUNT(*) FROM diagnostic_events WHERE profile_id = ?1)",
+                [self.manifest.profile_id.to_string()],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
+                    ))
+                },
+            )
+            .map_err(|_| StorageError::Unavailable)?;
+
+        let root = self
+            .database_path
+            .parent()
+            .ok_or(StorageError::UnsafeLocation)?;
+        let database_bytes = known_file_bytes(&self.database_path, true)?;
+        let wal_bytes = known_file_bytes(&self.database_path.with_extension("db-wal"), false)?;
+        let shared_memory_bytes =
+            known_file_bytes(&self.database_path.with_extension("db-shm"), false)?;
+        let manifest_bytes = known_file_bytes(&root.join(MANIFEST_FILENAME), true)?;
+        let recovery_metadata_bytes =
+            known_file_bytes(&root.join(PREVIOUS_MANIFEST_FILENAME), false)?
+                .checked_add(known_file_bytes(
+                    &root.join(MANIFEST_UPDATE_FILENAME),
+                    false,
+                )?)
+                .ok_or(StorageError::InvalidData)?;
+        let total_profile_bytes = [
+            database_bytes,
+            wal_bytes,
+            shared_memory_bytes,
+            manifest_bytes,
+            recovery_metadata_bytes,
+        ]
+        .into_iter()
+        .try_fold(0_u64, u64::checked_add)
+        .ok_or(StorageError::InvalidData)?;
+        if total_profile_bytes > 9_007_199_254_740_991 {
+            return Err(StorageError::InvalidData);
+        }
+        let database_schema =
+            u16::try_from(self.manifest.schema_version).map_err(|_| StorageError::InvalidData)?;
+        Ok(StorageUsage {
+            database_schema,
+            drafts: count_to_u32(counts.0)?,
+            published_snapshots: count_to_u32(counts.1)?,
+            settings: count_to_u32(counts.2)?,
+            render_manifests: count_to_u32(counts.3)?,
+            diagnostic_events: count_to_u32(counts.4)?,
+            database_bytes,
+            wal_bytes,
+            shared_memory_bytes,
+            manifest_bytes,
+            recovery_metadata_bytes,
+            total_profile_bytes,
+        })
     }
 
     /// Loads the current editable resume.
@@ -1198,6 +1295,19 @@ impl EncryptedStore {
             return Err(error);
         }
         Ok(())
+    }
+}
+
+fn count_to_u32(value: i64) -> Result<u32, StorageError> {
+    u32::try_from(value).map_err(|_| StorageError::InvalidData)
+}
+
+fn known_file_bytes(path: &Path, required: bool) -> Result<u64, StorageError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_file() => Ok(metadata.len()),
+        Ok(_) => Err(StorageError::UnsafeLocation),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound && !required => Ok(0),
+        Err(_) => Err(StorageError::Unavailable),
     }
 }
 
@@ -2149,6 +2259,87 @@ mod tests {
         drop(reopened);
 
         assert_no_marker_in_files(temporary.path());
+    }
+
+    #[test]
+    fn storage_usage_reports_only_bounded_counts_and_exact_known_file_bytes() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("initialize encrypted store");
+        let empty = store.storage_usage().expect("empty usage");
+        assert_eq!(empty.database_schema, 2);
+        assert_eq!(empty.drafts, 0);
+        assert_eq!(empty.published_snapshots, 0);
+        assert_eq!(empty.settings, 0);
+        assert_eq!(empty.render_manifests, 0);
+        assert_eq!(empty.diagnostic_events, 0);
+        assert!(empty.database_bytes > 0);
+        assert!(empty.manifest_bytes > 0);
+        assert_eq!(
+            empty.total_profile_bytes,
+            empty.database_bytes
+                + empty.wal_bytes
+                + empty.shared_memory_bytes
+                + empty.manifest_bytes
+                + empty.recovery_metadata_bytes
+        );
+
+        let document = ResumeDocument::empty(PLAINTEXT_MARKER);
+        let draft = store.create_draft(&document).expect("create draft");
+        store.publish_draft(draft.revision).expect("publish first");
+        let draft = store
+            .save_draft(draft.revision, &document)
+            .expect("save second revision");
+        store.publish_draft(draft.revision).expect("publish second");
+        store
+            .save_setting("editor.zoom", None, &Value::from(125))
+            .expect("save setting");
+        store
+            .record_diagnostic("STORAGE_USAGE", DiagnosticSeverity::Info, &Map::new())
+            .expect("record diagnostic");
+        store
+            .record_render_manifest(
+                ExportSource::SavedDraft,
+                draft.revision,
+                2_000,
+                &synthetic_render_receipt("d".repeat(64)),
+            )
+            .expect("record render manifest");
+
+        let usage = store.storage_usage().expect("populated usage");
+        assert_eq!(usage.drafts, 1);
+        assert_eq!(usage.published_snapshots, 2);
+        assert_eq!(usage.settings, 1);
+        assert_eq!(usage.render_manifests, 1);
+        assert_eq!(usage.diagnostic_events, 1);
+        assert!(usage.total_profile_bytes >= empty.total_profile_bytes);
+        assert_eq!(
+            usage.total_profile_bytes,
+            usage.database_bytes
+                + usage.wal_bytes
+                + usage.shared_memory_bytes
+                + usage.manifest_bytes
+                + usage.recovery_metadata_bytes
+        );
+        assert_no_marker_in_files(temporary.path());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn storage_usage_rejects_unexpected_recovery_metadata_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("initialize encrypted store");
+        symlink(
+            temporary.path().join("outside"),
+            temporary.path().join(super::PREVIOUS_MANIFEST_FILENAME),
+        )
+        .expect("seed unexpected symlink");
+        assert_eq!(store.storage_usage(), Err(StorageError::UnsafeLocation));
     }
 
     #[test]

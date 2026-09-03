@@ -134,7 +134,9 @@ fn export_with_dialog(
             "docx",
             DOCX_FORMAT_VERSION,
         ),
-        ExportFileType::Pdf => return export_failure("EXPORT_INVALID_CONTENT"),
+        ExportFileType::Backup | ExportFileType::Pdf => {
+            return export_failure("EXPORT_INVALID_CONTENT");
+        }
     };
     let selection = window
         .dialog()
@@ -177,7 +179,8 @@ fn render_saved(saved: &VersionedResume, format: ExportFileType) -> Result<Vec<u
             .map(String::into_bytes)
             .map_err(|_| ()),
         ExportFileType::Docx => render_docx(&saved.document).map_err(|_| ()),
-        ExportFileType::Pdf => Err(()), // PDF exports consume a preview ticket.
+        ExportFileType::Backup | ExportFileType::Pdf => Err(()),
+        // Backup owns a separate encrypted-profile command; PDF consumes a preview ticket.
     }
 }
 

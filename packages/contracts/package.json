@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./backup": "./generated/backup.ts",
     "./health": "./generated/health.ts",
     "./resume": "./generated/resume.ts",
+    "./storage": "./generated/storage.ts",
     "./lifecycle": "./generated/lifecycle.ts",
     "./export": "./generated/export.ts",
     "./pdf": "./generated/pdf.ts"

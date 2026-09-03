@@ -2,7 +2,8 @@ use ort_domain::{
     CONTRACT_VERSION, CloseDecision, CloseStatusRequest, CloseStatusResponse, CommandResponse,
     HealthRequest, HealthResponse, HealthStatus, LoadResumeRequest, PublishResumeRequest,
     PublishResumeResponse, ResolveCloseRequest, ResumeWorkspaceResponse, RuntimeProfile,
-    SaveResumeRequest, StorageStatus, VersionedResumeResponse, validate_health_request,
+    SaveResumeRequest, StorageStatus, StorageUsageRequest, StorageUsageResponse,
+    VersionedResumeResponse, validate_health_request,
 };
 use ort_storage::{EncryptedStore, StorageError, VersionedResume};
 use ort_vault::OsDatabaseKeyVault;
@@ -10,6 +11,7 @@ use tauri::{
     AppHandle, Emitter, EventTarget, Manager, RunEvent, State, WebviewWindow, WindowEvent,
 };
 
+mod backup_export;
 mod close_guard;
 mod menu;
 mod pdf_preview;
@@ -157,6 +159,41 @@ fn load_resume(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
+fn load_storage_usage(
+    window: WebviewWindow,
+    state: State<'_, DesktopState>,
+    request: StorageUsageRequest,
+) -> CommandResponse<StorageUsageResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    let DesktopStorage::Ready(store) = &state.storage else {
+        return storage_unavailable();
+    };
+    match store.storage_usage() {
+        Ok(usage) => CommandResponse::success(StorageUsageResponse {
+            database_schema: usage.database_schema,
+            drafts: usage.drafts,
+            published_snapshots: usage.published_snapshots,
+            settings: usage.settings,
+            render_manifests: usage.render_manifests,
+            diagnostic_events: usage.diagnostic_events,
+            database_bytes: usage.database_bytes,
+            wal_bytes: usage.wal_bytes,
+            shared_memory_bytes: usage.shared_memory_bytes,
+            manifest_bytes: usage.manifest_bytes,
+            recovery_metadata_bytes: usage.recovery_metadata_bytes,
+            total_profile_bytes: usage.total_profile_bytes,
+        }),
+        Err(error) => storage_failure(&error),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
 fn save_resume(
     window: WebviewWindow,
     state: State<'_, DesktopState>,
@@ -278,8 +315,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             health,
             load_resume,
+            load_storage_usage,
             save_resume,
             publish_resume,
+            backup_export::export_portable_backup,
+            backup_export::validate_portable_backup,
             text_export::export_resume_text,
             text_export::export_resume_docx,
             pdf_preview::render_resume_pdf,

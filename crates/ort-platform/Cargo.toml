@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 ort-domain = { path = "../ort-domain" }
 cap-std.workspace = true
+cap-primitives.workspace = true
 uuid.workspace = true
 thiserror.workspace = true
 

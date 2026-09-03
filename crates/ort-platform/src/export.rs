@@ -17,6 +17,7 @@ const MAX_BYTES: usize = 256 * 1024;
 /// Chosen by a fixed native command, never inferred from a renderer path.
 #[derive(Clone, Copy)]
 pub enum ExportFileType {
+    Backup,
     Text,
     Docx,
     Pdf,
@@ -25,6 +26,7 @@ pub enum ExportFileType {
 impl ExportFileType {
     const fn extension(self) -> &'static str {
         match self {
+            Self::Backup => ".ort-backup",
             Self::Text => ".txt",
             Self::Docx => ".docx",
             Self::Pdf => ".pdf",
@@ -32,6 +34,7 @@ impl ExportFileType {
     }
     const fn max_bytes(self) -> usize {
         match self {
+            Self::Backup => ort_domain::MAX_BACKUP_BYTES,
             Self::Text => MAX_BYTES,
             Self::Docx => 2 * 1024 * 1024,
             Self::Pdf => ort_domain::MAX_PDF_BYTES,
@@ -223,6 +226,38 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::TempDir;
+
+    #[test]
+    fn backup_uses_private_no_clobber_publication_and_its_fixed_extension() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("synthetic.ort-backup");
+        let bytes = b"ORTB-synthetic-encrypted-container";
+        let receipt = ExportDestination::for_native_dialog(&path, ExportFileType::Backup)
+            .unwrap()
+            .write(bytes)
+            .unwrap();
+        assert!(!receipt.cleanup_pending);
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(
+            ExportDestination::for_native_dialog(&path, ExportFileType::Backup).err(),
+            Some(ExportWriteError::AlreadyExists)
+        );
+        assert!(
+            ExportDestination::for_native_dialog(
+                &dir.path().join("synthetic.backup"),
+                ExportFileType::Backup
+            )
+            .is_err()
+        );
+        let large = dir.path().join("large.ort-backup");
+        assert!(matches!(
+            ExportDestination::for_native_dialog(&large, ExportFileType::Backup)
+                .unwrap()
+                .write(&vec![0; ort_domain::MAX_BACKUP_BYTES + 1]),
+            Err(ExportWriteError::InvalidContent)
+        ));
+        assert!(!large.exists());
+    }
 
     #[test]
     fn docx_uses_same_no_clobber_capability_with_its_own_bound_and_extension() {

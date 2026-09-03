@@ -1,5 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  isExportBackupCommandResponse,
+  isValidateBackupCommandResponse,
+  type ExportBackupCommandResponse,
+  type ExportBackupRequest,
+  type ValidateBackupCommandResponse,
+  type ValidateBackupRequest,
+} from "@ort/contracts/backup";
+import {
   isPdfPreviewCommandResponse,
   isPdfExportCommandResponse,
   isPdfRenderHistoryCommandResponse,
@@ -43,6 +51,11 @@ import {
   type VersionedResume,
   type VersionedResumeCommandResponse,
 } from "@ort/contracts/resume";
+import {
+  isStorageUsageCommandResponse,
+  type StorageUsage,
+  type StorageUsageCommandResponse,
+} from "@ort/contracts/storage";
 
 export async function requestHealth(): Promise<HealthCommandResponse> {
   try {
@@ -80,6 +93,51 @@ export async function requestResumeWorkspace(): Promise<ResumeWorkspaceCommandRe
       : invalidCommandResponse<ResumeWorkspace>();
   } catch {
     return commandUnavailable<ResumeWorkspace>();
+  }
+}
+
+export async function requestStorageUsage(): Promise<StorageUsageCommandResponse> {
+  try {
+    const response: unknown = await invoke("load_storage_usage", {
+      request: requestEnvelope({}),
+    });
+    return isStorageUsageCommandResponse(response)
+      ? response
+      : invalidCommandResponse<StorageUsage>();
+  } catch {
+    return commandUnavailable<StorageUsage>();
+  }
+}
+
+export async function exportPortableBackup(
+  passphrase: string,
+): Promise<ExportBackupCommandResponse> {
+  try {
+    const request: ExportBackupRequest = requestEnvelope({ passphrase });
+    const response: unknown = await invoke("export_portable_backup", {
+      request,
+    });
+    return isExportBackupCommandResponse(response)
+      ? response
+      : invalidCommandResponse();
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function validatePortableBackup(
+  passphrase: string,
+): Promise<ValidateBackupCommandResponse> {
+  try {
+    const request: ValidateBackupRequest = requestEnvelope({ passphrase });
+    const response: unknown = await invoke("validate_portable_backup", {
+      request,
+    });
+    return isValidateBackupCommandResponse(response)
+      ? response
+      : invalidCommandResponse();
+  } catch {
+    return commandUnavailable();
   }
 }
 

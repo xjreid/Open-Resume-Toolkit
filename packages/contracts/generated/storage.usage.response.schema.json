@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StorageUsageResponse",
+  "type": "object",
+  "properties": {
+    "databaseBytes": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "databaseSchema": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "diagnosticEvents": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "drafts": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "manifestBytes": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "publishedSnapshots": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "recoveryMetadataBytes": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "renderManifests": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "settings": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "sharedMemoryBytes": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "totalProfileBytes": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "walBytes": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "databaseSchema",
+    "drafts",
+    "publishedSnapshots",
+    "settings",
+    "renderManifests",
+    "diagnosticEvents",
+    "databaseBytes",
+    "walBytes",
+    "sharedMemoryBytes",
+    "manifestBytes",
+    "recoveryMetadataBytes",
+    "totalProfileBytes"
+  ]
+}

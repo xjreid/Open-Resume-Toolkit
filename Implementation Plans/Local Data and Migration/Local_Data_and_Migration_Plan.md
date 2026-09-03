@@ -107,8 +107,9 @@ apply v2 in an immediate transaction and then replace the non-secret profile
 manifest through an exact-name previous/current handoff. Startup can restore the
 previous exact manifest if interruption occurs between those renames; symlinks
 and unexpected entry types fail closed. This additive migration does not require
-a database safety copy. Historical renderer replay and inclusion of render
-manifests in the portable-backup prototype remain later M2 work.
+a database safety copy. Render manifests are now included in portable backup
+format 1.1 and exposed through a content-free storage inventory; historical
+renderer replay remains later M2 work.
 
 ## Record choices
 
