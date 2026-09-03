@@ -1,10 +1,28 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
+  DELETE_SAFETY_CONFIRMATION_PHRASE,
   MAX_BACKUP_PASSPHRASE_BYTES,
+  RESTORE_CONFIRMATION_PHRASE,
+  ROLLBACK_CONFIRMATION_PHRASE,
+  type BackupRecoveryStatus,
   type ValidatedBackup,
 } from "@ort/contracts/backup";
-import { exportPortableBackup, validatePortableBackup } from "./command-client";
-import { backupFeedback, backupValidationFeedback } from "./backup-export";
+import {
+  exportPortableBackup,
+  deleteSafetyCopy,
+  requestBackupRecoveryStatus,
+  restorePortableBackup,
+  rollbackSafetyCopy,
+  validatePortableBackup,
+} from "./command-client";
+import {
+  backupFeedback,
+  backupRestoreFeedback,
+  backupValidationFeedback,
+  deleteSafetyFeedback,
+  recoveryStatusFeedback,
+  rollbackSafetyFeedback,
+} from "./backup-export";
 
 export function BackupPanel({
   blocked,
@@ -21,9 +39,16 @@ export function BackupPanel({
   const [confirmation, setConfirmation] = useState("");
   const [validationPassphrase, setValidationPassphrase] = useState("");
   const [validated, setValidated] = useState<ValidatedBackup | null>(null);
-  const [operation, setOperation] = useState<"export" | "validate" | null>(
-    null,
-  );
+  const [restorePassphrase, setRestorePassphrase] = useState("");
+  const [restoreConfirmation, setRestoreConfirmation] = useState("");
+  const [rollbackConfirmation, setRollbackConfirmation] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [restoreStaged, setRestoreStaged] = useState(false);
+  const [recovery, setRecovery] = useState<BackupRecoveryStatus | null>(null);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [operation, setOperation] = useState<
+    "export" | "validate" | "restore" | "rollback" | "delete-safety" | null
+  >(null);
   const running = operation !== null;
   const byteCount = new TextEncoder().encode(passphrase).byteLength;
   const confirmationMatches = passphrase === confirmation;
@@ -39,6 +64,49 @@ export function BackupPanel({
     !running &&
     validationByteCount > 0 &&
     validationByteCount <= MAX_BACKUP_PASSPHRASE_BYTES;
+  const restoreByteCount = new TextEncoder().encode(
+    restorePassphrase,
+  ).byteLength;
+  const canRestore =
+    !blocked &&
+    !running &&
+    !restoreStaged &&
+    recovery !== null &&
+    !recovery.safetyCopyAvailable &&
+    !recovery.restartOperationPending &&
+    !recovery.safetyCleanupPending &&
+    restoreByteCount > 0 &&
+    restoreByteCount <= MAX_BACKUP_PASSPHRASE_BYTES &&
+    restoreConfirmation === RESTORE_CONFIRMATION_PHRASE;
+  const canRollback =
+    !blocked &&
+    !running &&
+    recovery?.safetyCopyAvailable === true &&
+    !recovery.restartOperationPending &&
+    !recovery.safetyCleanupPending &&
+    rollbackConfirmation === ROLLBACK_CONFIRMATION_PHRASE;
+  const canDeleteSafety =
+    !blocked &&
+    !running &&
+    recovery?.safetyCopyAvailable === true &&
+    !recovery.restartOperationPending &&
+    !recovery.safetyCleanupPending &&
+    deleteConfirmation === DELETE_SAFETY_CONFIRMATION_PHRASE;
+
+  async function refreshRecovery() {
+    const result = await requestBackupRecoveryStatus();
+    if (result.ok) {
+      setRecovery(result.value);
+      setRecoveryError(null);
+    } else {
+      setRecovery(null);
+      setRecoveryError(recoveryStatusFeedback(result));
+    }
+  }
+
+  useEffect(() => {
+    if (!blocked) void refreshRecovery();
+  }, [blocked]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -69,6 +137,66 @@ export function BackupPanel({
     onFinish(backupValidationFeedback(result));
   }
 
+  async function restore(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canRestore || !onBegin()) return;
+    setOperation("restore");
+    const submittedPassphrase = restorePassphrase;
+    const submittedConfirmation = restoreConfirmation;
+    setRestorePassphrase("");
+    setRestoreConfirmation("");
+    const result = await restorePortableBackup(
+      submittedPassphrase,
+      submittedConfirmation,
+    );
+    if (result.ok && result.value.status === "staged") {
+      setRestoreStaged(true);
+      setRecovery((current) =>
+        current ? { ...current, restartOperationPending: true } : current,
+      );
+    }
+    setOperation(null);
+    onFinish(backupRestoreFeedback(result));
+  }
+
+  async function rollback(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canRollback || !onBegin()) return;
+    setOperation("rollback");
+    const submittedConfirmation = rollbackConfirmation;
+    setRollbackConfirmation("");
+    const result = await rollbackSafetyCopy(submittedConfirmation);
+    if (result.ok) {
+      setRecovery((current) =>
+        current ? { ...current, restartOperationPending: true } : current,
+      );
+    }
+    setOperation(null);
+    onFinish(rollbackSafetyFeedback(result));
+  }
+
+  async function removeSafety(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canDeleteSafety || !onBegin()) return;
+    setOperation("delete-safety");
+    const submittedConfirmation = deleteConfirmation;
+    setDeleteConfirmation("");
+    const result = await deleteSafetyCopy(submittedConfirmation);
+    if (result.ok) {
+      setRecovery((current) =>
+        current
+          ? {
+              ...current,
+              safetyCopyAvailable: false,
+              safetyCleanupPending: false,
+            }
+          : current,
+      );
+    }
+    setOperation(null);
+    onFinish(deleteSafetyFeedback(result));
+  }
+
   const validation =
     byteCount > MAX_BACKUP_PASSPHRASE_BYTES
       ? "The passphrase is over the 1,024-byte limit."
@@ -95,8 +223,9 @@ export function BackupPanel({
         replaced.
       </p>
       <p className="description">
-        Restore into a clean replacement profile is not enabled in this
-        checkpoint. Keep this backup and its passphrase safe for that flow.
+        A restore is prepared in a fresh encrypted profile and activated only
+        after restart. The replaced encrypted profile remains on this device as
+        a safety copy; external exports and backups are never changed.
       </p>
       <form className="backup-form" onSubmit={(event) => void submit(event)}>
         <label className="field">
@@ -195,6 +324,145 @@ export function BackupPanel({
         </form>
         {validated ? <ValidatedBackupSummary backup={validated} /> : null}
       </section>
+
+      <section
+        className="backup-validation"
+        aria-labelledby="backup-recovery-heading"
+      >
+        <h3 id="backup-recovery-heading">Local recovery safety copy</h3>
+        {recoveryError ? (
+          <p role="alert" className="field-error">
+            {recoveryError}
+          </p>
+        ) : recovery ? (
+          <p role="status" className="description">
+            {recovery.restartOperationPending
+              ? "A verified replacement or rollback is waiting for restart."
+              : recovery.safetyCleanupPending
+                ? "Confirmed safety-copy cleanup will resume at startup."
+                : recovery.safetyCopyAvailable
+                  ? "One encrypted safety copy is retained on this device."
+                  : "No retained safety copy is present."}
+          </p>
+        ) : (
+          <p role="status" className="description">
+            Checking local recovery state…
+          </p>
+        )}
+        <p className="description" id="rollback-guidance">
+          Rollback verifies and stages the retained profile for activation after
+          restart. The current profile then becomes the new safety copy.
+        </p>
+        <form
+          className="backup-form"
+          onSubmit={(event) => void rollback(event)}
+        >
+          <label className="field">
+            Type {ROLLBACK_CONFIRMATION_PHRASE} to confirm rollback
+            <input
+              type="text"
+              value={rollbackConfirmation}
+              autoComplete="off"
+              aria-describedby="rollback-guidance"
+              disabled={blocked || running || !recovery?.safetyCopyAvailable}
+              onChange={(event) => setRollbackConfirmation(event.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={!canRollback}>
+            {operation === "rollback"
+              ? "Preparing rollback…"
+              : "Roll back after restart"}
+          </button>
+        </form>
+        <p className="description" id="safety-delete-guidance">
+          Deleting the safety copy is permanent and removes its exact encrypted
+          profile directory and OS-vault key. It does not change the active
+          profile or delete exports and backups saved elsewhere.
+        </p>
+        <form
+          className="backup-form"
+          onSubmit={(event) => void removeSafety(event)}
+        >
+          <label className="field">
+            Type {DELETE_SAFETY_CONFIRMATION_PHRASE} to delete it
+            <input
+              type="text"
+              value={deleteConfirmation}
+              autoComplete="off"
+              aria-describedby="safety-delete-guidance"
+              disabled={blocked || running || !recovery?.safetyCopyAvailable}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={!canDeleteSafety}>
+            {operation === "delete-safety"
+              ? "Deleting safety copy…"
+              : "Permanently delete safety copy"}
+          </button>
+        </form>
+      </section>
+
+      <section
+        className="backup-validation"
+        aria-labelledby="backup-restore-heading"
+      >
+        <h3 id="backup-restore-heading">Replace saved profile from backup</h3>
+        <p className="description" id="backup-restore-description">
+          This replaces the draft, published snapshots, settings, and render
+          history after restart. Save current edits first. ORT authenticates the
+          selected archive and imports it into a separately keyed encrypted
+          staging profile before scheduling any replacement.
+        </p>
+        <form className="backup-form" onSubmit={(event) => void restore(event)}>
+          <label className="field backup-validation__passphrase">
+            Backup passphrase
+            <input
+              type="password"
+              value={restorePassphrase}
+              autoComplete="current-password"
+              aria-describedby="backup-restore-description backup-restore-guidance"
+              aria-invalid={restoreByteCount > MAX_BACKUP_PASSPHRASE_BYTES}
+              disabled={blocked || running || restoreStaged}
+              onChange={(event) => setRestorePassphrase(event.target.value)}
+            />
+          </label>
+          <label className="field">
+            Type {RESTORE_CONFIRMATION_PHRASE} to confirm
+            <input
+              type="text"
+              value={restoreConfirmation}
+              autoComplete="off"
+              disabled={blocked || running || restoreStaged}
+              onChange={(event) => setRestoreConfirmation(event.target.value)}
+            />
+          </label>
+          <p
+            className="description backup-guidance"
+            id="backup-restore-guidance"
+          >
+            Merge restore is not supported. Restart promptly after staging; the
+            current profile remains active until then.
+          </p>
+          {restoreByteCount > MAX_BACKUP_PASSPHRASE_BYTES ? (
+            <p className="field-error" role="alert">
+              The passphrase is over the 1,024-byte limit.
+            </p>
+          ) : null}
+          <button type="submit" disabled={!canRestore}>
+            {operation === "restore"
+              ? "Preparing encrypted replacement…"
+              : restoreStaged
+                ? "Restart ORT to finish restore"
+                : "Select backup and replace after restart"}
+          </button>
+          {operation === "restore" ? (
+            <p role="status">
+              Finish or cancel the native file dialog. Authentication and
+              encrypted staging may take a moment.
+            </p>
+          ) : null}
+        </form>
+      </section>
     </section>
   );
 }
@@ -238,8 +506,8 @@ function ValidatedBackupSummary({ backup }: { backup: ValidatedBackup }) {
       </dl>
       <p className="description">
         This summary proves that the selected archive authenticated and passed
-        current structural checks. Replace-restore is still disabled and the
-        active profile remains unchanged.
+        current structural checks. The active profile remains unchanged unless
+        you separately confirm and stage a replacement below.
       </p>
     </section>
   );

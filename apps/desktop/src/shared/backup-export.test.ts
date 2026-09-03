@@ -3,8 +3,21 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { invoke } from "@tauri-apps/api/core";
 import { BackupPanel } from "./BackupPanel";
-import { exportPortableBackup, validatePortableBackup } from "./command-client";
-import { backupFeedback, backupValidationFeedback } from "./backup-export";
+import {
+  exportPortableBackup,
+  deleteSafetyCopy,
+  requestBackupRecoveryStatus,
+  restorePortableBackup,
+  rollbackSafetyCopy,
+  validatePortableBackup,
+} from "./command-client";
+import {
+  backupFeedback,
+  backupRestoreFeedback,
+  backupValidationFeedback,
+  deleteSafetyFeedback,
+  rollbackSafetyFeedback,
+} from "./backup-export";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 beforeEach(() => vi.clearAllMocks());
@@ -28,17 +41,19 @@ describe("portable backup export", () => {
         onFinish: () => {},
       }),
     );
-    expect(html.match(/type="password"/g)).toHaveLength(3);
+    expect(html.match(/type="password"/g)).toHaveLength(4);
     expect(html).toContain("Encrypted portable backup");
     expect(html).toContain("passphrase cannot be recovered");
     expect(html).toContain("credentials are excluded");
-    expect(html).toContain(
-      "Restore into a clean replacement profile is not enabled",
-    );
+    expect(html).toContain("activated only after restart");
     expect(html).toContain("Check an existing backup");
     expect(html).toContain("does not replace or write to the active profile");
     expect(html).toContain("selected path is never returned");
-    expect(html).not.toContain('type="text"');
+    expect(html).toContain("REPLACE SAVED PROFILE");
+    expect(html).toContain("ROLL BACK SAVED PROFILE");
+    expect(html).toContain("DELETE SAFETY COPY");
+    expect(html).toContain("external exports and backups");
+    expect(html).toContain('type="text"');
   });
 
   it("sends only the bounded passphrase and validates the fixed format receipt", async () => {
@@ -128,5 +143,102 @@ describe("portable backup export", () => {
     expect(message).toContain("passphrase may be incorrect");
     expect(message).toContain("file may be damaged or unsupported");
     expect(message).not.toContain("path");
+  });
+
+  it("sends only passphrase and exact confirmation for staged replacement", async () => {
+    vi.mocked(invoke).mockResolvedValue({
+      ok: true,
+      value: {
+        status: "staged",
+        restartRequired: true,
+        safetyCopyRetained: true,
+      },
+    });
+    const result = await restorePortableBackup(
+      "synthetic restore phrase",
+      "REPLACE SAVED PROFILE",
+    );
+    expect(result.ok).toBe(true);
+    expect(invoke).toHaveBeenCalledWith("restore_portable_backup", {
+      request: {
+        contractVersion: 2,
+        requestId: expect.any(String),
+        payload: {
+          passphrase: "synthetic restore phrase",
+          confirmation: "REPLACE SAVED PROFILE",
+        },
+      },
+    });
+    expect(JSON.stringify(vi.mocked(invoke).mock.calls[0]?.[1])).not.toContain(
+      "path",
+    );
+    expect(backupRestoreFeedback(result)).toContain("Restart ORT");
+    expect(backupRestoreFeedback(result)).toContain("safety copy");
+  });
+
+  it("uses content-free status and exact confirmations for safety management", async () => {
+    vi.mocked(invoke)
+      .mockResolvedValueOnce({
+        ok: true,
+        value: {
+          safetyCopyAvailable: true,
+          restartOperationPending: false,
+          safetyCleanupPending: false,
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { restartRequired: true, currentProfileRetained: true },
+      })
+      .mockResolvedValueOnce({ ok: true, value: { deleted: true } });
+
+    expect((await requestBackupRecoveryStatus()).ok).toBe(true);
+    expect(await rollbackSafetyCopy("ROLL BACK SAVED PROFILE")).toEqual({
+      ok: true,
+      value: { restartRequired: true, currentProfileRetained: true },
+    });
+    const deleted = await deleteSafetyCopy("DELETE SAFETY COPY");
+    expect(deleted.ok).toBe(true);
+    expect(vi.mocked(invoke).mock.calls).toEqual([
+      [
+        "load_backup_recovery_status",
+        {
+          request: {
+            contractVersion: 2,
+            requestId: expect.any(String),
+            payload: {},
+          },
+        },
+      ],
+      [
+        "rollback_safety_copy",
+        {
+          request: {
+            contractVersion: 2,
+            requestId: expect.any(String),
+            payload: { confirmation: "ROLL BACK SAVED PROFILE" },
+          },
+        },
+      ],
+      [
+        "delete_safety_copy",
+        {
+          request: {
+            contractVersion: 2,
+            requestId: expect.any(String),
+            payload: { confirmation: "DELETE SAFETY COPY" },
+          },
+        },
+      ],
+    ]);
+    expect(
+      rollbackSafetyFeedback({
+        ok: true,
+        value: { restartRequired: true, currentProfileRetained: true },
+      }),
+    ).toContain("current profile");
+    expect(deleteSafetyFeedback(deleted)).toContain(
+      "external exports or backups",
+    );
   });
 });

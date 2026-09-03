@@ -11,9 +11,13 @@ mod storage_usage;
 mod text_export;
 
 pub use backup::{
+    BackupRecoveryStatusPayload, BackupRecoveryStatusRequest, BackupRecoveryStatusResponse,
+    DELETE_SAFETY_CONFIRMATION_PHRASE, DeleteSafetyCopyRequest, DeleteSafetyCopyResponse,
     ExportBackupPayload, ExportBackupRequest, ExportBackupResponse, MAX_BACKUP_BYTES,
-    MAX_BACKUP_PASSPHRASE_BYTES, ValidateBackupPayload, ValidateBackupRequest,
-    ValidateBackupResponse,
+    MAX_BACKUP_PASSPHRASE_BYTES, RESTORE_CONFIRMATION_PHRASE, ROLLBACK_CONFIRMATION_PHRASE,
+    RestoreBackupPayload, RestoreBackupRequest, RestoreBackupResponse, RollbackSafetyCopyRequest,
+    RollbackSafetyCopyResponse, SafetyCopyActionPayload, ValidateBackupPayload,
+    ValidateBackupRequest, ValidateBackupResponse,
 };
 pub use pdf::{
     MAX_PDF_BYTES, MAX_PDF_PAGES, MAX_PDF_RENDER_HISTORY, PDF_PREVIEW_TTL_SECONDS,

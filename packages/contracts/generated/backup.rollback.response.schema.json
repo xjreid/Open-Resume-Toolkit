@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RollbackSafetyCopyResponse",
+  "type": "object",
+  "properties": {
+    "currentProfileRetained": {
+      "type": "boolean"
+    },
+    "restartRequired": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "restartRequired",
+    "currentProfileRetained"
+  ]
+}

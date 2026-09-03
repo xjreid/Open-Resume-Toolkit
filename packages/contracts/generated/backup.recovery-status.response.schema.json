@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BackupRecoveryStatusResponse",
+  "type": "object",
+  "properties": {
+    "restartOperationPending": {
+      "type": "boolean"
+    },
+    "safetyCleanupPending": {
+      "type": "boolean"
+    },
+    "safetyCopyAvailable": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "safetyCopyAvailable",
+    "restartOperationPending",
+    "safetyCleanupPending"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RestoreBackupRequest",
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "payload": {
+      "$ref": "#/$defs/RestoreBackupPayload"
+    },
+    "requestId": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "requestId",
+    "payload"
+  ],
+  "$defs": {
+    "RestoreBackupPayload": {
+      "type": "object",
+      "properties": {
+        "confirmation": {
+          "type": "string"
+        },
+        "passphrase": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "passphrase",
+        "confirmation"
+      ]
+    }
+  }
+}

@@ -282,8 +282,8 @@ fn initialize_storage(app: &tauri::App) -> DesktopStorage {
     };
     let profile_root = app_data.join("profiles").join("default");
     let vault = OsDatabaseKeyVault::new();
-    match EncryptedStore::open_or_initialize(&profile_root, "dev", &vault) {
-        Ok(store) => DesktopStorage::Ready(store),
+    match EncryptedStore::open_or_activate_pending_restore(&profile_root, "dev", &vault) {
+        Ok((store, _activated_restore)) => DesktopStorage::Ready(store),
         Err(_) => DesktopStorage::Unavailable,
     }
 }
@@ -320,6 +320,10 @@ pub fn run() {
             publish_resume,
             backup_export::export_portable_backup,
             backup_export::validate_portable_backup,
+            backup_export::restore_portable_backup,
+            backup_export::load_backup_recovery_status,
+            backup_export::rollback_safety_copy,
+            backup_export::delete_safety_copy,
             text_export::export_resume_text,
             text_export::export_resume_docx,
             pdf_preview::render_resume_pdf,

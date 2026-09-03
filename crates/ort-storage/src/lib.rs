@@ -34,6 +34,10 @@ const DATABASE_FILENAME: &str = "profile.db";
 const MANIFEST_FILENAME: &str = "profile.json";
 const PREVIOUS_MANIFEST_FILENAME: &str = "profile.json.previous";
 const MANIFEST_UPDATE_FILENAME: &str = ".profile-update.tmp";
+const RESTORE_MARKER_FILENAME: &str = ".ort-restore-pending.json";
+const RESTORE_STAGING_DIRECTORY: &str = ".ort-restore-staged";
+const RESTORE_SAFETY_DIRECTORY: &str = ".ort-restore-safety";
+const SAFETY_DELETE_DIRECTORY: &str = ".ort-safety-delete-pending";
 const DATABASE_FORMAT_VERSION: u16 = 1;
 const SCHEMA_VERSION: i64 = 2;
 const MAX_RENDER_MANIFESTS: i64 = 100;
@@ -259,6 +263,21 @@ pub struct StorageUsage {
     pub total_profile_bytes: u64,
 }
 
+/// Content-free state for recovery controls. Paths, profile identities and
+/// record contents are intentionally excluded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BackupRecoveryStatus {
+    pub safety_copy_available: bool,
+    pub restart_operation_pending: bool,
+    pub safety_cleanup_pending: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RestoreMarkerState {
+    ReplaceReady,
+    RollbackReady,
+}
+
 pub struct EncryptedStore {
     connection: Mutex<Connection>,
     manifest: ProfileManifest,
@@ -266,6 +285,111 @@ pub struct EncryptedStore {
 }
 
 impl EncryptedStore {
+    /// Opens the active profile, first completing a fully staged portable
+    /// replacement when a valid recovery marker is present.
+    ///
+    /// The old encrypted profile is retained under a fixed sibling safety-copy
+    /// name. A crash between either directory rename is resolved conservatively
+    /// on the next call: the staged profile is promoted when possible, otherwise
+    /// the untouched safety copy is put back.
+    ///
+    /// # Errors
+    /// Returns a safe storage error for malformed recovery state or an
+    /// unavailable/invalid encrypted profile.
+    pub fn open_or_activate_pending_restore(
+        root: &Path,
+        channel: &str,
+        vault: &dyn DatabaseKeyVault,
+    ) -> Result<(Self, bool), StorageError> {
+        let Some(parent) = root.parent() else {
+            return Err(StorageError::UnsafeLocation);
+        };
+        recover_pending_safety_deletion(parent, channel, vault)?;
+        let marker = parent.join(RESTORE_MARKER_FILENAME);
+        match fs::symlink_metadata(&marker) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Self::open_or_initialize(root, channel, vault).map(|store| (store, false));
+            }
+            Err(_) => return Err(StorageError::Unavailable),
+            Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+                return Err(StorageError::UnsafeLocation);
+            }
+            Ok(_) => {}
+        }
+        let marker_state = validate_restore_marker(&marker)?;
+        let staging = parent.join(RESTORE_STAGING_DIRECTORY);
+        let safety = parent.join(RESTORE_SAFETY_DIRECTORY);
+        reject_directory_symlink(root)?;
+        reject_directory_symlink(&staging)?;
+        reject_directory_symlink(&safety)?;
+
+        if marker_state == RestoreMarkerState::RollbackReady
+            && root.is_dir()
+            && staging.is_dir()
+            && safety.is_dir()
+        {
+            // The staged checkpoint and retained safety directory share the
+            // same vault identity. Remove only the redundant directory before
+            // the ordinary promotion path; the key remains required by staging.
+            cleanup_profile_directory(&safety)?;
+            sync_directory(parent)?;
+        }
+
+        let active = root.is_dir();
+        let staged = staging.is_dir();
+        let retained = safety.is_dir();
+        match (active, staged, retained) {
+            (true, true, false) => {
+                fs::rename(root, &safety).map_err(|_| StorageError::Unavailable)?;
+                sync_directory(parent)?;
+                if fs::rename(&staging, root).is_err() {
+                    let _ = fs::rename(&safety, root);
+                    let _ = sync_directory(parent);
+                    return Err(StorageError::Unavailable);
+                }
+                sync_directory(parent)?;
+            }
+            (false, true, true) => {
+                fs::rename(&staging, root).map_err(|_| StorageError::Unavailable)?;
+                sync_directory(parent)?;
+            }
+            (true, false, true) => {}
+            (false, false, true) => {
+                fs::rename(&safety, root).map_err(|_| StorageError::Unavailable)?;
+                sync_directory(parent)?;
+                remove_exact_optional_file(&marker)?;
+                sync_directory(parent)?;
+                return Self::open_or_initialize(root, channel, vault).map(|store| (store, false));
+            }
+            _ => return Err(StorageError::IncompleteInitialization),
+        }
+
+        match Self::open_or_initialize(root, channel, vault) {
+            Ok(store) => {
+                remove_exact_optional_file(&marker)?;
+                sync_directory(parent)?;
+                Ok((store, true))
+            }
+            Err(error) => {
+                // If the promoted profile cannot be opened, preserve it for
+                // inspection and restore the known-good previous directory.
+                if root.is_dir()
+                    && safety.is_dir()
+                    && !staging.exists()
+                    && fs::rename(root, &staging).is_ok()
+                    && fs::rename(&safety, root).is_ok()
+                    && sync_directory(parent).is_ok()
+                {
+                    remove_exact_optional_file(&marker)?;
+                    sync_directory(parent)?;
+                    return Self::open_or_initialize(root, channel, vault)
+                        .map(|store| (store, false));
+                }
+                Err(error)
+            }
+        }
+    }
+
     /// Opens an existing encrypted profile or creates one atomically enough to
     /// ensure that a missing vault key is never silently replaced.
     ///
@@ -1139,6 +1263,174 @@ impl EncryptedStore {
         self.verify_integrity()
     }
 
+    /// Authenticates and imports a portable backup into a fresh, separately
+    /// keyed sibling profile, then commits a startup recovery marker. The live
+    /// profile is never modified by this operation.
+    ///
+    /// # Errors
+    /// Refuses an existing staged/safety recovery state, malformed input, or
+    /// any failure to create and verify the encrypted replacement.
+    pub fn stage_portable_restore(
+        &self,
+        bytes: &[u8],
+        passphrase: &BackupPassphrase,
+        channel: &str,
+        vault: &dyn DatabaseKeyVault,
+    ) -> Result<(), StorageError> {
+        let root = self
+            .database_path
+            .parent()
+            .ok_or(StorageError::UnsafeLocation)?;
+        let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
+        let staging = parent.join(RESTORE_STAGING_DIRECTORY);
+        let safety = parent.join(RESTORE_SAFETY_DIRECTORY);
+        let marker = parent.join(RESTORE_MARKER_FILENAME);
+        for path in [&staging, &safety, &marker] {
+            reject_symlink(path)?;
+            if path.exists() {
+                return Err(StorageError::RevisionConflict);
+            }
+        }
+
+        let staged = Self::open_or_initialize(&staging, channel, vault)?;
+        let staged_reference = staged.manifest.vault_reference()?;
+        if staged_reference == self.manifest.vault_reference()? {
+            drop(staged);
+            cleanup_profile_directory(&staging)?;
+            return Err(StorageError::InvalidData);
+        }
+        let result = staged
+            .restore_portable_backup(bytes, passphrase)
+            .and_then(|()| staged.verify_integrity());
+        drop(staged);
+        if let Err(error) = result {
+            cleanup_profile_directory(&staging)?;
+            vault
+                .delete(&staged_reference)
+                .map_err(|_| StorageError::VaultKeyUnavailable)?;
+            return Err(error);
+        }
+
+        let marker_result = write_restore_marker(&marker, parent, RestoreMarkerState::ReplaceReady);
+        if let Err(error) = marker_result {
+            let cleanup = cleanup_profile_directory(&staging);
+            let vault_cleanup = vault.delete(&staged_reference);
+            if cleanup.is_err() || vault_cleanup.is_err() {
+                return Err(StorageError::Unavailable);
+            }
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    /// Returns fixed-name, content-free recovery state without scanning any
+    /// external export or backup location.
+    ///
+    /// # Errors
+    /// Rejects symlinks, unexpected entry types and inconsistent orphan state.
+    pub fn backup_recovery_status(&self) -> Result<BackupRecoveryStatus, StorageError> {
+        let root = self
+            .database_path
+            .parent()
+            .ok_or(StorageError::UnsafeLocation)?;
+        let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
+        let marker = known_optional_file(&parent.join(RESTORE_MARKER_FILENAME))?;
+        let staging = known_optional_directory(&parent.join(RESTORE_STAGING_DIRECTORY))?;
+        let safety = known_optional_directory(&parent.join(RESTORE_SAFETY_DIRECTORY))?;
+        let cleanup = known_optional_directory(&parent.join(SAFETY_DELETE_DIRECTORY))?;
+        if staging && !marker {
+            return Err(StorageError::IncompleteInitialization);
+        }
+        Ok(BackupRecoveryStatus {
+            safety_copy_available: safety,
+            restart_operation_pending: marker,
+            safety_cleanup_pending: cleanup,
+        })
+    }
+
+    /// Prepares an exact rollback to the retained encrypted safety profile.
+    /// The live profile remains untouched until the restart marker is consumed.
+    ///
+    /// # Errors
+    /// Returns `NotFound` without creating a profile when no safety copy exists,
+    /// or refuses overlapping recovery/cleanup state.
+    pub fn stage_safety_rollback(
+        &self,
+        channel: &str,
+        vault: &dyn DatabaseKeyVault,
+    ) -> Result<(), StorageError> {
+        let root = self
+            .database_path
+            .parent()
+            .ok_or(StorageError::UnsafeLocation)?;
+        let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
+        let marker = parent.join(RESTORE_MARKER_FILENAME);
+        let staging = parent.join(RESTORE_STAGING_DIRECTORY);
+        let safety = parent.join(RESTORE_SAFETY_DIRECTORY);
+        let deleting = parent.join(SAFETY_DELETE_DIRECTORY);
+        if known_optional_file(&marker)?
+            || known_optional_directory(&staging)?
+            || known_optional_directory(&deleting)?
+        {
+            return Err(StorageError::RevisionConflict);
+        }
+        let safety_store = open_existing_profile(&safety, channel, vault)?;
+        if safety_store.manifest.vault_reference()? == self.manifest.vault_reference()? {
+            return Err(StorageError::InvalidData);
+        }
+        safety_store.verify_integrity()?;
+        safety_store.create_encrypted_checkpoint(&staging, vault)?;
+        drop(safety_store);
+        if let Err(error) = write_restore_marker(&marker, parent, RestoreMarkerState::RollbackReady)
+        {
+            cleanup_profile_directory(&staging)?;
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    /// Permanently removes the exact retained safety-copy directory and its
+    /// vault key after first moving it to a restart-recoverable deletion slot.
+    /// External exports and backups are outside this fixed-name boundary.
+    ///
+    /// # Errors
+    /// Refuses overlapping recovery state and fails closed on unsafe paths,
+    /// integrity failures, or unavailable vault/filesystem operations.
+    pub fn delete_retained_safety_copy(
+        &self,
+        channel: &str,
+        vault: &dyn DatabaseKeyVault,
+    ) -> Result<bool, StorageError> {
+        let root = self
+            .database_path
+            .parent()
+            .ok_or(StorageError::UnsafeLocation)?;
+        let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
+        let marker = parent.join(RESTORE_MARKER_FILENAME);
+        let staging = parent.join(RESTORE_STAGING_DIRECTORY);
+        let safety = parent.join(RESTORE_SAFETY_DIRECTORY);
+        let deleting = parent.join(SAFETY_DELETE_DIRECTORY);
+        if known_optional_file(&marker)? || known_optional_directory(&staging)? {
+            return Err(StorageError::RevisionConflict);
+        }
+        if known_optional_directory(&deleting)? {
+            recover_pending_safety_deletion(parent, channel, vault)?;
+        }
+        if !known_optional_directory(&safety)? {
+            return Ok(false);
+        }
+        let safety_store = open_existing_profile(&safety, channel, vault)?;
+        if safety_store.manifest.vault_reference()? == self.manifest.vault_reference()? {
+            return Err(StorageError::InvalidData);
+        }
+        safety_store.verify_integrity()?;
+        drop(safety_store);
+        fs::rename(&safety, &deleting).map_err(|_| StorageError::Unavailable)?;
+        sync_directory(parent)?;
+        recover_pending_safety_deletion(parent, channel, vault)?;
+        Ok(true)
+    }
+
     fn read_portable_profile(&self) -> Result<PortableProfileV1, StorageError> {
         let mut connection = self
             .connection
@@ -1656,6 +1948,154 @@ fn reject_symlink(path: &Path) -> Result<(), StorageError> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(_) => Err(StorageError::Unavailable),
     }
+}
+
+fn reject_directory_symlink(path: &Path) -> Result<(), StorageError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_dir() => {
+            Err(StorageError::UnsafeLocation)
+        }
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(_) => Err(StorageError::Unavailable),
+    }
+}
+
+fn known_optional_file(path: &Path) -> Result<bool, StorageError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+            Err(StorageError::UnsafeLocation)
+        }
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(_) => Err(StorageError::Unavailable),
+    }
+}
+
+fn known_optional_directory(path: &Path) -> Result<bool, StorageError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_dir() => {
+            Err(StorageError::UnsafeLocation)
+        }
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(_) => Err(StorageError::Unavailable),
+    }
+}
+
+fn validate_restore_marker(path: &Path) -> Result<RestoreMarkerState, StorageError> {
+    reject_symlink(path)?;
+    let file = File::open(path).map_err(|_| StorageError::Unavailable)?;
+    let metadata = file.metadata().map_err(|_| StorageError::Unavailable)?;
+    if metadata.len() > 64 {
+        return Err(StorageError::IncompleteInitialization);
+    }
+    let mut bytes = Vec::with_capacity(
+        usize::try_from(metadata.len()).map_err(|_| StorageError::IncompleteInitialization)?,
+    );
+    file.take(65)
+        .read_to_end(&mut bytes)
+        .map_err(|_| StorageError::Unavailable)?;
+    match bytes.as_slice() {
+        b"{\"version\":1,\"state\":\"replace_ready\"}\n" => Ok(RestoreMarkerState::ReplaceReady),
+        b"{\"version\":1,\"state\":\"rollback_ready\"}\n" => Ok(RestoreMarkerState::RollbackReady),
+        _ => Err(StorageError::IncompleteInitialization),
+    }
+}
+
+fn write_restore_marker(
+    path: &Path,
+    parent: &Path,
+    state: RestoreMarkerState,
+) -> Result<(), StorageError> {
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(path)
+        .map_err(|_| StorageError::Unavailable)?;
+    if set_private_file_permissions(path).is_err() {
+        let _ = fs::remove_file(path);
+        return Err(StorageError::Unavailable);
+    }
+    let bytes = match state {
+        RestoreMarkerState::ReplaceReady => {
+            b"{\"version\":1,\"state\":\"replace_ready\"}\n".as_slice()
+        }
+        RestoreMarkerState::RollbackReady => {
+            b"{\"version\":1,\"state\":\"rollback_ready\"}\n".as_slice()
+        }
+    };
+    if file
+        .write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .is_err()
+    {
+        let _ = fs::remove_file(path);
+        return Err(StorageError::Unavailable);
+    }
+    if sync_directory(parent).is_err() {
+        let _ = fs::remove_file(path);
+        let _ = sync_directory(parent);
+        return Err(StorageError::Unavailable);
+    }
+    Ok(())
+}
+
+fn open_existing_profile(
+    root: &Path,
+    channel: &str,
+    vault: &dyn DatabaseKeyVault,
+) -> Result<EncryptedStore, StorageError> {
+    if !known_optional_directory(root)? {
+        return Err(StorageError::NotFound);
+    }
+    if !known_optional_file(&root.join(MANIFEST_FILENAME))?
+        || !known_optional_file(&root.join(DATABASE_FILENAME))?
+    {
+        return Err(StorageError::IncompleteInitialization);
+    }
+    EncryptedStore::open_or_initialize(root, channel, vault)
+}
+
+fn recover_pending_safety_deletion(
+    parent: &Path,
+    channel: &str,
+    vault: &dyn DatabaseKeyVault,
+) -> Result<(), StorageError> {
+    let deleting = parent.join(SAFETY_DELETE_DIRECTORY);
+    if !known_optional_directory(&deleting)? {
+        return Ok(());
+    }
+    let manifest_path = deleting.join(MANIFEST_FILENAME);
+    if !known_optional_file(&manifest_path)? {
+        let mut entries = fs::read_dir(&deleting).map_err(|_| StorageError::Unavailable)?;
+        if entries.next().is_some() {
+            return Err(StorageError::IncompleteInitialization);
+        }
+        fs::remove_dir(&deleting).map_err(|_| StorageError::Unavailable)?;
+        return sync_directory(parent);
+    }
+    let manifest = read_manifest(&manifest_path, channel)?;
+    let reference = manifest.vault_reference()?;
+    vault
+        .delete(&reference)
+        .map_err(|_| StorageError::VaultKeyUnavailable)?;
+    cleanup_profile_directory(&deleting)?;
+    sync_directory(parent)
+}
+
+fn cleanup_profile_directory(root: &Path) -> Result<(), StorageError> {
+    reject_directory_symlink(root)?;
+    let database = root.join(DATABASE_FILENAME);
+    remove_exact_database_files(&database)?;
+    for name in [
+        MANIFEST_FILENAME,
+        PREVIOUS_MANIFEST_FILENAME,
+        MANIFEST_UPDATE_FILENAME,
+    ] {
+        remove_exact_optional_file(&root.join(name))?;
+    }
+    fs::remove_dir(root).map_err(|_| StorageError::Unavailable)
 }
 
 fn create_private_directory(path: &Path) -> Result<(), StorageError> {
@@ -2184,7 +2624,7 @@ mod tests {
     use serde_json::{Map, Value};
     use tempfile::TempDir;
 
-    use super::{DiagnosticSeverity, EncryptedStore, StorageError};
+    use super::*;
 
     const PLAINTEXT_MARKER: &str = "SYNTHETIC-PRIVATE-RESUME-MARKER-9d87f8";
 
@@ -2929,6 +3369,289 @@ mod tests {
             vec![render_manifest]
         );
         destination.verify_integrity().expect("restored integrity");
+    }
+
+    #[test]
+    fn staged_replace_restore_promotes_a_fresh_key_and_retains_the_old_profile() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let source_root = temporary.path().join("source");
+        let active_root = temporary.path().join("active");
+        let vault = MemoryDatabaseKeyVault::new();
+        let source = EncryptedStore::open_or_initialize(&source_root, "test", &vault)
+            .expect("source profile");
+        source
+            .create_draft(&ResumeDocument::empty("Restored synthetic draft"))
+            .expect("source draft");
+        let passphrase = BackupPassphrase::new("synthetic replace phrase".to_owned()).unwrap();
+        let backup = source
+            .create_portable_backup(&passphrase, "0.0.0-dev")
+            .expect("portable backup");
+
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault)
+            .expect("active profile");
+        active
+            .create_draft(&ResumeDocument::empty("Previous synthetic draft"))
+            .expect("active draft");
+        let previous_reference = active.manifest().vault_reference().unwrap();
+        active
+            .stage_portable_restore(&backup, &passphrase, "test", &vault)
+            .expect("stage replacement");
+        assert_eq!(
+            active.load_draft().unwrap().unwrap().document.title,
+            "Previous synthetic draft"
+        );
+        assert!(temporary.path().join(RESTORE_MARKER_FILENAME).is_file());
+        assert!(temporary.path().join(RESTORE_STAGING_DIRECTORY).is_dir());
+        drop(active);
+
+        let (restored, activated) =
+            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault)
+                .expect("activate replacement");
+        assert!(activated);
+        assert_eq!(
+            restored.load_draft().unwrap().unwrap().document.title,
+            "Restored synthetic draft"
+        );
+        assert_ne!(
+            restored.manifest().vault_reference().unwrap(),
+            previous_reference
+        );
+        assert!(!temporary.path().join(RESTORE_MARKER_FILENAME).exists());
+        assert!(!temporary.path().join(RESTORE_STAGING_DIRECTORY).exists());
+        drop(restored);
+
+        let safety = EncryptedStore::open_or_initialize(
+            &temporary.path().join(RESTORE_SAFETY_DIRECTORY),
+            "test",
+            &vault,
+        )
+        .expect("retained safety profile");
+        assert_eq!(
+            safety.load_draft().unwrap().unwrap().document.title,
+            "Previous synthetic draft"
+        );
+    }
+
+    #[test]
+    fn pending_restore_recovers_the_old_profile_if_staging_disappears() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let source_root = temporary.path().join("source");
+        let active_root = temporary.path().join("active");
+        let vault = MemoryDatabaseKeyVault::new();
+        let source = EncryptedStore::open_or_initialize(&source_root, "test", &vault).unwrap();
+        source
+            .create_draft(&ResumeDocument::empty("Replacement"))
+            .unwrap();
+        let passphrase = BackupPassphrase::new("synthetic rollback phrase".to_owned()).unwrap();
+        let backup = source
+            .create_portable_backup(&passphrase, "0.0.0-dev")
+            .unwrap();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        active
+            .create_draft(&ResumeDocument::empty("Recover me"))
+            .unwrap();
+        active
+            .stage_portable_restore(&backup, &passphrase, "test", &vault)
+            .unwrap();
+        drop(active);
+
+        let staging = temporary.path().join(RESTORE_STAGING_DIRECTORY);
+        let staged_manifest = read_manifest(&staging.join(MANIFEST_FILENAME), "test").unwrap();
+        let staged_reference = staged_manifest.vault_reference().unwrap();
+        let safety = temporary.path().join(RESTORE_SAFETY_DIRECTORY);
+        fs::rename(&active_root, &safety).unwrap();
+        cleanup_profile_directory(&staging).unwrap();
+        vault.delete(&staged_reference).unwrap();
+
+        let (recovered, activated) =
+            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault)
+                .expect("rollback previous profile");
+        assert!(!activated);
+        assert_eq!(
+            recovered.load_draft().unwrap().unwrap().document.title,
+            "Recover me"
+        );
+        assert!(!temporary.path().join(RESTORE_MARKER_FILENAME).exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pending_restore_marker_and_directory_symlinks_fail_closed() {
+        use std::os::unix::fs::symlink;
+
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("active");
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        drop(active);
+        let marker = temporary.path().join(RESTORE_MARKER_FILENAME);
+        symlink(temporary.path().join("missing"), &marker).unwrap();
+        assert_eq!(
+            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).err(),
+            Some(StorageError::UnsafeLocation)
+        );
+        fs::remove_file(&marker).unwrap();
+        fs::write(&marker, vec![b'x'; 65]).unwrap();
+        assert_eq!(
+            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).err(),
+            Some(StorageError::IncompleteInitialization)
+        );
+        assert!(active_root.is_dir());
+    }
+
+    #[test]
+    fn retained_safety_copy_can_be_rolled_back_without_losing_current_profile() {
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("active");
+        let safety_root = temporary.path().join(RESTORE_SAFETY_DIRECTORY);
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        active
+            .create_draft(&ResumeDocument::empty("Current restored profile"))
+            .unwrap();
+        let safety = EncryptedStore::open_or_initialize(&safety_root, "test", &vault).unwrap();
+        safety
+            .create_draft(&ResumeDocument::empty("Previous safety profile"))
+            .unwrap();
+        drop(safety);
+
+        assert_eq!(
+            active.backup_recovery_status().unwrap(),
+            BackupRecoveryStatus {
+                safety_copy_available: true,
+                restart_operation_pending: false,
+                safety_cleanup_pending: false,
+            }
+        );
+        active
+            .stage_safety_rollback("test", &vault)
+            .expect("stage safety rollback");
+        assert!(
+            active
+                .backup_recovery_status()
+                .unwrap()
+                .restart_operation_pending
+        );
+        assert_eq!(
+            active.load_draft().unwrap().unwrap().document.title,
+            "Current restored profile"
+        );
+        drop(active);
+
+        let (rolled_back, activated) =
+            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault)
+                .expect("activate rollback");
+        assert!(activated);
+        assert_eq!(
+            rolled_back.load_draft().unwrap().unwrap().document.title,
+            "Previous safety profile"
+        );
+        drop(rolled_back);
+        let retained_current =
+            EncryptedStore::open_or_initialize(&safety_root, "test", &vault).unwrap();
+        assert_eq!(
+            retained_current
+                .load_draft()
+                .unwrap()
+                .unwrap()
+                .document
+                .title,
+            "Current restored profile"
+        );
+    }
+
+    #[test]
+    fn confirmed_safety_cleanup_removes_only_the_exact_copy_and_vault_key() {
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("active");
+        let safety_root = temporary.path().join(RESTORE_SAFETY_DIRECTORY);
+        let external = temporary.path().join("external.ort-backup");
+        fs::write(&external, b"synthetic external backup").unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        active
+            .create_draft(&ResumeDocument::empty("Active profile"))
+            .unwrap();
+        let safety = EncryptedStore::open_or_initialize(&safety_root, "test", &vault).unwrap();
+        safety
+            .create_draft(&ResumeDocument::empty("Delete safety only"))
+            .unwrap();
+        let safety_reference = safety.manifest().vault_reference().unwrap();
+        drop(safety);
+
+        assert!(
+            active
+                .delete_retained_safety_copy("test", &vault)
+                .expect("delete retained safety")
+        );
+        assert!(!safety_root.exists());
+        assert!(vault.load(&safety_reference).is_err());
+        assert_eq!(fs::read(&external).unwrap(), b"synthetic external backup");
+        assert_eq!(
+            active.load_draft().unwrap().unwrap().document.title,
+            "Active profile"
+        );
+        assert!(!active.delete_retained_safety_copy("test", &vault).unwrap());
+    }
+
+    #[test]
+    fn startup_resumes_an_interrupted_confirmed_safety_deletion() {
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("active");
+        let safety_root = temporary.path().join(RESTORE_SAFETY_DIRECTORY);
+        let deleting = temporary.path().join(SAFETY_DELETE_DIRECTORY);
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        active
+            .create_draft(&ResumeDocument::empty("Keep active"))
+            .unwrap();
+        let safety = EncryptedStore::open_or_initialize(&safety_root, "test", &vault).unwrap();
+        let safety_reference = safety.manifest().vault_reference().unwrap();
+        drop(safety);
+        fs::rename(&safety_root, &deleting).unwrap();
+        drop(active);
+
+        let (reopened, activated) =
+            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault)
+                .expect("resume safety deletion before opening active");
+        assert!(!activated);
+        assert!(!deleting.exists());
+        assert!(vault.load(&safety_reference).is_err());
+        assert_eq!(
+            reopened.load_draft().unwrap().unwrap().document.title,
+            "Keep active"
+        );
+    }
+
+    #[test]
+    fn safety_actions_never_delete_or_stage_the_active_vault_identity() {
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("active");
+        let safety_root = temporary.path().join(RESTORE_SAFETY_DIRECTORY);
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        active
+            .create_draft(&ResumeDocument::empty("Shared identity guard"))
+            .unwrap();
+        let active_reference = active.manifest().vault_reference().unwrap();
+        active
+            .create_encrypted_checkpoint(&safety_root, &vault)
+            .unwrap();
+
+        assert_eq!(
+            active.stage_safety_rollback("test", &vault),
+            Err(StorageError::InvalidData)
+        );
+        assert_eq!(
+            active.delete_retained_safety_copy("test", &vault),
+            Err(StorageError::InvalidData)
+        );
+        assert!(vault.load(&active_reference).is_ok());
+        assert_eq!(
+            active.load_draft().unwrap().unwrap().document.title,
+            "Shared identity guard"
+        );
+        assert!(safety_root.is_dir());
     }
 
     #[test]

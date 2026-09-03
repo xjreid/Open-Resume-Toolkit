@@ -1,12 +1,15 @@
 use ort_backup::{BackupPassphrase, inspect_backup, restore_backup};
 use ort_domain::{
-    CommandResponse, ExportBackupRequest, ExportBackupResponse, ValidateBackupRequest,
-    ValidateBackupResponse,
+    BackupRecoveryStatusRequest, BackupRecoveryStatusResponse, CommandResponse,
+    DeleteSafetyCopyRequest, DeleteSafetyCopyResponse, ExportBackupRequest, ExportBackupResponse,
+    RestoreBackupRequest, RestoreBackupResponse, RollbackSafetyCopyRequest,
+    RollbackSafetyCopyResponse, ValidateBackupRequest, ValidateBackupResponse,
 };
 use ort_platform::{
     ExportDestination, ExportFileType, ExportWriteError, NativeInputError, read_native_backup,
 };
 use ort_storage::StorageError;
+use ort_vault::OsDatabaseKeyVault;
 use tauri::{Manager, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
@@ -63,6 +66,111 @@ pub(crate) async fn validate_portable_backup(
     {
         Ok(response) => response,
         Err(_) => validation_failure("BACKUP_OUTCOME_UNKNOWN"),
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn restore_portable_backup(
+    window: WebviewWindow,
+    request: RestoreBackupRequest,
+) -> CommandResponse<RestoreBackupResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    let exports = window.app_handle().state::<ExportState>();
+    let Some(lease) = exports.begin() else {
+        return restore_failure("BACKUP_BUSY");
+    };
+
+    match tauri::async_runtime::spawn_blocking(move || {
+        let _lease = lease;
+        restore_with_dialog(&window, request.payload.passphrase)
+    })
+    .await
+    {
+        Ok(response) => response,
+        Err(_) => restore_failure("RESTORE_OUTCOME_UNKNOWN"),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn load_backup_recovery_status(
+    window: WebviewWindow,
+    request: BackupRecoveryStatusRequest,
+) -> CommandResponse<BackupRecoveryStatusResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    let state = window.app_handle().state::<DesktopState>();
+    let DesktopStorage::Ready(store) = &state.storage else {
+        return recovery_failure("STORAGE_UNAVAILABLE");
+    };
+    match store.backup_recovery_status() {
+        Ok(status) => CommandResponse::success(BackupRecoveryStatusResponse {
+            safety_copy_available: status.safety_copy_available,
+            restart_operation_pending: status.restart_operation_pending,
+            safety_cleanup_pending: status.safety_cleanup_pending,
+        }),
+        Err(error) => recovery_storage_failure(&error),
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn rollback_safety_copy(
+    window: WebviewWindow,
+    request: RollbackSafetyCopyRequest,
+) -> CommandResponse<RollbackSafetyCopyResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    let exports = window.app_handle().state::<ExportState>();
+    let Some(lease) = exports.begin() else {
+        return recovery_failure("BACKUP_BUSY");
+    };
+    match tauri::async_runtime::spawn_blocking(move || {
+        let _lease = lease;
+        rollback_safety_copy_blocking(&window)
+    })
+    .await
+    {
+        Ok(response) => response,
+        Err(_) => recovery_failure("RECOVERY_OUTCOME_UNKNOWN"),
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn delete_safety_copy(
+    window: WebviewWindow,
+    request: DeleteSafetyCopyRequest,
+) -> CommandResponse<DeleteSafetyCopyResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    let exports = window.app_handle().state::<ExportState>();
+    let Some(lease) = exports.begin() else {
+        return recovery_failure("BACKUP_BUSY");
+    };
+    match tauri::async_runtime::spawn_blocking(move || {
+        let _lease = lease;
+        delete_safety_copy_blocking(&window)
+    })
+    .await
+    {
+        Ok(response) => response,
+        Err(_) => recovery_failure("RECOVERY_OUTCOME_UNKNOWN"),
     }
 }
 
@@ -165,6 +273,75 @@ fn validate_backup_bytes(
     })
 }
 
+fn restore_with_dialog(
+    window: &WebviewWindow,
+    passphrase: String,
+) -> CommandResponse<RestoreBackupResponse> {
+    let Ok(passphrase) = BackupPassphrase::new(passphrase) else {
+        return restore_failure("INVALID_BACKUP_PASSPHRASE");
+    };
+    let selection = window
+        .dialog()
+        .file()
+        .set_parent(window)
+        .set_title("Replace saved profile from encrypted backup")
+        .add_filter("Open Resume Toolkit backup", &["ort-backup"])
+        .blocking_pick_file();
+    let Some(selection) = selection else {
+        return CommandResponse::success(RestoreBackupResponse::Cancelled);
+    };
+    let FilePath::Path(path) = selection else {
+        return restore_failure("BACKUP_INVALID_OR_PASSPHRASE");
+    };
+    let bytes = match read_native_backup(&path) {
+        Ok(value) => value,
+        Err(error) => return restore_read_failure(&error),
+    };
+    let state = window.app_handle().state::<DesktopState>();
+    let DesktopStorage::Ready(store) = &state.storage else {
+        return restore_failure("STORAGE_UNAVAILABLE");
+    };
+    let vault = OsDatabaseKeyVault::new();
+    match store.stage_portable_restore(&bytes, &passphrase, &store.manifest().channel, &vault) {
+        Ok(()) => CommandResponse::success(RestoreBackupResponse::Staged {
+            restart_required: true,
+            safety_copy_retained: true,
+        }),
+        Err(error) => restore_storage_failure(&error),
+    }
+}
+
+fn rollback_safety_copy_blocking(
+    window: &WebviewWindow,
+) -> CommandResponse<RollbackSafetyCopyResponse> {
+    let state = window.app_handle().state::<DesktopState>();
+    let DesktopStorage::Ready(store) = &state.storage else {
+        return recovery_failure("STORAGE_UNAVAILABLE");
+    };
+    let vault = OsDatabaseKeyVault::new();
+    match store.stage_safety_rollback(&store.manifest().channel, &vault) {
+        Ok(()) => CommandResponse::success(RollbackSafetyCopyResponse {
+            restart_required: true,
+            current_profile_retained: true,
+        }),
+        Err(error) => recovery_storage_failure(&error),
+    }
+}
+
+fn delete_safety_copy_blocking(
+    window: &WebviewWindow,
+) -> CommandResponse<DeleteSafetyCopyResponse> {
+    let state = window.app_handle().state::<DesktopState>();
+    let DesktopStorage::Ready(store) = &state.storage else {
+        return recovery_failure("STORAGE_UNAVAILABLE");
+    };
+    let vault = OsDatabaseKeyVault::new();
+    match store.delete_retained_safety_copy(&store.manifest().channel, &vault) {
+        Ok(deleted) => CommandResponse::success(DeleteSafetyCopyResponse { deleted }),
+        Err(error) => recovery_storage_failure(&error),
+    }
+}
+
 fn backup_storage_failure(error: &StorageError) -> CommandResponse<ExportBackupResponse> {
     match error {
         StorageError::InvalidData => backup_failure("BACKUP_INVALID_CONTENT"),
@@ -190,12 +367,50 @@ fn backup_read_failure(error: &NativeInputError) -> CommandResponse<ValidateBack
     })
 }
 
+fn restore_read_failure(error: &NativeInputError) -> CommandResponse<RestoreBackupResponse> {
+    restore_failure(match error {
+        NativeInputError::Unavailable => "BACKUP_READ_UNAVAILABLE",
+        NativeInputError::InvalidSelection | NativeInputError::InvalidContent => {
+            "BACKUP_INVALID_OR_PASSPHRASE"
+        }
+    })
+}
+
+fn restore_storage_failure(error: &StorageError) -> CommandResponse<RestoreBackupResponse> {
+    restore_failure(match error {
+        StorageError::InvalidData => "BACKUP_INVALID_OR_PASSPHRASE",
+        StorageError::RevisionConflict => "RESTORE_RECOVERY_PENDING",
+        StorageError::VaultKeyUnavailable => "RESTORE_VAULT_UNAVAILABLE",
+        _ => "RESTORE_UNAVAILABLE",
+    })
+}
+
+fn recovery_storage_failure<T: serde::Serialize>(error: &StorageError) -> CommandResponse<T> {
+    recovery_failure(match error {
+        StorageError::NotFound => "SAFETY_COPY_NOT_FOUND",
+        StorageError::RevisionConflict => "RECOVERY_BUSY",
+        StorageError::IntegrityFailure
+        | StorageError::DatabaseKeyMismatch
+        | StorageError::InvalidData
+        | StorageError::VaultKeyUnavailable => "SAFETY_COPY_UNAVAILABLE",
+        _ => "RECOVERY_UNAVAILABLE",
+    })
+}
+
 fn backup_failure(code: &str) -> CommandResponse<ExportBackupResponse> {
     CommandResponse::failure(code, "errors.backupExport", false)
 }
 
 fn validation_failure(code: &str) -> CommandResponse<ValidateBackupResponse> {
     CommandResponse::failure(code, "errors.backupValidation", false)
+}
+
+fn restore_failure(code: &str) -> CommandResponse<RestoreBackupResponse> {
+    CommandResponse::failure(code, "errors.backupRestore", false)
+}
+
+fn recovery_failure<T: serde::Serialize>(code: &str) -> CommandResponse<T> {
+    CommandResponse::failure(code, "errors.backupRecovery", false)
 }
 
 #[cfg(test)]
@@ -262,5 +477,43 @@ mod tests {
         };
         assert_eq!(error.code, "BACKUP_INVALID_OR_PASSPHRASE");
         assert!(error.details.is_empty());
+    }
+
+    #[test]
+    fn restore_errors_are_stable_and_do_not_expose_storage_details() {
+        for (error, code) in [
+            (StorageError::InvalidData, "BACKUP_INVALID_OR_PASSPHRASE"),
+            (StorageError::RevisionConflict, "RESTORE_RECOVERY_PENDING"),
+            (
+                StorageError::VaultKeyUnavailable,
+                "RESTORE_VAULT_UNAVAILABLE",
+            ),
+            (StorageError::Unavailable, "RESTORE_UNAVAILABLE"),
+        ] {
+            let CommandResponse::Failure { error, .. } = restore_storage_failure(&error) else {
+                panic!("expected failure");
+            };
+            assert_eq!(error.code, code);
+            assert!(error.details.is_empty());
+        }
+    }
+
+    #[test]
+    fn recovery_errors_are_stable_and_content_free() {
+        for (error, code) in [
+            (StorageError::NotFound, "SAFETY_COPY_NOT_FOUND"),
+            (StorageError::RevisionConflict, "RECOVERY_BUSY"),
+            (StorageError::IntegrityFailure, "SAFETY_COPY_UNAVAILABLE"),
+            (StorageError::InvalidData, "SAFETY_COPY_UNAVAILABLE"),
+            (StorageError::Unavailable, "RECOVERY_UNAVAILABLE"),
+        ] {
+            let CommandResponse::Failure { error, .. } =
+                recovery_storage_failure::<DeleteSafetyCopyResponse>(&error)
+            else {
+                panic!("expected failure");
+            };
+            assert_eq!(error.code, code);
+            assert!(error.details.is_empty());
+        }
     }
 }

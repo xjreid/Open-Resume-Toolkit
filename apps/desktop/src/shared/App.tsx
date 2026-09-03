@@ -727,9 +727,11 @@ function ResumeEditor() {
 
       <footer className="development-gates">
         PDF preview, PDF, DOCX and text export use saved revisions. PDF/DOCX
-        import, backup replacement, export replacement and crash recovery remain
-        gated in M2; authenticated backup validation is read-only. AI and
-        browser integration arrive in later milestones. Use synthetic data only.
+        import, export replacement and broader crash cleanup remain gated in M2;
+        backup replacement is staged into a fresh encrypted profile and applied
+        on restart with the previous profile retained as a manageable safety
+        copy. AI and browser integration arrive in later milestones. Use
+        synthetic data only.
       </footer>
     </main>
   );

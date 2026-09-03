@@ -2,9 +2,10 @@
 
 - Extension: `.ort-backup`
 - Writer format: 1.1 (reader also accepts 1.0)
-- Status: native export and read-only authenticated validation commands integrated;
-  native cross-platform dialog, replace-restore, and hostile-input suites remain
-  release gates
+- Status: native export, read-only authenticated validation, restart-staged
+  replace-restore, rollback, and exact safety-copy cleanup commands integrated;
+  native cross-platform dialogs/vaults, low-disk injection, and hostile-input
+  suites remain release gates
 
 ## Fixed header
 
@@ -99,3 +100,48 @@ bytes/version, application/schema versions, creation time, and bounded draft,
 published, setting, and render-manifest counts. No file path, filename, resume
 content, setting value, hash, passphrase, or native error crosses the command
 response. Validation does not open, close, copy, or replace the active profile.
+
+## Restart-staged replacement boundary
+
+Replace-restore is a separate, explicitly confirmed command. Its generated
+request contains only the passphrase and exact phrase `REPLACE SAVED PROFILE`;
+paths, merge options, profile identifiers and destinations are rejected. The
+selected final entry passes through the same bounded, no-follow native input
+adapter and the same non-oracular authentication behavior as validation.
+
+Before any replacement, ORT creates a new private sibling profile with a new
+database key and vault identity, imports the portable records transactionally,
+and verifies SQLCipher integrity. Only then does it durably create a fixed,
+content-free restart marker. The open active database is not swapped in place.
+At the next startup, fixed-name directory renames retain the previous encrypted
+profile as a local safety copy and promote the staged profile. The marker remains
+until the promoted profile opens successfully. Startup recognizes interruptions
+before, between, and after the renames and either completes promotion or restores
+the untouched old directory.
+
+The response exposes only cancellation or the facts that restart is required and
+a safety copy will be retained. The current profile, staged/safety paths, vault
+references, file selection and record contents never cross to the renderer.
+
+## Retained safety-copy management
+
+A content-free status command reports three booleans only: whether the fixed
+safety copy exists, a replacement/rollback awaits restart, or confirmed cleanup
+is pending. It does not return a path, profile or vault identity, timestamps,
+sizes, record counts, or content.
+
+Rollback requires the exact phrase `ROLL BACK SAVED PROFILE`. It verifies the
+retained encrypted profile and creates a same-key encrypted checkpoint in the
+fixed staging slot before committing a `rollback_ready` marker. At startup, the
+redundant old safety directory is removed without deleting its still-needed key,
+the current profile becomes the new safety copy, and the verified checkpoint is
+promoted through the existing restart state machine. Neither profile is silently
+discarded.
+
+Permanent cleanup requires `DELETE SAFETY COPY`. The exact safety directory is
+first renamed to a fixed deletion-pending slot. Its manifest then identifies the
+one vault key to delete before only known profile files are removed. Startup
+repeats vault deletion idempotently and completes an interrupted cleanup before
+opening the active profile. User-controlled exports/backups and the active
+profile are outside this boundary. Symlinks, unexpected entry types, overlapping
+recovery state, and unverifiable safety profiles fail closed.

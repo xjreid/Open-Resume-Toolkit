@@ -7,9 +7,10 @@ its OS-vault-backed encrypted database, and export a saved draft or published
 snapshot as unencrypted UTF-8 text, constrained DOCX, or the exact locally
 previewed PDF through a native Save dialog. It can also create a passphrase-
 protected portable backup of saved profile records through a native Save dialog.
-It can authenticate and inspect an existing backup through a native Open dialog
-without changing the active profile. Backup replacement, PDF/DOCX import, AI,
-updater, and browser-native messaging remain gated or unimplemented.
+It can authenticate and inspect an existing backup through a native Open dialog,
+or stage it into a fresh encrypted replacement profile that is activated safely
+on restart. PDF/DOCX import, AI, updater, and browser-native messaging remain
+gated or unimplemented.
 
 ## Prerequisites
 
@@ -234,11 +235,33 @@ the filename, path, passphrase, resume text, settings values, hashes, and native
 errors never return to the webview. Wrong passphrases, damaged archives, and
 unsupported encrypted content deliberately share one failure result.
 
-Validation is read-only. Replace-restore is not yet exposed: it still needs clean-
-profile staging, a safety copy, atomic profile/vault switching, restart recovery,
-and native cross-platform proof. Only synthetic data is permitted in development.
+Validation is read-only. To replace saved profile data, enter the backup
+passphrase under **Replace saved profile from backup**, type
+`REPLACE SAVED PROFILE`, and select the archive again. ORT authenticates it,
+creates a fresh OS-vault database key, imports it into a private encrypted staging
+profile, verifies integrity, and writes a content-free restart marker. The current
+profile remains active and unchanged until the app is quit and reopened.
+
+At the next startup, ORT renames the current encrypted profile to its fixed local
+safety-copy slot, promotes the separately keyed staged profile, verifies it, and
+then removes the marker. Startup resumes the handoff after interruption between
+renames, or restores the old directory if the staged profile disappeared or the
+promoted profile cannot open. The safety copy and its old vault key are retained;
+external exports/backups are untouched. Restart promptly after staging and use
+only synthetic data in development.
+
+After activation, **Local recovery safety copy** reports only whether a retained
+copy, restart operation, or cleanup operation exists. To return to the retained
+profile, type `ROLL BACK SAVED PROFILE`. ORT verifies it, stages an encrypted
+checkpoint, and swaps it in at the next restart; the current profile becomes the
+new safety copy. To free the fixed safety slot, type `DELETE SAFETY COPY`. This
+permanently removes only that encrypted directory and its OS-vault key. The active
+profile and user-selected exports/backups are never included. An interrupted
+confirmed cleanup resumes before the active database opens on the next startup.
 See `evidence/0.0.0-dev/m2-portable-backup-export.md` and
-`evidence/0.0.0-dev/m2-backup-validation.md`.
+`evidence/0.0.0-dev/m2-backup-validation.md`, plus the replacement checkpoint in
+`evidence/0.0.0-dev/m2-replace-restore.md` and safety-copy management in
+`evidence/0.0.0-dev/m2-safety-copy-management.md`.
 
 ## Encrypted profile storage usage
 
@@ -256,7 +279,9 @@ or the in-memory PDF preview. WAL/shared-memory sizes can change after saves or
 SQLite maintenance, so the panel labels the reading as refreshable rather than a
 quota. The command accepts no path, profile identifier, category selector,
 cleanup flag, or content-bearing value. This checkpoint is read-only: deletion,
-vacuum/cleanup, all-local-data removal, and profile replacement remain gated. See
+vacuum/cleanup and all-local-data removal remain gated. Retained restore safety
+copies are reported and managed through their separate content-free recovery
+boundary, and their bytes are not included in this active-profile total. See
 `evidence/0.0.0-dev/m2-storage-usage.md`.
 
 ## No-AI import core (backend-only checkpoint)

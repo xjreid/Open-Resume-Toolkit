@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RestoreBackupResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "cancelled"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "restartRequired": {
+          "type": "boolean"
+        },
+        "safetyCopyRetained": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "const": "staged"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "restartRequired",
+        "safetyCopyRetained"
+      ]
+    }
+  ]
+}

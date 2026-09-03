@@ -1,12 +1,14 @@
 use std::{fs, path::PathBuf};
 
 use ort_domain::{
-    CloseStatusRequest, CloseStatusResponse, DocumentLimits, ExportBackupRequest,
-    ExportBackupResponse, ExportDocxRequest, ExportDocxResponse, ExportTextRequest,
-    ExportTextResponse, HealthRequest, HealthResponse, LoadResumeRequest, PublishResumeRequest,
-    PublishResumeResponse, ResolveCloseRequest, ResumeWorkspaceResponse, SaveResumeRequest,
-    StorageUsageRequest, StorageUsageResponse, ValidateBackupRequest, ValidateBackupResponse,
-    VersionedResumeResponse,
+    BackupRecoveryStatusRequest, BackupRecoveryStatusResponse, CloseStatusRequest,
+    CloseStatusResponse, DeleteSafetyCopyRequest, DeleteSafetyCopyResponse, DocumentLimits,
+    ExportBackupRequest, ExportBackupResponse, ExportDocxRequest, ExportDocxResponse,
+    ExportTextRequest, ExportTextResponse, HealthRequest, HealthResponse, LoadResumeRequest,
+    PublishResumeRequest, PublishResumeResponse, ResolveCloseRequest, RestoreBackupRequest,
+    RestoreBackupResponse, ResumeWorkspaceResponse, RollbackSafetyCopyRequest,
+    RollbackSafetyCopyResponse, SaveResumeRequest, StorageUsageRequest, StorageUsageResponse,
+    ValidateBackupRequest, ValidateBackupResponse, VersionedResumeResponse,
 };
 use schemars::schema_for;
 
@@ -18,27 +20,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = workspace_root()?;
     let output = root.join("packages/contracts/generated");
     fs::create_dir_all(&output)?;
-    write_schema::<ExportBackupRequest>(&output.join("backup.export.request.schema.json"))?;
-    write_schema::<ExportBackupResponse>(&output.join("backup.export.response.schema.json"))?;
-    write_schema::<ValidateBackupRequest>(&output.join("backup.validate.request.schema.json"))?;
-    write_schema::<ValidateBackupResponse>(&output.join("backup.validate.response.schema.json"))?;
-    fs::write(
-        output.join("backup.ts"),
-        include_str!("backup.ts.template")
-            .replace(
-                "__MAX_BACKUP_BYTES__",
-                &ort_domain::MAX_BACKUP_BYTES.to_string(),
-            )
-            .replace(
-                "__MAX_BACKUP_PASSPHRASE_BYTES__",
-                &ort_domain::MAX_BACKUP_PASSPHRASE_BYTES.to_string(),
-            ),
-    )?;
+    write_backup_contracts(&output)?;
     write_schema::<ExportTextRequest>(&output.join("export.text.request.schema.json"))?;
     write_schema::<ExportTextResponse>(&output.join("export.text.response.schema.json"))?;
     write_schema::<ExportDocxRequest>(&output.join("export.docx.request.schema.json"))?;
     write_schema::<ExportDocxResponse>(&output.join("export.docx.response.schema.json"))?;
     fs::write(output.join("export.ts"), include_str!("export.ts.template"))?;
+
     write_schema::<ort_domain::RenderPdfRequest>(&output.join("pdf.render.request.schema.json"))?;
     write_schema::<ort_domain::PdfPreviewResponse>(
         &output.join("pdf.preview.response.schema.json"),
@@ -111,6 +99,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(output.join("compatibility.json"), COMPATIBILITY)?;
 
     println!("Generated development contracts in {}", output.display());
+    Ok(())
+}
+
+fn write_backup_contracts(output: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    write_schema::<ExportBackupRequest>(&output.join("backup.export.request.schema.json"))?;
+    write_schema::<ExportBackupResponse>(&output.join("backup.export.response.schema.json"))?;
+    write_schema::<ValidateBackupRequest>(&output.join("backup.validate.request.schema.json"))?;
+    write_schema::<ValidateBackupResponse>(&output.join("backup.validate.response.schema.json"))?;
+    write_schema::<RestoreBackupRequest>(&output.join("backup.restore.request.schema.json"))?;
+    write_schema::<RestoreBackupResponse>(&output.join("backup.restore.response.schema.json"))?;
+    write_schema::<BackupRecoveryStatusRequest>(
+        &output.join("backup.recovery-status.request.schema.json"),
+    )?;
+    write_schema::<BackupRecoveryStatusResponse>(
+        &output.join("backup.recovery-status.response.schema.json"),
+    )?;
+    write_schema::<RollbackSafetyCopyRequest>(&output.join("backup.rollback.request.schema.json"))?;
+    write_schema::<RollbackSafetyCopyResponse>(
+        &output.join("backup.rollback.response.schema.json"),
+    )?;
+    write_schema::<DeleteSafetyCopyRequest>(
+        &output.join("backup.safety-delete.request.schema.json"),
+    )?;
+    write_schema::<DeleteSafetyCopyResponse>(
+        &output.join("backup.safety-delete.response.schema.json"),
+    )?;
+    fs::write(
+        output.join("backup.ts"),
+        include_str!("backup.ts.template")
+            .replace(
+                "__MAX_BACKUP_BYTES__",
+                &ort_domain::MAX_BACKUP_BYTES.to_string(),
+            )
+            .replace(
+                "__MAX_BACKUP_PASSPHRASE_BYTES__",
+                &ort_domain::MAX_BACKUP_PASSPHRASE_BYTES.to_string(),
+            )
+            .replace(
+                "__RESTORE_CONFIRMATION_PHRASE__",
+                ort_domain::RESTORE_CONFIRMATION_PHRASE,
+            )
+            .replace(
+                "__ROLLBACK_CONFIRMATION_PHRASE__",
+                ort_domain::ROLLBACK_CONFIRMATION_PHRASE,
+            )
+            .replace(
+                "__DELETE_SAFETY_CONFIRMATION_PHRASE__",
+                ort_domain::DELETE_SAFETY_CONFIRMATION_PHRASE,
+            ),
+    )?;
     Ok(())
 }
 

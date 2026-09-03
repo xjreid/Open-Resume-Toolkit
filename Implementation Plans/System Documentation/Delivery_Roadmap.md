@@ -64,18 +64,19 @@ Exit evidence:
 
 Current development status:
 
-As of 2026-09-03, the working stage-gate estimate is **about 52% complete**.
+As of 2026-09-03, the working stage-gate estimate is **about 59% complete**.
 This estimate weights end-to-end deliverables and mandatory security, recovery,
 accessibility, cross-platform and offline-journey evidence rather than counting
 implemented code or checkpoints equally. The underlying implementation foundation
-is approximately 65–70% present, end-to-end M2 functionality is approximately
-50–55% present, and release/exit evidence is approximately 35–40% complete. Major
+is approximately 75% present, end-to-end M2 functionality is approximately
+60% present, and release/exit evidence is approximately 45% complete. Major
 gates such as production parser containment, import/review integration,
-replace-restore, destructive profile deletion and the complete offline journey
-remain substantial incomplete capabilities, not polish. The latest three local
-checkpoints—portable-backup export, encrypted-profile storage usage, and read-only
-authenticated backup validation—are verified together in the current uncommitted
-working tree based on `a3ad66e`; they advance M2 but do not make it release-ready.
+destructive profile deletion and the complete offline journey
+remain substantial incomplete capabilities, not polish. Portable-backup export,
+encrypted-profile storage usage, and read-only authenticated backup validation are
+committed through `0a706b2`; restart-staged replacement and retained safety-copy
+management are verified in the current uncommitted working tree based on that
+commit. These checkpoints advance M2 but do not make it release-ready.
 
 - implemented locally: generated load/save/publish contracts, a main-window-only
   encrypted command boundary, fail-closed OS-vault startup, optimistic draft
@@ -230,8 +231,36 @@ working tree based on `a3ad66e`; they advance M2 but do not make it release-read
   native error—and does not write, close or replace the active profile. Focused
   contract/UI/native-input/crypto tests and the full local check pass; native
   Open-dialog/reparse/accessibility inspection, parser-memory hardening,
-  cross-platform CI and crash-safe replace-restore remain pending. See
-  `../../evidence/0.0.0-dev/m2-backup-validation.md`;
+  cross-platform CI and crash-safe replace-restore remained pending at that
+  checkpoint. See `../../evidence/0.0.0-dev/m2-backup-validation.md`;
+- added locally: explicitly confirmed, restart-staged portable-backup replacement.
+  The native request accepts only a bounded passphrase and the exact destructive
+  phrase; the selected archive reuses the bounded no-follow file intake. Before
+  the active profile is touched, records are authenticated and imported into a
+  private sibling SQLCipher profile with a fresh OS-vault key and verified
+  integrity. A durable content-free marker makes startup retain the previous
+  encrypted profile in a fixed safety slot and promote the staged profile through
+  exact directory renames. Recovery tests cover normal activation, interruption
+  with missing staging, malformed/oversized markers and symlink refusal; the live
+  profile remains unchanged until restart. The full local check passes. Native
+  macOS/Windows dialog and vault handoff, low-disk and injected rename/fsync
+  failures, safety-copy discovery/cleanup and cross-platform CI remained release
+  gates at that checkpoint. See
+  `../../evidence/0.0.0-dev/m2-replace-restore.md`;
+- added locally: content-free retained safety-copy status, verified rollback and
+  explicit permanent cleanup. Generated main-window commands expose only three
+  state booleans and accept exact typed phrases, never paths, identities, sizes or
+  content. Rollback checkpoints the old encrypted profile before restart and then
+  reuses the recovery journal to exchange it with the active profile while
+  retaining the latter as the new safety copy. Cleanup renames only the fixed
+  safety directory into a deletion-pending slot, deletes its exact vault key and
+  known files, and resumes idempotently at startup after interruption. Tests cover
+  the two-way content swap, different vault identities, exact-target deletion,
+  preserved active/external files, cleanup restart recovery, rejection of a
+  malformed safety directory sharing the active vault identity, boundary
+  rejection and UI disclosure. The full local check passes; native and
+  cross-platform results remain release gates for this checkpoint. See
+  `../../evidence/0.0.0-dev/m2-safety-copy-management.md`;
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
   UI/session integration, private binary staging, richer entry/date/link mapping,
@@ -239,8 +268,9 @@ working tree based on `a3ad66e`; they advance M2 but do not make it release-read
   and reader verification, confirmed replacement and crash-cleanup policy for
   exports, historical renderer replay, Windows native Save-dialog/ACL/filesystem
   proof, destructive storage deletion/cleanup, and complete offline
-  journey evidence. Portable render-manifest backup is implemented, but native
-  full-backup replace-restore UX and its release verification remain gated. M2 is
+  journey evidence. Portable render-manifest backup, restart-staged replacement,
+  rollback and safety-copy cleanup are implemented, but native/cross-platform
+  recovery release verification remains gated. M2 is
   not complete; do not enable hostile-file parsing or advance to public release
   based on these local checkpoints alone.
 

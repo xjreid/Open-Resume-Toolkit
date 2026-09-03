@@ -1,9 +1,22 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  isBackupRecoveryStatusCommandResponse,
+  isDeleteSafetyCopyCommandResponse,
   isExportBackupCommandResponse,
+  isRestoreBackupCommandResponse,
+  isRollbackSafetyCopyCommandResponse,
   isValidateBackupCommandResponse,
+  type BackupRecoveryStatus,
+  type BackupRecoveryStatusCommandResponse,
+  type BackupRecoveryStatusRequest,
+  type DeleteSafetyCopyCommandResponse,
+  type DeleteSafetyCopyRequest,
   type ExportBackupCommandResponse,
   type ExportBackupRequest,
+  type RestoreBackupCommandResponse,
+  type RestoreBackupRequest,
+  type RollbackSafetyCopyCommandResponse,
+  type RollbackSafetyCopyRequest,
   type ValidateBackupCommandResponse,
   type ValidateBackupRequest,
 } from "@ort/contracts/backup";
@@ -134,6 +147,70 @@ export async function validatePortableBackup(
       request,
     });
     return isValidateBackupCommandResponse(response)
+      ? response
+      : invalidCommandResponse();
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function restorePortableBackup(
+  passphrase: string,
+  confirmation: string,
+): Promise<RestoreBackupCommandResponse> {
+  try {
+    const request: RestoreBackupRequest = requestEnvelope({
+      passphrase,
+      confirmation,
+    });
+    const response: unknown = await invoke("restore_portable_backup", {
+      request,
+    });
+    return isRestoreBackupCommandResponse(response)
+      ? response
+      : invalidCommandResponse();
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function requestBackupRecoveryStatus(): Promise<BackupRecoveryStatusCommandResponse> {
+  try {
+    const request: BackupRecoveryStatusRequest = requestEnvelope({});
+    const response: unknown = await invoke("load_backup_recovery_status", {
+      request,
+    });
+    return isBackupRecoveryStatusCommandResponse(response)
+      ? response
+      : invalidCommandResponse<BackupRecoveryStatus>();
+  } catch {
+    return commandUnavailable<BackupRecoveryStatus>();
+  }
+}
+
+export async function rollbackSafetyCopy(
+  confirmation: string,
+): Promise<RollbackSafetyCopyCommandResponse> {
+  try {
+    const request: RollbackSafetyCopyRequest = requestEnvelope({
+      confirmation,
+    });
+    const response: unknown = await invoke("rollback_safety_copy", { request });
+    return isRollbackSafetyCopyCommandResponse(response)
+      ? response
+      : invalidCommandResponse();
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function deleteSafetyCopy(
+  confirmation: string,
+): Promise<DeleteSafetyCopyCommandResponse> {
+  try {
+    const request: DeleteSafetyCopyRequest = requestEnvelope({ confirmation });
+    const response: unknown = await invoke("delete_safety_copy", { request });
+    return isDeleteSafetyCopyCommandResponse(response)
       ? response
       : invalidCommandResponse();
   } catch {

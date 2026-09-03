@@ -5,6 +5,9 @@ import { isCommandResponse, type CommandResponse } from "./resume";
 
 export const MAX_BACKUP_BYTES = 67109008;
 export const MAX_BACKUP_PASSPHRASE_BYTES = 1024;
+export const RESTORE_CONFIRMATION_PHRASE = "REPLACE SAVED PROFILE";
+export const ROLLBACK_CONFIRMATION_PHRASE = "ROLL BACK SAVED PROFILE";
+export const DELETE_SAFETY_CONFIRMATION_PHRASE = "DELETE SAFETY COPY";
 
 export interface ExportBackupRequest {
   contractVersion: typeof CONTRACT_VERSION;
@@ -50,6 +53,61 @@ export type ValidateBackupResult = { status: "cancelled" } | ValidatedBackup;
 
 export type ValidateBackupCommandResponse =
   CommandResponse<ValidateBackupResult>;
+
+export interface RestoreBackupRequest {
+  contractVersion: typeof CONTRACT_VERSION;
+  requestId: string;
+  payload: {
+    passphrase: string;
+    confirmation: string;
+  };
+}
+
+export type RestoreBackupResult =
+  | { status: "cancelled" }
+  | {
+      status: "staged";
+      restartRequired: true;
+      safetyCopyRetained: true;
+    };
+
+export type RestoreBackupCommandResponse = CommandResponse<RestoreBackupResult>;
+
+export interface BackupRecoveryStatusRequest {
+  contractVersion: typeof CONTRACT_VERSION;
+  requestId: string;
+  payload: Record<string, never>;
+}
+
+export type BackupRecoveryStatus = {
+  safetyCopyAvailable: boolean;
+  restartOperationPending: boolean;
+  safetyCleanupPending: boolean;
+};
+
+export type BackupRecoveryStatusCommandResponse =
+  CommandResponse<BackupRecoveryStatus>;
+
+export interface RollbackSafetyCopyRequest {
+  contractVersion: typeof CONTRACT_VERSION;
+  requestId: string;
+  payload: { confirmation: string };
+}
+
+export type RollbackSafetyCopyCommandResponse = CommandResponse<{
+  restartRequired: true;
+  currentProfileRetained: true;
+}>;
+
+export interface DeleteSafetyCopyRequest {
+  contractVersion: typeof CONTRACT_VERSION;
+  requestId: string;
+  payload: { confirmation: string };
+}
+
+export type DeleteSafetyCopyCommandResponse = CommandResponse<{
+  deleted: boolean;
+}>;
 
 export function isExportBackupCommandResponse(
   value: unknown,
@@ -103,6 +161,79 @@ export function isValidateBackupCommandResponse(
     )
       return false;
     return record.formatMinor === 1 || record.renderManifests === 0;
+  });
+}
+
+export function isRestoreBackupCommandResponse(
+  value: unknown,
+): value is RestoreBackupCommandResponse {
+  return isCommandResponse(value, (result): result is RestoreBackupResult => {
+    if (typeof result !== "object" || result === null || Array.isArray(result))
+      return false;
+    const record = result as Record<string, unknown>;
+    if (record.status === "cancelled") return Object.keys(record).length === 1;
+    return (
+      Object.keys(record).length === 3 &&
+      record.status === "staged" &&
+      record.restartRequired === true &&
+      record.safetyCopyRetained === true
+    );
+  });
+}
+
+export function isBackupRecoveryStatusCommandResponse(
+  value: unknown,
+): value is BackupRecoveryStatusCommandResponse {
+  return isCommandResponse(value, (result): result is BackupRecoveryStatus => {
+    if (typeof result !== "object" || result === null || Array.isArray(result))
+      return false;
+    const record = result as Record<string, unknown>;
+    return (
+      Object.keys(record).length === 3 &&
+      typeof record.safetyCopyAvailable === "boolean" &&
+      typeof record.restartOperationPending === "boolean" &&
+      typeof record.safetyCleanupPending === "boolean"
+    );
+  });
+}
+
+export function isRollbackSafetyCopyCommandResponse(
+  value: unknown,
+): value is RollbackSafetyCopyCommandResponse {
+  return isCommandResponse(
+    value,
+    (
+      result,
+    ): result is {
+      restartRequired: true;
+      currentProfileRetained: true;
+    } => {
+      if (
+        typeof result !== "object" ||
+        result === null ||
+        Array.isArray(result)
+      )
+        return false;
+      const record = result as Record<string, unknown>;
+      return (
+        Object.keys(record).length === 2 &&
+        record.restartRequired === true &&
+        record.currentProfileRetained === true
+      );
+    },
+  );
+}
+
+export function isDeleteSafetyCopyCommandResponse(
+  value: unknown,
+): value is DeleteSafetyCopyCommandResponse {
+  return isCommandResponse(value, (result): result is { deleted: boolean } => {
+    if (typeof result !== "object" || result === null || Array.isArray(result))
+      return false;
+    const record = result as Record<string, unknown>;
+    return (
+      Object.keys(record).length === 1 && typeof record.deleted === "boolean"
+    );
   });
 }
 

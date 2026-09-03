@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_BACKUP_BYTES,
   MAX_BACKUP_PASSPHRASE_BYTES,
+  DELETE_SAFETY_CONFIRMATION_PHRASE,
+  RESTORE_CONFIRMATION_PHRASE,
+  ROLLBACK_CONFIRMATION_PHRASE,
+  isBackupRecoveryStatusCommandResponse,
+  isDeleteSafetyCopyCommandResponse,
   isExportBackupCommandResponse,
+  isRestoreBackupCommandResponse,
+  isRollbackSafetyCopyCommandResponse,
   isValidateBackupCommandResponse,
 } from "../generated/backup";
 
@@ -96,5 +103,87 @@ describe("portable backup contract", () => {
     ]) {
       expect(isValidateBackupCommandResponse({ ok: true, value })).toBe(false);
     }
+  });
+
+  it("accepts only exact staged-replacement receipts", () => {
+    expect(RESTORE_CONFIRMATION_PHRASE).toBe("REPLACE SAVED PROFILE");
+    expect(
+      isRestoreBackupCommandResponse({
+        ok: true,
+        value: {
+          status: "staged",
+          restartRequired: true,
+          safetyCopyRetained: true,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isRestoreBackupCommandResponse({
+        ok: true,
+        value: { status: "cancelled" },
+      }),
+    ).toBe(true);
+    for (const value of [
+      { status: "staged", restartRequired: false, safetyCopyRetained: true },
+      { status: "staged", restartRequired: true, safetyCopyRetained: false },
+      {
+        status: "staged",
+        restartRequired: true,
+        safetyCopyRetained: true,
+        path: "/private/profile",
+      },
+    ]) {
+      expect(isRestoreBackupCommandResponse({ ok: true, value })).toBe(false);
+    }
+  });
+
+  it("validates content-free safety-copy status and exact action receipts", () => {
+    expect(ROLLBACK_CONFIRMATION_PHRASE).toBe("ROLL BACK SAVED PROFILE");
+    expect(DELETE_SAFETY_CONFIRMATION_PHRASE).toBe("DELETE SAFETY COPY");
+    expect(
+      isBackupRecoveryStatusCommandResponse({
+        ok: true,
+        value: {
+          safetyCopyAvailable: true,
+          restartOperationPending: false,
+          safetyCleanupPending: false,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isBackupRecoveryStatusCommandResponse({
+        ok: true,
+        value: {
+          safetyCopyAvailable: true,
+          restartOperationPending: false,
+          safetyCleanupPending: false,
+          path: "/private/safety",
+        },
+      }),
+    ).toBe(false);
+    expect(
+      isRollbackSafetyCopyCommandResponse({
+        ok: true,
+        value: { restartRequired: true, currentProfileRetained: true },
+      }),
+    ).toBe(true);
+    expect(
+      isRollbackSafetyCopyCommandResponse({
+        ok: true,
+        value: { restartRequired: false, currentProfileRetained: true },
+      }),
+    ).toBe(false);
+    expect(
+      isDeleteSafetyCopyCommandResponse({
+        ok: true,
+        value: { deleted: true },
+      }),
+    ).toBe(true);
+    expect(
+      isDeleteSafetyCopyCommandResponse({
+        ok: true,
+        value: { deleted: true, externalDeleted: true },
+      }),
+    ).toBe(false);
   });
 });
