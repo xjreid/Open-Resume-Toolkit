@@ -1,0 +1,3 @@
+# These XML files are embedded verbatim by include_str! into deterministic DOCX
+# packages. EditorConfig does not control Git checkout conversion on Windows.
+crates/ort-documents/src/docx/*.xml text eol=lf

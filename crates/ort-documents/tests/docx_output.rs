@@ -53,7 +53,11 @@ fn fixed_parts_well_formed_xml_and_deterministic_bytes_for_whole_corpus() {
                 "word/styles.xml"
             ]
         );
-        for xml in parts.values() {
+        for (name, xml) in &parts {
+            assert!(
+                !xml.contains('\r'),
+                "{name}: DOCX XML must use LF; check .gitattributes and checkout conversion"
+            );
             let mut reader = Reader::from_str(xml);
             let mut depth = 0;
             loop {

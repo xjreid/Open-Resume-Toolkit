@@ -127,7 +127,13 @@ Current development status:
   plain layout. It shares the native one-operation/no-clobber export boundary,
   not the gated hostile-input worker. Synthetic encrypted-restart/file-write,
   negative-content, package/semantic and headless-render checks accompany it.
-  Cross-platform CI and native document-reader/dialog verification remain pending.
+  The user subsequently reported three of four CI jobs passing for `e349856`;
+  the supplied Windows log failed only at the DOCX golden-byte check after
+  Rust tests passed. CRLF-converted embedded XML reproduced that failure locally.
+  A scoped LF checkout policy, cross-platform checkout regression tests and
+  explicit output diagnostics restore the unchanged goldens locally; the repaired
+  CI run and native document-reader/dialog verification remain pending.
+  See `../../evidence/0.0.0-dev/windows-docx-checkout.md`.
   See `../../evidence/0.0.0-dev/m2-docx-export.md`;
 - Windows CI repair passed per user report after `bdc3e10`: stage logs narrowed the
   stack overflow to encrypted-profile opening. A matching upstream SQLCipher

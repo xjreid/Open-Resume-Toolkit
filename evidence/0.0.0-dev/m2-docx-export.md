@@ -4,6 +4,13 @@ Date: 2026-09-03 UTC (2026-09-02 local). Base commit: `e978cfe`.
 Local platform: macOS arm64. Status: implemented and locally verified;
 cross-platform CI and native reader/dialog checks pending. M2 remains underway.
 
+Follow-up: the user reported three of four jobs passing for commit `e349856`
+and supplied the Windows failure log. Rust tests passed; the independent DOCX
+golden check failed because embedded XML was checked out with CRLF. The local
+reproduction, scoped checkout fix, stronger regression checks and Node-action
+runtime update are recorded in `windows-docx-checkout.md`. The repaired CI result
+is pending; the original verification below is preserved as checkpoint history.
+
 Before implementation, the user confirmed all four jobs passed for `e978cfe`.
 That confirmation was not independently retrieved. This checkpoint groups the
 output generator, command/contracts, editor controls, native write policy,

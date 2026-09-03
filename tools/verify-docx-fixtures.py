@@ -75,6 +75,8 @@ def verify(data, source):
         assert not archive.comment
         assert archive.testzip() is None, "ZIP CRC"
         contents = {name: archive.read(name) for name in PARTS}
+    for name, body in contents.items():
+        assert b"\r" not in body, f"{name}: noncanonical CR/CRLF XML; check .gitattributes and checkout conversion"
     assert all(b"<!DOCTYPE" not in body and b"<!ENTITY" not in body for body in contents.values())
     xml = {name: ET.fromstring(body) for name, body in contents.items()}
     document = xml["word/document.xml"]
@@ -141,6 +143,7 @@ def rejection_checks(data, source):
         {"word/document.xml": original["word/document.xml"].replace(b'val="Heading1"', b'val="Normal"')},
         {"word/_rels/document.xml.rels": original["word/_rels/document.xml.rels"].replace(b"/hyperlink", b"/attachedTemplate")},
         {"word/_rels/document.xml.rels": original["word/_rels/document.xml.rels"].replace(b"https://example.org/project", b"file:///private/secret")},
+        {"word/styles.xml": original["word/styles.xml"].replace(b"\n", b"\r\n")},
     ]
     for change in changes:
         mutated = io.BytesIO()
@@ -166,9 +169,10 @@ def main():
         data = (root / (name + ".docx")).read_bytes()
         source = json.loads((root / (name + ".json")).read_text(encoding="utf-8"))
         verify(data, source)
-        assert hashlib.sha256(data).hexdigest() == goldens[name], "review required: deterministic DOCX bytes changed"
+        digest = hashlib.sha256(data).hexdigest()
+        assert digest == goldens[name], f"{name}: review required: deterministic DOCX bytes changed; expected {goldens[name]}, got {digest} ({len(data)} bytes)"
     rejection_checks((root / "standard.docx").read_bytes(), json.loads((root / "standard.json").read_text(encoding="utf-8")))
-    print("Five DOCX fixtures: golden SHA-256, ZIP/CRC, fixed OPC parts, XML, semantic parity, relationships, headings/lists and geometry passed; six negative controls rejected.")
+    print("Five DOCX fixtures: golden SHA-256, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; seven negative controls rejected.")
 
 
 if __name__ == "__main__":

@@ -128,6 +128,19 @@ Local headless-render and manual/platform limits are recorded in
 `evidence/0.0.0-dev/m2-docx-export.md`. There is no production Python or
 LibreOffice dependency; the exporter is Rust-only.
 
+The first DOCX CI run passed three jobs but Windows failed the golden-byte
+check after its Rust tests passed. Git's CRLF checkout conversion changed the
+four XML assets embedded by `include_str!`. `.gitattributes` now pins only
+those assets to LF; no global Git setting or golden hash change is required.
+`node --test tools/tests/docx-checkout.test.mjs` exercises real Git checkouts
+with positive/negative controls and runs early in all four CI jobs, as well as
+through `just check`. Existing Windows working copies should use a fresh
+checkout if these files still contain CRLF; preserve local edits first.
+The verifier now identifies noncanonical line endings explicitly. The same
+repair updates the pinned Node setup action to its Node 24 runtime; the project's
+Node version stays unchanged. The repaired Windows run is still pending.
+See `evidence/0.0.0-dev/windows-docx-checkout.md`.
+
 ## No-AI import core (backend-only checkpoint)
 
 The deterministic mapper and in-memory review engine now have synthetic tests,
@@ -205,7 +218,8 @@ death, broker-created descendants, the child's complete authority boundary and
 the remaining resource ceilings are still gated. Import is still disabled.
 See `evidence/0.0.0-dev/m2-macos-lifecycle.md`. The user subsequently confirmed
 all four CI jobs passing for `e978cfe`; this is user-reported, not an independently
-retrieved run. The new DOCX checkpoint needs its own cross-platform CI result.
+retrieved run. The DOCX checkpoint subsequently passed three of four jobs;
+its Windows golden-byte failure and pending repair verification are recorded above.
 
 The preceding Windows log showed both isolated startup and import-storage tests crash
 while opening the encrypted profile. A matching pinned SQLCipher logging defect
