@@ -70,6 +70,7 @@ function ResumeEditor() {
   const close = useCloseGuard(editor);
   const [confirmReload, setConfirmReload] = useState(false);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("txt");
+  const [profileGeneration, setProfileGeneration] = useState(0);
   const ioBusy = useRef(false);
   const loadGeneration = useRef(0);
   const { document, notice } = editor;
@@ -395,6 +396,7 @@ function ResumeEditor() {
       </section>
 
       <PdfPreviewPanel
+        key={profileGeneration}
         saved={editor.saved}
         published={editor.published}
         dirty={dirty}
@@ -459,6 +461,36 @@ function ResumeEditor() {
           !confirmReload &&
           !close.pending
         }
+        onDeleteBegin={() => {
+          if (
+            ioBusy.current ||
+            busy ||
+            mustReload ||
+            confirmReload ||
+            close.pending
+          )
+            return false;
+          ioBusy.current = true;
+          dispatch({ type: "deleting" });
+          return true;
+        }}
+        onDeleteFinish={(committed, freshProfileReady) => {
+          ioBusy.current = false;
+          if (!committed) {
+            dispatch({ type: "delete-finished" });
+            return;
+          }
+          setProfileGeneration((value) => value + 1);
+          dispatch({ type: "data-deleted" });
+          if (freshProfileReady) {
+            void loadWorkspace();
+          } else {
+            setHealth({
+              kind: "error",
+              message: "Local data cleanup requires restart.",
+            });
+          }
+        }}
       />
 
       <div className="editor-tools">
@@ -563,7 +595,10 @@ function ResumeEditor() {
         <fieldset
           className="editor-layout editor-fields"
           disabled={
-            editor.status === "loading" || confirmReload || close.pending
+            editor.status === "loading" ||
+            editor.status === "deleting" ||
+            confirmReload ||
+            close.pending
           }
         >
           <section className="editor-panel" aria-labelledby="identity-heading">

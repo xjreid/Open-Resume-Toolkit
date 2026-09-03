@@ -15,7 +15,8 @@ export interface EditorState {
     | "saving"
     | "publishing"
     | "exporting"
-    | "rendering";
+    | "rendering"
+    | "deleting";
   editEpoch: number;
   errorCode: string | null;
   autosavePaused: boolean;
@@ -49,6 +50,9 @@ type EditorAction =
   | { type: "published"; value: VersionedResume }
   | { type: "exporting" }
   | { type: "rendering" }
+  | { type: "deleting" }
+  | { type: "delete-finished" }
+  | { type: "data-deleted" }
   | { type: "export-finished"; notice: string }
   | { type: "failed"; code: string };
 
@@ -151,6 +155,12 @@ export function editorReducer(
       return { ...state, status: "exporting", notice: null };
     case "rendering":
       return { ...state, status: "rendering", notice: null };
+    case "deleting":
+      return { ...state, status: "deleting", notice: null };
+    case "delete-finished":
+      return { ...state, status: "idle", notice: null };
+    case "data-deleted":
+      return { ...initialEditorState, status: "loading" };
     case "export-finished":
       // Export never mutates stored revisions or the editor. In particular,
       // an uncertain file result must not pause autosave or clear save errors.

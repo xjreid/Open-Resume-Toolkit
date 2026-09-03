@@ -75,4 +75,12 @@ describe("native quit policy", () => {
       closeDisposition(editorReducer(loaded(), { type: "publishing" })),
     ).toBe("wait");
   });
+
+  it("waits while destructive local-data deletion is active", () => {
+    const deleting = editorReducer(loaded(), { type: "deleting" });
+    expect(closeDisposition(deleting)).toBe("wait");
+    expect(
+      closeDisposition(editorReducer(deleting, { type: "delete-finished" })),
+    ).toBe("quit");
+  });
 });

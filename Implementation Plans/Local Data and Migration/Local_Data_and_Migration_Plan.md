@@ -211,6 +211,42 @@ Downgrades that cannot read the current schema are blocked. The supported rollba
 
 In-app deletion requires an explicit confirmation and closes the database before removing the exact resolved profile directory and vault entries. Material deletion uses platform trash when practical or clearly describes permanence. External exports are never deleted.
 
+### Implemented M2 all-local-data deletion
+
+The development command accepts only the exact phrase `DELETE ALL LOCAL ORT
+DATA`; the webview cannot supply a path, profile identity, category selector,
+external-backup flag, or safety-copy exception. The desktop serializes deletion
+with every native file/recovery operation, takes the encrypted store offline,
+and drops its SQLCipher connection before filesystem mutation.
+
+The current M2 cleanup inventory contains the active profile and only the fixed
+restore-staging, retained-safety and safety-deletion sibling directories. Every
+existing directory and regular file is validated against the closed known-name
+set before a durable private deletion-intent marker commits the action. After
+commit, startup resolves and deletes all distinct manifest-derived database-vault
+references before removing manifests, deletes only recognized database sidecars
+and recovery metadata, removes the restore marker, and removes the deletion
+marker last. A vault or filesystem interruption leaves the intent durable and
+blocks fresh-profile creation until exact cleanup resumes. Pre-commit symlinks,
+unknown entries, malformed manifests and unsafe active-root names fail without
+deleting a key or known file.
+
+Successful cleanup resets the manifest-held installation/profile identifiers and
+creates a separately keyed empty profile so the application can remain usable.
+The UI immediately discards the old editor and in-memory PDF preview. It never
+targets user-selected backups/exports or unrelated sibling entries.
+
+For the data categories implemented through M2, retention is explicit and
+bounded: one active profile remains until this command; at most one restore
+safety copy remains until rollback, separately confirmed safety deletion, or
+all-data deletion; render receipts retain the newest 100 identities; in-memory
+PDF bytes expire after ten minutes and are cleared by deletion. ORT does not scan
+user-selected export folders for abandoned staging names because it cannot prove
+ownership after a crash. Future import, drag-out, provider credential, Codex,
+native-IPC and workspace implementations must add their own exact owned targets
+and tests to this deletion inventory before those features can claim complete
+local deletion.
+
 Normal uninstall removes application binaries and native-host registration but preserves profile data by default. Documentation and uninstall UI explain how to delete retained data. Repair verifies database integrity, permissions, indexes, vault references, native-host registration, and cache; it never rewrites canonical content without a safety copy.
 
 ## Tests

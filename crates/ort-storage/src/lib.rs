@@ -38,6 +38,7 @@ const RESTORE_MARKER_FILENAME: &str = ".ort-restore-pending.json";
 const RESTORE_STAGING_DIRECTORY: &str = ".ort-restore-staged";
 const RESTORE_SAFETY_DIRECTORY: &str = ".ort-restore-safety";
 const SAFETY_DELETE_DIRECTORY: &str = ".ort-safety-delete-pending";
+const DELETE_ALL_MARKER_FILENAME: &str = ".ort-delete-all-pending.json";
 const DATABASE_FORMAT_VERSION: u16 = 1;
 const SCHEMA_VERSION: i64 = 2;
 const MAX_RENDER_MANIFESTS: i64 = 100;
@@ -273,6 +274,12 @@ pub struct BackupRecoveryStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AllLocalDataDeletion {
+    Deleted,
+    CleanupPending,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RestoreMarkerState {
     ReplaceReady,
     RollbackReady,
@@ -304,6 +311,8 @@ impl EncryptedStore {
         let Some(parent) = root.parent() else {
             return Err(StorageError::UnsafeLocation);
         };
+        validate_active_profile_root(root)?;
+        recover_pending_all_data_deletion(root, channel, vault)?;
         recover_pending_safety_deletion(parent, channel, vault)?;
         let marker = parent.join(RESTORE_MARKER_FILENAME);
         match fs::symlink_metadata(&marker) {
@@ -1103,6 +1112,38 @@ impl EncryptedStore {
         .collect()
     }
 
+    /// Loads one render receipt by its opaque identity without returning PDF
+    /// bytes or resume content.
+    ///
+    /// # Errors
+    /// Returns an error for malformed persisted metadata or unavailable storage.
+    pub fn load_render_manifest(
+        &self,
+        manifest_id: Uuid,
+    ) -> Result<Option<StoredRenderManifest>, StorageError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        connection
+            .query_row(
+                "SELECT manifest_id, source, source_revision, generated_at_unix_ms, \
+                 last_generated_at_unix_ms, render_count, document_sha256, \
+                 document_schema_version, pdf_sha256, renderer_version, template_id, \
+                 template_sha256, font_bundle_id, font_bundle_sha256, page_count, byte_count \
+                 FROM render_manifests WHERE profile_id = ?1 AND manifest_id = ?2",
+                params![
+                    self.manifest.profile_id.to_string(),
+                    manifest_id.to_string()
+                ],
+                render_manifest_row,
+            )
+            .optional()
+            .map_err(|_| StorageError::Unavailable)?
+            .map(parse_render_manifest)
+            .transpose()
+    }
+
     fn load_render_manifest_identity(
         &self,
         source: ExportSource,
@@ -1429,6 +1470,45 @@ impl EncryptedStore {
         sync_directory(parent)?;
         recover_pending_safety_deletion(parent, channel, vault)?;
         Ok(true)
+    }
+
+    /// Permanently deletes every currently implemented ORT profile/recovery
+    /// record and associated database-vault key under the active profile's
+    /// fixed parent. A durable marker makes the destructive intent resumable
+    /// before a fresh profile can be opened.
+    ///
+    /// The caller must drop the active `EncryptedStore` first so SQLite has
+    /// closed its database, WAL and shared-memory handles. User-selected
+    /// exports and backups are outside this exact-name boundary.
+    ///
+    /// # Errors
+    /// Returns an error only before destructive intent is durably committed.
+    /// After the marker is durable, an incomplete cleanup is reported as
+    /// `CleanupPending` and startup must resume it.
+    pub fn delete_all_local_data(
+        root: &Path,
+        channel: &str,
+        vault: &dyn DatabaseKeyVault,
+    ) -> Result<AllLocalDataDeletion, StorageError> {
+        validate_channel(channel)?;
+        validate_active_profile_root(root)?;
+        let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
+        if !known_optional_directory(root)? {
+            return Err(StorageError::NotFound);
+        }
+        let marker = parent.join(DELETE_ALL_MARKER_FILENAME);
+        if known_optional_file(&marker)? {
+            validate_delete_all_marker(&marker)?;
+        } else {
+            validate_all_data_deletion_targets(root, channel, true)?;
+            write_delete_all_marker(&marker, parent)?;
+        }
+        Ok(
+            match recover_pending_all_data_deletion(root, channel, vault) {
+                Ok(()) => AllLocalDataDeletion::Deleted,
+                Err(_) => AllLocalDataDeletion::CleanupPending,
+            },
+        )
     }
 
     fn read_portable_profile(&self) -> Result<PortableProfileV1, StorageError> {
@@ -2057,6 +2137,139 @@ fn open_existing_profile(
     EncryptedStore::open_or_initialize(root, channel, vault)
 }
 
+fn validate_active_profile_root(root: &Path) -> Result<(), StorageError> {
+    let name = root
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or(StorageError::UnsafeLocation)?;
+    if name.is_empty()
+        || matches!(
+            name,
+            RESTORE_STAGING_DIRECTORY
+                | RESTORE_SAFETY_DIRECTORY
+                | SAFETY_DELETE_DIRECTORY
+                | DELETE_ALL_MARKER_FILENAME
+                | RESTORE_MARKER_FILENAME
+        )
+    {
+        return Err(StorageError::UnsafeLocation);
+    }
+    root.parent().ok_or(StorageError::UnsafeLocation)?;
+    Ok(())
+}
+
+fn validate_delete_all_marker(path: &Path) -> Result<(), StorageError> {
+    reject_symlink(path)?;
+    let file = File::open(path).map_err(|_| StorageError::Unavailable)?;
+    let metadata = file.metadata().map_err(|_| StorageError::Unavailable)?;
+    if !metadata.is_file() || metadata.len() > 64 {
+        return Err(StorageError::IncompleteInitialization);
+    }
+    let mut bytes = Vec::with_capacity(
+        usize::try_from(metadata.len()).map_err(|_| StorageError::IncompleteInitialization)?,
+    );
+    file.take(65)
+        .read_to_end(&mut bytes)
+        .map_err(|_| StorageError::Unavailable)?;
+    if bytes == b"{\"version\":1,\"state\":\"delete_all\"}\n" {
+        Ok(())
+    } else {
+        Err(StorageError::IncompleteInitialization)
+    }
+}
+
+fn write_delete_all_marker(path: &Path, parent: &Path) -> Result<(), StorageError> {
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(path)
+        .map_err(|_| StorageError::Unavailable)?;
+    if set_private_file_permissions(path).is_err()
+        || file
+            .write_all(b"{\"version\":1,\"state\":\"delete_all\"}\n")
+            .and_then(|()| file.sync_all())
+            .is_err()
+        || sync_directory(parent).is_err()
+    {
+        let _ = fs::remove_file(path);
+        let _ = sync_directory(parent);
+        return Err(StorageError::Unavailable);
+    }
+    Ok(())
+}
+
+fn all_data_profile_roots(root: &Path) -> Result<[PathBuf; 4], StorageError> {
+    let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
+    Ok([
+        root.to_path_buf(),
+        parent.join(RESTORE_STAGING_DIRECTORY),
+        parent.join(RESTORE_SAFETY_DIRECTORY),
+        parent.join(SAFETY_DELETE_DIRECTORY),
+    ])
+}
+
+fn validate_all_data_deletion_targets(
+    root: &Path,
+    channel: &str,
+    require_manifests: bool,
+) -> Result<Vec<VaultReference>, StorageError> {
+    let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
+    known_optional_file(&parent.join(RESTORE_MARKER_FILENAME))?;
+    let mut references = Vec::new();
+    for candidate in all_data_profile_roots(root)? {
+        if !known_optional_directory(&candidate)? {
+            continue;
+        }
+        validate_cleanup_profile_directory(&candidate)?;
+        let manifest_path = candidate.join(MANIFEST_FILENAME);
+        if !known_optional_file(&manifest_path)? {
+            if require_manifests {
+                return Err(StorageError::IncompleteInitialization);
+            }
+            continue;
+        }
+        let reference = read_manifest(&manifest_path, channel)?.vault_reference()?;
+        if !references.contains(&reference) {
+            references.push(reference);
+        }
+    }
+    if require_manifests && references.is_empty() {
+        return Err(StorageError::IncompleteInitialization);
+    }
+    Ok(references)
+}
+
+fn recover_pending_all_data_deletion(
+    root: &Path,
+    channel: &str,
+    vault: &dyn DatabaseKeyVault,
+) -> Result<(), StorageError> {
+    let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
+    let marker = parent.join(DELETE_ALL_MARKER_FILENAME);
+    if !known_optional_file(&marker)? {
+        return Ok(());
+    }
+    validate_delete_all_marker(&marker)?;
+    let references = validate_all_data_deletion_targets(root, channel, false)?;
+
+    // Resolve every reference before deleting any manifest. Missing credentials
+    // are success so an interrupted deletion remains idempotent.
+    for reference in references {
+        vault
+            .delete(&reference)
+            .map_err(|_| StorageError::VaultKeyUnavailable)?;
+    }
+    for candidate in all_data_profile_roots(root)? {
+        if known_optional_directory(&candidate)? {
+            cleanup_profile_directory(&candidate)?;
+            sync_directory(parent)?;
+        }
+    }
+    remove_exact_optional_file(&parent.join(RESTORE_MARKER_FILENAME))?;
+    remove_exact_optional_file(&marker)?;
+    sync_directory(parent)
+}
+
 fn recover_pending_safety_deletion(
     parent: &Path,
     channel: &str,
@@ -2085,7 +2298,7 @@ fn recover_pending_safety_deletion(
 }
 
 fn cleanup_profile_directory(root: &Path) -> Result<(), StorageError> {
-    reject_directory_symlink(root)?;
+    validate_cleanup_profile_directory(root)?;
     let database = root.join(DATABASE_FILENAME);
     remove_exact_database_files(&database)?;
     for name in [
@@ -2096,6 +2309,37 @@ fn cleanup_profile_directory(root: &Path) -> Result<(), StorageError> {
         remove_exact_optional_file(&root.join(name))?;
     }
     fs::remove_dir(root).map_err(|_| StorageError::Unavailable)
+}
+
+fn validate_cleanup_profile_directory(root: &Path) -> Result<(), StorageError> {
+    reject_directory_symlink(root)?;
+    if !root.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(root).map_err(|_| StorageError::Unavailable)? {
+        let entry = entry.map_err(|_| StorageError::Unavailable)?;
+        let name = entry
+            .file_name()
+            .into_string()
+            .map_err(|_| StorageError::UnsafeLocation)?;
+        if !matches!(
+            name.as_str(),
+            DATABASE_FILENAME
+                | "profile.db-wal"
+                | "profile.db-shm"
+                | "profile.db-journal"
+                | MANIFEST_FILENAME
+                | PREVIOUS_MANIFEST_FILENAME
+                | MANIFEST_UPDATE_FILENAME
+        ) {
+            return Err(StorageError::UnsafeLocation);
+        }
+        let metadata = fs::symlink_metadata(entry.path()).map_err(|_| StorageError::Unavailable)?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(StorageError::UnsafeLocation);
+        }
+    }
+    Ok(())
 }
 
 fn create_private_directory(path: &Path) -> Result<(), StorageError> {
@@ -2616,17 +2860,46 @@ fn remove_exact_database_files(database_path: &Path) -> Result<(), StorageError>
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     use ort_backup::BackupPassphrase;
     use ort_domain::{ExportSource, PdfRenderReceipt, ResumeDocument};
-    use ort_vault::DatabaseKeyVault;
     use ort_vault::testing::MemoryDatabaseKeyVault;
+    use ort_vault::{DatabaseKey, DatabaseKeyVault, VaultError, VaultReference};
     use serde_json::{Map, Value};
     use tempfile::TempDir;
 
     use super::*;
 
     const PLAINTEXT_MARKER: &str = "SYNTHETIC-PRIVATE-RESUME-MARKER-9d87f8";
+
+    #[derive(Default)]
+    struct FailingDeleteVault {
+        inner: MemoryDatabaseKeyVault,
+        fail_delete: AtomicBool,
+    }
+
+    impl DatabaseKeyVault for FailingDeleteVault {
+        fn load(&self, reference: &VaultReference) -> Result<DatabaseKey, VaultError> {
+            self.inner.load(reference)
+        }
+
+        fn store_new(
+            &self,
+            reference: &VaultReference,
+            key: &DatabaseKey,
+        ) -> Result<(), VaultError> {
+            self.inner.store_new(reference, key)
+        }
+
+        fn delete(&self, reference: &VaultReference) -> Result<(), VaultError> {
+            if self.fail_delete.load(Ordering::Acquire) {
+                Err(VaultError::Unavailable)
+            } else {
+                self.inner.delete(reference)
+            }
+        }
+    }
 
     fn synthetic_render_receipt(pdf_sha256: String) -> PdfRenderReceipt {
         PdfRenderReceipt {
@@ -3108,6 +3381,18 @@ mod tests {
             .expect("load newest manifest");
         assert_eq!(recent[0].source_revision, 100);
         assert_eq!(recent[0].receipt.pdf_sha256, format!("{:064x}", 100));
+        assert_eq!(
+            reopened
+                .load_render_manifest(recent[0].manifest_id)
+                .expect("load exact manifest"),
+            Some(recent[0].clone())
+        );
+        assert!(
+            reopened
+                .load_render_manifest(Uuid::now_v7())
+                .expect("unknown identity is not an error")
+                .is_none()
+        );
     }
 
     #[test]
@@ -3652,6 +3937,223 @@ mod tests {
             "Shared identity guard"
         );
         assert!(safety_root.is_dir());
+    }
+
+    #[test]
+    fn delete_all_removes_exact_profile_recovery_data_and_rekeys_a_fresh_profile() {
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("default");
+        let safety_root = temporary.path().join(RESTORE_SAFETY_DIRECTORY);
+        let staged_root = temporary.path().join(RESTORE_STAGING_DIRECTORY);
+        let external_backup = temporary.path().join("user-backup.ort-backup");
+        let unrelated = temporary.path().join("another-profile");
+        fs::write(&external_backup, b"synthetic external backup").unwrap();
+        fs::create_dir(&unrelated).unwrap();
+        fs::write(unrelated.join("keep.txt"), b"keep unrelated data").unwrap();
+
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        active
+            .create_draft(&ResumeDocument::empty("Delete active profile"))
+            .unwrap();
+        let active_reference = active.manifest().vault_reference().unwrap();
+        let old_install_id = active.manifest().install_id;
+        drop(active);
+
+        let safety = EncryptedStore::open_or_initialize(&safety_root, "test", &vault).unwrap();
+        let safety_reference = safety.manifest().vault_reference().unwrap();
+        drop(safety);
+        let staged = EncryptedStore::open_or_initialize(&staged_root, "test", &vault).unwrap();
+        let staged_reference = staged.manifest().vault_reference().unwrap();
+        drop(staged);
+        write_restore_marker(
+            &temporary.path().join(RESTORE_MARKER_FILENAME),
+            temporary.path(),
+            RestoreMarkerState::ReplaceReady,
+        )
+        .unwrap();
+
+        assert_eq!(
+            EncryptedStore::delete_all_local_data(&active_root, "test", &vault),
+            Ok(AllLocalDataDeletion::Deleted)
+        );
+        for path in [&active_root, &safety_root, &staged_root] {
+            assert!(!path.exists());
+        }
+        assert!(!temporary.path().join(RESTORE_MARKER_FILENAME).exists());
+        for reference in [&active_reference, &safety_reference, &staged_reference] {
+            assert_eq!(vault.load(reference).err(), Some(VaultError::Missing));
+        }
+        assert_eq!(
+            fs::read(&external_backup).unwrap(),
+            b"synthetic external backup"
+        );
+        assert_eq!(
+            fs::read(unrelated.join("keep.txt")).unwrap(),
+            b"keep unrelated data"
+        );
+
+        let (fresh, activated) =
+            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).unwrap();
+        assert!(!activated);
+        assert_ne!(fresh.manifest().install_id, old_install_id);
+        assert!(fresh.load_draft().unwrap().is_none());
+        assert!(fresh.load_latest_published().unwrap().is_none());
+        assert!(fresh.load_recent_render_manifests(20).unwrap().is_empty());
+    }
+
+    #[test]
+    fn committed_delete_all_resumes_after_a_vault_failure_before_opening_fresh_data() {
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("default");
+        let safety_root = temporary.path().join(RESTORE_SAFETY_DIRECTORY);
+        let vault = FailingDeleteVault::default();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        active
+            .create_draft(&ResumeDocument::empty("Delete after retry"))
+            .unwrap();
+        let active_reference = active.manifest().vault_reference().unwrap();
+        drop(active);
+        let safety = EncryptedStore::open_or_initialize(&safety_root, "test", &vault).unwrap();
+        let safety_reference = safety.manifest().vault_reference().unwrap();
+        drop(safety);
+
+        vault.fail_delete.store(true, Ordering::Release);
+        assert_eq!(
+            EncryptedStore::delete_all_local_data(&active_root, "test", &vault),
+            Ok(AllLocalDataDeletion::CleanupPending)
+        );
+        assert!(temporary.path().join(DELETE_ALL_MARKER_FILENAME).is_file());
+        assert!(active_root.is_dir());
+        assert!(vault.load(&active_reference).is_ok());
+
+        vault.fail_delete.store(false, Ordering::Release);
+        let (fresh, activated) =
+            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).unwrap();
+        assert!(!activated);
+        assert!(fresh.load_draft().unwrap().is_none());
+        assert_eq!(
+            vault.load(&active_reference).err(),
+            Some(VaultError::Missing)
+        );
+        assert_eq!(
+            vault.load(&safety_reference).err(),
+            Some(VaultError::Missing)
+        );
+        assert!(!temporary.path().join(DELETE_ALL_MARKER_FILENAME).exists());
+        assert!(!safety_root.exists());
+    }
+
+    #[test]
+    fn startup_resumes_after_keys_and_one_profile_directory_were_already_deleted() {
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("default");
+        let safety_root = temporary.path().join(RESTORE_SAFETY_DIRECTORY);
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        active
+            .create_draft(&ResumeDocument::empty("Partially removed active"))
+            .unwrap();
+        let active_reference = active.manifest().vault_reference().unwrap();
+        drop(active);
+        let safety = EncryptedStore::open_or_initialize(&safety_root, "test", &vault).unwrap();
+        let safety_reference = safety.manifest().vault_reference().unwrap();
+        drop(safety);
+        write_restore_marker(
+            &temporary.path().join(RESTORE_MARKER_FILENAME),
+            temporary.path(),
+            RestoreMarkerState::RollbackReady,
+        )
+        .unwrap();
+        write_delete_all_marker(
+            &temporary.path().join(DELETE_ALL_MARKER_FILENAME),
+            temporary.path(),
+        )
+        .unwrap();
+
+        // Model interruption after the complete key phase and the first exact
+        // directory removal, before remaining profiles/markers are removed.
+        vault.delete(&active_reference).unwrap();
+        vault.delete(&safety_reference).unwrap();
+        cleanup_profile_directory(&active_root).unwrap();
+
+        let (fresh, activated) =
+            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).unwrap();
+        assert!(!activated);
+        assert!(fresh.load_draft().unwrap().is_none());
+        assert!(!safety_root.exists());
+        assert!(!temporary.path().join(RESTORE_MARKER_FILENAME).exists());
+        assert!(!temporary.path().join(DELETE_ALL_MARKER_FILENAME).exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn delete_all_rejects_unsafe_known_targets_before_committing_intent() {
+        use std::os::unix::fs::symlink;
+
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("default");
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        let active_reference = active.manifest().vault_reference().unwrap();
+        drop(active);
+        symlink(
+            temporary.path().join("outside"),
+            temporary.path().join(RESTORE_SAFETY_DIRECTORY),
+        )
+        .unwrap();
+
+        assert_eq!(
+            EncryptedStore::delete_all_local_data(&active_root, "test", &vault),
+            Err(StorageError::UnsafeLocation)
+        );
+        assert!(!temporary.path().join(DELETE_ALL_MARKER_FILENAME).exists());
+        assert!(active_root.is_dir());
+        assert!(vault.load(&active_reference).is_ok());
+    }
+
+    #[test]
+    fn delete_all_refuses_unknown_profile_entries_without_deleting_the_key() {
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("default");
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        let reference = active.manifest().vault_reference().unwrap();
+        drop(active);
+        fs::write(active_root.join("unexpected.txt"), b"do not delete").unwrap();
+
+        assert_eq!(
+            EncryptedStore::delete_all_local_data(&active_root, "test", &vault),
+            Err(StorageError::UnsafeLocation)
+        );
+        assert!(active_root.join("unexpected.txt").is_file());
+        assert!(vault.load(&reference).is_ok());
+        assert!(!temporary.path().join(DELETE_ALL_MARKER_FILENAME).exists());
+    }
+
+    #[test]
+    fn malformed_delete_all_marker_blocks_startup_without_changing_data() {
+        let temporary = TempDir::new().unwrap();
+        let active_root = temporary.path().join("default");
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&active_root, "test", &vault).unwrap();
+        active
+            .create_draft(&ResumeDocument::empty("Preserve on bad marker"))
+            .unwrap();
+        let reference = active.manifest().vault_reference().unwrap();
+        drop(active);
+        fs::write(
+            temporary.path().join(DELETE_ALL_MARKER_FILENAME),
+            b"{\"version\":1,\"state\":\"invented\"}\n",
+        )
+        .unwrap();
+
+        assert_eq!(
+            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).err(),
+            Some(StorageError::IncompleteInitialization)
+        );
+        assert!(active_root.is_dir());
+        assert!(vault.load(&reference).is_ok());
     }
 
     #[test]

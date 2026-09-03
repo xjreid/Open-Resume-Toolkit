@@ -28,5 +28,9 @@ serde.workspace = true
 tauri.workspace = true
 tauri-plugin-dialog.workspace = true
 
+[dev-dependencies]
+ort-vault = { path = "../../../crates/ort-vault", features = ["test-support"] }
+tempfile.workspace = true
+
 [lints]
 workspace = true

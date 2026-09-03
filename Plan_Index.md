@@ -6,7 +6,15 @@ This is the navigation and authority map for the product and technical implement
 
 ## Current planning status
 
-The product direction and core workflows are defined. The initial technical implementation baseline now selects Tauri 2, React/TypeScript, a Rust service core, SQLCipher local storage, Typst rendering, direct-provider adapters, an optional external Codex app-server, Manifest V3/native messaging, SignPath-first GitHub distribution, and a static Astro website. Coding and validation have not begun. Visual design remains intentionally deferred to `Aesthetic/`.
+The product direction and core workflows are defined. Implementation is underway
+at M2 on the selected Tauri 2, React/TypeScript, Rust, SQLCipher and Typst
+baseline. The development build supports encrypted structured editing,
+publication, local exports/rendering, portable backup/recovery, storage reporting
+and exact crash-resumable local-profile deletion. Hostile document import remains
+disabled pending its macOS/Windows containment proof; AI, browser messaging,
+updates and release hardening remain later milestones. Quiet Navy/Open Frame is
+the approved application direction, while final document-template work remains
+incomplete under `Aesthetic/`.
 
 ## Authority and precedence
 

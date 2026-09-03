@@ -13,7 +13,7 @@ use ort_vault::OsDatabaseKeyVault;
 use tauri::{Manager, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
-use super::{DesktopState, DesktopStorage, text_export::ExportState, window_not_authorized};
+use super::{DesktopState, text_export::ExportState, window_not_authorized};
 
 #[tauri::command]
 pub(crate) async fn export_portable_backup(
@@ -109,10 +109,7 @@ pub(crate) fn load_backup_recovery_status(
         return CommandResponse::Failure { ok: false, error };
     }
     let state = window.app_handle().state::<DesktopState>();
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return recovery_failure("STORAGE_UNAVAILABLE");
-    };
-    match store.backup_recovery_status() {
+    match state.with_store(ort_storage::EncryptedStore::backup_recovery_status) {
         Ok(status) => CommandResponse::success(BackupRecoveryStatusResponse {
             safety_copy_available: status.safety_copy_available,
             restart_operation_pending: status.restart_operation_pending,
@@ -202,10 +199,9 @@ fn export_with_dialog(
         Err(error) => return backup_write_failure(&error),
     };
     let state = window.app_handle().state::<DesktopState>();
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return backup_failure("STORAGE_UNAVAILABLE");
-    };
-    let bytes = match store.create_portable_backup(&passphrase, env!("CARGO_PKG_VERSION")) {
+    let bytes = match state
+        .with_store(|store| store.create_portable_backup(&passphrase, env!("CARGO_PKG_VERSION")))
+    {
         Ok(value) => value,
         Err(error) => return backup_storage_failure(&error),
     };
@@ -298,11 +294,10 @@ fn restore_with_dialog(
         Err(error) => return restore_read_failure(&error),
     };
     let state = window.app_handle().state::<DesktopState>();
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return restore_failure("STORAGE_UNAVAILABLE");
-    };
     let vault = OsDatabaseKeyVault::new();
-    match store.stage_portable_restore(&bytes, &passphrase, &store.manifest().channel, &vault) {
+    match state.with_store(|store| {
+        store.stage_portable_restore(&bytes, &passphrase, &store.manifest().channel, &vault)
+    }) {
         Ok(()) => CommandResponse::success(RestoreBackupResponse::Staged {
             restart_required: true,
             safety_copy_retained: true,
@@ -315,11 +310,8 @@ fn rollback_safety_copy_blocking(
     window: &WebviewWindow,
 ) -> CommandResponse<RollbackSafetyCopyResponse> {
     let state = window.app_handle().state::<DesktopState>();
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return recovery_failure("STORAGE_UNAVAILABLE");
-    };
     let vault = OsDatabaseKeyVault::new();
-    match store.stage_safety_rollback(&store.manifest().channel, &vault) {
+    match state.with_store(|store| store.stage_safety_rollback(&store.manifest().channel, &vault)) {
         Ok(()) => CommandResponse::success(RollbackSafetyCopyResponse {
             restart_required: true,
             current_profile_retained: true,
@@ -332,11 +324,10 @@ fn delete_safety_copy_blocking(
     window: &WebviewWindow,
 ) -> CommandResponse<DeleteSafetyCopyResponse> {
     let state = window.app_handle().state::<DesktopState>();
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return recovery_failure("STORAGE_UNAVAILABLE");
-    };
     let vault = OsDatabaseKeyVault::new();
-    match store.delete_retained_safety_copy(&store.manifest().channel, &vault) {
+    match state
+        .with_store(|store| store.delete_retained_safety_copy(&store.manifest().channel, &vault))
+    {
         Ok(deleted) => CommandResponse::success(DeleteSafetyCopyResponse { deleted }),
         Err(error) => recovery_storage_failure(&error),
     }

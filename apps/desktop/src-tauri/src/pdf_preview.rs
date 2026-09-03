@@ -1,6 +1,6 @@
 //! One bounded, memory-only preview. The webview cannot submit PDFs or paths.
 use super::{
-    DesktopState, DesktopStorage, storage_failure, storage_unavailable,
+    DesktopState, storage_failure,
     text_export::{ExportState, exact_revision},
     window_not_authorized,
 };
@@ -8,7 +8,8 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use ort_domain::{
     CommandResponse, ExportSource, MAX_PDF_RENDER_HISTORY, PDF_PREVIEW_TTL_SECONDS,
     PdfExportResponse, PdfPreviewResponse, PdfReleaseResponse, PdfRenderHistoryRequest,
-    PdfRenderHistoryResponse, PdfRenderManifest, PdfTicketRequest, RenderPdfRequest,
+    PdfRenderHistoryResponse, PdfRenderManifest, PdfReplayRequest, PdfTicketRequest,
+    RenderPdfRequest,
 };
 use ort_platform::{ExportDestination, ExportFileType, ExportWriteError};
 use ort_render::{PdfArtifact, PdfRenderError};
@@ -54,6 +55,14 @@ impl PdfState {
             false
         }
     }
+
+    pub(crate) fn clear(&self) -> bool {
+        let Ok(mut slot) = self.0.lock() else {
+            return false;
+        };
+        *slot = None;
+        true
+    }
 }
 
 fn load_exact(
@@ -61,14 +70,13 @@ fn load_exact(
     source: ExportSource,
     revision: i64,
 ) -> Result<VersionedResume, StorageError> {
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return Err(StorageError::NotFound);
-    };
-    let value = match source {
-        ExportSource::SavedDraft => store.load_draft(),
-        ExportSource::PublishedSnapshot => store.load_latest_published(),
-    }?;
-    exact_revision(value, revision)
+    state.with_store(|store| {
+        let value = match source {
+            ExportSource::SavedDraft => store.load_draft(),
+            ExportSource::PublishedSnapshot => store.load_latest_published(),
+        }?;
+        exact_revision(value, revision)
+    })
 }
 
 #[tauri::command]
@@ -87,9 +95,6 @@ pub(crate) async fn render_resume_pdf(
         return failure("EXPORT_BUSY");
     };
     let state = app.state::<DesktopState>();
-    if !matches!(state.storage, DesktopStorage::Ready(_)) {
-        return storage_unavailable();
-    }
     let source = request.payload.source;
     let saved = match load_exact(&state, source, request.payload.expected_revision) {
         Ok(saved) => saved,
@@ -134,15 +139,14 @@ pub(crate) async fn render_resume_pdf(
             artifact,
         });
         let state = app.state::<DesktopState>();
-        let DesktopStorage::Ready(store) = &state.storage else {
-            return storage_unavailable();
-        };
-        if let Err(error) = store.record_render_manifest(
-            source,
-            saved.revision,
-            generated_at_unix_ms,
-            &preview.artifact.receipt,
-        ) {
+        if let Err(error) = state.with_store(|store| {
+            store.record_render_manifest(
+                source,
+                saved.revision,
+                generated_at_unix_ms,
+                &preview.artifact.receipt,
+            )
+        }) {
             return storage_failure(&error);
         }
         let response = PdfPreviewResponse {
@@ -180,10 +184,7 @@ pub(crate) fn load_pdf_render_history(
         return CommandResponse::Failure { ok: false, error };
     }
     let state = window.state::<DesktopState>();
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return storage_unavailable();
-    };
-    match store.load_recent_render_manifests(MAX_PDF_RENDER_HISTORY) {
+    match state.with_store(|store| store.load_recent_render_manifests(MAX_PDF_RENDER_HISTORY)) {
         Ok(manifests) => CommandResponse::success(PdfRenderHistoryResponse {
             manifests: manifests
                 .into_iter()
@@ -203,6 +204,124 @@ fn render_manifest_response(value: StoredRenderManifest) -> PdfRenderManifest {
         last_generated_at_unix_ms: value.last_generated_at_unix_ms,
         render_count: value.render_count,
         receipt: value.receipt,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReplayRenderError {
+    Render(PdfRenderError),
+    Incompatible,
+}
+
+fn render_matching_receipt(
+    document: &ort_domain::ResumeDocument,
+    expected: &ort_domain::PdfRenderReceipt,
+) -> Result<PdfArtifact, ReplayRenderError> {
+    let artifact = ort_render::render_pdf(document).map_err(ReplayRenderError::Render)?;
+    if artifact.receipt == *expected {
+        Ok(artifact)
+    } else {
+        Err(ReplayRenderError::Incompatible)
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn replay_resume_pdf(
+    window: WebviewWindow,
+    request: PdfReplayRequest,
+) -> CommandResponse<PdfPreviewResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    let app = window.app_handle().clone();
+    let Some(lease) = app.state::<ExportState>().begin() else {
+        return failure("EXPORT_BUSY");
+    };
+    let Ok(manifest_id) = uuid::Uuid::parse_str(&request.payload.manifest_id) else {
+        return failure("PDF_REPLAY_UNAVAILABLE");
+    };
+    let replay = app.state::<DesktopState>().with_store(|store| {
+        let manifest = store
+            .load_render_manifest(manifest_id)?
+            .ok_or(StorageError::NotFound)?;
+        let source = match manifest.source {
+            ExportSource::SavedDraft => store.load_draft(),
+            ExportSource::PublishedSnapshot => store.load_latest_published(),
+        }?;
+        let saved = exact_revision(source, manifest.source_revision)?;
+        Ok((manifest, saved))
+    });
+    let (manifest, saved) = match replay {
+        Ok(value) => value,
+        Err(StorageError::NotFound) => return failure("PDF_REPLAY_SOURCE_UNAVAILABLE"),
+        Err(error) => return storage_failure(&error),
+    };
+    if !app.state::<PdfState>().clear() {
+        return failure("PDF_UNAVAILABLE");
+    }
+    match tauri::async_runtime::spawn_blocking(move || {
+        let _lease = lease;
+        let artifact = match render_matching_receipt(&saved.document, &manifest.receipt) {
+            Ok(value) => value,
+            Err(ReplayRenderError::Incompatible) => return failure("PDF_REPLAY_INCOMPATIBLE"),
+            Err(ReplayRenderError::Render(error)) => {
+                return failure(match error {
+                    PdfRenderError::UnsupportedGlyph => "PDF_UNSUPPORTED_GLYPH",
+                    PdfRenderError::LayoutLimit => "PDF_LAYOUT_LIMIT",
+                    PdfRenderError::OutputTooLarge => "PDF_BYTE_LIMIT",
+                    PdfRenderError::InvalidContent => "PDF_INVALID_CONTENT",
+                    PdfRenderError::Unavailable => "PDF_UNAVAILABLE",
+                });
+            }
+        };
+        let Some(generated_at_unix_ms) = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .ok()
+            .and_then(|value| u64::try_from(value.as_millis()).ok())
+            .filter(|value| (1..=9_007_199_254_740_991).contains(value))
+        else {
+            return failure("PDF_UNAVAILABLE");
+        };
+        let preview = Arc::new(Preview {
+            id: uuid::Uuid::now_v7().to_string(),
+            source: manifest.source,
+            revision: saved.revision,
+            created: Instant::now(),
+            generated_at_unix_ms,
+            artifact,
+        });
+        if let Err(error) = app.state::<DesktopState>().with_store(|store| {
+            store.record_render_manifest(
+                preview.source,
+                preview.revision,
+                generated_at_unix_ms,
+                &preview.artifact.receipt,
+            )
+        }) {
+            return storage_failure(&error);
+        }
+        let response = PdfPreviewResponse {
+            render_id: preview.id.clone(),
+            source: preview.source,
+            revision: preview.revision,
+            generated_at_unix_ms,
+            receipt: preview.artifact.receipt.clone(),
+            pdf_base64: STANDARD.encode(&preview.artifact.bytes),
+        };
+        let cache = app.state::<PdfState>();
+        let Ok(mut slot) = cache.0.lock() else {
+            return failure("PDF_UNAVAILABLE");
+        };
+        *slot = Some(preview);
+        CommandResponse::success(response)
+    })
+    .await
+    {
+        Ok(response) => response,
+        Err(_) => failure("PDF_UNAVAILABLE"),
     }
 }
 
@@ -340,5 +459,24 @@ mod tests {
         *state.0.lock().unwrap() = Some(first.clone());
         assert!(state.release(&first.id));
         assert!(!state.release(&first.id));
+        *state.0.lock().unwrap() = Some(first);
+        assert!(state.clear());
+        assert!(state.0.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn replay_exposes_bytes_only_when_the_full_receipt_matches() {
+        let mut document = ort_domain::ResumeDocument::empty("Replay source");
+        document.contact.full_name = "Synthetic Replay".into();
+        let original = ort_render::render_pdf(&document).unwrap();
+        let replay = render_matching_receipt(&document, &original.receipt).unwrap();
+        assert_eq!(replay.bytes, original.bytes);
+
+        let mut changed = document;
+        changed.contact.full_name = "Changed Synthetic Replay".into();
+        assert_eq!(
+            render_matching_receipt(&changed, &original.receipt).err(),
+            Some(ReplayRenderError::Incompatible)
+        );
     }
 }

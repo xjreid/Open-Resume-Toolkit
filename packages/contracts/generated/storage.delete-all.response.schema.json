@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeleteAllLocalDataResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "freshProfileReady": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "const": "deleted"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "freshProfileReady"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "restartRequired": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "const": "cleanup_pending"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "restartRequired"
+      ]
+    }
+  ]
+}

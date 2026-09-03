@@ -7,12 +7,14 @@ use ort_domain::{
 };
 use ort_storage::{EncryptedStore, StorageError, VersionedResume};
 use ort_vault::OsDatabaseKeyVault;
+use std::sync::Mutex;
 use tauri::{
     AppHandle, Emitter, EventTarget, Manager, RunEvent, State, WebviewWindow, WindowEvent,
 };
 
 mod backup_export;
 mod close_guard;
+mod data_deletion;
 mod menu;
 mod pdf_preview;
 mod text_export;
@@ -95,7 +97,44 @@ enum DesktopStorage {
 }
 
 struct DesktopState {
-    storage: DesktopStorage,
+    storage: Mutex<DesktopStorage>,
+}
+
+impl DesktopState {
+    fn with_store<T>(
+        &self,
+        operation: impl FnOnce(&EncryptedStore) -> Result<T, StorageError>,
+    ) -> Result<T, StorageError> {
+        let storage = self.storage.lock().map_err(|_| StorageError::Unavailable)?;
+        let DesktopStorage::Ready(store) = &*storage else {
+            return Err(StorageError::Unavailable);
+        };
+        operation(store)
+    }
+
+    fn storage_status(&self) -> StorageStatus {
+        self.storage
+            .lock()
+            .ok()
+            .map_or(StorageStatus::Unavailable, |storage| match &*storage {
+                DesktopStorage::Ready(_) => StorageStatus::Ready,
+                DesktopStorage::Unavailable => StorageStatus::Unavailable,
+            })
+    }
+
+    fn take_store(&self) -> Result<EncryptedStore, StorageError> {
+        let mut storage = self.storage.lock().map_err(|_| StorageError::Unavailable)?;
+        match std::mem::replace(&mut *storage, DesktopStorage::Unavailable) {
+            DesktopStorage::Ready(store) => Ok(store),
+            DesktopStorage::Unavailable => Err(StorageError::Unavailable),
+        }
+    }
+
+    fn replace_storage(&self, replacement: DesktopStorage) -> Result<(), StorageError> {
+        let mut storage = self.storage.lock().map_err(|_| StorageError::Unavailable)?;
+        *storage = replacement;
+        Ok(())
+    }
 }
 
 #[tauri::command]
@@ -112,10 +151,7 @@ fn health(
         return CommandResponse::Failure { ok: false, error };
     }
 
-    let storage_status = match state.storage {
-        DesktopStorage::Ready(_) => StorageStatus::Ready,
-        DesktopStorage::Unavailable => StorageStatus::Unavailable,
-    };
+    let storage_status = state.storage_status();
     CommandResponse::success(HealthResponse {
         status: HealthStatus::Ok,
         app_version: env!("CARGO_PKG_VERSION").to_owned(),
@@ -138,16 +174,13 @@ fn load_resume(
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };
     }
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return storage_unavailable();
-    };
-
-    let draft = match store.load_draft() {
-        Ok(value) => value.map(versioned_response),
-        Err(error) => return storage_failure(&error),
-    };
-    let latest_published = match store.load_latest_published() {
-        Ok(value) => value.map(versioned_response),
+    let (draft, latest_published) = match state.with_store(|store| {
+        Ok((
+            store.load_draft()?.map(versioned_response),
+            store.load_latest_published()?.map(versioned_response),
+        ))
+    }) {
+        Ok(value) => value,
         Err(error) => return storage_failure(&error),
     };
 
@@ -170,10 +203,7 @@ fn load_storage_usage(
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };
     }
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return storage_unavailable();
-    };
-    match store.storage_usage() {
+    match state.with_store(EncryptedStore::storage_usage) {
         Ok(usage) => CommandResponse::success(StorageUsageResponse {
             database_schema: usage.database_schema,
             drafts: usage.drafts,
@@ -205,14 +235,10 @@ fn save_resume(
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };
     }
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return storage_unavailable();
-    };
-
-    let saved = match request.payload.expected_revision {
+    let saved = state.with_store(|store| match request.payload.expected_revision {
         Some(revision) => store.save_draft(revision, &request.payload.document),
         None => store.create_draft(&request.payload.document),
-    };
+    });
     match saved {
         Ok(value) => CommandResponse::success(versioned_response(value)),
         Err(error) => storage_failure(&error),
@@ -232,12 +258,8 @@ fn publish_resume(
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };
     }
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return storage_unavailable();
-    };
-
     let draft_revision = request.payload.expected_draft_revision;
-    match store.publish_draft(draft_revision) {
+    match state.with_store(|store| store.publish_draft(draft_revision)) {
         Ok(published) => CommandResponse::success(PublishResumeResponse {
             draft_revision,
             published: versioned_response(published),
@@ -308,7 +330,7 @@ pub fn run() {
         })
         .setup(|app| {
             app.manage(DesktopState {
-                storage: initialize_storage(app),
+                storage: Mutex::new(initialize_storage(app)),
             });
             Ok(())
         })
@@ -324,9 +346,11 @@ pub fn run() {
             backup_export::load_backup_recovery_status,
             backup_export::rollback_safety_copy,
             backup_export::delete_safety_copy,
+            data_deletion::delete_all_local_data,
             text_export::export_resume_text,
             text_export::export_resume_docx,
             pdf_preview::render_resume_pdf,
+            pdf_preview::replay_resume_pdf,
             pdf_preview::load_pdf_render_history,
             pdf_preview::export_resume_pdf,
             pdf_preview::release_resume_pdf,

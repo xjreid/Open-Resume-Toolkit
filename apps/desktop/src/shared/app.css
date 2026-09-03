@@ -510,6 +510,19 @@ textarea {
   font-size: 13px;
 }
 
+.storage-danger {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #c7a4a4;
+  border-radius: 10px;
+  background: #fff8f8;
+}
+
+.storage-danger > h3 {
+  margin-bottom: 8px;
+  color: #7a2525;
+}
+
 .backup-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

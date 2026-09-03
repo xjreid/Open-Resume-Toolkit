@@ -27,8 +27,11 @@ import {
   type PdfPreview,
   type PdfPreviewCommandResponse,
   type PdfExportCommandResponse,
+  type PdfRenderManifest,
   type PdfRenderHistory,
   type PdfRenderHistoryCommandResponse,
+  type PdfReplayCommandResponse,
+  type PdfReplayRequest,
 } from "@ort/contracts/pdf";
 import {
   isExportTextCommandResponse,
@@ -65,10 +68,14 @@ import {
   type VersionedResumeCommandResponse,
 } from "@ort/contracts/resume";
 import {
+  isDeleteAllLocalDataCommandResponse,
   isStorageUsageCommandResponse,
+  type DeleteAllLocalDataCommandResponse,
+  type DeleteAllLocalDataRequest,
   type StorageUsage,
   type StorageUsageCommandResponse,
 } from "@ort/contracts/storage";
+import { samePdfReceipt } from "./pdf-preview";
 
 export async function requestHealth(): Promise<HealthCommandResponse> {
   try {
@@ -119,6 +126,24 @@ export async function requestStorageUsage(): Promise<StorageUsageCommandResponse
       : invalidCommandResponse<StorageUsage>();
   } catch {
     return commandUnavailable<StorageUsage>();
+  }
+}
+
+export async function deleteAllLocalData(
+  confirmation: string,
+): Promise<DeleteAllLocalDataCommandResponse> {
+  try {
+    const request: DeleteAllLocalDataRequest = requestEnvelope({
+      confirmation,
+    });
+    const response: unknown = await invoke("delete_all_local_data", {
+      request,
+    });
+    return isDeleteAllLocalDataCommandResponse(response)
+      ? response
+      : invalidCommandResponse();
+  } catch {
+    return commandUnavailable();
   }
 }
 
@@ -358,6 +383,28 @@ export async function requestPdfRenderHistory(): Promise<PdfRenderHistoryCommand
       : invalidCommandResponse<PdfRenderHistory>();
   } catch {
     return commandUnavailable<PdfRenderHistory>();
+  }
+}
+
+export async function replayPdfRender(
+  manifest: PdfRenderManifest,
+): Promise<PdfReplayCommandResponse> {
+  try {
+    const request: PdfReplayRequest = requestEnvelope({
+      manifestId: manifest.manifestId,
+    });
+    const response: unknown = await invoke("replay_resume_pdf", { request });
+    if (!isPdfPreviewCommandResponse(response)) return invalidCommandResponse();
+    if (
+      response.ok &&
+      (response.value.source !== manifest.source ||
+        response.value.revision !== manifest.sourceRevision ||
+        !samePdfReceipt(response.value.receipt, manifest.receipt))
+    )
+      return invalidCommandResponse();
+    return response;
+  } catch {
+    return commandUnavailable();
   }
 }
 

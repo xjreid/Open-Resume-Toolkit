@@ -2,8 +2,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { requestStorageUsage } from "./command-client";
-import { formatBytes, StoragePanel } from "./StoragePanel";
+import { deleteAllLocalData, requestStorageUsage } from "./command-client";
+import {
+  deleteAllLocalDataFeedback,
+  formatBytes,
+  StoragePanel,
+} from "./StoragePanel";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 beforeEach(() => vi.clearAllMocks());
@@ -51,12 +55,73 @@ describe("storage usage", () => {
 
   it("renders content-free scope and exclusions before data is available", () => {
     const html = renderToStaticMarkup(
-      createElement(StoragePanel, { enabled: false }),
+      createElement(StoragePanel, {
+        enabled: false,
+        onDeleteBegin: () => true,
+        onDeleteFinish: () => {},
+      }),
     );
     expect(html).toContain("Encrypted profile storage");
     expect(html).toContain("External exports and backups");
     expect(html).toContain("OS-vault");
     expect(html).not.toContain("profileId");
     expect(html).not.toContain("path");
+    expect(html).toContain("DELETE ALL LOCAL ORT DATA");
+    expect(html).toContain("unsaved edits");
+    expect(html).toContain("are not deleted");
+    expect(html).toContain('class="button--danger"');
+  });
+
+  it("sends only the exact confirmation and validates deletion outcomes", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({
+      ok: true,
+      value: { status: "deleted", freshProfileReady: true },
+    });
+    const result = await deleteAllLocalData("DELETE ALL LOCAL ORT DATA");
+    expect(result.ok).toBe(true);
+    expect(invoke).toHaveBeenCalledWith("delete_all_local_data", {
+      request: {
+        contractVersion: 2,
+        requestId: expect.any(String),
+        payload: { confirmation: "DELETE ALL LOCAL ORT DATA" },
+      },
+    });
+    const serialized = JSON.stringify(vi.mocked(invoke).mock.calls[0]?.[1]);
+    expect(serialized).not.toContain("path");
+    expect(serialized).not.toContain("profileId");
+    expect(deleteAllLocalDataFeedback(result)).toContain(
+      "new empty encrypted profile",
+    );
+  });
+
+  it("distinguishes committed cleanup from an unstarted or unknown result", () => {
+    expect(
+      deleteAllLocalDataFeedback({
+        ok: true,
+        value: { status: "cleanup_pending", restartRequired: true },
+      }),
+    ).toContain("Deletion was committed");
+    expect(
+      deleteAllLocalDataFeedback({
+        ok: false,
+        error: {
+          code: "LOCAL_DATA_DELETE_UNSAFE",
+          messageKey: "errors.localDataDelete",
+          retryable: false,
+          details: {},
+        },
+      }),
+    ).toContain("Deletion was not started");
+    expect(
+      deleteAllLocalDataFeedback({
+        ok: false,
+        error: {
+          code: "LOCAL_DATA_DELETE_OUTCOME_UNKNOWN",
+          messageKey: "errors.localDataDelete",
+          retryable: true,
+          details: {},
+        },
+      }),
+    ).toContain("outcome is unknown");
   });
 });

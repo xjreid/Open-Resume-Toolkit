@@ -3,6 +3,9 @@
 import { CONTRACT_VERSION } from "./health";
 import { isCommandResponse, type CommandResponse } from "./resume";
 
+export const DELETE_ALL_LOCAL_DATA_CONFIRMATION_PHRASE =
+  "DELETE ALL LOCAL ORT DATA";
+
 export interface StorageUsageRequest {
   contractVersion: typeof CONTRACT_VERSION;
   requestId: string;
@@ -26,10 +29,51 @@ export interface StorageUsage {
 
 export type StorageUsageCommandResponse = CommandResponse<StorageUsage>;
 
+export interface DeleteAllLocalDataRequest {
+  contractVersion: typeof CONTRACT_VERSION;
+  requestId: string;
+  payload: { confirmation: string };
+}
+
+export type DeleteAllLocalDataResult =
+  | { status: "deleted"; freshProfileReady: boolean }
+  | { status: "cleanup_pending"; restartRequired: true };
+
+export type DeleteAllLocalDataCommandResponse =
+  CommandResponse<DeleteAllLocalDataResult>;
+
 export function isStorageUsageCommandResponse(
   value: unknown,
 ): value is StorageUsageCommandResponse {
   return isCommandResponse(value, isStorageUsage);
+}
+
+export function isDeleteAllLocalDataCommandResponse(
+  value: unknown,
+): value is DeleteAllLocalDataCommandResponse {
+  return isCommandResponse(
+    value,
+    (result): result is DeleteAllLocalDataResult => {
+      if (
+        typeof result !== "object" ||
+        result === null ||
+        Array.isArray(result)
+      )
+        return false;
+      const record = result as Record<string, unknown>;
+      if (record.status === "deleted") {
+        return (
+          Object.keys(record).length === 2 &&
+          typeof record.freshProfileReady === "boolean"
+        );
+      }
+      return (
+        Object.keys(record).length === 2 &&
+        record.status === "cleanup_pending" &&
+        record.restartRequired === true
+      );
+    },
+  );
 }
 
 function isStorageUsage(value: unknown): value is StorageUsage {

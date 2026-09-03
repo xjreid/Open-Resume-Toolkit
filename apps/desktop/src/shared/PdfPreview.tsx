@@ -17,6 +17,7 @@ import {
   renderResumePdf,
   exportResumePdf,
   releaseResumePdf,
+  replayPdfRender,
   requestPdfRenderHistory,
 } from "./command-client";
 import {
@@ -35,6 +36,17 @@ interface Props {
   onBegin: (kind: "rendering" | "exporting") => boolean;
   onFinish: (notice: string) => void;
   semantic: (document: ResumeDocument) => ReactNode;
+}
+
+export function replayableDocument(
+  manifest: PdfRenderManifest,
+  saved: VersionedResume | null,
+  published: VersionedResume | null,
+): ResumeDocument | null {
+  const current = manifest.source === "saved_draft" ? saved : published;
+  return current?.revision === manifest.sourceRevision
+    ? current.document
+    : null;
 }
 
 export function PdfPreviewPanel({
@@ -143,6 +155,44 @@ export function PdfPreviewPanel({
       setMessage(notice);
       onFinish(notice);
     }
+  }
+
+  function replayDocument(manifest: PdfRenderManifest) {
+    return replayableDocument(manifest, saved, published);
+  }
+
+  async function replay(manifest: PdfRenderManifest) {
+    const document = replayDocument(manifest);
+    if (
+      blocked ||
+      (manifest.source === "saved_draft" && dirty) ||
+      !document ||
+      !onBegin("rendering")
+    )
+      return;
+    setSnapshot(null);
+    setReady(false);
+    setMessage("Verifying the retained receipt with the installed renderer…");
+    const result = await replayPdfRender(manifest);
+    if (!mounted.current) {
+      if (result.ok) void releaseResumePdf(result.value.renderId);
+      return;
+    }
+    if (result.ok) {
+      setSnapshot({ preview: result.value, document });
+      setMessage("Loading the verified replay PDF…");
+      onFinish("The installed renderer reproduced the exact retained receipt.");
+      void refreshHistory();
+      return;
+    }
+    const notice =
+      result.error.code === "PDF_REPLAY_SOURCE_UNAVAILABLE"
+        ? "That exact source revision is no longer the current draft or published snapshot. No substitute was rendered."
+        : result.error.code === "PDF_REPLAY_INCOMPATIBLE"
+          ? "The installed renderer could not reproduce the exact historical receipt. No replay was exposed."
+          : pdfFailure(result.error.code);
+    setMessage(notice);
+    onFinish(notice);
   }
 
   const preview = snapshot?.preview;
@@ -290,6 +340,23 @@ export function PdfPreviewPanel({
                   {manifest.renderCount} time(s)
                 </span>
                 <code>{manifest.receipt.pdfSha256}</code>
+                <button
+                  type="button"
+                  className="button--secondary button--compact"
+                  disabled={
+                    blocked ||
+                    (manifest.source === "saved_draft" && dirty) ||
+                    replayDocument(manifest) === null
+                  }
+                  title={
+                    replayDocument(manifest) === null
+                      ? "Replay requires this exact revision to be the current draft or latest published snapshot."
+                      : "Regenerate and expose a preview only if every retained receipt field matches."
+                  }
+                  onClick={() => void replay(manifest)}
+                >
+                  Verify &amp; replay
+                </button>
               </li>
             ))}
           </ol>
@@ -297,7 +364,9 @@ export function PdfPreviewPanel({
         <p>
           The encrypted profile retains at most 100 distinct receipt identities;
           this view shows the newest 20. PDF bytes and resume text are not
-          stored in this history.
+          stored in this history. Replay never substitutes a newer source or a
+          different renderer result; unavailable revisions remain
+          inspection-only.
         </p>
       </details>
       <PdfNotices />

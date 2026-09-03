@@ -22,8 +22,8 @@ pub use backup::{
 pub use pdf::{
     MAX_PDF_BYTES, MAX_PDF_PAGES, MAX_PDF_RENDER_HISTORY, PDF_PREVIEW_TTL_SECONDS,
     PdfExportResponse, PdfPreviewResponse, PdfReleaseResponse, PdfRenderHistoryRequest,
-    PdfRenderHistoryResponse, PdfRenderManifest, PdfRenderReceipt, PdfTicketPayload,
-    PdfTicketRequest, RenderPdfRequest,
+    PdfRenderHistoryResponse, PdfRenderManifest, PdfRenderReceipt, PdfReplayPayload,
+    PdfReplayRequest, PdfTicketPayload, PdfTicketRequest, RenderPdfRequest,
 };
 
 pub use text_export::{
@@ -45,7 +45,11 @@ pub use resume_commands::{
     PublishResumeResponse, ResumeWorkspaceResponse, SaveResumePayload, SaveResumeRequest,
     VersionedResumeResponse,
 };
-pub use storage_usage::{StorageUsagePayload, StorageUsageRequest, StorageUsageResponse};
+pub use storage_usage::{
+    DELETE_ALL_LOCAL_DATA_CONFIRMATION_PHRASE, DeleteAllLocalDataPayload,
+    DeleteAllLocalDataRequest, DeleteAllLocalDataResponse, StorageUsagePayload,
+    StorageUsageRequest, StorageUsageResponse,
+};
 
 pub const CONTRACT_VERSION: u16 = 2;
 

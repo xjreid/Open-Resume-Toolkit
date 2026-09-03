@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isStorageUsageCommandResponse } from "../generated/storage";
+import {
+  DELETE_ALL_LOCAL_DATA_CONFIRMATION_PHRASE,
+  isDeleteAllLocalDataCommandResponse,
+  isStorageUsageCommandResponse,
+} from "../generated/storage";
 
 const usage = {
   databaseSchema: 2,
@@ -32,6 +36,34 @@ describe("storage usage contract", () => {
       { ...usage, totalProfileBytes: 136 },
     ]) {
       expect(isStorageUsageCommandResponse({ ok: true, value })).toBe(false);
+    }
+  });
+
+  it("accepts only exact all-local-data deletion outcomes", () => {
+    expect(DELETE_ALL_LOCAL_DATA_CONFIRMATION_PHRASE).toBe(
+      "DELETE ALL LOCAL ORT DATA",
+    );
+    expect(
+      isDeleteAllLocalDataCommandResponse({
+        ok: true,
+        value: { status: "deleted", freshProfileReady: true },
+      }),
+    ).toBe(true);
+    expect(
+      isDeleteAllLocalDataCommandResponse({
+        ok: true,
+        value: { status: "cleanup_pending", restartRequired: true },
+      }),
+    ).toBe(true);
+    for (const value of [
+      { status: "deleted", freshProfileReady: true, path: "/private/profile" },
+      { status: "deleted", freshProfileReady: "yes" },
+      { status: "cleanup_pending", restartRequired: false },
+      { status: "cleanup_pending", restartRequired: true, deleted: false },
+    ]) {
+      expect(isDeleteAllLocalDataCommandResponse({ ok: true, value })).toBe(
+        false,
+      );
     }
   });
 });

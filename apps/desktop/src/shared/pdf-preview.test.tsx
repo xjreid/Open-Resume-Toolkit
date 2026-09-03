@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import type { PdfPreview } from "@ort/contracts/pdf";
-import { PdfPreviewPanel } from "./PdfPreview";
+import { PdfPreviewPanel, replayableDocument } from "./PdfPreview";
 import {
   previewExpired,
   previewIsStale,
+  samePdfReceipt,
   verifiedPdfBytes,
   pdfFailure,
 } from "./pdf-preview";
@@ -15,6 +16,7 @@ import { closeDisposition } from "./close-policy";
 import {
   renderResumePdf,
   exportResumePdf,
+  replayPdfRender,
   requestPdfRenderHistory,
 } from "./command-client";
 import { invoke } from "@tauri-apps/api/core";
@@ -62,6 +64,33 @@ it("verifies exact bytes before sending them to PDF.js", async () => {
     }),
   ).rejects.toThrow();
 });
+it("compares every receipt field before accepting a replay", () => {
+  expect(samePdfReceipt(preview.receipt, { ...preview.receipt })).toBe(true);
+  expect(
+    samePdfReceipt(preview.receipt, {
+      ...preview.receipt,
+      templateSha256: "e".repeat(64),
+    }),
+  ).toBe(false);
+});
+it("never substitutes a different current revision for replay", () => {
+  const document = createResumeDocument();
+  const manifest = {
+    manifestId: "019a0000-0000-7000-8000-000000000002",
+    source: "saved_draft" as const,
+    sourceRevision: 2,
+    generatedAtUnixMs: 900,
+    lastGeneratedAtUnixMs: 1000,
+    renderCount: 1,
+    receipt: preview.receipt,
+  };
+  expect(
+    replayableDocument(manifest, { revision: 1, document }, null),
+  ).toBeNull();
+  expect(replayableDocument(manifest, { revision: 2, document }, null)).toBe(
+    document,
+  );
+});
 it("native requests contain no path, document, PDF bytes or template", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({ ok: true, value: preview });
   expect((await renderResumePdf("saved_draft", 1)).ok).toBe(true);
@@ -88,6 +117,30 @@ it("native requests contain no path, document, PDF bytes or template", async () 
   expect(invoke).toHaveBeenLastCalledWith("load_pdf_render_history", {
     request: expect.objectContaining({ payload: {} }),
   });
+  const manifest = {
+    manifestId: "019a0000-0000-7000-8000-000000000002",
+    source: "saved_draft" as const,
+    sourceRevision: 1,
+    generatedAtUnixMs: 900,
+    lastGeneratedAtUnixMs: 1000,
+    renderCount: 1,
+    receipt: preview.receipt,
+  };
+  vi.mocked(invoke).mockResolvedValueOnce({ ok: true, value: preview });
+  expect((await replayPdfRender(manifest)).ok).toBe(true);
+  expect(invoke).toHaveBeenLastCalledWith("replay_resume_pdf", {
+    request: expect.objectContaining({
+      payload: { manifestId: manifest.manifestId },
+    }),
+  });
+  vi.mocked(invoke).mockResolvedValueOnce({
+    ok: true,
+    value: {
+      ...preview,
+      receipt: { ...preview.receipt, pdfSha256: "f".repeat(64) },
+    },
+  });
+  expect((await replayPdfRender(manifest)).ok).toBe(false);
   vi.mocked(invoke).mockResolvedValueOnce({
     ok: true,
     value: { ...preview, revision: 2 },

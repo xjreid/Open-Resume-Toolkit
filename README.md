@@ -4,7 +4,13 @@
 
 This repository defines and implements **Open Resume Toolkit**: a free, open-source, local-first desktop application with companion Chrome and Edge extensions.
 
-Implementation has begun at milestone M0. The current code is an architecture shell only: it provides isolated main/overlay development windows, a typed health command, generated contracts, and an inert permission-free extension skeleton. It does not yet store resumes or enable import, AI, browser messaging, or updates.
+Implementation has reached milestone M2. The development build has an encrypted
+local resume editor with draft/publish lifecycle, guarded quit, text/DOCX export,
+local PDF preview/export and render history, encrypted backup validation/restore,
+storage management, and crash-resumable deletion of all currently implemented
+local profile data. Production PDF/DOCX import remains disabled pending its
+cross-platform containment proof. AI, browser messaging, updates, final document
+templates, and release hardening are not yet implemented.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) to configure a development machine and run the shell.
 

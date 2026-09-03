@@ -62,6 +62,10 @@
     "m2SchemaV2Migration": "passed-local-additive-checksummed-upgrade-and-interrupted-exact-manifest-handoff-recovery-macos-arm64",
     "m2PdfRenderHistory": "passed-local-encrypted-deduplicated-bounded-restart-contract-ui-and-full-workspace-check-macos-arm64",
     "m2PdfRenderHistoryNative": "pending-refreshed-application-after-cross-platform-ci",
+    "m2CurrentRendererReplay": "passed-local-exact-current-source-full-receipt-match-and-no-substitution-macos-arm64",
+    "m2ArchivedRendererReplay": "pending-retained-source-and-superseded-renderer-bundles",
+    "m2AllLocalDataDeletion": "passed-local-synthetic-exact-target-rekey-restart-recovery-contract-ui-macos-arm64",
+    "m2AllLocalDataDeletionNative": "pending-installed-macos-and-windows-vault-filesystem-interruption-accessibility",
     "macosPreviewPackage": "296610a-arm64-app-built-installed-hash-matched-and-codesign-deep-strict-passed-dmg-not-refreshed",
     "platformBuilds": "296610a-all-four-ci-jobs-user-reported-passed-not-independently-retrieved"
   },

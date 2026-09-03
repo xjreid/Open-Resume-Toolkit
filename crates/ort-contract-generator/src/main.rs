@@ -2,13 +2,14 @@ use std::{fs, path::PathBuf};
 
 use ort_domain::{
     BackupRecoveryStatusRequest, BackupRecoveryStatusResponse, CloseStatusRequest,
-    CloseStatusResponse, DeleteSafetyCopyRequest, DeleteSafetyCopyResponse, DocumentLimits,
-    ExportBackupRequest, ExportBackupResponse, ExportDocxRequest, ExportDocxResponse,
-    ExportTextRequest, ExportTextResponse, HealthRequest, HealthResponse, LoadResumeRequest,
-    PublishResumeRequest, PublishResumeResponse, ResolveCloseRequest, RestoreBackupRequest,
-    RestoreBackupResponse, ResumeWorkspaceResponse, RollbackSafetyCopyRequest,
-    RollbackSafetyCopyResponse, SaveResumeRequest, StorageUsageRequest, StorageUsageResponse,
-    ValidateBackupRequest, ValidateBackupResponse, VersionedResumeResponse,
+    CloseStatusResponse, DeleteAllLocalDataRequest, DeleteAllLocalDataResponse,
+    DeleteSafetyCopyRequest, DeleteSafetyCopyResponse, DocumentLimits, ExportBackupRequest,
+    ExportBackupResponse, ExportDocxRequest, ExportDocxResponse, ExportTextRequest,
+    ExportTextResponse, HealthRequest, HealthResponse, LoadResumeRequest, PublishResumeRequest,
+    PublishResumeResponse, ResolveCloseRequest, RestoreBackupRequest, RestoreBackupResponse,
+    ResumeWorkspaceResponse, RollbackSafetyCopyRequest, RollbackSafetyCopyResponse,
+    SaveResumeRequest, StorageUsageRequest, StorageUsageResponse, ValidateBackupRequest,
+    ValidateBackupResponse, VersionedResumeResponse,
 };
 use schemars::schema_for;
 
@@ -42,6 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_schema::<ort_domain::PdfRenderHistoryResponse>(
         &output.join("pdf.history.response.schema.json"),
     )?;
+    write_schema::<ort_domain::PdfReplayRequest>(&output.join("pdf.replay.request.schema.json"))?;
     fs::write(
         output.join("pdf.ts"),
         include_str!("pdf.ts.template")
@@ -76,9 +78,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(output.join("resume.ts"), RESUME_TYPESCRIPT)?;
     write_schema::<StorageUsageRequest>(&output.join("storage.usage.request.schema.json"))?;
     write_schema::<StorageUsageResponse>(&output.join("storage.usage.response.schema.json"))?;
+    write_schema::<DeleteAllLocalDataRequest>(
+        &output.join("storage.delete-all.request.schema.json"),
+    )?;
+    write_schema::<DeleteAllLocalDataResponse>(
+        &output.join("storage.delete-all.response.schema.json"),
+    )?;
     fs::write(
         output.join("storage.ts"),
-        include_str!("storage.ts.template"),
+        include_str!("storage.ts.template").replace(
+            "__DELETE_ALL_CONFIRMATION_PHRASE__",
+            ort_domain::DELETE_ALL_LOCAL_DATA_CONFIRMATION_PHRASE,
+        ),
     )?;
     let limits = DocumentLimits::default();
     fs::write(

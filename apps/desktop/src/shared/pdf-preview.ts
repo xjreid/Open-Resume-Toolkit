@@ -1,4 +1,8 @@
-import { PDF_PREVIEW_TTL_SECONDS, type PdfPreview } from "@ort/contracts/pdf";
+import {
+  PDF_PREVIEW_TTL_SECONDS,
+  type PdfPreview,
+  type PdfRenderReceipt,
+} from "@ort/contracts/pdf";
 
 export function previewExpired(preview: PdfPreview, now: number): boolean {
   return now >= preview.generatedAtUnixMs + PDF_PREVIEW_TTL_SECONDS * 1000;
@@ -11,6 +15,24 @@ export function previewIsStale(
 ): boolean {
   return (
     preview.revision !== revision || (preview.source === "saved_draft" && dirty)
+  );
+}
+
+export function samePdfReceipt(
+  left: PdfRenderReceipt,
+  right: PdfRenderReceipt,
+): boolean {
+  return (
+    left.documentSha256 === right.documentSha256 &&
+    left.documentSchemaVersion === right.documentSchemaVersion &&
+    left.pdfSha256 === right.pdfSha256 &&
+    left.rendererVersion === right.rendererVersion &&
+    left.templateId === right.templateId &&
+    left.templateSha256 === right.templateSha256 &&
+    left.fontBundleId === right.fontBundleId &&
+    left.fontBundleSha256 === right.fontBundleSha256 &&
+    left.pageCount === right.pageCount &&
+    left.byteCount === right.byteCount
   );
 }
 

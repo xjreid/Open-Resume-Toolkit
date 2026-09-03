@@ -87,15 +87,24 @@ Exit evidence:
 
 ### Current status
 
-As of 2026-09-03, M2 is **about 59% complete** by stage-gate weighting:
-approximately 75% of the implementation foundation, 60% of end-to-end
-functionality, and 45% of release/exit evidence. The estimate gives security,
+As of 2026-09-03, M2 is **about 64% complete** by stage-gate weighting after
+the all-local-data deletion and current-bundle render-replay checkpoints:
+approximately 82% of the implementation foundation, 64% of end-to-end
+functionality, and 48% of release/exit evidence.
+The estimate gives security,
 recovery, accessibility, cross-platform behavior, and the complete offline
 journey more weight than raw feature count.
 
 Portable-backup export, storage inventory, and authenticated backup validation
 are committed through `0a706b2`. Restart-staged replacement and retained
 safety-copy management are committed in `96fc983`. M2 is not release-ready.
+The all-local-data deletion checkpoint is implemented in the current working
+tree based on `104d8aa`; native and cross-platform evidence remains pending.
+The bounded medium-reasoning **current-bundle verified render-history replay**
+checkpoint is also implemented locally. It regenerates only an exact current
+draft/latest-published revision, verifies the complete retained receipt before
+exposing bytes, and reports unavailable history without substituting content.
+Archived-source and superseded-renderer binary replay remains a later M2 gate.
 
 ### Completed or working locally
 
@@ -110,8 +119,13 @@ safety-copy management are committed in `96fc983`. M2 is not release-ready.
   parsing and import UI remain disabled.
 - **[HIGH]** **Backup and recovery:** encrypted portable export, authenticated
   read-only validation, confirmed restart-staged replacement,
-  retained safety-copy status/rollback, and exact confirmed safety-copy cleanup.
+  retained safety-copy status/rollback, exact confirmed safety-copy cleanup, and
+  crash-resumable deletion/re-keying of all currently implemented local profile
+  and recovery data.
 - **Storage reporting:** content-free storage usage inventory.
+- **Verified current-bundle replay:** exact current draft/latest-published
+  receipts can be regenerated with the installed renderer and are exposed only
+  when document, PDF, template, font and renderer receipt fields all match.
 - **[HIGH]** **Storage and restart safety:** no-clobber native file boundaries,
   encrypted restart tests, and Windows SQLCipher logging mitigation.
 - **Reliability:** generated contracts, deterministic output/golden tests, and
@@ -131,13 +145,15 @@ safety-copy management are committed in `96fc983`. M2 is not release-ready.
   [Windows checkout repair](../../evidence/0.0.0-dev/windows-docx-checkout.md),
   [PDF preview](../../evidence/0.0.0-dev/m2-pdf-preview.md),
   [installed PDF smoke](../../evidence/0.0.0-dev/m2-installed-pdf-smoke.md),
-  [render history](../../evidence/0.0.0-dev/m2-render-history.md), and
-  [portable render history](../../evidence/0.0.0-dev/m2-portable-render-history.md).
+  [render history](../../evidence/0.0.0-dev/m2-render-history.md),
+  [portable render history](../../evidence/0.0.0-dev/m2-portable-render-history.md),
+  and [verified current-bundle replay](../../evidence/0.0.0-dev/m2-current-render-replay.md).
 - Storage and backup: [portable export](../../evidence/0.0.0-dev/m2-portable-backup-export.md),
   [storage usage](../../evidence/0.0.0-dev/m2-storage-usage.md),
   [backup validation](../../evidence/0.0.0-dev/m2-backup-validation.md),
   [replace restore](../../evidence/0.0.0-dev/m2-replace-restore.md), and
-  [safety-copy management](../../evidence/0.0.0-dev/m2-safety-copy-management.md).
+  [safety-copy management](../../evidence/0.0.0-dev/m2-safety-copy-management.md),
+  and [all-local-data deletion](../../evidence/0.0.0-dev/m2-all-local-data-deletion.md).
 - Cross-platform repair: [Windows SQLCipher logging](../../evidence/0.0.0-dev/windows-sqlcipher-logging.md).
 
 ### Remaining release gates
@@ -148,9 +164,12 @@ safety-copy management are committed in `96fc983`. M2 is not release-ready.
 - **[HIGH]** Finish native/cross-platform vault, filesystem, quit, low-disk, and
   injected crash/failure verification.
 - Finish native/cross-platform editor, dialog, accessibility, final PDF/DOCX
-  templates, historical renderer replay, and native reader verification.
-- **[HIGH]** Add full active-profile deletion and the final cleanup/retention
-  policy.
+  templates, archived-source/superseded-renderer replay, and native reader
+  verification.
+- **[HIGH]** Complete native macOS/Windows vault, interruption, filesystem and
+  assistive-technology evidence for all-local-data deletion. Extend its exact
+  cleanup inventory when later milestones add credentials, native IPC state,
+  workspace records, or ORT-owned import/drag temporary files.
 - **[HIGH]** Pass the complete offline journey and all M2 exit evidence.
   Hostile-file parsing must remain disabled until its containment gate passes.
 

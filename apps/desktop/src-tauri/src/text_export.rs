@@ -13,9 +13,7 @@ use ort_storage::{StorageError, VersionedResume};
 use tauri::{Manager, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
-use super::{
-    DesktopState, DesktopStorage, storage_failure, storage_unavailable, window_not_authorized,
-};
+use super::{DesktopState, storage_failure, window_not_authorized};
 
 #[derive(Default)]
 pub(crate) struct ExportState(Arc<AtomicBool>);
@@ -73,19 +71,17 @@ async fn export_saved(
     let Some(lease) = exports.begin() else {
         return export_failure("EXPORT_BUSY");
     };
-    let DesktopStorage::Ready(store) = &state.storage else {
-        return storage_unavailable();
-    };
     let source = request.payload.source;
-    let loaded = match source {
-        ExportSource::SavedDraft => store.load_draft(),
-        ExportSource::PublishedSnapshot => store.load_latest_published(),
-    };
-    let saved =
-        match loaded.and_then(|value| exact_revision(value, request.payload.expected_revision)) {
-            Ok(value) => value,
-            Err(error) => return storage_failure(&error),
+    let saved = match state.with_store(|store| {
+        let loaded = match source {
+            ExportSource::SavedDraft => store.load_draft(),
+            ExportSource::PublishedSnapshot => store.load_latest_published(),
         };
+        loaded.and_then(|value| exact_revision(value, request.payload.expected_revision))
+    }) {
+        Ok(value) => value,
+        Err(error) => return storage_failure(&error),
+    };
     // The immutable saved content is captured before the dialog; editing while
     // it is open cannot substitute renderer text into this export.
     match tauri::async_runtime::spawn_blocking(move || {

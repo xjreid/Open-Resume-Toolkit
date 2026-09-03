@@ -66,6 +66,29 @@ pub struct PdfRenderHistoryRequest {
     pub payload: EmptyPayload,
 }
 
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PdfReplayPayload {
+    pub manifest_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PdfReplayRequest {
+    pub contract_version: u16,
+    pub request_id: String,
+    pub payload: PdfReplayPayload,
+}
+
+impl PdfReplayRequest {
+    /// # Errors
+    /// Rejects noncanonical manifest IDs and metadata before storage access.
+    pub fn validate(&self) -> Result<(), ErrorEnvelope> {
+        validate_request_metadata(self.contract_version, &self.request_id)?;
+        validate_v7_id(&self.payload.manifest_id, "INVALID_RENDER_MANIFEST_ID")
+    }
+}
+
 impl PdfRenderHistoryRequest {
     /// # Errors
     /// Rejects unsupported or malformed command metadata.
@@ -93,17 +116,16 @@ impl PdfTicketRequest {
     /// Rejects noncanonical IDs and metadata before accessing a preview or dialog.
     pub fn validate(&self) -> Result<(), ErrorEnvelope> {
         validate_request_metadata(self.contract_version, &self.request_id)?;
-        let parsed = uuid::Uuid::parse_str(&self.payload.render_id).ok();
-        if !parsed
-            .is_some_and(|id| id.get_version_num() == 7 && id.to_string() == self.payload.render_id)
-        {
-            return Err(ErrorEnvelope::new(
-                "INVALID_RENDER_ID",
-                "errors.invalidRenderId",
-                false,
-            ));
-        }
+        validate_v7_id(&self.payload.render_id, "INVALID_RENDER_ID")
+    }
+}
+
+fn validate_v7_id(value: &str, code: &str) -> Result<(), ErrorEnvelope> {
+    let parsed = uuid::Uuid::parse_str(value).ok();
+    if parsed.is_some_and(|id| id.get_version_num() == 7 && id.to_string() == value) {
         Ok(())
+    } else {
+        Err(ErrorEnvelope::new(code, "errors.invalidRenderId", false))
     }
 }
 
@@ -161,5 +183,33 @@ mod tests {
             bad["payload"][key] = json!("untrusted");
             assert!(serde_json::from_value::<PdfTicketRequest>(bad).is_err());
         }
+    }
+
+    #[test]
+    fn replay_accepts_only_a_canonical_manifest_identity() {
+        let valid = serde_json::json!({
+            "contractVersion": crate::CONTRACT_VERSION,
+            "requestId": "synthetic-replay",
+            "payload": {"manifestId": "019abcde-abcd-7abc-8abc-abcdef012345"}
+        });
+        assert!(
+            serde_json::from_value::<PdfReplayRequest>(valid.clone())
+                .unwrap()
+                .validate()
+                .is_ok()
+        );
+        for value in ["../manifest", "00000000-0000-4000-8000-000000000000"] {
+            let mut invalid = valid.clone();
+            invalid["payload"]["manifestId"] = serde_json::json!(value);
+            assert!(
+                serde_json::from_value::<PdfReplayRequest>(invalid)
+                    .unwrap()
+                    .validate()
+                    .is_err()
+            );
+        }
+        let mut extra = valid;
+        extra["payload"]["source"] = serde_json::json!("saved_draft");
+        assert!(serde_json::from_value::<PdfReplayRequest>(extra).is_err());
     }
 }
