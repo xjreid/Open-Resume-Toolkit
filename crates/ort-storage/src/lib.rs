@@ -14,14 +14,16 @@ use std::time::Duration;
 use jiff::Timestamp;
 use ort_backup::{
     BackupError, BackupExportRequestV1, BackupPassphrase, PortableProfileV1,
-    PortablePublishedResumeV1, PortableResumeRevisionV1, PortableSettingV1, create_backup,
-    restore_backup,
+    PortablePublishedResumeV1, PortableRenderManifestV1, PortableResumeRevisionV1,
+    PortableSettingV1, create_backup, restore_backup,
 };
 use ort_domain::{
     DocumentLimits, ExportSource, MAX_PDF_BYTES, MAX_PDF_PAGES, PdfRenderReceipt, ResumeDocument,
 };
 use ort_vault::{DatabaseKey, DatabaseKeyVault, VaultError, VaultReference};
-use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, backup, params};
+use rusqlite::{
+    Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior, backup, params,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
@@ -1028,6 +1030,11 @@ impl EncryptedStore {
                 )
                 .map_err(|_| StorageError::Unavailable)?;
         }
+        restore_render_manifests(
+            &transaction,
+            &self.manifest.profile_id.to_string(),
+            &backup.profile.render_manifests,
+        )?;
         transaction
             .commit()
             .map_err(|_| StorageError::Unavailable)?;
@@ -1113,6 +1120,8 @@ impl EncryptedStore {
                 })
                 .collect::<Result<BTreeMap<_, _>, StorageError>>()?
         };
+        let render_manifests =
+            read_portable_render_manifests(&transaction, &self.manifest.profile_id.to_string())?;
         transaction
             .commit()
             .map_err(|_| StorageError::Unavailable)?;
@@ -1120,6 +1129,7 @@ impl EncryptedStore {
             master_draft,
             published_resumes,
             settings,
+            render_manifests,
         })
     }
 
@@ -1189,6 +1199,103 @@ impl EncryptedStore {
         }
         Ok(())
     }
+}
+
+fn restore_render_manifests(
+    transaction: &Transaction<'_>,
+    profile_id: &str,
+    manifests: &[PortableRenderManifestV1],
+) -> Result<(), StorageError> {
+    for manifest in manifests {
+        let manifest_id =
+            Uuid::parse_str(&manifest.manifest_id).map_err(|_| StorageError::InvalidData)?;
+        if manifest_id.get_version_num() != 7
+            || manifest_id.to_string() != manifest.manifest_id
+            || manifest.last_generated_at_unix_ms < manifest.generated_at_unix_ms
+            || manifest.render_count == 0
+        {
+            return Err(StorageError::InvalidData);
+        }
+        validate_render_manifest(
+            manifest.source_revision,
+            manifest.generated_at_unix_ms,
+            &manifest.receipt,
+        )?;
+        let generated_at =
+            i64::try_from(manifest.generated_at_unix_ms).map_err(|_| StorageError::InvalidData)?;
+        let last_generated_at = i64::try_from(manifest.last_generated_at_unix_ms)
+            .map_err(|_| StorageError::InvalidData)?;
+        let page_count =
+            i64::try_from(manifest.receipt.page_count).map_err(|_| StorageError::InvalidData)?;
+        let byte_count =
+            i64::try_from(manifest.receipt.byte_count).map_err(|_| StorageError::InvalidData)?;
+        transaction
+            .execute(
+                "INSERT INTO render_manifests \
+                 (manifest_id, profile_id, source, source_revision, generated_at_unix_ms, \
+                  last_generated_at_unix_ms, render_count, document_sha256, \
+                  document_schema_version, pdf_sha256, renderer_version, template_id, \
+                  template_sha256, font_bundle_id, font_bundle_sha256, page_count, byte_count) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+                params![
+                    manifest.manifest_id,
+                    profile_id,
+                    export_source_code(manifest.source),
+                    manifest.source_revision,
+                    generated_at,
+                    last_generated_at,
+                    i64::from(manifest.render_count),
+                    manifest.receipt.document_sha256,
+                    i64::from(manifest.receipt.document_schema_version),
+                    manifest.receipt.pdf_sha256,
+                    manifest.receipt.renderer_version,
+                    manifest.receipt.template_id,
+                    manifest.receipt.template_sha256,
+                    manifest.receipt.font_bundle_id,
+                    manifest.receipt.font_bundle_sha256,
+                    page_count,
+                    byte_count,
+                ],
+            )
+            .map_err(|_| StorageError::Unavailable)?;
+    }
+    Ok(())
+}
+
+fn read_portable_render_manifests(
+    transaction: &Transaction<'_>,
+    profile_id: &str,
+) -> Result<Vec<PortableRenderManifestV1>, StorageError> {
+    let mut statement = transaction
+        .prepare(
+            "SELECT manifest_id, source, source_revision, generated_at_unix_ms, \
+             last_generated_at_unix_ms, render_count, document_sha256, \
+             document_schema_version, pdf_sha256, renderer_version, template_id, \
+             template_sha256, font_bundle_id, font_bundle_sha256, page_count, byte_count \
+             FROM render_manifests WHERE profile_id = ?1 \
+             ORDER BY last_generated_at_unix_ms DESC, manifest_id DESC \
+             LIMIT ?2",
+        )
+        .map_err(|_| StorageError::Unavailable)?;
+    statement
+        .query_map(
+            params![profile_id, MAX_RENDER_MANIFESTS + 1],
+            render_manifest_row,
+        )
+        .map_err(|_| StorageError::Unavailable)?
+        .map(|row| {
+            let stored = parse_render_manifest(row.map_err(|_| StorageError::Unavailable)?)?;
+            Ok(PortableRenderManifestV1 {
+                manifest_id: stored.manifest_id.to_string(),
+                source: stored.source,
+                source_revision: stored.source_revision,
+                generated_at_unix_ms: stored.generated_at_unix_ms,
+                last_generated_at_unix_ms: stored.last_generated_at_unix_ms,
+                render_count: stored.render_count,
+                receipt: stored.receipt,
+            })
+        })
+        .collect()
 }
 
 type RenderManifestRow = (
@@ -2555,6 +2662,14 @@ mod tests {
                 &Value::String("system".to_owned()),
             )
             .expect("save setting");
+        let render_manifest = source
+            .record_render_manifest(
+                ExportSource::PublishedSnapshot,
+                1,
+                1_725_192_000_000,
+                &synthetic_render_receipt("e".repeat(64)),
+            )
+            .expect("record render manifest");
         let passphrase = BackupPassphrase::new("synthetic portable backup passphrase".to_owned())
             .expect("valid passphrase");
         let backup = source
@@ -2615,6 +2730,12 @@ mod tests {
                 .expect("setting exists")
                 .value,
             Value::String("system".to_owned())
+        );
+        assert_eq!(
+            destination
+                .load_recent_render_manifests(20)
+                .expect("load restored render history"),
+            vec![render_manifest]
         );
         destination.verify_integrity().expect("restored integrity");
     }

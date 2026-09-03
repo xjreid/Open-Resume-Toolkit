@@ -12,10 +12,15 @@ authenticates the bounded fixed header as associated data. The implementation
 pins `argon2 0.6.0`, `chacha20poly1305 0.11.0`, and `sha2 0.11.0` with secret
 clearing features where provided.
 
+The M2 format-1.1 extension includes the encrypted profile's bounded,
+content-free PDF render manifests and advertises database schema 2. Readers keep
+format-1.0 compatibility, require header/payload version agreement, and reject
+render history presented as 1.0. PDF bytes, source content, preview tickets and
+paths remain excluded.
+
 ## Consequences
 
 Restoring creates a fresh local SQLCipher key and vault identity. Device-bound
 keys and credentials never enter the container. The prototype remains disabled
 in the UI until Windows/macOS cross-restore, file atomicity, hostile-input/fuzz,
 memory-pressure, cancellation, and user-recovery behavior pass.
-

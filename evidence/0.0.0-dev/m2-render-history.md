@@ -71,9 +71,10 @@ build; its saved profile was not migrated by these source-level tests.
 - Historical binary replay is not implemented. A receipt identifies prior
   inputs/tooling/output but does not retain the old renderer bundle, structured
   revision or PDF bytes needed to regenerate every old artifact.
-- The portable-backup prototype does not yet include render manifests. Final
-  backup/export semantics, deletion/storage-management UI and bounded retention
-  controls remain M2 work.
+- Portable backup format 1.1 now includes render manifests; see
+  [the follow-on checkpoint](m2-portable-render-history.md). Final backup/export
+  UI semantics, deletion/storage-management UI and bounded retention controls
+  remain M2 work.
 - Import stays disabled (`IMPORT_ENABLED=false`; worker exit 78). Export
   replacement/crash cleanup, final templates, broader native PDF/DOCX checks and
   Windows containment remain separate gates.

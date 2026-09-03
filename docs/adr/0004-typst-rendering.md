@@ -36,7 +36,9 @@ and generation time. The M2 schema-v2 checkpoint now stores those content-free
 receipts in the encrypted profile, deduplicated by exact source revision and PDF
 identity with bounded retention. It does not persist PDF bytes, source content,
 paths or preview tickets, and it does not yet provide historical binary replay or
-portable-backup inclusion.
+historical binary replay. Portable backup format 1.1 now carries the same
+bounded, content-free manifests while continuing to exclude PDF bytes and source
+content.
 
 See [checkpoint evidence](../../evidence/0.0.0-dev/m2-pdf-preview.md) and
 [dependency/font provenance](../dependencies/pdf/README.md). Golden and native

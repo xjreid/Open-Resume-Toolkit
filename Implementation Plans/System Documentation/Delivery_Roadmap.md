@@ -157,9 +157,12 @@ Current development status:
   before the UI receives bytes. Identical render identities deduplicate with a
   count; the newest 100 remain and the UI exposes 20 without PDF bytes, resume
   text, paths or preview tickets. Schema-v1 upgrade and interrupted exact-manifest
-  handoff recovery preserve existing records. Historical renderer replay and
-  portable-backup inclusion remain pending. See
-  `../../evidence/0.0.0-dev/m2-render-history.md`;
+  handoff recovery preserve existing records. Portable backup format 1.1 now
+  includes the same bounded, content-free manifests, restores them atomically
+  into a separately keyed profile, and retains format-1.0 read compatibility.
+  Historical renderer replay and native backup/export UX remain pending. See
+  `../../evidence/0.0.0-dev/m2-render-history.md` and
+  `../../evidence/0.0.0-dev/m2-portable-render-history.md`;
 - Windows CI repair passed per user report after `bdc3e10`: stage logs narrowed the
   stack overflow to encrypted-profile opening. A matching upstream SQLCipher
   Windows logging-recursion defect is mitigated by compiling out its native
@@ -171,10 +174,13 @@ Current development status:
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
   UI/session integration, private binary staging, richer entry/date/link mapping,
-  remaining native PDF preview/export verification, final PDF/DOCX templates and reader verification, confirmed replacement and
-  crash-cleanup policy for exports, historical renderer replay/backup inclusion, Windows native
-  Save-dialog/ACL/filesystem proof, storage management, and complete offline
-  journey evidence. M2 is not complete; do not enable hostile-file parsing or
+  remaining native PDF preview/export verification, final PDF/DOCX templates
+  and reader verification, confirmed replacement and crash-cleanup policy for
+  exports, historical renderer replay, Windows native Save-dialog/ACL/filesystem
+  proof, storage management, and complete offline
+  journey evidence. Portable render-manifest backup is implemented, but native
+  full-backup export/restore UX and its release verification remain gated. M2 is
+  not complete; do not enable hostile-file parsing or
   advance to public release based on the text-export checkpoint alone.
 
 Deliver:

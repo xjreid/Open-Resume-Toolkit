@@ -4,13 +4,16 @@
 //! associated data. Its encrypted payload contains canonical portable records,
 //! never a live database, OS-vault key, provider credential, or diagnostic log.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 use jiff::Timestamp;
-use ort_domain::{DocumentLimits, ResumeDocument};
+use ort_domain::{
+    DocumentLimits, EntityId, ExportSource, MAX_PDF_BYTES, MAX_PDF_PAGES, PdfRenderReceipt,
+    ResumeDocument,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -18,7 +21,9 @@ use zeroize::{Zeroize, Zeroizing};
 
 const MAGIC: &[u8; 4] = b"ORTB";
 const FORMAT_MAJOR: u16 = 1;
-const FORMAT_MINOR: u16 = 0;
+const FORMAT_MINOR: u16 = 1;
+const DATABASE_SCHEMA_V1_0: u16 = 1;
+const DATABASE_SCHEMA_V1_1: u16 = 2;
 const KDF_ARGON2ID: u8 = 1;
 const HEADER_LEN: usize = 76;
 const SALT_LEN: usize = 16;
@@ -34,9 +39,11 @@ const MIN_ITERATIONS: u32 = 3;
 const MAX_ITERATIONS: u32 = 10;
 const MAX_PAYLOAD_BYTES: usize = 64 * 1_024 * 1_024;
 const MAX_PUBLISHED_RESUMES: usize = 100;
+const MAX_RENDER_MANIFESTS: usize = 100;
 const MAX_SETTINGS: usize = 128;
 const MAX_SETTING_BYTES: usize = 64 * 1_024;
 const MAX_PASSPHRASE_BYTES: usize = 1_024;
+const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum BackupError {
@@ -105,12 +112,26 @@ pub struct PortableSettingV1 {
     pub value: Value,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortableRenderManifestV1 {
+    pub manifest_id: String,
+    pub source: ExportSource,
+    pub source_revision: i64,
+    pub generated_at_unix_ms: u64,
+    pub last_generated_at_unix_ms: u64,
+    pub render_count: u32,
+    pub receipt: PdfRenderReceipt,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PortableProfileV1 {
     pub master_draft: Option<PortableResumeRevisionV1>,
     pub published_resumes: Vec<PortablePublishedResumeV1>,
     pub settings: BTreeMap<String, PortableSettingV1>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub render_manifests: Vec<PortableRenderManifestV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,6 +140,8 @@ pub struct BackupInventoryV1 {
     pub master_drafts: u16,
     pub published_resumes: u16,
     pub settings: u16,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub render_manifests: u16,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -202,8 +225,33 @@ fn create_backup_with_entropy(
     salt: [u8; SALT_LEN],
     nonce: [u8; NONCE_LEN],
 ) -> Result<Vec<u8>, BackupError> {
+    create_backup_with_entropy_for_format(
+        passphrase,
+        request,
+        salt,
+        nonce,
+        FORMAT_MINOR,
+        DATABASE_SCHEMA_V1_1,
+    )
+}
+
+fn create_backup_with_entropy_for_format(
+    passphrase: &BackupPassphrase,
+    request: BackupExportRequestV1,
+    salt: [u8; SALT_LEN],
+    nonce: [u8; NONCE_LEN],
+    format_minor: u16,
+    database_schema: u16,
+) -> Result<Vec<u8>, BackupError> {
     validate_export_metadata(&request.app_version, &request.created_at)?;
     validate_profile(&request.profile)?;
+    let supported_writer = (format_minor == 0
+        && database_schema == DATABASE_SCHEMA_V1_0
+        && request.profile.render_manifests.is_empty())
+        || (format_minor == FORMAT_MINOR && database_schema == DATABASE_SCHEMA_V1_1);
+    if !supported_writer {
+        return Err(BackupError::InvalidContent);
+    }
     let profile_json =
         serde_json::to_vec(&request.profile).map_err(|_| BackupError::InvalidContent)?;
     if profile_json.len() > MAX_PAYLOAD_BYTES {
@@ -211,9 +259,9 @@ fn create_backup_with_entropy(
     }
     let manifest = BackupManifestV1 {
         format_major: FORMAT_MAJOR,
-        format_minor: FORMAT_MINOR,
+        format_minor,
         app_version: request.app_version,
-        database_schema: 1,
+        database_schema,
         document_schema: 1,
         created_at: request.created_at,
         inventory: inventory_for(&request.profile)?,
@@ -235,6 +283,7 @@ fn create_backup_with_entropy(
     let ciphertext_len_u64 =
         u64::try_from(ciphertext_len).map_err(|_| BackupError::InvalidContent)?;
     let header = build_header(
+        format_minor,
         WRITER_MEMORY_KIB,
         WRITER_ITERATIONS,
         WRITER_LANES,
@@ -297,7 +346,7 @@ fn restore_backup_inner(
     }
     let payload: PortableBackupV1 =
         serde_json::from_slice(&plaintext).map_err(|_| BackupError::InvalidBackup)?;
-    validate_payload(&payload)?;
+    validate_payload(&payload, &parsed.info)?;
     Ok(payload)
 }
 
@@ -325,6 +374,7 @@ fn cipher_for(
 }
 
 fn build_header(
+    format_minor: u16,
     memory_kib: u32,
     iterations: u32,
     lanes: u32,
@@ -335,7 +385,7 @@ fn build_header(
     let mut header = Vec::with_capacity(HEADER_LEN);
     header.extend_from_slice(MAGIC);
     header.extend_from_slice(&FORMAT_MAJOR.to_be_bytes());
-    header.extend_from_slice(&FORMAT_MINOR.to_be_bytes());
+    header.extend_from_slice(&format_minor.to_be_bytes());
     header.push(KDF_ARGON2ID);
     header.extend_from_slice(&[0_u8; 3]);
     header.extend_from_slice(&memory_kib.to_be_bytes());
@@ -369,7 +419,7 @@ fn parse_header(bytes: &[u8]) -> Result<ParsedHeader<'_>, BackupError> {
     let lanes = read_u32(bytes, 20)?;
     let ciphertext_bytes = read_u64(bytes, 28)?;
     let header_is_valid = format_major == FORMAT_MAJOR
-        && format_minor == FORMAT_MINOR
+        && format_minor <= FORMAT_MINOR
         && bytes[8] == KDF_ARGON2ID
         && bytes[9..12] == [0_u8; 3]
         && (MIN_MEMORY_KIB..=MAX_MEMORY_KIB).contains(&memory_kib)
@@ -434,11 +484,21 @@ fn read_u64(bytes: &[u8], offset: usize) -> Result<u64, BackupError> {
     Ok(u64::from_be_bytes(value))
 }
 
-fn validate_payload(payload: &PortableBackupV1) -> Result<(), BackupError> {
+fn validate_payload(
+    payload: &PortableBackupV1,
+    header: &BackupHeaderInfo,
+) -> Result<(), BackupError> {
+    let expected_database_schema = match header.format_minor {
+        0 => DATABASE_SCHEMA_V1_0,
+        FORMAT_MINOR => DATABASE_SCHEMA_V1_1,
+        _ => return Err(BackupError::InvalidBackup),
+    };
     if payload.manifest.format_major != FORMAT_MAJOR
-        || payload.manifest.format_minor != FORMAT_MINOR
-        || payload.manifest.database_schema != 1
+        || payload.manifest.format_major != header.format_major
+        || payload.manifest.format_minor != header.format_minor
+        || payload.manifest.database_schema != expected_database_schema
         || payload.manifest.document_schema != 1
+        || (header.format_minor == 0 && !payload.profile.render_manifests.is_empty())
     {
         return Err(BackupError::InvalidBackup);
     }
@@ -473,6 +533,7 @@ fn validate_export_metadata(app_version: &str, created_at: &str) -> Result<(), B
 
 fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
     if profile.published_resumes.len() > MAX_PUBLISHED_RESUMES
+        || profile.render_manifests.len() > MAX_RENDER_MANIFESTS
         || profile.settings.len() > MAX_SETTINGS
     {
         return Err(BackupError::InvalidContent);
@@ -500,11 +561,83 @@ fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
         }
         validate_setting(key, &setting.value)?;
     }
+    validate_render_manifests(&profile.render_manifests)?;
     let serialized = serde_json::to_vec(profile).map_err(|_| BackupError::InvalidContent)?;
     if serialized.len() > MAX_PAYLOAD_BYTES {
         return Err(BackupError::InvalidContent);
     }
     Ok(())
+}
+
+fn validate_render_manifests(manifests: &[PortableRenderManifestV1]) -> Result<(), BackupError> {
+    let mut manifest_ids = BTreeSet::new();
+    let mut render_identities = BTreeSet::new();
+    let mut previous_order: Option<(u64, &str)> = None;
+    for manifest in manifests {
+        let manifest_id =
+            EntityId::parse(&manifest.manifest_id).map_err(|_| BackupError::InvalidContent)?;
+        let manifest_id_canonical = manifest_id.to_string();
+        if manifest_id_canonical != manifest.manifest_id
+            || !manifest_ids.insert(manifest.manifest_id.as_str())
+        {
+            return Err(BackupError::InvalidContent);
+        }
+        let order = (
+            manifest.last_generated_at_unix_ms,
+            manifest.manifest_id.as_str(),
+        );
+        if previous_order.is_some_and(|previous| previous <= order) {
+            return Err(BackupError::InvalidContent);
+        }
+        previous_order = Some(order);
+        if !(1..=9_007_199_254_740_991).contains(&manifest.source_revision)
+            || !(1..=MAX_JAVASCRIPT_DATE_MS).contains(&manifest.generated_at_unix_ms)
+            || manifest.last_generated_at_unix_ms < manifest.generated_at_unix_ms
+            || manifest.last_generated_at_unix_ms > MAX_JAVASCRIPT_DATE_MS
+            || manifest.render_count == 0
+            || !valid_render_receipt(&manifest.receipt)
+        {
+            return Err(BackupError::InvalidContent);
+        }
+        let source = match manifest.source {
+            ExportSource::SavedDraft => "saved_draft",
+            ExportSource::PublishedSnapshot => "published_snapshot",
+        };
+        if !render_identities.insert((
+            source,
+            manifest.source_revision,
+            manifest.receipt.pdf_sha256.as_str(),
+        )) {
+            return Err(BackupError::InvalidContent);
+        }
+    }
+    Ok(())
+}
+
+fn valid_render_receipt(receipt: &PdfRenderReceipt) -> bool {
+    let valid_hash = |value: &str| {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    };
+    let valid_id = |value: &str| {
+        !value.is_empty()
+            && value.len() <= 128
+            && value.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'/')
+            })
+    };
+    receipt.document_schema_version > 0
+        && (1..=MAX_PDF_PAGES).contains(&receipt.page_count)
+        && (1..=MAX_PDF_BYTES).contains(&receipt.byte_count)
+        && valid_hash(&receipt.document_sha256)
+        && valid_hash(&receipt.pdf_sha256)
+        && valid_hash(&receipt.template_sha256)
+        && valid_hash(&receipt.font_bundle_sha256)
+        && valid_id(&receipt.renderer_version)
+        && valid_id(&receipt.template_id)
+        && valid_id(&receipt.font_bundle_id)
 }
 
 fn validate_resume_revision(resume: &PortableResumeRevisionV1) -> Result<(), BackupError> {
@@ -540,20 +673,31 @@ fn inventory_for(profile: &PortableProfileV1) -> Result<BackupInventoryV1, Backu
         published_resumes: u16::try_from(profile.published_resumes.len())
             .map_err(|_| BackupError::InvalidContent)?,
         settings: u16::try_from(profile.settings.len()).map_err(|_| BackupError::InvalidContent)?,
+        render_manifests: u16::try_from(profile.render_manifests.len())
+            .map_err(|_| BackupError::InvalidContent)?,
     })
+}
+
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if requires a shared-reference predicate"
+)]
+const fn is_zero(value: &u16) -> bool {
+    *value == 0
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
 
-    use ort_domain::{EntityId, ResumeDocument};
+    use ort_domain::{EntityId, ExportSource, PdfRenderReceipt, ResumeDocument};
     use serde_json::Value;
 
     use super::{
         BackupError, BackupExportRequestV1, BackupPassphrase, PortableProfileV1,
-        PortablePublishedResumeV1, PortableResumeRevisionV1, PortableSettingV1, Sha256,
-        create_backup, create_backup_with_entropy, inspect_backup, restore_backup,
+        PortablePublishedResumeV1, PortableRenderManifestV1, PortableResumeRevisionV1,
+        PortableSettingV1, Sha256, create_backup, create_backup_with_entropy,
+        create_backup_with_entropy_for_format, inspect_backup, restore_backup,
     };
     use sha2::Digest;
 
@@ -580,6 +724,7 @@ mod tests {
         let restored = restore_backup(&backup, &passphrase).expect("restore backup");
         assert_eq!(restored.profile, expected_profile);
         assert_eq!(restored.manifest.inventory.master_drafts, 1);
+        assert_eq!(restored.manifest.inventory.render_manifests, 1);
     }
 
     #[test]
@@ -650,7 +795,37 @@ mod tests {
     }
 
     #[test]
-    fn fixed_entropy_produces_a_stable_format_vector() {
+    fn render_history_must_be_canonical_bounded_and_valid() {
+        let passphrase = BackupPassphrase::new("correct passphrase".to_owned()).expect("valid");
+
+        let mut invalid_hash = sample_request();
+        invalid_hash.profile.render_manifests[0].receipt.pdf_sha256 = "A".repeat(64);
+        assert_eq!(
+            create_backup(&passphrase, invalid_hash),
+            Err(BackupError::InvalidContent)
+        );
+
+        let mut out_of_order = sample_request();
+        let mut later_id = out_of_order.profile.render_manifests[0].clone();
+        later_id.manifest_id = "018f8b1b-50ad-7b4a-8f7d-38fd63e44089".to_owned();
+        later_id.receipt.pdf_sha256 = "e".repeat(64);
+        out_of_order.profile.render_manifests.push(later_id);
+        assert_eq!(
+            create_backup(&passphrase, out_of_order),
+            Err(BackupError::InvalidContent)
+        );
+
+        let mut oversized = sample_request();
+        oversized.profile.render_manifests =
+            vec![oversized.profile.render_manifests[0].clone(); 101];
+        assert_eq!(
+            create_backup(&passphrase, oversized),
+            Err(BackupError::InvalidContent)
+        );
+    }
+
+    #[test]
+    fn fixed_entropy_produces_a_stable_current_format_vector() {
         let passphrase = BackupPassphrase::new("vector passphrase".to_owned()).expect("valid");
         let backup =
             create_backup_with_entropy(&passphrase, sample_request(), [0x11; 16], [0x22; 24])
@@ -658,13 +833,37 @@ mod tests {
         let digest = hex::encode(Sha256::digest(&backup));
         assert_eq!(
             digest,
-            "bad075c8e1369c6aa67f4b41d422826e84cde14070e43724caa063cae26e90aa"
+            "91ae6005a2879efed5cd379eb0804b5eed4f09fa689c442bddc8497a84ccf409"
         );
         let restored = restore_backup(&backup, &passphrase).expect("restore vector");
         assert_eq!(
             restored.profile.master_draft.expect("draft").document.title,
             MARKER
         );
+    }
+
+    #[test]
+    fn legacy_v1_0_vector_remains_readable() {
+        let passphrase = BackupPassphrase::new("vector passphrase".to_owned()).expect("valid");
+        let mut request = sample_request();
+        request.profile.render_manifests.clear();
+        let backup = create_backup_with_entropy_for_format(
+            &passphrase,
+            request,
+            [0x11; 16],
+            [0x22; 24],
+            0,
+            super::DATABASE_SCHEMA_V1_0,
+        )
+        .expect("create legacy vector");
+        assert_eq!(
+            hex::encode(Sha256::digest(&backup)),
+            "bad075c8e1369c6aa67f4b41d422826e84cde14070e43724caa063cae26e90aa"
+        );
+        let header = inspect_backup(&backup).expect("inspect legacy vector");
+        assert_eq!(header.format_minor, 0);
+        let restored = restore_backup(&backup, &passphrase).expect("restore legacy vector");
+        assert!(restored.profile.render_manifests.is_empty());
     }
 
     fn sample_request() -> BackupExportRequestV1 {
@@ -696,6 +895,26 @@ mod tests {
                     document: published,
                 }],
                 settings,
+                render_manifests: vec![PortableRenderManifestV1 {
+                    manifest_id: "018f8b1b-50ad-7b4a-8f7d-38fd63e44088".to_owned(),
+                    source: ExportSource::PublishedSnapshot,
+                    source_revision: 1,
+                    generated_at_unix_ms: 1_725_192_000_000,
+                    last_generated_at_unix_ms: 1_725_192_001_000,
+                    render_count: 2,
+                    receipt: PdfRenderReceipt {
+                        document_sha256: "a".repeat(64),
+                        document_schema_version: 1,
+                        pdf_sha256: "b".repeat(64),
+                        renderer_version: "typst-0.15.1/ort-1".to_owned(),
+                        template_id: "plain_pdf_v1".to_owned(),
+                        template_sha256: "c".repeat(64),
+                        font_bundle_id: "libertinus-serif/typst-assets-0.15.1".to_owned(),
+                        font_bundle_sha256: "d".repeat(64),
+                        page_count: 1,
+                        byte_count: 1_024,
+                    },
+                }],
             },
         }
     }

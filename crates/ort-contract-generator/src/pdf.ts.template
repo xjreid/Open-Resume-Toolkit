@@ -164,7 +164,9 @@ export function isPdfRenderHistoryCommandResponse(
       !history.manifests.every(isManifest)
     )
       return false;
-    return new Set(history.manifests.map((manifest) => manifest.manifestId)).size ===
-      history.manifests.length;
+    return (
+      new Set(history.manifests.map((manifest) => manifest.manifestId)).size ===
+      history.manifests.length
+    );
   });
 }
