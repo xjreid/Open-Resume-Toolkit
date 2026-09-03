@@ -12,6 +12,7 @@ members = [
     "crates/ort-ipc",
     "crates/ort-native-host",
     "crates/ort-platform",
+    "crates/ort-render",
     "crates/ort-storage",
     "crates/ort-vault",
 ]
@@ -45,6 +46,12 @@ thiserror = "2.0.17"
 url = "=2.5.8"
 uuid = { version = "=1.24.1", features = ["serde", "v7"] }
 zeroize = "=1.9.0"
+typst = "=0.15.1"
+typst-pdf = "=0.15.1"
+typst-layout = "=0.15.1"
+typst-assets = { version = "=0.15.1", features = ["fonts"] }
+comemo = "=0.5.1"
+base64 = "=0.22.1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

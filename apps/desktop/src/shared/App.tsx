@@ -20,6 +20,7 @@ import type {
 } from "@ort/contracts/resume";
 import { DOCUMENT_LIMITS } from "@ort/contracts/resume";
 import { CloseDialog } from "./CloseDialog";
+import { PdfPreviewPanel } from "./PdfPreview";
 import { useCloseGuard } from "./use-close-guard";
 import {
   editorReducer,
@@ -391,6 +392,33 @@ function ResumeEditor() {
         ) : null}
       </section>
 
+      <PdfPreviewPanel
+        saved={editor.saved}
+        published={editor.published}
+        dirty={dirty}
+        blocked={
+          !storageReady || busy || mustReload || confirmReload || close.pending
+        }
+        onBegin={(kind) => {
+          if (
+            ioBusy.current ||
+            busy ||
+            mustReload ||
+            confirmReload ||
+            close.pending
+          )
+            return false;
+          ioBusy.current = true;
+          dispatch({ type: kind });
+          return true;
+        }}
+        onFinish={(message) => {
+          dispatch({ type: "export-finished", notice: message });
+          ioBusy.current = false;
+        }}
+        semantic={(document) => <PublishedResume document={document} pdf />}
+      />
+
       <div className="editor-tools">
         <p>
           Valid changes autosave after a short pause. Closing checks for unsaved
@@ -656,9 +684,9 @@ function ResumeEditor() {
       ) : null}
 
       <footer className="development-gates">
-        This is a structured text review, not a PDF preview. PDF/DOCX import and
-        export remain gated in M2; AI and browser integration arrive in later
-        milestones.
+        PDF preview, PDF, DOCX and text export use saved revisions. PDF/DOCX
+        import, export replacement and crash recovery remain gated in M2; AI and
+        browser integration arrive in later milestones. Use synthetic data only.
       </footer>
     </main>
   );
@@ -1163,13 +1191,19 @@ function LinksEditor({
 }
 
 // Deliberately renders text only: stored URLs cannot navigate the privileged webview.
-export function PublishedResume({ document }: { document: ResumeDocument }) {
+export function PublishedResume({
+  document,
+  pdf = false,
+}: {
+  document: ResumeDocument;
+  pdf?: boolean;
+}) {
   return (
     <article
       className="published-content"
-      aria-label="Published resume content"
+      aria-label={pdf ? "PDF resume content" : "Published resume content"}
     >
-      <h2>{document.title}</h2>
+      {pdf ? null : <h2>{document.title}</h2>}
       <p>{document.contact.fullName}</p>
       <p>
         {[
@@ -1201,7 +1235,7 @@ export function PublishedResume({ document }: { document: ResumeDocument }) {
                   <div key={field.id}>
                     <dt>
                       {field.label}
-                      {field.isSkill ? " (skill)" : ""}
+                      {field.isSkill && !pdf ? " (skill)" : ""}
                     </dt>
                     <dd>{field.value}</dd>
                   </div>

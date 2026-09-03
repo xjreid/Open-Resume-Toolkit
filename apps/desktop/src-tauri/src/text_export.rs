@@ -25,7 +25,7 @@ impl ExportState {
         self.0.load(Ordering::Acquire)
     }
 
-    fn begin(&self) -> Option<ExportLease> {
+    pub(crate) fn begin(&self) -> Option<ExportLease> {
         self.0
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .ok()
@@ -33,7 +33,7 @@ impl ExportState {
     }
 }
 
-struct ExportLease(Arc<AtomicBool>);
+pub(crate) struct ExportLease(Arc<AtomicBool>);
 impl Drop for ExportLease {
     fn drop(&mut self) {
         self.0.store(false, Ordering::Release);
@@ -99,7 +99,7 @@ async fn export_saved(
     }
 }
 
-fn exact_revision(
+pub(crate) fn exact_revision(
     value: Option<VersionedResume>,
     expected: i64,
 ) -> Result<VersionedResume, StorageError> {
@@ -134,6 +134,7 @@ fn export_with_dialog(
             "docx",
             DOCX_FORMAT_VERSION,
         ),
+        ExportFileType::Pdf => return export_failure("EXPORT_INVALID_CONTENT"),
     };
     let selection = window
         .dialog()
@@ -176,6 +177,7 @@ fn render_saved(saved: &VersionedResume, format: ExportFileType) -> Result<Vec<u
             .map(String::into_bytes)
             .map_err(|_| ()),
         ExportFileType::Docx => render_docx(&saved.document).map_err(|_| ()),
+        ExportFileType::Pdf => Err(()), // PDF exports consume a preview ticket.
     }
 }
 

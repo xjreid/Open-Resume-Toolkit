@@ -15,6 +15,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build.workspace = true
 
 [dependencies]
+ort-render = { path = "../../../crates/ort-render" }
+base64.workspace = true
+uuid.workspace = true
 ort-documents = { path = "../../../crates/ort-documents" }
 ort-platform = { path = "../../../crates/ort-platform" }
 ort-domain = { path = "../../../crates/ort-domain" }

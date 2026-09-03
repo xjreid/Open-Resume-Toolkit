@@ -132,9 +132,20 @@ Current development status:
   Rust tests passed. CRLF-converted embedded XML reproduced that failure locally.
   A scoped LF checkout policy, cross-platform checkout regression tests and
   explicit output diagnostics restore the unchanged goldens locally; the repaired
-  CI run and native document-reader/dialog verification remain pending.
+  CI run was subsequently confirmed green on all four jobs by the user for
+  `748d13b`; native document-reader/dialog verification remains pending.
   See `../../evidence/0.0.0-dev/windows-docx-checkout.md`.
   See `../../evidence/0.0.0-dev/m2-docx-export.md`;
+- added locally: pinned embedded Typst 0.15.1 PDF rendering, six bundled
+  Libertinus Serif faces, original plain PDF layout, exact-byte PDF.js 6.3.289
+  preview and native no-overwrite PDF export from saved revisions. One bounded
+  expiring native preview ticket, SHA-256/version receipts, stale-preview guards,
+  shared render/export/quit gate, accessible text view and bundled license notices
+  accompany encrypted-restart, hostile-literal, layout-limit, contract, filesystem,
+  independent PDF parser/golden and synthetic browser/CSP checks. This is an
+  output-only fixed-template integration, not hostile-file containment. Receipts
+  remain session-only; CI for this checkpoint and native WebView/dialog/AT checks
+  are pending. See `../../evidence/0.0.0-dev/m2-pdf-preview.md`;
 - Windows CI repair passed per user report after `bdc3e10`: stage logs narrowed the
   stack overflow to encrypted-profile opening. A matching upstream SQLCipher
   Windows logging-recursion defect is mitigated by compiling out its native
@@ -146,7 +157,7 @@ Current development status:
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
   UI/session integration, private binary staging, richer entry/date/link mapping,
-  Typst preview/PDF rendering, final DOCX template/reader verification, confirmed replacement and
+  native PDF preview/export verification, final PDF/DOCX templates and reader verification, confirmed replacement and
   crash-cleanup policy for exports, historical render metadata, Windows native
   Save-dialog/ACL/filesystem proof, storage management, and complete offline
   journey evidence. M2 is not complete; do not enable hostile-file parsing or

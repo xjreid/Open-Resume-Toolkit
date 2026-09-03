@@ -141,6 +141,28 @@ If supported public OS mechanisms cannot enforce these properties without admini
   Unencrypted staging/recovery and Windows ACL/reader gates remain applicable.
   This output generator is unrelated to the disabled hostile-document importer.
 - Render templates are bundled and addressed by known IDs; user content cannot inject Typst source.
+- M2 PDF output embeds pinned Typst in Rust with a fixed in-memory World. It
+  exposes only the bundled source, typed JSON string data and six pinned fonts;
+  external reads, packages, plugins, system-font lookup and current-date access
+  are unavailable. The document is validated before rendering; block/break,
+  five-page and 4 MiB caps apply. Post-layout glyph bounds reject clipping,
+  missing glyphs and unexpected draw/transform behavior. Compile warnings/errors
+  are returned as bounded codes without private text. This is not an OS sandbox
+  or a hard renderer CPU/memory deadline; native hostile-import gates do not change.
+- The main window receives only generated PDF bytes plus an opaque UUIDv7 ticket
+  and version/hash receipt. PDF export accepts that ticket only, checks expiry and
+  the saved revision, then holds the exact bytes across the native dialog. The
+  existing shared lease and no-clobber destination capability apply. The cache
+  holds one PDF and expires on access; UI clear/refresh/expiry/unmount also releases
+  it. Typst memoized content is evicted after each render. Neither mechanism is a
+  secure-erasure guarantee for process memory, swap or crash dumps.
+- PDF.js displays only these generated, hash-verified bytes on a bounded canvas
+  using an explicit bundled worker (`worker-src 'self'`), embedded font paths,
+  no system fonts, WASM, worker network fetch, annotation UI, scripting or XFA.
+  No remote resource or filesystem capability was granted; CSP still forbids
+  frames, objects and dynamic evaluation. Accessible text is rendered by React,
+  not HTML injection. Native custom-scheme worker support and assistive-technology
+  behavior remain platform verification gates; a preview failure disables export.
 - Resume/cover-letter file drags expose only validated PDFs materialized in a random private ORT session directory. Paths cannot be supplied by web content; Finish/discard and startup recovery remove only containment-verified ORT-owned files. Download uses a separate one-use native dialog token.
 - Links are parsed as data, allow only approved schemes, and are escaped by the renderer.
 - Backup payload entries use logical IDs rather than paths. Restore never joins an archive-provided path to disk.

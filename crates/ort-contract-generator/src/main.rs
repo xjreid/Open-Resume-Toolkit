@@ -21,6 +21,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_schema::<ExportDocxRequest>(&output.join("export.docx.request.schema.json"))?;
     write_schema::<ExportDocxResponse>(&output.join("export.docx.response.schema.json"))?;
     fs::write(output.join("export.ts"), include_str!("export.ts.template"))?;
+    write_schema::<ort_domain::RenderPdfRequest>(&output.join("pdf.render.request.schema.json"))?;
+    write_schema::<ort_domain::PdfPreviewResponse>(
+        &output.join("pdf.preview.response.schema.json"),
+    )?;
+    write_schema::<ort_domain::PdfTicketRequest>(&output.join("pdf.ticket.request.schema.json"))?;
+    write_schema::<ort_domain::PdfExportResponse>(&output.join("pdf.export.response.schema.json"))?;
+    write_schema::<ort_domain::PdfReleaseResponse>(
+        &output.join("pdf.release.response.schema.json"),
+    )?;
+    fs::write(
+        output.join("pdf.ts"),
+        include_str!("pdf.ts.template")
+            .replace("__MAX_PDF_BYTES__", &ort_domain::MAX_PDF_BYTES.to_string())
+            .replace("__MAX_PDF_PAGES__", &ort_domain::MAX_PDF_PAGES.to_string())
+            .replace(
+                "__PDF_TTL__",
+                &ort_domain::PDF_PREVIEW_TTL_SECONDS.to_string(),
+            ),
+    )?;
 
     write_schema::<HealthRequest>(&output.join("health.request.schema.json"))?;
     write_schema::<HealthResponse>(&output.join("health.response.schema.json"))?;

@@ -7,7 +7,8 @@
     "./health": "./generated/health.ts",
     "./resume": "./generated/resume.ts",
     "./lifecycle": "./generated/lifecycle.ts",
-    "./export": "./generated/export.ts"
+    "./export": "./generated/export.ts",
+    "./pdf": "./generated/pdf.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

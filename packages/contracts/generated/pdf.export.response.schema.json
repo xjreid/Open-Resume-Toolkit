@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PdfExportResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "cancelled"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "byteCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "cleanupPending": {
+          "type": "boolean"
+        },
+        "durabilityUnconfirmed": {
+          "type": "boolean"
+        },
+        "pdfSha256": {
+          "type": "string"
+        },
+        "renderId": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "const": "exported"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "renderId",
+        "pdfSha256",
+        "byteCount",
+        "cleanupPending",
+        "durabilityUnconfirmed"
+      ]
+    }
+  ]
+}

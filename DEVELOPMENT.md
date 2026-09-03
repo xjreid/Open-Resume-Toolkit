@@ -4,8 +4,8 @@ Open Resume Toolkit implements the M0 architecture skeleton, the local M1
 encrypted-storage slice, and an M2 offline editor checkpoint. The development
 app can autosave synthetic resume drafts and publish immutable snapshots through
 its OS-vault-backed encrypted database, and export a saved draft or published
-snapshot as unencrypted UTF-8 text or constrained DOCX through a native Save
-dialog. PDF/DOCX import, PDF preview/output, AI, updater, and browser-native
+snapshot as unencrypted UTF-8 text, constrained DOCX, or the exact locally
+previewed PDF through a native Save dialog. PDF/DOCX import, AI, updater, and browser-native
 messaging remain gated or unimplemented.
 
 ## Prerequisites
@@ -138,8 +138,57 @@ through `just check`. Existing Windows working copies should use a fresh
 checkout if these files still contain CRLF; preserve local edits first.
 The verifier now identifies noncanonical line endings explicitly. The same
 repair updates the pinned Node setup action to its Node 24 runtime; the project's
-Node version stays unchanged. The repaired Windows run is still pending.
+Node version stays unchanged. The user confirmed all four CI jobs passed for
+`748d13b` before PDF development resumed; that result was not independently retrieved.
 See `evidence/0.0.0-dev/windows-docx-checkout.md`.
+
+## Local PDF preview and export
+
+The main editor offers **Preview saved draft** and **Preview published snapshot**.
+Save pending draft edits first. Rendering is manual and uses the selected exact
+saved revision. The fixed `plain_pdf_v1` layout uses US Letter, one-inch margins,
+11 pt Libertinus Serif, and no user-authored Typst or system fonts. The bundled
+renderer is Typst 0.15.1; PDF.js 6.3.289 displays its exact output locally.
+
+Review pages with Previous/Next and 100–200% zoom. The scrollable page is keyboard
+focusable; an accessible, read-only content view follows it. PDF links are visible
+text in the privileged preview, not clickable navigation. **Export this preview**
+uses the same cached bytes, not a second render. It opens the native Save dialog
+for a new `.pdf` filename and never replaces an existing file. Cancel creates no
+file; committed cleanup/durability warnings remain distinct from failures.
+
+Edits or newer saved revisions mark a draft preview stale and disable export.
+Published preview revisions are independent of draft edits. Generate a fresh
+preview after changes or ten-minute expiry. Clear/refresh/unmount releases the
+preview; Rust holds at most one cached PDF and checks expiry on access. Renderer
+reloads can leave that bounded cache until its next access or process exit; this
+is not guaranteed timed memory erasure. No preview file is staged on disk.
+
+Current development limits are 4 MiB, five pages, 800 content blocks and 200 hard
+line breaks, in addition to document limits. Overflow, uncovered glyphs (including
+the current CJK/emoji fixture), compile warnings, and unsupported layouts are
+explicit failures, never silent truncation or font substitution. Tabs become four
+spaces. Text and DOCX remain alternatives. This original plain fixture is not the
+final template catalogue. The fixed typography/language options and full bundled
+licenses are visible in the panel; receipts are session-only, not persisted render
+history or an old-renderer replay guarantee.
+
+Headless structural verification, without launching the app or OS vault:
+
+```sh
+cargo run --locked -p ort-render --example pdf_fixtures -- target/pdf-review-fixtures
+node tools/verify-pdf-fixtures.mjs target/pdf-review-fixtures
+# Optional second independent parser (requires pypdf):
+python3 tools/verify-pdf-fonts.py target/pdf-review-fixtures
+```
+
+Every CI runner now checks PDF golden bytes, visible text/order, page geometry,
+tags and safe links. New template sources also retain LF bytes under Windows
+checkout conversion. `tools/smoke-pdf-browser.mjs` performs optional headless
+Chromium QA against a loopback production frontend with synthetic mocked native
+commands; supply `ORT_PLAYWRIGHT_MODULE` / `ORT_BROWSER_EXECUTABLE` if needed.
+It never proves native IPC, WKWebView/WebView2, save dialogs, vaults or ACLs.
+See `evidence/0.0.0-dev/m2-pdf-preview.md` for actual checks and manual gates.
 
 ## No-AI import core (backend-only checkpoint)
 
@@ -219,7 +268,7 @@ the remaining resource ceilings are still gated. Import is still disabled.
 See `evidence/0.0.0-dev/m2-macos-lifecycle.md`. The user subsequently confirmed
 all four CI jobs passing for `e978cfe`; this is user-reported, not an independently
 retrieved run. The DOCX checkpoint subsequently passed three of four jobs;
-its Windows golden-byte failure and pending repair verification are recorded above.
+its Windows golden-byte failure and subsequently confirmed repair are recorded above.
 
 The preceding Windows log showed both isolated startup and import-storage tests crash
 while opening the encrypted profile. A matching pinned SQLCipher logging defect

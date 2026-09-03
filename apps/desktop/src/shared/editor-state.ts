@@ -9,7 +9,13 @@ export interface EditorState {
   document: ResumeDocument | null;
   saved: VersionedResume | null;
   published: VersionedResume | null;
-  status: "loading" | "idle" | "saving" | "publishing" | "exporting";
+  status:
+    | "loading"
+    | "idle"
+    | "saving"
+    | "publishing"
+    | "exporting"
+    | "rendering";
   editEpoch: number;
   errorCode: string | null;
   autosavePaused: boolean;
@@ -42,6 +48,7 @@ type EditorAction =
   | { type: "publishing" }
   | { type: "published"; value: VersionedResume }
   | { type: "exporting" }
+  | { type: "rendering" }
   | { type: "export-finished"; notice: string }
   | { type: "failed"; code: string };
 
@@ -142,6 +149,8 @@ export function editorReducer(
       };
     case "exporting":
       return { ...state, status: "exporting", notice: null };
+    case "rendering":
+      return { ...state, status: "rendering", notice: null };
     case "export-finished":
       // Export never mutates stored revisions or the editor. In particular,
       // an uncertain file result must not pause autosave or clear save errors.

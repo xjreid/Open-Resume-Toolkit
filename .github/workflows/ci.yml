@@ -72,6 +72,9 @@ jobs:
       - name: Audit JavaScript dependencies
         run: pnpm audit --audit-level high --prod
 
+      - name: Independently verify PDF bytes, text, geometry, tags and links
+        run: cargo run --locked -p ort-render --example pdf_fixtures -- target/pdf-ci-fixtures && node tools/verify-pdf-fixtures.mjs target/pdf-ci-fixtures
+
   desktop-build:
     name: Desktop build (${{ matrix.os }})
     strategy:
@@ -124,9 +127,14 @@ jobs:
         # Keep the original cold-start/concurrent test process even if the
         # separate startup probe crashes. Neither failure is ignored or masked.
         if: ${{ !cancelled() && steps.desktop-build.outcome == 'success' }}
-        run: cargo test --locked -p ort-domain -p ort-documents -p ort-document-worker -p ort-application -p ort-platform -p ort-storage -- --nocapture
+        run: cargo test --locked -p ort-domain -p ort-documents -p ort-render -p ort-desktop -p ort-document-worker -p ort-application -p ort-platform -p ort-storage -- --nocapture
 
       - name: Independently verify DOCX output on the target OS
         if: ${{ !cancelled() && steps.desktop-build.outcome == 'success' }}
         shell: bash
         run: cargo run --locked -p ort-documents --example docx_fixtures -- target/docx-ci-fixtures && ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/verify-docx-fixtures.py target/docx-ci-fixtures
+
+      - name: Independently verify PDF output on the target OS
+        if: ${{ !cancelled() && steps.desktop-build.outcome == 'success' }}
+        shell: bash
+        run: cargo run --locked -p ort-render --example pdf_fixtures -- target/pdf-ci-fixtures && node tools/verify-pdf-fixtures.mjs target/pdf-ci-fixtures

@@ -12,6 +12,7 @@ use tauri::{
 
 mod close_guard;
 mod menu;
+mod pdf_preview;
 mod text_export;
 use close_guard::CloseGuard;
 
@@ -260,6 +261,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(CloseGuard::default())
         .manage(text_export::ExportState::default())
+        .manage(pdf_preview::PdfState::default())
         .plugin(tauri_plugin_dialog::init())
         .menu(menu::editor_menu)
         .on_menu_event(|app, event| {
@@ -280,6 +282,9 @@ pub fn run() {
             publish_resume,
             text_export::export_resume_text,
             text_export::export_resume_docx,
+            pdf_preview::render_resume_pdf,
+            pdf_preview::export_resume_pdf,
+            pdf_preview::release_resume_pdf,
             close_status,
             resolve_close
         ])

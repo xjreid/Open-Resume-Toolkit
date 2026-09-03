@@ -19,6 +19,7 @@ const MAX_BYTES: usize = 256 * 1024;
 pub enum ExportFileType {
     Text,
     Docx,
+    Pdf,
 }
 
 impl ExportFileType {
@@ -26,12 +27,14 @@ impl ExportFileType {
         match self {
             Self::Text => ".txt",
             Self::Docx => ".docx",
+            Self::Pdf => ".pdf",
         }
     }
     const fn max_bytes(self) -> usize {
         match self {
             Self::Text => MAX_BYTES,
             Self::Docx => 2 * 1024 * 1024,
+            Self::Pdf => ort_domain::MAX_PDF_BYTES,
         }
     }
 }
@@ -380,4 +383,34 @@ mod tests {
         assert_eq!(fs::read(moved.join("new.txt")).expect("read"), b"synthetic");
         assert!(!other.join("new.txt").exists());
     }
+}
+#[test]
+fn pdf_uses_exact_bytes_a_fixed_extension_and_no_overwrite() {
+    use std::fs;
+    use tempfile::TempDir;
+    let directory = TempDir::new().unwrap();
+    let path = directory.path().join("resume.pdf");
+    let target = ExportDestination::for_native_dialog(&path, ExportFileType::Pdf).unwrap();
+    let bytes = b"%PDF-synthetic-fixture-only";
+    target.write(bytes).unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    assert!(matches!(
+        ExportDestination::for_native_dialog(&path, ExportFileType::Pdf),
+        Err(ExportWriteError::AlreadyExists)
+    ));
+    assert!(
+        ExportDestination::for_native_dialog(
+            &directory.path().join("wrong.txt"),
+            ExportFileType::Pdf
+        )
+        .is_err()
+    );
+    let large = directory.path().join("large.pdf");
+    assert!(matches!(
+        ExportDestination::for_native_dialog(&large, ExportFileType::Pdf)
+            .unwrap()
+            .write(&vec![0; ort_domain::MAX_PDF_BYTES + 1]),
+        Err(ExportWriteError::InvalidContent)
+    ));
+    assert!(!large.exists());
 }

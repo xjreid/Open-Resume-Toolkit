@@ -1,5 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  isPdfPreviewCommandResponse,
+  isPdfExportCommandResponse,
+  type PdfPreview,
+  type PdfPreviewCommandResponse,
+  type PdfExportCommandResponse,
+} from "@ort/contracts/pdf";
+import {
   isExportTextCommandResponse,
   isExportDocxCommandResponse,
   type ExportFormat,
@@ -180,6 +187,59 @@ function requestEnvelope<T>(payload: T) {
     requestId: crypto.randomUUID(),
     payload,
   };
+}
+
+export async function renderResumePdf(
+  source: ExportSource,
+  expectedRevision: number,
+): Promise<PdfPreviewCommandResponse> {
+  try {
+    const response: unknown = await invoke("render_resume_pdf", {
+      request: requestEnvelope({ source, expectedRevision }),
+    });
+    if (!isPdfPreviewCommandResponse(response)) return invalidCommandResponse();
+    if (
+      response.ok &&
+      (response.value.source !== source ||
+        response.value.revision !== expectedRevision)
+    )
+      return invalidCommandResponse();
+    return response;
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function exportResumePdf(
+  preview: PdfPreview,
+): Promise<PdfExportCommandResponse> {
+  try {
+    const response: unknown = await invoke("export_resume_pdf", {
+      request: requestEnvelope({ renderId: preview.renderId }),
+    });
+    if (!isPdfExportCommandResponse(response)) return invalidCommandResponse();
+    if (
+      response.ok &&
+      response.value.status === "exported" &&
+      (response.value.renderId !== preview.renderId ||
+        response.value.pdfSha256 !== preview.receipt.pdfSha256 ||
+        response.value.byteCount !== preview.receipt.byteCount)
+    )
+      return invalidCommandResponse();
+    return response;
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function releaseResumePdf(renderId: string): Promise<void> {
+  try {
+    await invoke("release_resume_pdf", {
+      request: requestEnvelope({ renderId }),
+    });
+  } catch {
+    /* Native cache remains bounded and expires on access. */
+  }
 }
 
 function invalidResponse(): HealthCommandResponse {

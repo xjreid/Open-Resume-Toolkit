@@ -4,6 +4,10 @@ Date: 2026-09-03 UTC. Base commit: `e349856`.
 Platform used for this repair: macOS arm64. Status: locally verified repair;
 the new four-job CI result, especially Windows, is still required.
 
+Follow-up (before the PDF checkpoint): the user confirmed all four CI jobs
+passed for `748d13b`. No run URL was independently retrieved. This closes the
+reported CI repair gate, not the separate native UI/vault/filesystem gates.
+
 ## Failure and cause
 
 The user reported three of four CI jobs passing and supplied the Windows log

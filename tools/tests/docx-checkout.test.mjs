@@ -71,6 +71,14 @@ function checkout(t, autocrlf, policy) {
   // New template files must also match the rule; unrelated text/binary files
   // must retain ordinary Git behavior rather than a repository-wide rewrite.
   originals.set(`${assetPath}/future-template.xml`, Buffer.from("<future/>\n"));
+  originals.set(
+    "templates/resume/plain_pdf_v1.typ",
+    readFileSync(join(root, "templates/resume/plain_pdf_v1.typ")),
+  );
+  originals.set(
+    "templates/resume/future-pdf.typ",
+    Buffer.from("Fixed template\n"),
+  );
   originals.set("unprotected.xml", Buffer.from("<control/>\n"));
   originals.set("binary.bin", Buffer.from([0, 10, 13, 10, 255]));
   for (const [relative, bytes] of originals) {

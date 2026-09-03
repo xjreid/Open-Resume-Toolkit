@@ -9,7 +9,10 @@ and supplied the Windows failure log. Rust tests passed; the independent DOCX
 golden check failed because embedded XML was checked out with CRLF. The local
 reproduction, scoped checkout fix, stronger regression checks and Node-action
 runtime update are recorded in `windows-docx-checkout.md`. The repaired CI result
-is pending; the original verification below is preserved as checkpoint history.
+was subsequently confirmed green on all four jobs by the user for `748d13b`,
+before PDF implementation began. No run was independently retrieved; native
+reader/dialog checks remain pending. The original verification below is
+preserved as checkpoint history.
 
 Before implementation, the user confirmed all four jobs passed for `e978cfe`.
 That confirmation was not independently retrieved. This checkpoint groups the

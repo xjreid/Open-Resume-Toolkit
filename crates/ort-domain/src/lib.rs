@@ -3,9 +3,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 mod lifecycle;
+mod pdf;
 mod resume;
 mod resume_commands;
 mod text_export;
+
+pub use pdf::{
+    MAX_PDF_BYTES, MAX_PDF_PAGES, PDF_PREVIEW_TTL_SECONDS, PdfExportResponse, PdfPreviewResponse,
+    PdfReleaseResponse, PdfRenderReceipt, PdfTicketPayload, PdfTicketRequest, RenderPdfRequest,
+};
 
 pub use text_export::{
     ExportDocxRequest, ExportDocxResponse, ExportSource, ExportTextPayload, ExportTextRequest,
