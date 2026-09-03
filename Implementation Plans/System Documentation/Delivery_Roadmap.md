@@ -8,22 +8,40 @@
 
 The Quiet Navy/Open Frame application and website direction is approved under `../../Aesthetic/`. Early milestones still use semantic, minimally styled controls and a deliberately plain renderer fixture so security, contracts, accessibility, and data behavior stabilize first. Production component polish and the non-default document-template details may be tested and refined during development, but the three promised style categories must pass their functional, accessibility, licensing, and golden-render gates before release.
 
+## Reasoning-effort routing
+
+- **[HIGH]** marks work that requires high reasoning because an error could cross
+  a trust boundary, lose or corrupt user data, weaken containment, misstate a
+  fact, authorize spending, or invalidate release evidence. The marker applies
+  to implementation, test design, review, and gate sign-off for the whole bullet.
+- **[HIGH]** is a reasoning route, not a schedule priority or progress status;
+  it remains on completed work to govern future changes and regression review.
+- Unmarked work defaults to medium reasoning. Medium sessions may inspect or
+  report the status of a **[HIGH]** item and run an already-defined check, but
+  must not design, modify, approve, or declare the item complete.
+- When a medium session reaches a **[HIGH]** item, it must stop that work and tell
+  the user to switch to high reasoning. A user may explicitly override this
+  routing rule for a bounded task.
+
 ## M0 — architecture skeleton and contracts
 
 Deliver:
 
 - Cargo/pnpm workspaces, pinned toolchains, Tauri/React shell, and isolated dev profile;
-- domain error envelope, command/event transport, generated schemas, and compatibility manifest;
+- **[HIGH]** domain error envelope, command/event transport, generated schemas,
+  and compatibility manifest;
 - CI for Windows/macOS build, tests, formatting, license/vulnerability scanning, and schema drift;
 - synthetic fixture policy and evidence layout;
-- initial architecture decision records for Tauri/Rust, SQLCipher, Typst, native messaging, and external Codex.
+- **[HIGH]** initial architecture decision records for Tauri/Rust, SQLCipher,
+  Typst, native messaging, and external Codex.
 - repository and CI skeleton matching `Development_and_Deployment_Outline.md`, including shared desktop source, shared Chrome/Edge extension source, and platform-specific packaging boundaries.
 
 Exit evidence:
 
 - clean checkout bootstrap;
 - main and overlay windows can call a typed health command;
-- production build has no remote web assets or broad Tauri capabilities;
+- **[HIGH]** production build has no remote web assets or broad Tauri
+  capabilities;
 - CI matrix is green.
 
 ## M1 — encrypted local core and structured resume
@@ -38,309 +56,200 @@ Current development status:
   same-device checkpoints, and a password-protected portable backup/restore
   prototype that creates a fresh device key, plus a verified arm64 macOS local
   preview `.app`/DMG with an isolated identity and explicit ad-hoc signing;
-- still release-gated: native macOS and Windows vault matrices, signed-build
-  access behavior, platform crash/migration/low-disk suites, cross-platform
-  backup files, and expanded hostile restore/fuzz tests.
+- **[HIGH]** still release-gated: native macOS and Windows vault matrices,
+  signed-build access behavior, platform crash/migration/low-disk suites,
+  cross-platform backup files, and expanded hostile restore/fuzz tests.
 
 Deliver:
 
-- OS vault abstraction and database-key lifecycle;
-- platform vault-boundary matrix, including Windows same-user limitations and macOS desktop/native-host access behavior across preview, signed, moved, and updated builds;
-- SQLCipher schema v1, migrations, repositories, transactions, and startup recovery;
+- **[HIGH]** OS vault abstraction and database-key lifecycle;
+- **[HIGH]** platform vault-boundary matrix, including Windows same-user
+  limitations and macOS desktop/native-host access behavior across preview,
+  signed, moved, and updated builds;
+- **[HIGH]** SQLCipher schema v1, migrations, repositories, transactions, and
+  startup recovery;
 - profile, master draft, published snapshot, settings, and diagnostic records;
 - structured resume domain validation and optimistic draft revisions;
-- encrypted backup container prototype with create/inspect/restore tests (the
-  implemented same-device checkpoint is a migration/recovery primitive, not the
-  portable cross-device container).
+- **[HIGH]** encrypted backup container prototype with create/inspect/restore
+  tests (the implemented same-device checkpoint is a migration/recovery
+  primitive, not the portable cross-device container).
 
 Exit evidence:
 
-- synthetic resume survives restart and cannot be read from the database/WAL without the key;
-- vault namespace/cross-user/cross-process tests match the documented Windows and macOS boundaries without plaintext fallback;
-- vault-unavailable and corrupt-database paths are safe and actionable;
-- migration and backup corruption suites pass.
+- **[HIGH]** synthetic resume survives restart and cannot be read from the
+  database/WAL without the key;
+- **[HIGH]** vault namespace/cross-user/cross-process tests match the documented
+  Windows and macOS boundaries without plaintext fallback;
+- **[HIGH]** vault-unavailable and corrupt-database paths are safe and actionable;
+- **[HIGH]** migration and backup corruption suites pass.
 
 ## M2 — complete offline resume path
 
-Current development status:
+### Current status
 
-As of 2026-09-03, the working stage-gate estimate is **about 59% complete**.
-This estimate weights end-to-end deliverables and mandatory security, recovery,
-accessibility, cross-platform and offline-journey evidence rather than counting
-implemented code or checkpoints equally. The underlying implementation foundation
-is approximately 75% present, end-to-end M2 functionality is approximately
-60% present, and release/exit evidence is approximately 45% complete. Major
-gates such as production parser containment, import/review integration,
-destructive profile deletion and the complete offline journey
-remain substantial incomplete capabilities, not polish. Portable-backup export,
-encrypted-profile storage usage, and read-only authenticated backup validation are
-committed through `0a706b2`; restart-staged replacement and retained safety-copy
-management are verified in the current uncommitted working tree based on that
-commit. These checkpoints advance M2 but do not make it release-ready.
+As of 2026-09-03, M2 is **about 59% complete** by stage-gate weighting:
+approximately 75% of the implementation foundation, 60% of end-to-end
+functionality, and 45% of release/exit evidence. The estimate gives security,
+recovery, accessibility, cross-platform behavior, and the complete offline
+journey more weight than raw feature count.
 
-- implemented locally: generated load/save/publish contracts, a main-window-only
-  encrypted command boundary, fail-closed OS-vault startup, optimistic draft
-  saves, idempotent immutable publication, a structured editor for contact
-  details, sections, entries, bullets, links, and named custom/skill fields,
-  race-safe debounced autosave, shared-limit inline validation, keyboard
-  reordering, bounded session undo/redo, explicit reload/discard recovery, and
-  read-only published text review. Native macOS synthetic save/publish/restart
-  checks are recorded under `../../evidence/0.0.0-dev/m2-editor-smoke.md`;
-- added locally: native-owned single-use quit attempts, main-window-only
-  lifecycle commands, and accessible Save/Discard/Keep editing confirmation
-  for the main close button and application Quit menu/shortcut, with pending
-  operation waits and save-failure recovery. Verified macOS paths and the
-  upstream termination gap are in `../../evidence/0.0.0-dev/m2-close-guard-smoke.md`;
-- added locally: deterministic bounded UTF-8 text export from an exact saved
-  draft revision or latest immutable published snapshot, a Rust-only native Save
-  dialog, single-use held-directory destination authority, and no-clobber atomic
-  publication. The UI warns that exports are unencrypted; cancellation/export
-  failure never changes resume revisions or pauses autosave. Existing-file
-  replacement is intentionally unavailable in this checkpoint. Evidence and
-  limitations: `../../evidence/0.0.0-dev/m2-text-export-smoke.md`;
-- added locally: the backend-only No-AI import-review foundation. A bounded,
-  versioned extraction decoder, conservative multilingual heading/explicit
-  contact-label mapping, and source-indexed proposals preserve every extracted
-  block. In-memory review requires a decision for each block, supports explicit
-  section merge/keep-both and contact conflict choices, and prepares a validated
-  revision-bound save without modifying storage. Synthetic encrypted-storage
-  tests cover commit races, replay refusal, published-snapshot isolation, and
-  restart. Evidence: `../../evidence/0.0.0-dev/m2-import-core.md`. No import UI,
-  file picker, parser, or worker launch was enabled by this checkpoint;
-- added locally: bounded parent-side worker transport policy with capped stdout
-  and discarded stderr, monotonic wall deadline, cancellation, terminal failures,
-  and both-EOF/successful-exit validation. These are event simulations, not native
-  pipe/process/sandbox proof. The implementation candidates and access-denial
-  checklist are in `Document_Worker_Containment.md`; evidence is in
-  `../../evidence/0.0.0-dev/m2-import-transport.md`;
-- added locally: a separately signed synthetic macOS App Sandbox/XPC probe.
-  Read-only descriptor transfer, seeded sibling/symlink restrictions and loopback
-  denial passed on local arm64. Direct child creation was allowed; cooperative
-  disconnect is not forced process-tree cleanup. This is partial evidence, not
-  a production sandbox or an import-enablement gate. Both macOS CI jobs run the
-  measured subset. See `../../evidence/0.0.0-dev/m2-native-sandbox-probe.md`;
-- added locally: helper-only hard limits now deny direct `fork`/`posix_spawn`
-  in the macOS probe, enforce a 64-descriptor ceiling with recovery and reject
-  raising the hard limits. The parent is unaffected; the plain App Sandbox
-  baseline is retained. Memory/CPU/broker/forced-cleanup and Windows containment
-  remain unproven. All four CI jobs were subsequently reported passing after `723a97f`.
-  See `../../evidence/0.0.0-dev/m2-macos-hard-limits.md`;
-- added locally: a separate minimal XPC supervisor/inherited-child lifecycle
-  probe. Nine native cases cover normal completion, cancellation, timeouts,
-  output floods, invalid/nonzero results and complete output/EOFs without exit.
-  The supervisor terminates and reaps its own direct child before accepting
-  completion; no XPC PID is signaled. Both macOS CI jobs now run the new subset.
-  This does not prove supervisor-death cleanup, broker descendants or the full
-  inherited-child authority boundary. Production parser/UI remain disabled.
-  See `../../evidence/0.0.0-dev/m2-macos-lifecycle.md`;
-- subsequent CI status: the user confirmed all four jobs passing for `e978cfe`
-  before the DOCX checkpoint began; no run URL was independently retrieved;
-- added locally: a constrained, output-only DOCX generator and main-window
-  saved-draft/published-snapshot export integration. Fixed OPC parts, literal
-  escaped content, semantic headings/lists and allowlisted links use a versioned
-  plain layout. It shares the native one-operation/no-clobber export boundary,
-  not the gated hostile-input worker. Synthetic encrypted-restart/file-write,
-  negative-content, package/semantic and headless-render checks accompany it.
-  The user subsequently reported three of four CI jobs passing for `e349856`;
-  the supplied Windows log failed only at the DOCX golden-byte check after
-  Rust tests passed. CRLF-converted embedded XML reproduced that failure locally.
-  A scoped LF checkout policy, cross-platform checkout regression tests and
-  explicit output diagnostics restore the unchanged goldens locally; the repaired
-  CI run was subsequently confirmed green on all four jobs by the user for
-  `748d13b`; native document-reader/dialog verification remains pending.
-  See `../../evidence/0.0.0-dev/windows-docx-checkout.md`.
-  See `../../evidence/0.0.0-dev/m2-docx-export.md`;
-- added locally: pinned embedded Typst 0.15.1 PDF rendering, six bundled
-  Libertinus Serif faces, original plain PDF layout, exact-byte PDF.js 6.3.289
-  preview and native no-overwrite PDF export from saved revisions. One bounded
-  expiring native preview ticket, SHA-256/version receipts, stale-preview guards,
-  shared render/export/quit gate, accessible text view and bundled license notices
-  accompany encrypted-restart, hostile-literal, layout-limit, contract, filesystem,
-  independent PDF parser/golden and synthetic browser/CSP checks. This is an
-  output-only fixed-template integration, not hostile-file containment. All four
-  CI jobs for `296610a` were subsequently confirmed
-  passing by the user (not independently retrieved). A rebuilt, installed macOS
-  arm64 app passed saved-draft native canvas rendering at 100%/150%, accessible
-  text expansion and native PDF Save cancellation without changing saved data.
-  Broader native WebView/dialog/AT checks remain pending. See
-  `../../evidence/0.0.0-dev/m2-pdf-preview.md` and
-  `../../evidence/0.0.0-dev/m2-installed-pdf-smoke.md`;
-- added locally: additive encrypted schema v2 migration and bounded historical
-  PDF render manifests. Successful previews durably record source/revision,
-  renderer/template/font identities, hashes, page/byte counts and timestamps
-  before the UI receives bytes. Identical render identities deduplicate with a
-  count; the newest 100 remain and the UI exposes 20 without PDF bytes, resume
-  text, paths or preview tickets. Schema-v1 upgrade and interrupted exact-manifest
-  handoff recovery preserve existing records. Portable backup format 1.1 now
-  includes the same bounded, content-free manifests, restores them atomically
-  into a separately keyed profile, and retains format-1.0 read compatibility.
-  Historical renderer replay and native backup/export UX remained pending at
-  that checkpoint. See
-  `../../evidence/0.0.0-dev/m2-render-history.md` and
-  `../../evidence/0.0.0-dev/m2-portable-render-history.md`;
-- Windows CI repair passed per user report after `bdc3e10`: stage logs narrowed the
-  stack overflow to encrypted-profile opening. A matching upstream SQLCipher
-  Windows logging-recursion defect is mitigated by compiling out its native
-  diagnostic logger, with a fail-closed build-policy check. Encryption and
-  allocation memory protection remain enabled; no test is skipped or given a
-  larger stack. All four CI jobs were reported passing; the run URL/log has not
-  been independently retrieved. This does not prove Windows vault/UI or parser
-  containment. See `../../evidence/0.0.0-dev/windows-sqlcipher-logging.md`;
-- added locally: main-window encrypted portable-backup export. A generated,
-  bounded passphrase-only request creates the existing format-1.1 archive from
-  canonical saved records on a blocking native worker; the request types avoid
-  accidental debug/clone support and Rust zeroizes its owned passphrase. An
-  accessible confirmation form clears both visible fields at dispatch and states
-  the unrecoverable-passphrase, credential-exclusion, sync-provider, saved-only,
-  and restore limitations. The native Save dialog issues held-directory,
-  single-use authority for a new `.ort-backup` file; private staging, exact byte
-  bounds, mode 0600 on Unix and no-clobber publication share the reviewed export
-  boundary. Cancellation and failure do not modify the profile, the response
-  exposes no path/content/passphrase/native error, and quit waits on the shared
-  file-operation gate. Synthetic storage-to-file-to-separately-keyed-profile
-  integration and the full local check pass; native dialog/ACL/filesystem,
-  cancellation timing, low-disk/crash cleanup, cross-platform CI and replace-
-  restore safety-copy/profile-swap verification remain pending. See
-  `../../evidence/0.0.0-dev/m2-portable-backup-export.md`;
-- added locally: a main-window, content-free encrypted-profile storage inventory.
-  One generated empty request returns the verified database schema, bounded
-  counts for drafts, published snapshots, settings, PDF render manifests and
-  diagnostic events, plus exact byte sizes for the SQLCipher database, encrypted
-  WAL, SQLite shared-memory file, non-secret manifest and transient recovery
-  metadata. The total is checked arithmetically and every byte value is
-  JavaScript-safe. The storage layer reads only fixed known filenames, rejects
-  symlink/unexpected file types, exposes no paths/IDs/content, and does not scan
-  external exports, backups or vault entries. The accessible UI distinguishes
-  those exclusions, exact bytes and transient file behavior, refreshes after
-  completed editor operations, and performs no cleanup or mutation. Contract,
-  encrypted-storage, symlink, formatting and UI tests accompany the full local
-  check; cross-platform CI and native assistive-technology inspection remain
-  pending. See `../../evidence/0.0.0-dev/m2-storage-usage.md`;
-- added locally: read-only authenticated portable-backup intake and validation.
-  A generated passphrase-only request opens a native `.ort-backup` picker on the
-  shared file-operation worker; no renderer-supplied path or replacement flag is
-  accepted. The platform boundary holds the selected parent directory, requires
-  an absolute regular final entry with the fixed extension, disables final
-  symlink following, bounds file length before allocation and rejects empty,
-  oversized, short or growing reads. The existing reader validates the bounded
-  header/KDF policy, authenticates and decrypts the whole container, then checks
-  schemas, hashes, inventory and domain invariants. Wrong passphrases, tampering
-  and malformed authenticated content share one response. The accessible preview
-  exposes only authenticated format/schema/time/version/byte and record-count
-  metadata—never a path, filename, passphrase, content, setting value, hash or
-  native error—and does not write, close or replace the active profile. Focused
-  contract/UI/native-input/crypto tests and the full local check pass; native
-  Open-dialog/reparse/accessibility inspection, parser-memory hardening,
-  cross-platform CI and crash-safe replace-restore remained pending at that
-  checkpoint. See `../../evidence/0.0.0-dev/m2-backup-validation.md`;
-- added locally: explicitly confirmed, restart-staged portable-backup replacement.
-  The native request accepts only a bounded passphrase and the exact destructive
-  phrase; the selected archive reuses the bounded no-follow file intake. Before
-  the active profile is touched, records are authenticated and imported into a
-  private sibling SQLCipher profile with a fresh OS-vault key and verified
-  integrity. A durable content-free marker makes startup retain the previous
-  encrypted profile in a fixed safety slot and promote the staged profile through
-  exact directory renames. Recovery tests cover normal activation, interruption
-  with missing staging, malformed/oversized markers and symlink refusal; the live
-  profile remains unchanged until restart. The full local check passes. Native
-  macOS/Windows dialog and vault handoff, low-disk and injected rename/fsync
-  failures, safety-copy discovery/cleanup and cross-platform CI remained release
-  gates at that checkpoint. See
-  `../../evidence/0.0.0-dev/m2-replace-restore.md`;
-- added locally: content-free retained safety-copy status, verified rollback and
-  explicit permanent cleanup. Generated main-window commands expose only three
-  state booleans and accept exact typed phrases, never paths, identities, sizes or
-  content. Rollback checkpoints the old encrypted profile before restart and then
-  reuses the recovery journal to exchange it with the active profile while
-  retaining the latter as the new safety copy. Cleanup renames only the fixed
-  safety directory into a deletion-pending slot, deletes its exact vault key and
-  known files, and resumes idempotently at startup after interruption. Tests cover
-  the two-way content swap, different vault identities, exact-target deletion,
-  preserved active/external files, cleanup restart recovery, rejection of a
-  malformed safety directory sharing the active vault identity, boundary
-  rejection and UI disclosure. The full local check passes; native and
-  cross-platform results remain release gates for this checkpoint. See
-  `../../evidence/0.0.0-dev/m2-safety-copy-management.md`;
-- still gated: macOS Dock/system-shutdown quit protection, Windows native editor
-  verification, local PDF/DOCX parsing, hostile-worker containment, review
-  UI/session integration, private binary staging, richer entry/date/link mapping,
-  remaining native PDF preview/export verification, final PDF/DOCX templates
-  and reader verification, confirmed replacement and crash-cleanup policy for
-  exports, historical renderer replay, Windows native Save-dialog/ACL/filesystem
-  proof, destructive storage deletion/cleanup, and complete offline
-  journey evidence. Portable render-manifest backup, restart-staged replacement,
-  rollback and safety-copy cleanup are implemented, but native/cross-platform
-  recovery release verification remains gated. M2 is
-  not complete; do not enable hostile-file parsing or advance to public release
-  based on these local checkpoints alone.
+Portable-backup export, storage inventory, and authenticated backup validation
+are committed through `0a706b2`. Restart-staged replacement and retained
+safety-copy management are committed in `96fc983`. M2 is not release-ready.
+
+### Completed or working locally
+
+- **Editing and lifecycle:** structured editing, validation, autosave,
+  publication, undo/redo, conflict recovery, published review, and guarded quit.
+- **Output and history:** bounded text and DOCX export, pinned local PDF
+  rendering/preview/export, accessible text preview, and encrypted render-history
+  persistence with portable-backup compatibility.
+- **[HIGH]** **Import foundations:** bounded extraction decoding, conservative
+  No-AI mapping/review logic, revision-safe storage integration, parent-side
+  transport policy, and partial macOS containment/lifecycle probes. Production
+  parsing and import UI remain disabled.
+- **[HIGH]** **Backup and recovery:** encrypted portable export, authenticated
+  read-only validation, confirmed restart-staged replacement,
+  retained safety-copy status/rollback, and exact confirmed safety-copy cleanup.
+- **Storage reporting:** content-free storage usage inventory.
+- **[HIGH]** **Storage and restart safety:** no-clobber native file boundaries,
+  encrypted restart tests, and Windows SQLCipher logging mitigation.
+- **Reliability:** generated contracts, deterministic output/golden tests, and
+  passing full local checks for the latest checkpoint.
+
+### Detailed checkpoint evidence
+
+- Editor and lifecycle: [editor smoke](../../evidence/0.0.0-dev/m2-editor-smoke.md),
+  [close guard](../../evidence/0.0.0-dev/m2-close-guard-smoke.md), and
+  [text export](../../evidence/0.0.0-dev/m2-text-export-smoke.md).
+- Import security: [import core](../../evidence/0.0.0-dev/m2-import-core.md),
+  [transport](../../evidence/0.0.0-dev/m2-import-transport.md),
+  [sandbox probe](../../evidence/0.0.0-dev/m2-native-sandbox-probe.md),
+  [hard limits](../../evidence/0.0.0-dev/m2-macos-hard-limits.md), and
+  [worker lifecycle](../../evidence/0.0.0-dev/m2-macos-lifecycle.md).
+- Documents and rendering: [DOCX](../../evidence/0.0.0-dev/m2-docx-export.md),
+  [Windows checkout repair](../../evidence/0.0.0-dev/windows-docx-checkout.md),
+  [PDF preview](../../evidence/0.0.0-dev/m2-pdf-preview.md),
+  [installed PDF smoke](../../evidence/0.0.0-dev/m2-installed-pdf-smoke.md),
+  [render history](../../evidence/0.0.0-dev/m2-render-history.md), and
+  [portable render history](../../evidence/0.0.0-dev/m2-portable-render-history.md).
+- Storage and backup: [portable export](../../evidence/0.0.0-dev/m2-portable-backup-export.md),
+  [storage usage](../../evidence/0.0.0-dev/m2-storage-usage.md),
+  [backup validation](../../evidence/0.0.0-dev/m2-backup-validation.md),
+  [replace restore](../../evidence/0.0.0-dev/m2-replace-restore.md), and
+  [safety-copy management](../../evidence/0.0.0-dev/m2-safety-copy-management.md).
+- Cross-platform repair: [Windows SQLCipher logging](../../evidence/0.0.0-dev/windows-sqlcipher-logging.md).
+
+### Remaining release gates
+
+- **[HIGH]** Complete and prove production PDF/DOCX parser containment on macOS
+  and Windows; then integrate the file picker, review UI, private binary staging,
+  and richer deterministic mapping.
+- **[HIGH]** Finish native/cross-platform vault, filesystem, quit, low-disk, and
+  injected crash/failure verification.
+- Finish native/cross-platform editor, dialog, accessibility, final PDF/DOCX
+  templates, historical renderer replay, and native reader verification.
+- **[HIGH]** Add full active-profile deletion and the final cleanup/retention
+  policy.
+- **[HIGH]** Pass the complete offline journey and all M2 exit evidence.
+  Hostile-file parsing must remain disabled until its containment gate passes.
 
 Deliver:
 
 - functional structured editor and publish lifecycle;
-- local PDF/DOCX extraction, deterministic schema mapping, and temporary review staging; optional AI-assisted remapping is enabled with the configured backend in M3/M4;
-- disposable OS-sandboxed parser worker plus deterministic No-AI mapping that preserves unfamiliar content as reviewable custom/simple sections;
+- **[HIGH]** local PDF/DOCX extraction, deterministic schema mapping, and
+  temporary review staging; optional AI-assisted remapping is enabled with the
+  configured backend in M3/M4;
+- **[HIGH]** disposable OS-sandboxed parser worker plus deterministic No-AI
+  mapping that preserves unfamiliar content as reviewable custom/simple sections;
 - pinned Typst preview/PDF renderer and constrained DOCX/plain-text exporters;
 - accessible preview, save dialogs, atomic export, and historical renderer metadata;
-- storage usage, deletion, and full portable export.
+- **[HIGH]** destructive storage deletion and full portable export;
+- content-free storage usage reporting.
 
 Exit evidence:
 
-- critical offline journey passes without network access;
-- hostile parser fixtures cannot read application data/secrets, access network, spawn children, or survive worker termination;
+- **[HIGH]** critical offline journey passes without network access;
+- **[HIGH]** hostile parser fixtures cannot read application data/secrets,
+  access network, spawn children, or survive worker termination;
 - golden corpus passes semantic, link, pagination, Unicode, and accessibility checks;
-- local extraction never changes the master record; an AI-backed mapping remains unavailable until an AI connection is configured and the user confirms transmission.
+- **[HIGH]** local extraction never changes the master record; an AI-backed
+  mapping remains unavailable until an AI connection is configured and the user
+  confirms transmission.
 
 ## M3 — direct AI foundation
 
 Deliver:
 
-- No AI / Direct API connection state and OS-vault credential setup;
-- OpenAI, Anthropic, and Gemini adapters behind one port;
-- versioned model/preset/pricing catalog with independent signature verification;
-- operation/attempt ledger, streaming, cancellation, one retry, crash recovery;
-- token/cost normalization and transactional direct-spend reservations/caps;
+- No AI / Direct API connection state;
+- **[HIGH]** OS-vault credential setup and lifecycle;
+- **[HIGH]** OpenAI, Anthropic, and Gemini adapters behind one port;
+- **[HIGH]** versioned model/preset/pricing catalog with independent signature
+  verification;
+- **[HIGH]** operation/attempt ledger, cancellation, retry, and crash recovery;
+- basic streaming;
+- **[HIGH]** token/cost normalization and transactional direct-spend
+  reservations/caps;
 - aggregate AI Monitoring queries, Week/Month/Year/All time token/direct-cost series and totals, secondary breakdowns, CSV/JSON export, date-range clearing, and separate cap resets; attempt rows remain internal accounting/recovery data.
 
 Exit evidence:
 
-- provider contract suites and live synthetic probes pass;
-- cost/cap arithmetic passes boundary and concurrent-dispatch tests;
-- credentials and seeded content are absent from logs/backups.
+- **[HIGH]** provider contract suites and live synthetic probes pass without
+  exposing credentials;
+- **[HIGH]** cost/cap arithmetic passes boundary and concurrent-dispatch tests;
+- **[HIGH]** credentials and seeded content are absent from logs/backups.
 
 ## M4 — tailoring, alerts, and application materials
 
 Deliver:
 
-- tailoring, cover-letter, and application-answer prompt/schema versions;
-- factual-evidence validator and no more than three user-visible change points;
-- same-call Required Qualification Alert extraction, versioned category allowlist, deterministic per-category validation, evidence, bounds, persistence, dismissal/ignore/reopen behavior;
+- **[HIGH]** tailoring, cover-letter, and application-answer prompt/schema
+  versions;
+- **[HIGH]** factual-evidence validator and no more than three user-visible
+  change points;
+- **[HIGH]** same-call Required Qualification Alert extraction, versioned
+  category allowlist, deterministic per-category validation, evidence, bounds,
+  persistence, dismissal/ignore/reopen behavior;
 - overlay Stage 2 Resume/Cover letter/Answers tabs, required resume-regeneration instruction, resettable question capture, expanded structured editing/PDF preview, and resume/cover-letter PDF Download/drag handoff;
-- adversarial AI evaluation corpus and preset-specific quality thresholds.
+- **[HIGH]** adversarial AI evaluation corpus and preset-specific quality thresholds.
 
 Exit evidence:
 
-- no generated claim can enter accepted output without mapped input evidence or user entry;
-- required-versus-preferred and alert false-positive gates pass;
-- alerts remain informational and non-blocking.
+- **[HIGH]** no generated claim can enter accepted output without mapped input
+  evidence or user entry;
+- **[HIGH]** required-versus-preferred and alert false-positive gates pass;
+- **[HIGH]** alerts remain informational and non-blocking.
 
 ## M5 — workspace, tracker, and browser bridge
 
 Deliver:
 
-- overlay Stage 1 capture/review, workspace/tracker state machine, and atomic persistent `Finish Application` transaction;
+- **[HIGH]** workspace/tracker state transitions and the atomic persistent
+  `Finish Application` transaction;
+- basic overlay Stage 1 capture/review UI;
 - application snapshots, search/filter, and reopen behavior;
-- Chrome/Edge MV3 extension, native host, authenticated IPC, install/repair/status UI;
-- overlay launch and capture review with version-skew handling, default extension-action/shortcut gesture flow, and separately gated optional-permission overlay-initiation experiment.
+- **[HIGH]** Chrome/Edge MV3 extension/native-host authenticated IPC and
+  install/repair state;
+- basic extension/native-host status UI;
+- **[HIGH]** overlay launch and capture review with version-skew handling,
+  default extension-action/shortcut gesture flow, and separately gated
+  optional-permission overlay-initiation experiment.
 
 Exit evidence:
 
-- selected-text-to-workspace journey passes on both browsers and operating systems;
-- malicious page, spoofed client, replay, oversized frame, desktop-absent, repair, and uninstall tests pass;
-- capture never triggers AI automatically.
+- **[HIGH]** selected-text-to-workspace journey passes on both browsers and
+  operating systems without crossing the documented authority boundary;
+- **[HIGH]** malicious page, spoofed client, replay, oversized frame,
+  desktop-absent, repair, and uninstall tests pass;
+- **[HIGH]** capture never triggers AI automatically.
 
 ## M6 — optional external Codex
 
 Deliver only if the security gate passes:
+
+**[HIGH] — Entire milestone.** Every M6 implementation, test, review, and
+exit-gate decision crosses the external-runtime containment boundary and
+requires high reasoning.
 
 - strict official-runtime discovery/provenance verification (a user-selected path cannot waive identity checks), version/capability negotiation, and isolated ORT Codex home;
 - managed ChatGPT/device-code sign-in and keyring use through the external runtime;
@@ -361,18 +270,21 @@ If the gate fails, record the result and defer M6 without blocking M7.
 
 Deliver:
 
-- Windows NSIS preview and SignPath-signed direct stable pipeline;
+- **[HIGH]** Windows NSIS preview and SignPath-signed direct stable pipeline;
 - Microsoft Store fallback feasibility/package path;
 - unsigned macOS preview DMG and later-signing readiness;
-- signed updater metadata, release channels, rollback/recovery, checksums, SBOM, provenance;
-- extension Store packages and compatibility sequencing;
-- accessibility manual matrix, performance budgets, clean-machine install/update/repair/uninstall tests;
+- **[HIGH]** signed updater metadata, release channels, rollback/recovery,
+  checksums, SBOM, and provenance;
+- **[HIGH]** extension Store packages and compatibility sequencing;
+- **[HIGH]** accessibility manual matrix, performance budgets, and clean-machine
+  install/update/repair/uninstall tests;
 - public support/diagnostic and release runbooks.
 
 Exit evidence:
 
-- all stable release gates in `Quality_Accessibility_and_Verification.md` pass;
-- published artifacts are byte-for-byte the tested artifacts;
+- **[HIGH]** all stable release gates in
+  `Quality_Accessibility_and_Verification.md` pass;
+- **[HIGH]** published artifacts are byte-for-byte the tested artifacts;
 - download pages can be generated from the signed release manifest.
 
 ## M8 — static project website
@@ -381,11 +293,19 @@ The private website plan may be implemented once real release metadata exists. I
 
 ## Cross-milestone rules
 
-- Each milestone ships behind usable local data migrations; unfinished features remain absent or clearly disabled.
-- Database migrations are forward-only in production. Rollback restores a pre-migration safety copy when compatible rather than attempting risky down-migrations.
-- A new renderer/template/prompt/catalog version is immutable after release; fixes create a new version.
-- Security, accessibility, and license checks are part of the feature, not cleanup work.
-- No milestone may add telemetry or remote content storage through implementation convenience.
+- **[HIGH]** Each milestone ships behind usable local data migrations;
+  unfinished features remain absent or clearly disabled.
+- **[HIGH]** Database migrations are forward-only in production. Rollback
+  restores a pre-migration safety copy when compatible rather than attempting
+  risky down-migrations.
+- **[HIGH]** A new renderer/template/prompt/catalog version is immutable after
+  release; fixes create a new version.
+- **[HIGH]** Security gate design and sign-off are part of the feature, not
+  cleanup work;
+- Routine accessibility and license implementation;
+- **[HIGH]** final accessibility and license release sign-off;
+- **[HIGH]** No milestone may add telemetry or remote content storage through
+  implementation convenience.
 
 ## Explicitly deferred
 
