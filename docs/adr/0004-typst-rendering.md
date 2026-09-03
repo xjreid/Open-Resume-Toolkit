@@ -32,7 +32,11 @@ Libertinus Serif, 18 pt name, 12/11 pt headings, English layout language). It is
 not a promise of identical DOCX pagination. Unsupported glyphs and clipped or
 over-limit layouts fail explicitly. Session receipts identify the document hash
 and schema, exact PDF hash/size/page count, engine version, template/font hashes
-and generation time; no historical receipt storage migration is claimed.
+and generation time. The M2 schema-v2 checkpoint now stores those content-free
+receipts in the encrypted profile, deduplicated by exact source revision and PDF
+identity with bounded retention. It does not persist PDF bytes, source content,
+paths or preview tickets, and it does not yet provide historical binary replay or
+portable-backup inclusion.
 
 See [checkpoint evidence](../../evidence/0.0.0-dev/m2-pdf-preview.md) and
 [dependency/font provenance](../dependencies/pdf/README.md). Golden and native

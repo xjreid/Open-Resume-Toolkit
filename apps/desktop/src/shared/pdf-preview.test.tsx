@@ -12,7 +12,11 @@ import {
 import { createResumeDocument } from "./resume-editor";
 import { editorReducer, initialEditorState } from "./editor-state";
 import { closeDisposition } from "./close-policy";
-import { renderResumePdf, exportResumePdf } from "./command-client";
+import {
+  renderResumePdf,
+  exportResumePdf,
+  requestPdfRenderHistory,
+} from "./command-client";
 import { invoke } from "@tauri-apps/api/core";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 const preview: PdfPreview = {
@@ -78,6 +82,14 @@ it("native requests contain no path, document, PDF bytes or template", async () 
   });
   vi.mocked(invoke).mockResolvedValueOnce({
     ok: true,
+    value: { manifests: [] },
+  });
+  expect((await requestPdfRenderHistory()).ok).toBe(true);
+  expect(invoke).toHaveBeenLastCalledWith("load_pdf_render_history", {
+    request: expect.objectContaining({ payload: {} }),
+  });
+  vi.mocked(invoke).mockResolvedValueOnce({
+    ok: true,
     value: { ...preview, revision: 2 },
   });
   expect((await renderResumePdf("saved_draft", 1)).ok).toBe(false);
@@ -125,6 +137,8 @@ it("offers explicit saved-source controls, privacy warning and local license not
   );
   expect(html).toContain("Preview saved draft");
   expect(html).toContain("Preview published snapshot");
+  expect(html).toContain("Stored render history");
+  expect(html).toContain("encrypted profile retains at most 100");
   expect(html).toContain("unencrypted");
   expect(html).toContain("SIL OPEN FONT LICENSE");
   expect(html).not.toContain("<iframe");

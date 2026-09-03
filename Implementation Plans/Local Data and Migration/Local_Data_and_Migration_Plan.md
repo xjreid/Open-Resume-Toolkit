@@ -92,6 +92,24 @@ All IDs are UUIDv7 strings generated locally. Every mutable row includes `create
 
 `schema_migrations`, `app_metadata`, `renderer_bundles`, `catalog_receipts`, and `maintenance_jobs` record compatibility and recovery state. SQLite full-text tables are introduced only for explicitly selected tracker/resume fields, and remain inside SQLCipher.
 
+### Implemented development schema v2
+
+The first additive M2 migration creates `render_manifests`. Each row records a
+content-free PDF render identity for one saved-draft or published-snapshot
+revision: document/PDF hashes, document schema, pinned renderer/template/font
+IDs and hashes, page/byte counts, first/last generation times and a repeat count.
+PDF bytes, resume text, filesystem paths and preview tickets are excluded.
+Identical source/revision/PDF identities update one row; retention keeps the
+newest 100 identities and the current UI requests at most 20.
+
+Schema receipts for v1 and v2 are verified independently. Existing v1 profiles
+apply v2 in an immediate transaction and then replace the non-secret profile
+manifest through an exact-name previous/current handoff. Startup can restore the
+previous exact manifest if interruption occurs between those renames; symlinks
+and unexpected entry types fail closed. This additive migration does not require
+a database safety copy. Historical renderer replay and inclusion of render
+manifests in the portable-backup prototype remain later M2 work.
+
 ## Record choices
 
 - Resume/workspace/snapshot payloads are JSON validated against the canonical generated schema before write and after read.

@@ -143,9 +143,23 @@ Current development status:
   shared render/export/quit gate, accessible text view and bundled license notices
   accompany encrypted-restart, hostile-literal, layout-limit, contract, filesystem,
   independent PDF parser/golden and synthetic browser/CSP checks. This is an
-  output-only fixed-template integration, not hostile-file containment. Receipts
-  remain session-only; CI for this checkpoint and native WebView/dialog/AT checks
-  are pending. See `../../evidence/0.0.0-dev/m2-pdf-preview.md`;
+  output-only fixed-template integration, not hostile-file containment. All four
+  CI jobs for `296610a` were subsequently confirmed
+  passing by the user (not independently retrieved). A rebuilt, installed macOS
+  arm64 app passed saved-draft native canvas rendering at 100%/150%, accessible
+  text expansion and native PDF Save cancellation without changing saved data.
+  Broader native WebView/dialog/AT checks remain pending. See
+  `../../evidence/0.0.0-dev/m2-pdf-preview.md` and
+  `../../evidence/0.0.0-dev/m2-installed-pdf-smoke.md`;
+- added locally: additive encrypted schema v2 migration and bounded historical
+  PDF render manifests. Successful previews durably record source/revision,
+  renderer/template/font identities, hashes, page/byte counts and timestamps
+  before the UI receives bytes. Identical render identities deduplicate with a
+  count; the newest 100 remain and the UI exposes 20 without PDF bytes, resume
+  text, paths or preview tickets. Schema-v1 upgrade and interrupted exact-manifest
+  handoff recovery preserve existing records. Historical renderer replay and
+  portable-backup inclusion remain pending. See
+  `../../evidence/0.0.0-dev/m2-render-history.md`;
 - Windows CI repair passed per user report after `bdc3e10`: stage logs narrowed the
   stack overflow to encrypted-profile opening. A matching upstream SQLCipher
   Windows logging-recursion defect is mitigated by compiling out its native
@@ -157,8 +171,8 @@ Current development status:
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
   UI/session integration, private binary staging, richer entry/date/link mapping,
-  native PDF preview/export verification, final PDF/DOCX templates and reader verification, confirmed replacement and
-  crash-cleanup policy for exports, historical render metadata, Windows native
+  remaining native PDF preview/export verification, final PDF/DOCX templates and reader verification, confirmed replacement and
+  crash-cleanup policy for exports, historical renderer replay/backup inclusion, Windows native
   Save-dialog/ACL/filesystem proof, storage management, and complete offline
   journey evidence. M2 is not complete; do not enable hostile-file parsing or
   advance to public release based on the text-export checkpoint alone.

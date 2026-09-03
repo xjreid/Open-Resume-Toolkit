@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "version": "0.0.0-dev",
-  "commit": null,
+  "commit": "296610a49461363ff47da6353558ea5b35ebf3f4",
   "channel": "development",
   "profileIdentity": "com.openresumetoolkit.dev",
   "artifacts": [
@@ -11,7 +11,7 @@
       "architecture": "arm64",
       "bundleIdentifier": "com.openresumetoolkit.dev",
       "signing": "adhoc-runtime",
-      "executableSha256": "4f3e8f37955d6e166a0040d3516a18dc83f9f66d42c08de4fde0e1ca22506527",
+      "executableSha256": "ecd01fa08ef6e5d82a62b7024dac56d27149bfa426480291dc398c6a8034b88a",
       "verification": "codesign-deep-strict"
     }
   ],
@@ -57,8 +57,13 @@
     "m2ImportReviewUi": "pending",
     "javascriptProductionAudit": "passed-local-no-known-vulnerabilities",
     "rustAdvisoryAudit": "pending-tool-unavailable",
-    "macosPreviewPackage": "previous-text-export-checkpoint-not-rebuilt-for-lifecycle-probes-and-storage-logging",
-    "platformBuilds": "723a97f-all-ci-user-reported-passed-current-lifecycle-checkpoint-pending"
+    "m2PdfNativeMacosPreview": "partial-installed-arm64-saved-draft-canvas-100-and-150-percent-accessible-text-and-save-cancel-passed",
+    "m2PdfNativeWindowsPreview": "pending",
+    "m2SchemaV2Migration": "passed-local-additive-checksummed-upgrade-and-interrupted-exact-manifest-handoff-recovery-macos-arm64",
+    "m2PdfRenderHistory": "passed-local-encrypted-deduplicated-bounded-restart-contract-ui-and-full-workspace-check-macos-arm64",
+    "m2PdfRenderHistoryNative": "pending-refreshed-application-after-cross-platform-ci",
+    "macosPreviewPackage": "296610a-arm64-app-built-installed-hash-matched-and-codesign-deep-strict-passed-dmg-not-refreshed",
+    "platformBuilds": "296610a-all-four-ci-jobs-user-reported-passed-not-independently-retrieved"
   },
   "releaseEligible": false
 }

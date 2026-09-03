@@ -6,6 +6,13 @@ CI and native WebView/dialog/assistive-technology verification pending. M2 remai
 underway. The user confirmed all four preceding CI jobs passed before this work;
 that result was not independently retrieved.
 
+Follow-up, 2026-09-03 UTC: the user reported all four CI jobs passing for the
+completed checkpoint (`296610a`); no run URL/log was independently retrieved.
+The rebuilt, installed macOS arm64 app subsequently passed a limited native
+saved-draft PDF canvas/zoom/accessible-text and Save-cancel smoke check. See
+`m2-installed-pdf-smoke.md`. The pending statements below describe the original
+checkpoint; broader native and assistive-technology gates remain open.
+
 This checkpoint groups a pinned renderer, native commands/cache, generated
 contracts, preview/export UI, lifecycle protection, encrypted-restart integration,
 independent PDF audits, visual checks, licenses and documentation. It does not
@@ -149,7 +156,9 @@ migration is required; existing saved records and exports are unchanged.
    that custom-scheme workers function on either native WebView.
 3. Windows-native vault, UI, ACL/reparse/filesystem and containment verification;
    signed macOS lifecycle/broker authority/resource gates remain separate.
-4. Historical receipt persistence/renderer replay, final PDF/DOCX template
+4. Historical receipt persistence is implemented by the subsequent bounded
+   encrypted schema-v2 checkpoint in `m2-render-history.md`; renderer replay and
+   portable-backup inclusion remain open. Final PDF/DOCX template
    categories, broader glyph/RTL/language coverage, ATS/native-reader and p95
    performance qualification, replacement/recovery, storage UI and the complete
    offline journey remain M2 work. Preview refresh is manual, not live unsaved

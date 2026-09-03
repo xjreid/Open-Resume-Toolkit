@@ -6,13 +6,18 @@ import type {
   RenderTask,
 } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { PDF_PREVIEW_TTL_SECONDS, type PdfPreview } from "@ort/contracts/pdf";
+import {
+  PDF_PREVIEW_TTL_SECONDS,
+  type PdfPreview,
+  type PdfRenderManifest,
+} from "@ort/contracts/pdf";
 import type { ExportSource } from "@ort/contracts/export";
 import type { VersionedResume, ResumeDocument } from "@ort/contracts/resume";
 import {
   renderResumePdf,
   exportResumePdf,
   releaseResumePdf,
+  requestPdfRenderHistory,
 } from "./command-client";
 import {
   pdfFailure,
@@ -46,16 +51,30 @@ export function PdfPreviewPanel({
     document: ResumeDocument;
   } | null>(null);
   const [ready, setReady] = useState(false);
+  const [history, setHistory] = useState<PdfRenderManifest[] | null>(null);
+  const [historyError, setHistoryError] = useState(false);
   const [message, setMessage] = useState(
     "Generate a preview from a saved revision. Unsaved edits are not included.",
   );
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
+    void refreshHistory();
     return () => {
       mounted.current = false;
     };
   }, []);
+
+  async function refreshHistory() {
+    const result = await requestPdfRenderHistory();
+    if (!mounted.current) return;
+    if (result.ok) {
+      setHistory(result.value.manifests);
+      setHistoryError(false);
+    } else {
+      setHistoryError(true);
+    }
+  }
   useEffect(() => {
     if (!snapshot) return;
     const { preview } = snapshot;
@@ -98,6 +117,7 @@ export function PdfPreviewPanel({
       setSnapshot({ preview: result.value, document: selected.document });
       setMessage("Loading the generated PDF…");
       onFinish("PDF generated locally. Review the preview before exporting.");
+      void refreshHistory();
     } else {
       const message = pdfFailure(result.error.code);
       setMessage(message);
@@ -238,12 +258,48 @@ export function PdfPreviewPanel({
               </dd>
             </dl>
             <p>
-              Receipts are session-only. Historical renderer replay is not
-              implemented.
+              This content-free receipt is stored in the encrypted profile.
+              Historical renderer replay is not implemented.
             </p>
           </details>
         </>
       ) : null}
+      <details>
+        <summary>
+          Stored render history{history ? ` (${history.length})` : ""}
+        </summary>
+        {historyError ? (
+          <p role="status">Stored render history is temporarily unavailable.</p>
+        ) : history === null ? (
+          <p role="status">Loading encrypted render history…</p>
+        ) : history.length === 0 ? (
+          <p>No PDF render receipts are stored yet.</p>
+        ) : (
+          <ol className="pdf-history">
+            {history.map((manifest) => (
+              <li key={manifest.manifestId}>
+                <strong>
+                  {manifest.source === "saved_draft"
+                    ? "Saved draft"
+                    : "Published snapshot"}{" "}
+                  revision {manifest.sourceRevision}
+                </strong>
+                <span>
+                  {new Date(manifest.lastGeneratedAtUnixMs).toISOString()} ·{" "}
+                  {manifest.receipt.pageCount} page(s) · rendered{" "}
+                  {manifest.renderCount} time(s)
+                </span>
+                <code>{manifest.receipt.pdfSha256}</code>
+              </li>
+            ))}
+          </ol>
+        )}
+        <p>
+          The encrypted profile retains at most 100 distinct receipt identities;
+          this view shows the newest 20. PDF bytes and resume text are not
+          stored in this history.
+        </p>
+      </details>
       <PdfNotices />
     </section>
   );

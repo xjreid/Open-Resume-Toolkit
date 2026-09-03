@@ -1,5 +1,5 @@
 //! Synthetic encrypted-profile journey; no OS vault, app or native dialog.
-use ort_domain::ResumeDocument;
+use ort_domain::{ExportSource, ResumeDocument};
 use ort_platform::{ExportDestination, ExportFileType, ExportWriteError};
 use ort_render::{render_pdf, sha256};
 use ort_storage::EncryptedStore;
@@ -21,13 +21,21 @@ fn restart_render_and_export_preserve_exact_saved_and_published_revisions() {
     drop(store);
     let store = EncryptedStore::open_or_initialize(profile.path(), "test", &vault).unwrap();
     let mut hashes = Vec::new();
-    for (name, saved) in [
-        ("draft.pdf", store.load_draft().unwrap().unwrap()),
+    for (index, (name, source, saved)) in [
+        (
+            "draft.pdf",
+            ExportSource::SavedDraft,
+            store.load_draft().unwrap().unwrap(),
+        ),
         (
             "published.pdf",
+            ExportSource::PublishedSnapshot,
             store.load_latest_published().unwrap().unwrap(),
         ),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let artifact = render_pdf(&saved.document).unwrap();
         assert_eq!(
             artifact.receipt.document_sha256,
@@ -47,6 +55,14 @@ fn restart_render_and_export_preserve_exact_saved_and_published_revisions() {
             ExportDestination::for_native_dialog(&path, ExportFileType::Pdf),
             Err(ExportWriteError::AlreadyExists)
         ));
+        store
+            .record_render_manifest(
+                source,
+                saved.revision,
+                1_000 + u64::try_from(index).unwrap(),
+                &artifact.receipt,
+            )
+            .unwrap();
         hashes.push(artifact.receipt.pdf_sha256);
     }
     assert_ne!(hashes[0], hashes[1]);
@@ -57,4 +73,17 @@ fn restart_render_and_export_preserve_exact_saved_and_published_revisions() {
     assert_eq!(after_published.revision, published.revision);
     assert_eq!(after_published.document, published.document);
     assert_eq!(std::fs::read_dir(output.path()).unwrap().count(), 2);
+    drop(store);
+    let reopened = EncryptedStore::open_or_initialize(profile.path(), "test", &vault).unwrap();
+    let manifests = reopened.load_recent_render_manifests(20).unwrap();
+    assert_eq!(manifests.len(), 2);
+    assert_eq!(manifests[0].source, ExportSource::PublishedSnapshot);
+    assert_eq!(manifests[1].source, ExportSource::SavedDraft);
+    assert_eq!(
+        [
+            manifests[1].receipt.pdf_sha256.clone(),
+            manifests[0].receipt.pdf_sha256.clone(),
+        ],
+        [hashes[0].clone(), hashes[1].clone()]
+    );
 }

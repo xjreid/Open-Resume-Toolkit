@@ -2,9 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   isPdfPreviewCommandResponse,
   isPdfExportCommandResponse,
+  isPdfRenderHistoryCommandResponse,
   type PdfPreview,
   type PdfPreviewCommandResponse,
   type PdfExportCommandResponse,
+  type PdfRenderHistory,
+  type PdfRenderHistoryCommandResponse,
 } from "@ort/contracts/pdf";
 import {
   isExportTextCommandResponse,
@@ -207,6 +210,19 @@ export async function renderResumePdf(
     return response;
   } catch {
     return commandUnavailable();
+  }
+}
+
+export async function requestPdfRenderHistory(): Promise<PdfRenderHistoryCommandResponse> {
+  try {
+    const response: unknown = await invoke("load_pdf_render_history", {
+      request: requestEnvelope({}),
+    });
+    return isPdfRenderHistoryCommandResponse(response)
+      ? response
+      : invalidCommandResponse<PdfRenderHistory>();
+  } catch {
+    return commandUnavailable<PdfRenderHistory>();
   }
 }
 

@@ -2,7 +2,9 @@ import { expect, it } from "vitest";
 import {
   isPdfPreviewCommandResponse,
   isPdfExportCommandResponse,
+  isPdfRenderHistoryCommandResponse,
   MAX_PDF_BYTES,
+  MAX_PDF_RENDER_HISTORY,
 } from "../generated/pdf";
 
 const preview = {
@@ -75,4 +77,32 @@ it("accepts path-free PDF export receipts and rejects unexpected data", () => {
     { status: "cancelled", path: "private" },
   ])
     expect(isPdfExportCommandResponse(wrap(value))).toBe(false);
+});
+it("accepts bounded content-free render history and rejects unexpected fields", () => {
+  const manifest = {
+    manifestId: "019a0000-0000-7000-8000-000000000002",
+    source: "saved_draft",
+    sourceRevision: 1,
+    generatedAtUnixMs: 1000,
+    lastGeneratedAtUnixMs: 2000,
+    renderCount: 2,
+    receipt: preview.receipt,
+  };
+  expect(
+    isPdfRenderHistoryCommandResponse(wrap({ manifests: [manifest] })),
+  ).toBe(true);
+  for (const value of [
+    { manifests: [{ ...manifest, path: "/private" }] },
+    { manifests: [{ ...manifest, renderCount: 0 }] },
+    {
+      manifests: [
+        { ...manifest, lastGeneratedAtUnixMs: 8_640_000_000_000_001 },
+      ],
+    },
+    { manifests: [{ ...manifest, lastGeneratedAtUnixMs: 999 }] },
+    { manifests: [manifest, manifest] },
+    { manifests: Array(MAX_PDF_RENDER_HISTORY + 1).fill(manifest) },
+    { manifests: [], pdfBytes: "forbidden" },
+  ])
+    expect(isPdfRenderHistoryCommandResponse(wrap(value))).toBe(false);
 });

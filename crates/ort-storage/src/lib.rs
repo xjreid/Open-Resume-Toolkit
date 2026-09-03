@@ -17,7 +17,9 @@ use ort_backup::{
     PortablePublishedResumeV1, PortableResumeRevisionV1, PortableSettingV1, create_backup,
     restore_backup,
 };
-use ort_domain::{DocumentLimits, ResumeDocument};
+use ort_domain::{
+    DocumentLimits, ExportSource, MAX_PDF_BYTES, MAX_PDF_PAGES, PdfRenderReceipt, ResumeDocument,
+};
 use ort_vault::{DatabaseKey, DatabaseKeyVault, VaultError, VaultReference};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, backup, params};
 use serde::{Deserialize, Serialize};
@@ -28,8 +30,12 @@ use zeroize::Zeroize;
 
 const DATABASE_FILENAME: &str = "profile.db";
 const MANIFEST_FILENAME: &str = "profile.json";
+const PREVIOUS_MANIFEST_FILENAME: &str = "profile.json.previous";
+const MANIFEST_UPDATE_FILENAME: &str = ".profile-update.tmp";
 const DATABASE_FORMAT_VERSION: u16 = 1;
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
+const MAX_RENDER_MANIFESTS: i64 = 100;
+const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 const MAX_MANIFEST_BYTES: u64 = 16 * 1_024;
 const MAX_SETTING_BYTES: usize = 64 * 1_024;
 const MIGRATION_V1_SQL: &str = "CREATE TABLE schema_migrations (
@@ -83,6 +89,28 @@ const MIGRATION_V1_SQL: &str = "CREATE TABLE schema_migrations (
          safe_context_json BLOB NOT NULL,
          created_at TEXT NOT NULL
      ) STRICT;";
+const MIGRATION_V2_SQL: &str = "CREATE TABLE render_manifests (
+         manifest_id TEXT PRIMARY KEY,
+         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+         source TEXT NOT NULL CHECK (source IN ('saved_draft', 'published_snapshot')),
+         source_revision INTEGER NOT NULL CHECK (source_revision >= 1),
+         generated_at_unix_ms INTEGER NOT NULL CHECK (generated_at_unix_ms >= 1),
+         last_generated_at_unix_ms INTEGER NOT NULL CHECK (last_generated_at_unix_ms >= generated_at_unix_ms),
+         render_count INTEGER NOT NULL CHECK (render_count >= 1),
+         document_sha256 TEXT NOT NULL,
+         document_schema_version INTEGER NOT NULL CHECK (document_schema_version >= 1),
+         pdf_sha256 TEXT NOT NULL,
+         renderer_version TEXT NOT NULL,
+         template_id TEXT NOT NULL,
+         template_sha256 TEXT NOT NULL,
+         font_bundle_id TEXT NOT NULL,
+         font_bundle_sha256 TEXT NOT NULL,
+         page_count INTEGER NOT NULL CHECK (page_count >= 1),
+         byte_count INTEGER NOT NULL CHECK (byte_count >= 1),
+         UNIQUE (profile_id, source, source_revision, pdf_sha256)
+     ) STRICT;
+     CREATE INDEX render_manifests_recent
+         ON render_manifests (profile_id, last_generated_at_unix_ms DESC, manifest_id DESC);";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum StorageError {
@@ -201,6 +229,17 @@ pub struct DiagnosticEvent {
     pub created_at: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredRenderManifest {
+    pub manifest_id: Uuid,
+    pub source: ExportSource,
+    pub source_revision: i64,
+    pub generated_at_unix_ms: u64,
+    pub last_generated_at_unix_ms: u64,
+    pub render_count: u32,
+    pub receipt: PdfRenderReceipt,
+}
+
 pub struct EncryptedStore {
     connection: Mutex<Connection>,
     manifest: ProfileManifest,
@@ -223,6 +262,7 @@ impl EncryptedStore {
 
         let manifest_path = root.join(MANIFEST_FILENAME);
         let database_path = root.join(DATABASE_FILENAME);
+        recover_manifest_update(root, &manifest_path, &database_path)?;
 
         if manifest_path.exists() {
             reject_symlink(&manifest_path)?;
@@ -230,13 +270,20 @@ impl EncryptedStore {
             if !database_path.is_file() {
                 return Err(StorageError::IncompleteInitialization);
             }
-            let manifest = read_manifest(&manifest_path, channel)?;
+            let mut manifest = read_manifest(&manifest_path, channel)?;
             let reference = manifest.vault_reference()?;
             let key = vault
                 .load(&reference)
                 .map_err(|error| map_vault_load_error(&error))?;
             let connection = open_encrypted_connection(&database_path, &key, false)?;
+            migrate_schema(&connection)?;
             verify_schema(&connection)?;
+            if manifest.schema_version == SCHEMA_VERSION {
+                remove_previous_manifest(root)?;
+            } else {
+                manifest.schema_version = SCHEMA_VERSION;
+                replace_manifest_atomically(root, &manifest_path, &manifest)?;
+            }
             set_private_database_permissions(&database_path)?;
             return Ok(Self {
                 connection: Mutex::new(connection),
@@ -268,7 +315,8 @@ impl EncryptedStore {
         let initialized = (|| {
             let connection = open_encrypted_connection(&database_path, &key, true)?;
             initialize_schema(&connection, &manifest)?;
-            verify_integrity(&connection)?;
+            migrate_schema(&connection)?;
+            verify_schema(&connection)?;
             set_private_database_permissions(&database_path)?;
             write_manifest_atomically(root, &manifest_path, &manifest)?;
             Ok(connection)
@@ -717,6 +765,153 @@ impl EncryptedStore {
         .collect()
     }
 
+    /// Stores a content-free receipt for one exact locally rendered revision.
+    /// Re-rendering identical bytes updates the existing manifest instead of
+    /// growing an unbounded event log. Only the newest 100 identities remain.
+    ///
+    /// # Errors
+    /// Returns an error for invalid receipt metadata or unavailable storage.
+    pub fn record_render_manifest(
+        &self,
+        source: ExportSource,
+        source_revision: i64,
+        generated_at_unix_ms: u64,
+        receipt: &PdfRenderReceipt,
+    ) -> Result<StoredRenderManifest, StorageError> {
+        validate_render_manifest(source_revision, generated_at_unix_ms, receipt)?;
+        let generated_at =
+            i64::try_from(generated_at_unix_ms).map_err(|_| StorageError::InvalidData)?;
+        let page_count =
+            i64::try_from(receipt.page_count).map_err(|_| StorageError::InvalidData)?;
+        let byte_count =
+            i64::try_from(receipt.byte_count).map_err(|_| StorageError::InvalidData)?;
+        let source_code = export_source_code(source);
+        let manifest_id = Uuid::now_v7();
+        let mut connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|_| StorageError::Unavailable)?;
+        transaction
+            .execute(
+                "INSERT INTO render_manifests \
+                 (manifest_id, profile_id, source, source_revision, generated_at_unix_ms, \
+                  last_generated_at_unix_ms, render_count, document_sha256, \
+                  document_schema_version, pdf_sha256, renderer_version, template_id, \
+                  template_sha256, font_bundle_id, font_bundle_sha256, page_count, byte_count) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?5, 1, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) \
+                 ON CONFLICT(profile_id, source, source_revision, pdf_sha256) DO UPDATE SET \
+                  last_generated_at_unix_ms = MAX(render_manifests.last_generated_at_unix_ms, excluded.last_generated_at_unix_ms), \
+                  render_count = MIN(render_manifests.render_count + 1, 2147483647)",
+                params![
+                    manifest_id.to_string(),
+                    self.manifest.profile_id.to_string(),
+                    source_code,
+                    source_revision,
+                    generated_at,
+                    receipt.document_sha256,
+                    i64::from(receipt.document_schema_version),
+                    receipt.pdf_sha256,
+                    receipt.renderer_version,
+                    receipt.template_id,
+                    receipt.template_sha256,
+                    receipt.font_bundle_id,
+                    receipt.font_bundle_sha256,
+                    page_count,
+                    byte_count,
+                ],
+            )
+            .map_err(|_| StorageError::Unavailable)?;
+        transaction
+            .execute(
+                "DELETE FROM render_manifests WHERE manifest_id IN (\
+                   SELECT manifest_id FROM render_manifests WHERE profile_id = ?1 \
+                   ORDER BY last_generated_at_unix_ms DESC, manifest_id DESC \
+                   LIMIT -1 OFFSET ?2\
+                 )",
+                params![self.manifest.profile_id.to_string(), MAX_RENDER_MANIFESTS],
+            )
+            .map_err(|_| StorageError::Unavailable)?;
+        transaction
+            .commit()
+            .map_err(|_| StorageError::Unavailable)?;
+        drop(connection);
+        self.load_render_manifest_identity(source, source_revision, &receipt.pdf_sha256)?
+            .ok_or(StorageError::Unavailable)
+    }
+
+    /// Loads the newest bounded render identities without PDF bytes or content.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid limit or malformed persisted metadata.
+    pub fn load_recent_render_manifests(
+        &self,
+        limit: u16,
+    ) -> Result<Vec<StoredRenderManifest>, StorageError> {
+        if !(1..=50).contains(&limit) {
+            return Err(StorageError::InvalidData);
+        }
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let mut statement = connection
+            .prepare(
+                "SELECT manifest_id, source, source_revision, generated_at_unix_ms, \
+                 last_generated_at_unix_ms, render_count, document_sha256, \
+                 document_schema_version, pdf_sha256, renderer_version, template_id, \
+                 template_sha256, font_bundle_id, font_bundle_sha256, page_count, byte_count \
+                 FROM render_manifests WHERE profile_id = ?1 \
+                 ORDER BY last_generated_at_unix_ms DESC, manifest_id DESC LIMIT ?2",
+            )
+            .map_err(|_| StorageError::Unavailable)?;
+        let rows = statement
+            .query_map(
+                params![self.manifest.profile_id.to_string(), i64::from(limit)],
+                render_manifest_row,
+            )
+            .map_err(|_| StorageError::Unavailable)?;
+        rows.map(|row| {
+            let row = row.map_err(|_| StorageError::InvalidData)?;
+            parse_render_manifest(row)
+        })
+        .collect()
+    }
+
+    fn load_render_manifest_identity(
+        &self,
+        source: ExportSource,
+        source_revision: i64,
+        pdf_sha256: &str,
+    ) -> Result<Option<StoredRenderManifest>, StorageError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        connection
+            .query_row(
+                "SELECT manifest_id, source, source_revision, generated_at_unix_ms, \
+                 last_generated_at_unix_ms, render_count, document_sha256, \
+                 document_schema_version, pdf_sha256, renderer_version, template_id, \
+                 template_sha256, font_bundle_id, font_bundle_sha256, page_count, byte_count \
+                 FROM render_manifests WHERE profile_id = ?1 AND source = ?2 \
+                 AND source_revision = ?3 AND pdf_sha256 = ?4",
+                params![
+                    self.manifest.profile_id.to_string(),
+                    export_source_code(source),
+                    source_revision,
+                    pdf_sha256,
+                ],
+                render_manifest_row,
+            )
+            .optional()
+            .map_err(|_| StorageError::Unavailable)?
+            .map(parse_render_manifest)
+            .transpose()
+    }
+
     /// Creates a password-protected portable backup containing canonical
     /// records but no database key, vault reference, or diagnostics.
     ///
@@ -765,7 +960,8 @@ impl EncryptedStore {
                 "SELECT \
                  (SELECT COUNT(*) FROM resume_drafts WHERE profile_id = ?1) + \
                  (SELECT COUNT(*) FROM published_resumes WHERE profile_id = ?1) + \
-                 (SELECT COUNT(*) FROM settings WHERE profile_id = ?1)",
+                 (SELECT COUNT(*) FROM settings WHERE profile_id = ?1) + \
+                 (SELECT COUNT(*) FROM render_manifests WHERE profile_id = ?1)",
                 [self.manifest.profile_id.to_string()],
                 |row| row.get(0),
             )
@@ -995,6 +1191,161 @@ impl EncryptedStore {
     }
 }
 
+type RenderManifestRow = (
+    String,
+    String,
+    i64,
+    i64,
+    i64,
+    i64,
+    String,
+    i64,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    i64,
+    i64,
+);
+
+fn render_manifest_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RenderManifestRow> {
+    Ok((
+        row.get(0)?,
+        row.get(1)?,
+        row.get(2)?,
+        row.get(3)?,
+        row.get(4)?,
+        row.get(5)?,
+        row.get(6)?,
+        row.get(7)?,
+        row.get(8)?,
+        row.get(9)?,
+        row.get(10)?,
+        row.get(11)?,
+        row.get(12)?,
+        row.get(13)?,
+        row.get(14)?,
+        row.get(15)?,
+    ))
+}
+
+fn parse_render_manifest(row: RenderManifestRow) -> Result<StoredRenderManifest, StorageError> {
+    let (
+        manifest_id,
+        source,
+        source_revision,
+        generated_at,
+        last_generated_at,
+        render_count,
+        document_sha256,
+        document_schema_version,
+        pdf_sha256,
+        renderer_version,
+        template_id,
+        template_sha256,
+        font_bundle_id,
+        font_bundle_sha256,
+        page_count,
+        byte_count,
+    ) = row;
+    let manifest_id_text = manifest_id;
+    let manifest_id = Uuid::parse_str(&manifest_id_text).map_err(|_| StorageError::InvalidData)?;
+    if manifest_id.get_version_num() != 7 || manifest_id.to_string() != manifest_id_text {
+        return Err(StorageError::InvalidData);
+    }
+    let source = parse_export_source(&source)?;
+    let generated_at_unix_ms =
+        u64::try_from(generated_at).map_err(|_| StorageError::InvalidData)?;
+    let last_generated_at_unix_ms =
+        u64::try_from(last_generated_at).map_err(|_| StorageError::InvalidData)?;
+    let render_count = u32::try_from(render_count).map_err(|_| StorageError::InvalidData)?;
+    let document_schema_version =
+        u16::try_from(document_schema_version).map_err(|_| StorageError::InvalidData)?;
+    let page_count = usize::try_from(page_count).map_err(|_| StorageError::InvalidData)?;
+    let byte_count = usize::try_from(byte_count).map_err(|_| StorageError::InvalidData)?;
+    let receipt = PdfRenderReceipt {
+        document_sha256,
+        document_schema_version,
+        pdf_sha256,
+        renderer_version,
+        template_id,
+        template_sha256,
+        font_bundle_id,
+        font_bundle_sha256,
+        page_count,
+        byte_count,
+    };
+    validate_render_manifest(source_revision, generated_at_unix_ms, &receipt)?;
+    if last_generated_at_unix_ms < generated_at_unix_ms
+        || last_generated_at_unix_ms > MAX_JAVASCRIPT_DATE_MS
+        || render_count == 0
+    {
+        return Err(StorageError::InvalidData);
+    }
+    Ok(StoredRenderManifest {
+        manifest_id,
+        source,
+        source_revision,
+        generated_at_unix_ms,
+        last_generated_at_unix_ms,
+        render_count,
+        receipt,
+    })
+}
+
+const fn export_source_code(source: ExportSource) -> &'static str {
+    match source {
+        ExportSource::SavedDraft => "saved_draft",
+        ExportSource::PublishedSnapshot => "published_snapshot",
+    }
+}
+
+fn parse_export_source(value: &str) -> Result<ExportSource, StorageError> {
+    match value {
+        "saved_draft" => Ok(ExportSource::SavedDraft),
+        "published_snapshot" => Ok(ExportSource::PublishedSnapshot),
+        _ => Err(StorageError::InvalidData),
+    }
+}
+
+fn validate_render_manifest(
+    source_revision: i64,
+    generated_at_unix_ms: u64,
+    receipt: &PdfRenderReceipt,
+) -> Result<(), StorageError> {
+    let valid_hash = |value: &str| {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    };
+    let valid_id = |value: &str| {
+        !value.is_empty()
+            && value.len() <= 128
+            && value.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'/')
+            })
+    };
+    if !(1..=9_007_199_254_740_991).contains(&source_revision)
+        || !(1..=MAX_JAVASCRIPT_DATE_MS).contains(&generated_at_unix_ms)
+        || receipt.document_schema_version == 0
+        || !(1..=MAX_PDF_PAGES).contains(&receipt.page_count)
+        || !(1..=MAX_PDF_BYTES).contains(&receipt.byte_count)
+        || !valid_hash(&receipt.document_sha256)
+        || !valid_hash(&receipt.pdf_sha256)
+        || !valid_hash(&receipt.template_sha256)
+        || !valid_hash(&receipt.font_bundle_sha256)
+        || !valid_id(&receipt.renderer_version)
+        || !valid_id(&receipt.template_id)
+        || !valid_id(&receipt.font_bundle_id)
+    {
+        return Err(StorageError::InvalidData);
+    }
+    Ok(())
+}
+
 fn validate_channel(channel: &str) -> Result<(), StorageError> {
     let valid = !channel.is_empty()
         && channel.len() <= 32
@@ -1153,7 +1504,7 @@ fn write_manifest_atomically(
     destination: &Path,
     manifest: &ProfileManifest,
 ) -> Result<(), StorageError> {
-    let temporary = root.join(format!(".profile-{}.tmp", Uuid::now_v7()));
+    let temporary = root.join(MANIFEST_UPDATE_FILENAME);
     let bytes = serde_json::to_vec_pretty(manifest).map_err(|_| StorageError::Unavailable)?;
     let mut file = OpenOptions::new()
         .create_new(true)
@@ -1175,6 +1526,92 @@ fn write_manifest_atomically(
     }
     fs::rename(&temporary, destination).map_err(|_| StorageError::Unavailable)?;
     set_private_file_permissions(destination)?;
+    #[cfg(unix)]
+    File::open(root)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|_| StorageError::Unavailable)?;
+    Ok(())
+}
+
+fn replace_manifest_atomically(
+    root: &Path,
+    destination: &Path,
+    manifest: &ProfileManifest,
+) -> Result<(), StorageError> {
+    if !destination.is_file() {
+        return Err(StorageError::IncompleteInitialization);
+    }
+    remove_previous_manifest(root)?;
+    let previous = root.join(PREVIOUS_MANIFEST_FILENAME);
+    let temporary = root.join(MANIFEST_UPDATE_FILENAME);
+    let bytes = serde_json::to_vec_pretty(manifest).map_err(|_| StorageError::Unavailable)?;
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&temporary)
+        .map_err(|_| StorageError::Unavailable)?;
+    set_private_file_permissions(&temporary)?;
+    if file
+        .write_all(&bytes)
+        .and_then(|()| file.sync_all())
+        .is_err()
+    {
+        let _ = fs::remove_file(&temporary);
+        return Err(StorageError::Unavailable);
+    }
+    drop(file);
+    fs::rename(destination, &previous).map_err(|_| StorageError::Unavailable)?;
+    if fs::rename(&temporary, destination).is_err() {
+        let _ = fs::rename(&previous, destination);
+        let _ = fs::remove_file(&temporary);
+        return Err(StorageError::Unavailable);
+    }
+    set_private_file_permissions(destination)?;
+    sync_directory(root)?;
+    fs::remove_file(&previous).map_err(|_| StorageError::Unavailable)?;
+    sync_directory(root)
+}
+
+fn recover_manifest_update(
+    root: &Path,
+    destination: &Path,
+    database: &Path,
+) -> Result<(), StorageError> {
+    let previous = root.join(PREVIOUS_MANIFEST_FILENAME);
+    if previous.exists() {
+        reject_symlink(&previous)?;
+        if !previous.is_file() {
+            return Err(StorageError::IncompleteInitialization);
+        }
+        if !destination.exists() {
+            if !database.is_file() {
+                return Err(StorageError::IncompleteInitialization);
+            }
+            fs::rename(&previous, destination).map_err(|_| StorageError::Unavailable)?;
+            sync_directory(root)?;
+        }
+    }
+    remove_exact_optional_file(&root.join(MANIFEST_UPDATE_FILENAME))
+}
+
+fn remove_previous_manifest(root: &Path) -> Result<(), StorageError> {
+    let previous = root.join(PREVIOUS_MANIFEST_FILENAME);
+    remove_exact_optional_file(&previous)?;
+    sync_directory(root)
+}
+
+fn remove_exact_optional_file(path: &Path) -> Result<(), StorageError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+            Err(StorageError::UnsafeLocation)
+        }
+        Ok(_) => fs::remove_file(path).map_err(|_| StorageError::Unavailable),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(_) => Err(StorageError::Unavailable),
+    }
+}
+
+fn sync_directory(root: &Path) -> Result<(), StorageError> {
     #[cfg(unix)]
     File::open(root)
         .and_then(|directory| directory.sync_all())
@@ -1286,8 +1723,8 @@ fn initialize_schema(
                 "INSERT INTO schema_migrations \
                  (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
                   requires_safety_copy, applied_at) \
-                 VALUES (?1, ?2, ?3, 0, 0, ?4)",
-                params![SCHEMA_VERSION, migration_v1_checksum(), "0.0.0-dev", now],
+                 VALUES (1, ?1, ?2, 0, 0, ?3)",
+                params![migration_v1_checksum(), "0.0.0-dev", now],
             )
             .and_then(|_| {
                 connection.execute(
@@ -1314,26 +1751,96 @@ fn initialize_schema(
     result
 }
 
-fn verify_schema(connection: &Connection) -> Result<(), StorageError> {
-    let (version, checksum) = connection
-        .query_row(
-            "SELECT version, checksum_sha256 FROM schema_migrations \
-             ORDER BY version DESC LIMIT 1",
-            [],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-        )
-        .map_err(|_| StorageError::IntegrityFailure)?;
-    if version > SCHEMA_VERSION {
+fn migrate_schema(connection: &Connection) -> Result<(), StorageError> {
+    let migrations = load_migration_receipts(connection)?;
+    let latest = migrations
+        .last()
+        .map(|(version, _)| *version)
+        .ok_or(StorageError::IntegrityFailure)?;
+    if latest > SCHEMA_VERSION {
         return Err(StorageError::NewerSchema);
     }
-    if version != SCHEMA_VERSION || checksum != migration_v1_checksum() {
+    verify_migration_receipts(&migrations)?;
+    if latest == SCHEMA_VERSION {
+        return Ok(());
+    }
+    if latest != 1 {
         return Err(StorageError::IntegrityFailure);
     }
+
+    connection
+        .execute_batch("BEGIN IMMEDIATE")
+        .map_err(|_| StorageError::Unavailable)?;
+    let result = (|| {
+        connection
+            .execute_batch(MIGRATION_V2_SQL)
+            .map_err(|_| StorageError::Unavailable)?;
+        connection
+            .execute(
+                "INSERT INTO schema_migrations \
+                 (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
+                  requires_safety_copy, applied_at) \
+                 VALUES (2, ?1, ?2, 0, 0, ?3)",
+                params![migration_v2_checksum(), "0.0.0-dev", now_string()],
+            )
+            .map_err(|_| StorageError::Unavailable)?;
+        connection
+            .execute_batch("COMMIT")
+            .map_err(|_| StorageError::Unavailable)
+    })();
+    if result.is_err() {
+        let _ = connection.execute_batch("ROLLBACK");
+    }
+    result
+}
+
+fn verify_schema(connection: &Connection) -> Result<(), StorageError> {
+    let migrations = load_migration_receipts(connection)?;
+    let latest = migrations
+        .last()
+        .map(|(version, _)| *version)
+        .ok_or(StorageError::IntegrityFailure)?;
+    if latest > SCHEMA_VERSION {
+        return Err(StorageError::NewerSchema);
+    }
+    if latest != SCHEMA_VERSION {
+        return Err(StorageError::IntegrityFailure);
+    }
+    verify_migration_receipts(&migrations)?;
     verify_integrity(connection)
+}
+
+fn load_migration_receipts(connection: &Connection) -> Result<Vec<(i64, String)>, StorageError> {
+    let mut statement = connection
+        .prepare("SELECT version, checksum_sha256 FROM schema_migrations ORDER BY version")
+        .map_err(|_| StorageError::IntegrityFailure)?;
+    statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|_| StorageError::IntegrityFailure)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| StorageError::IntegrityFailure)
+}
+
+fn verify_migration_receipts(migrations: &[(i64, String)]) -> Result<(), StorageError> {
+    let expected = [(1, migration_v1_checksum()), (2, migration_v2_checksum())];
+    if migrations.len() > expected.len()
+        || migrations.iter().zip(expected).any(
+            |((version, checksum), (expected_version, expected_checksum))| {
+                *version != expected_version || *checksum != expected_checksum
+            },
+        )
+    {
+        return Err(StorageError::IntegrityFailure);
+    }
+    Ok(())
 }
 
 fn migration_v1_checksum() -> String {
     hex::encode(Sha256::digest(MIGRATION_V1_SQL.as_bytes()))
+}
+
+fn migration_v2_checksum() -> String {
+    hex::encode(Sha256::digest(MIGRATION_V2_SQL.as_bytes()))
 }
 
 fn verify_integrity(connection: &Connection) -> Result<(), StorageError> {
@@ -1454,7 +1961,7 @@ mod tests {
     use std::fs;
 
     use ort_backup::BackupPassphrase;
-    use ort_domain::ResumeDocument;
+    use ort_domain::{ExportSource, PdfRenderReceipt, ResumeDocument};
     use ort_vault::DatabaseKeyVault;
     use ort_vault::testing::MemoryDatabaseKeyVault;
     use serde_json::{Map, Value};
@@ -1463,6 +1970,21 @@ mod tests {
     use super::{DiagnosticSeverity, EncryptedStore, StorageError};
 
     const PLAINTEXT_MARKER: &str = "SYNTHETIC-PRIVATE-RESUME-MARKER-9d87f8";
+
+    fn synthetic_render_receipt(pdf_sha256: String) -> PdfRenderReceipt {
+        PdfRenderReceipt {
+            document_sha256: "a".repeat(64),
+            document_schema_version: 1,
+            pdf_sha256,
+            renderer_version: "typst-0.15.1/ort-1".to_owned(),
+            template_id: "plain_pdf_v1".to_owned(),
+            template_sha256: "b".repeat(64),
+            font_bundle_id: "libertinus-serif/typst-assets-0.15.1".to_owned(),
+            font_bundle_sha256: "c".repeat(64),
+            page_count: 1,
+            byte_count: 1024,
+        }
+    }
 
     #[test]
     fn encrypted_profile_round_trips_without_plaintext_on_disk() {
@@ -1651,7 +2173,7 @@ mod tests {
                     "INSERT INTO schema_migrations \
                      (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
                       requires_safety_copy, applied_at) \
-                     VALUES (2, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
+                     VALUES (3, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
                     [super::now_string()],
                 )
                 .expect("seed newer schema marker");
@@ -1694,6 +2216,160 @@ mod tests {
             StorageError::IntegrityFailure
         );
         assert_eq!(fs::read(database_path).expect("read after refusal"), before);
+    }
+
+    #[test]
+    fn schema_v1_profile_upgrades_additively_and_updates_its_manifest() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("initialize encrypted store");
+        store
+            .create_draft(&ResumeDocument::empty(PLAINTEXT_MARKER))
+            .expect("create draft");
+        {
+            let connection = store.connection.lock().expect("lock test connection");
+            connection
+                .execute_batch(
+                    "DROP TABLE render_manifests; DELETE FROM schema_migrations WHERE version = 2;",
+                )
+                .expect("simulate schema v1 database");
+        }
+        drop(store);
+        let manifest_path = temporary.path().join("profile.json");
+        let mut manifest: Value = serde_json::from_slice(
+            &fs::read(&manifest_path).expect("read manifest for v1 simulation"),
+        )
+        .expect("parse manifest");
+        manifest["schemaVersion"] = Value::from(1);
+        fs::write(
+            &manifest_path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize v1 manifest"),
+        )
+        .expect("write v1 manifest");
+
+        let upgraded = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("upgrade schema v1 profile");
+        assert_eq!(upgraded.manifest().schema_version, 2);
+        assert_eq!(
+            upgraded
+                .load_draft()
+                .expect("load upgraded draft")
+                .expect("draft exists")
+                .document
+                .title,
+            PLAINTEXT_MARKER
+        );
+        let connection = upgraded.connection.lock().expect("lock upgraded database");
+        let versions: Vec<i64> = connection
+            .prepare("SELECT version FROM schema_migrations ORDER BY version")
+            .expect("prepare migration query")
+            .query_map([], |row| row.get(0))
+            .expect("query migration versions")
+            .collect::<Result<_, _>>()
+            .expect("collect migration versions");
+        assert_eq!(versions, vec![1, 2]);
+    }
+
+    #[test]
+    fn interrupted_manifest_replacement_recovers_the_previous_exact_file() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("initialize encrypted store");
+        store
+            .create_draft(&ResumeDocument::empty(PLAINTEXT_MARKER))
+            .expect("create draft");
+        drop(store);
+        let manifest = temporary.path().join(super::MANIFEST_FILENAME);
+        let previous = temporary.path().join(super::PREVIOUS_MANIFEST_FILENAME);
+        fs::rename(&manifest, &previous).expect("simulate interrupted manifest handoff");
+        fs::write(
+            temporary.path().join(super::MANIFEST_UPDATE_FILENAME),
+            b"partial replacement",
+        )
+        .expect("seed interrupted temporary manifest");
+
+        let recovered = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("recover exact previous manifest");
+        assert!(manifest.is_file());
+        assert!(!previous.exists());
+        assert!(
+            !temporary
+                .path()
+                .join(super::MANIFEST_UPDATE_FILENAME)
+                .exists()
+        );
+        assert_eq!(
+            recovered
+                .load_draft()
+                .expect("load recovered draft")
+                .expect("draft exists")
+                .document
+                .title,
+            PLAINTEXT_MARKER
+        );
+    }
+
+    #[test]
+    fn render_manifests_are_encrypted_deduplicated_bounded_and_reopenable() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("initialize encrypted store");
+        let receipt = synthetic_render_receipt("d".repeat(64));
+        let first = store
+            .record_render_manifest(ExportSource::SavedDraft, 1, 1_000, &receipt)
+            .expect("record first render");
+        let repeated = store
+            .record_render_manifest(ExportSource::SavedDraft, 1, 2_000, &receipt)
+            .expect("record repeated render");
+        assert_eq!(repeated.manifest_id, first.manifest_id);
+        assert_eq!(repeated.generated_at_unix_ms, 1_000);
+        assert_eq!(repeated.last_generated_at_unix_ms, 2_000);
+        assert_eq!(repeated.render_count, 2);
+
+        for index in 1..=100_u64 {
+            let receipt = synthetic_render_receipt(format!("{index:064x}"));
+            store
+                .record_render_manifest(
+                    ExportSource::PublishedSnapshot,
+                    i64::try_from(index).expect("revision"),
+                    2_000 + index,
+                    &receipt,
+                )
+                .expect("record bounded manifest");
+        }
+        let count: i64 = store
+            .connection
+            .lock()
+            .expect("connection")
+            .query_row("SELECT COUNT(*) FROM render_manifests", [], |row| {
+                row.get(0)
+            })
+            .expect("count manifests");
+        assert_eq!(count, super::MAX_RENDER_MANIFESTS);
+        assert_eq!(
+            store
+                .load_recent_render_manifests(50)
+                .expect("load manifests")
+                .len(),
+            50
+        );
+        assert_eq!(
+            store.load_recent_render_manifests(51),
+            Err(StorageError::InvalidData)
+        );
+        assert_no_marker_in_files(temporary.path());
+        drop(store);
+
+        let reopened = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("reopen encrypted store");
+        let recent = reopened
+            .load_recent_render_manifests(1)
+            .expect("load newest manifest");
+        assert_eq!(recent[0].source_revision, 100);
+        assert_eq!(recent[0].receipt.pdf_sha256, format!("{:064x}", 100));
     }
 
     #[test]

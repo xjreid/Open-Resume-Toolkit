@@ -170,8 +170,13 @@ the current CJK/emoji fixture), compile warnings, and unsupported layouts are
 explicit failures, never silent truncation or font substitution. Tabs become four
 spaces. Text and DOCX remain alternatives. This original plain fixture is not the
 final template catalogue. The fixed typography/language options and full bundled
-licenses are visible in the panel; receipts are session-only, not persisted render
-history or an old-renderer replay guarantee.
+licenses are visible in the panel. Each successful preview stores a content-free
+receipt in the encrypted profile before the PDF is exposed to the UI. Repeated
+identical source/revision/PDF identities increment a counter instead of adding
+duplicate rows. Storage keeps the newest 100 identities and the UI shows the
+newest 20; resume text, PDF bytes, paths and preview tickets are not retained.
+This metadata does not provide an old-renderer replay guarantee and is not yet
+included in the portable-backup prototype.
 
 Headless structural verification, without launching the app or OS vault:
 

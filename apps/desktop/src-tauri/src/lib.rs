@@ -283,6 +283,7 @@ pub fn run() {
             text_export::export_resume_text,
             text_export::export_resume_docx,
             pdf_preview::render_resume_pdf,
+            pdf_preview::load_pdf_render_history,
             pdf_preview::export_resume_pdf,
             pdf_preview::release_resume_pdf,
             close_status,

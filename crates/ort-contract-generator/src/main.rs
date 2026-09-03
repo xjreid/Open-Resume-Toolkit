@@ -30,11 +30,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_schema::<ort_domain::PdfReleaseResponse>(
         &output.join("pdf.release.response.schema.json"),
     )?;
+    write_schema::<ort_domain::PdfRenderHistoryRequest>(
+        &output.join("pdf.history.request.schema.json"),
+    )?;
+    write_schema::<ort_domain::PdfRenderHistoryResponse>(
+        &output.join("pdf.history.response.schema.json"),
+    )?;
     fs::write(
         output.join("pdf.ts"),
         include_str!("pdf.ts.template")
             .replace("__MAX_PDF_BYTES__", &ort_domain::MAX_PDF_BYTES.to_string())
             .replace("__MAX_PDF_PAGES__", &ort_domain::MAX_PDF_PAGES.to_string())
+            .replace(
+                "__MAX_PDF_RENDER_HISTORY__",
+                &ort_domain::MAX_PDF_RENDER_HISTORY.to_string(),
+            )
             .replace(
                 "__PDF_TTL__",
                 &ort_domain::PDF_PREVIEW_TTL_SECONDS.to_string(),

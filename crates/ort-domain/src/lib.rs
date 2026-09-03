@@ -9,8 +9,10 @@ mod resume_commands;
 mod text_export;
 
 pub use pdf::{
-    MAX_PDF_BYTES, MAX_PDF_PAGES, PDF_PREVIEW_TTL_SECONDS, PdfExportResponse, PdfPreviewResponse,
-    PdfReleaseResponse, PdfRenderReceipt, PdfTicketPayload, PdfTicketRequest, RenderPdfRequest,
+    MAX_PDF_BYTES, MAX_PDF_PAGES, MAX_PDF_RENDER_HISTORY, PDF_PREVIEW_TTL_SECONDS,
+    PdfExportResponse, PdfPreviewResponse, PdfReleaseResponse, PdfRenderHistoryRequest,
+    PdfRenderHistoryResponse, PdfRenderManifest, PdfRenderReceipt, PdfTicketPayload,
+    PdfTicketRequest, RenderPdfRequest,
 };
 
 pub use text_export::{

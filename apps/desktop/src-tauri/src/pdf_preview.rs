@@ -6,12 +6,13 @@ use super::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use ort_domain::{
-    CommandResponse, ExportSource, PDF_PREVIEW_TTL_SECONDS, PdfExportResponse, PdfPreviewResponse,
-    PdfReleaseResponse, PdfTicketRequest, RenderPdfRequest,
+    CommandResponse, ExportSource, MAX_PDF_RENDER_HISTORY, PDF_PREVIEW_TTL_SECONDS,
+    PdfExportResponse, PdfPreviewResponse, PdfReleaseResponse, PdfRenderHistoryRequest,
+    PdfRenderHistoryResponse, PdfRenderManifest, PdfTicketRequest, RenderPdfRequest,
 };
 use ort_platform::{ExportDestination, ExportFileType, ExportWriteError};
 use ort_render::{PdfArtifact, PdfRenderError};
-use ort_storage::{StorageError, VersionedResume};
+use ort_storage::{StorageError, StoredRenderManifest, VersionedResume};
 use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -132,6 +133,18 @@ pub(crate) async fn render_resume_pdf(
             generated_at_unix_ms,
             artifact,
         });
+        let state = app.state::<DesktopState>();
+        let DesktopStorage::Ready(store) = &state.storage else {
+            return storage_unavailable();
+        };
+        if let Err(error) = store.record_render_manifest(
+            source,
+            saved.revision,
+            generated_at_unix_ms,
+            &preview.artifact.receipt,
+        ) {
+            return storage_failure(&error);
+        }
         let response = PdfPreviewResponse {
             render_id: preview.id.clone(),
             source,
@@ -151,6 +164,45 @@ pub(crate) async fn render_resume_pdf(
     {
         Ok(response) => response,
         Err(_) => failure("PDF_UNAVAILABLE"),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn load_pdf_render_history(
+    window: WebviewWindow,
+    request: PdfRenderHistoryRequest,
+) -> CommandResponse<PdfRenderHistoryResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    let state = window.state::<DesktopState>();
+    let DesktopStorage::Ready(store) = &state.storage else {
+        return storage_unavailable();
+    };
+    match store.load_recent_render_manifests(MAX_PDF_RENDER_HISTORY) {
+        Ok(manifests) => CommandResponse::success(PdfRenderHistoryResponse {
+            manifests: manifests
+                .into_iter()
+                .map(render_manifest_response)
+                .collect(),
+        }),
+        Err(error) => storage_failure(&error),
+    }
+}
+
+fn render_manifest_response(value: StoredRenderManifest) -> PdfRenderManifest {
+    PdfRenderManifest {
+        manifest_id: value.manifest_id.to_string(),
+        source: value.source,
+        source_revision: value.source_revision,
+        generated_at_unix_ms: value.generated_at_unix_ms,
+        last_generated_at_unix_ms: value.last_generated_at_unix_ms,
+        render_count: value.render_count,
+        receipt: value.receipt,
     }
 }
 

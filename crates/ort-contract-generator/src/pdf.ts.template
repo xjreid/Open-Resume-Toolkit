@@ -4,7 +4,9 @@ import type { ExportSource } from "./export";
 
 export const MAX_PDF_BYTES = __MAX_PDF_BYTES__;
 export const MAX_PDF_PAGES = __MAX_PDF_PAGES__;
+export const MAX_PDF_RENDER_HISTORY = __MAX_PDF_RENDER_HISTORY__;
 export const PDF_PREVIEW_TTL_SECONDS = __PDF_TTL__;
+const MAX_JAVASCRIPT_DATE_MS = 8640000000000000;
 export interface PdfRenderReceipt {
   documentSha256: string;
   documentSchemaVersion: 1;
@@ -25,6 +27,18 @@ export interface PdfPreview {
   receipt: PdfRenderReceipt;
   pdfBase64: string;
 }
+export interface PdfRenderManifest {
+  manifestId: string;
+  source: ExportSource;
+  sourceRevision: number;
+  generatedAtUnixMs: number;
+  lastGeneratedAtUnixMs: number;
+  renderCount: number;
+  receipt: PdfRenderReceipt;
+}
+export interface PdfRenderHistory {
+  manifests: PdfRenderManifest[];
+}
 export type PdfExportResult =
   | { status: "cancelled" }
   | {
@@ -37,6 +51,7 @@ export type PdfExportResult =
     };
 export type PdfPreviewCommandResponse = CommandResponse<PdfPreview>;
 export type PdfExportCommandResponse = CommandResponse<PdfExportResult>;
+export type PdfRenderHistoryCommandResponse = CommandResponse<PdfRenderHistory>;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -86,7 +101,7 @@ function isPreview(value: unknown): value is PdfPreview {
     !ticket(value.renderId) ||
     !["saved_draft", "published_snapshot"].includes(value.source as string) ||
     !positive(value.revision) ||
-    !positive(value.generatedAtUnixMs) ||
+    !positive(value.generatedAtUnixMs, MAX_JAVASCRIPT_DATE_MS) ||
     !isReceipt(value.receipt) ||
     typeof value.pdfBase64 !== "string"
   )
@@ -99,6 +114,20 @@ function isPreview(value: unknown): value is PdfPreview {
   return (
     !/[^A-Za-z0-9+/]/.test(encoded.slice(0, encoded.length - padding)) &&
     (encoded.length / 4) * 3 - padding === value.receipt.byteCount
+  );
+}
+function isManifest(value: unknown): value is PdfRenderManifest {
+  return (
+    record(value) &&
+    Object.keys(value).length === 7 &&
+    ticket(value.manifestId) &&
+    ["saved_draft", "published_snapshot"].includes(value.source as string) &&
+    positive(value.sourceRevision) &&
+    positive(value.generatedAtUnixMs, MAX_JAVASCRIPT_DATE_MS) &&
+    positive(value.lastGeneratedAtUnixMs, MAX_JAVASCRIPT_DATE_MS) &&
+    value.lastGeneratedAtUnixMs >= value.generatedAtUnixMs &&
+    positive(value.renderCount, 2147483647) &&
+    isReceipt(value.receipt)
   );
 }
 export function isPdfPreviewCommandResponse(
@@ -121,5 +150,21 @@ export function isPdfExportCommandResponse(
       typeof result.cleanupPending === "boolean" &&
       typeof result.durabilityUnconfirmed === "boolean"
     );
+  });
+}
+export function isPdfRenderHistoryCommandResponse(
+  value: unknown,
+): value is PdfRenderHistoryCommandResponse {
+  return isCommandResponse(value, (history): history is PdfRenderHistory => {
+    if (
+      !record(history) ||
+      Object.keys(history).length !== 1 ||
+      !Array.isArray(history.manifests) ||
+      history.manifests.length > MAX_PDF_RENDER_HISTORY ||
+      !history.manifests.every(isManifest)
+    )
+      return false;
+    return new Set(history.manifests.map((manifest) => manifest.manifestId)).size ===
+      history.manifests.length;
   });
 }
