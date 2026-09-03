@@ -1,6 +1,6 @@
 # Document worker containment implementation gate
 
-Status: transport policy plus macOS sandbox/hard-limit probe, 2026-09-02. **Not a
+Status: transport policy plus macOS sandbox/hard-limit and lifecycle probes, 2026-09-02. **Not a
 production sandbox or permission to enable import.** The parser worker still exits 78.
 This refines M2; it does not introduce an additional milestone.
 
@@ -151,7 +151,51 @@ new evidence is in `../../evidence/0.0.0-dev/m2-macos-hard-limits.md`.
 Both macOS CI jobs now require the descriptor, seeded filesystem, loopback,
 direct spawn/fork denial, hard-limit raise denial, descriptor-exhaustion/recovery,
 parent-unaffected and cooperative-disconnect checks. A green step still does
-not assert full containment. New cross-runner results are pending.
+not assert full containment. The user reported all four CI jobs passing after
+`723a97f`; a successful-run log was not independently retrieved.
+
+### Trusted supervisor and direct-child lifecycle experiment
+
+`just probe-document-lifecycle-macos` builds a **separate test candidate** with
+three executables: an unsandboxed synthetic client, a minimal App Sandbox XPC
+supervisor, and a fixed child inheriting the supervisor's sandbox. It does not
+inherit the desktop's broader authority. The child lowers its own hard limits
+before reading the synthetic input; no parser is linked into either process.
+The supervisor remains trusted and must be included in future security review.
+
+This addresses direct-child PID ownership: only the trusted supervisor calls
+`posix_spawn`, `kill` and `waitpid` for that child. One thread owns signaling and
+reaping, with default SIGCHLD handling; it never signals after reaping or after
+unexpected loss of wait ownership. No XPC PID, process-group signal, private
+audit-token API or arbitrary requested executable is used. The runner verifies
+the nested signatures; a production executable-identity policy is still required.
+Apple documents [sandbox inheritance](https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/EnablingAppSandbox.html)
+and [direct-child wait status](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/waitpid.2.html).
+
+Nine local cases measure normal completion, explicit cancellation, silent timeout,
+stdout/stderr floods, nonzero exit with valid bytes, malformed output, full output
+without exit, and both EOFs without exit. Cancellation/timeout/flood cases require
+observed SIGKILL exit status, reaping and both EOFs. A sent signal or XPC disconnect
+alone is insufficient. Complete data cannot be accepted until successful OS exit.
+
+The synthetic supervisor uses 1 KiB fair nonblocking read chunks, 4 KiB ceilings
+per stream, a 64-byte retained stdout prefix, discarded stderr and a one-second
+monotonic operation deadline. Counters saturate at 4097 as an over-limit marker;
+they are not claimed as total bytes emitted by a flooded child. These deliberately
+small test limits do not replace the production transport policy. A four-second
+cleanup observation budget fails closed; the test child's 12-second alarm is only
+a fallback, never accepted as forced-stop evidence. The child ignores SIGTERM.
+
+The supervisor explicitly inherits only stdin/stdout/stderr into its child using
+spawn file actions and `POSIX_SPAWN_CLOEXEC_DEFAULT`; it passes no inherited
+environment secrets. Only a validated read-only synthetic file is passed as input.
+No worker-provided output becomes a command, path, PID or profile mutation.
+
+Evidence: `../../evidence/0.0.0-dev/m2-macos-lifecycle.md`. Both macOS CI jobs now
+run this new probe; that cross-runner result is pending. The result is **direct-child
+supervision evidence**, not proof of full process-tree containment, cleanup after
+supervisor/client death, or the inherited child's complete filesystem, credential,
+network, broker and IPC boundary. Those gates remain mandatory before integration.
 
 ## Remaining executable proof
 
@@ -180,7 +224,8 @@ effective policy, allow/deny outcomes, and supervisor cleanup outcome:
   a later operation; no profile mutation occurs on any failed import.
 
 The Rust transport tests remain deterministic event simulations. The separate
-macOS probe adds only the native subset above. Forced process-tree termination,
+macOS probes add the native subsets above, including direct-child kill/reap.
+Forced process-tree termination,
 parent-death handling, memory/CPU/thread/Mach-port ceilings, credentials/brokers, broader filesystem
 and network denial, hostile-code cleanup, release signing and supported OS/CPU
 matrices remain unproven. Windows has no native containment evidence yet.

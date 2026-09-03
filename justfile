@@ -34,6 +34,10 @@ test-platform:
 probe-document-sandbox-macos:
 	node tools/probe-document-sandbox-macos.mjs
 
+# Separate synthetic XPC supervisor/direct-child lifecycle experiment.
+probe-document-lifecycle-macos:
+	node tools/probe-document-lifecycle-macos.mjs
+
 test-platform-vault:
 	ORT_RUN_OS_VAULT_TESTS=1 cargo test -p ort-vault --test os_vault native_database_key_round_trip_and_overwrite_denial -- --ignored --exact --nocapture
 

@@ -1,7 +1,10 @@
 # M2 macOS helper hard-limit checkpoint
 
 Date: 2026-09-02. Base commit: `bdc3e10`. Local platform: macOS 26.6.2 arm64.
-Status: expanded native subset passed locally; full containment remains gated.
+Status: expanded native subset passed locally; user subsequently reported all
+four CI jobs passing after `723a97f`. The run log was not independently retrieved.
+Full containment remains gated. The next independent supervision experiment is
+recorded in [M2 macOS lifecycle](m2-macos-lifecycle.md).
 
 ## Previous CI result
 
@@ -9,7 +12,7 @@ The user reported all four CI jobs passing following `bdc3e10`, including the
 previously failing Windows storage tests. This records user-provided evidence;
 no successful-run URL/log was independently retrieved. It does not establish
 Windows native vault/UI behavior or hostile-document containment. This new
-hard-limit checkpoint still requires its own CI run on both macOS architectures.
+hard-limit checkpoint later received the passing CI report noted above.
 
 ## Implemented experiment
 

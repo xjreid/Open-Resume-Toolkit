@@ -109,8 +109,16 @@ Current development status:
   in the macOS probe, enforce a 64-descriptor ceiling with recovery and reject
   raising the hard limits. The parent is unaffected; the plain App Sandbox
   baseline is retained. Memory/CPU/broker/forced-cleanup and Windows containment
-  remain unproven. Both macOS jobs require this expanded subset on the next push.
+  remain unproven. All four CI jobs were subsequently reported passing after `723a97f`.
   See `../../evidence/0.0.0-dev/m2-macos-hard-limits.md`;
+- added locally: a separate minimal XPC supervisor/inherited-child lifecycle
+  probe. Nine native cases cover normal completion, cancellation, timeouts,
+  output floods, invalid/nonzero results and complete output/EOFs without exit.
+  The supervisor terminates and reaps its own direct child before accepting
+  completion; no XPC PID is signaled. Both macOS CI jobs now run the new subset.
+  This does not prove supervisor-death cleanup, broker descendants or the full
+  inherited-child authority boundary. Production parser/UI remain disabled.
+  See `../../evidence/0.0.0-dev/m2-macos-lifecycle.md`;
 - Windows CI repair passed per user report after `bdc3e10`: stage logs narrowed the
   stack overflow to encrypted-profile opening. A matching upstream SQLCipher
   Windows logging-recursion defect is mitigated by compiling out its native

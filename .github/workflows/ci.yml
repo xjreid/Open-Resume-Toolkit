@@ -105,6 +105,10 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'macOS' && steps.desktop-build.outcome == 'success' }}
         run: node tools/probe-document-sandbox-macos.mjs
 
+      - name: Test macOS child cancellation, timeout, and bounded output
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.desktop-build.outcome == 'success' }}
+        run: node tools/probe-document-lifecycle-macos.mjs
+
       - name: Test storage, import review, text output, and filesystem safety on the target OS
         # Keep the original cold-start/concurrent test process even if the
         # separate startup probe crashes. Neither failure is ignored or masked.

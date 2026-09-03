@@ -125,8 +125,11 @@ If supported public OS mechanisms cannot enforce these properties without admini
   restrictions and loopback denial locally. Plain App Sandbox allows children;
   the helper-only zero hard NPROC limit additionally denied direct spawn/fork
   locally. A hard 64-descriptor cap, rejected limit increases and parent-unaffected
-  checks pass. This still observes only cooperative disconnect, not credential/broker
-  isolation, memory/CPU/thread/Mach-port ceilings or forced process-tree cleanup. Windows containment
+  checks pass. A separate trusted XPC supervisor/inherited-child experiment now
+  proves local direct-child termination/reaping on cancellation, timeout and floods,
+  and rejects output before successful OS exit. It does not prove supervisor-death
+  cleanup, inherited-child credential/broker isolation, memory/CPU/thread/Mach-port
+  ceilings or full process-tree cleanup. Windows containment
   is unproven. Import stays disabled; probe completion is not full containment.
 - External DOCX relationships, macros, embedded packages, scripts, and active content are never executed or fetched.
 - Render templates are bundled and addressed by known IDs; user content cannot inject Typst source.

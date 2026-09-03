@@ -283,7 +283,10 @@ probe passed local descriptor, seeded filesystem and loopback checks. Its plain
 App Sandbox baseline allowed children; helper-only zero hard NPROC and bounded
 descriptor limits subsequently passed local direct spawn/fork denial, descriptor
 exhaustion/recovery and limit-raise denial. Broker launch and other resource
-ceilings remain unproven; cooperative disconnect does not prove forced cleanup. No parser,
+ceilings remain unproven. A separate trusted XPC supervisor/inherited-child probe
+adds native direct-child kill/reap and bounded-pipe tests for cancellation, timeout,
+floods and bad/incomplete completion. Supervisor death, broker descendants and the
+child's full authority boundary remain unproven. No parser,
 production sandbox adapter or UI was enabled; the gates below remain in force:
 
 1. Prove supported native worker containment and supervision on macOS/Windows

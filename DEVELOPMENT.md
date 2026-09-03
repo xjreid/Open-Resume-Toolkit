@@ -146,6 +146,29 @@ A green probe invocation or CI job is **not** a full containment pass. Import is
 still disabled. See `evidence/0.0.0-dev/m2-macos-hard-limits.md`. The report printed
 in CI includes the synthetic measurements and hashes, not document content.
 
+The subsequent lifecycle checkpoint runs a separate signed XPC supervisor and
+its own fixed, sandbox-inheriting child:
+
+```sh
+just probe-document-lifecycle-macos
+```
+
+It tests nine synthetic cases: normal completion, cancellation, silent timeout,
+stdout/stderr floods, nonzero exit, malformed output, complete output without
+exit, and both pipe EOFs without exit. Stop cases require actual SIGKILL status
+and `waitpid` reaping; no reused XPC PID or unrelated process is signaled.
+The test uses small per-child limits, temporary marker files and no OS vault or
+network. It does not launch the desktop or alter your shell/system limits.
+Run outside an enclosing agent sandbox; `--build-only` is also supported by the
+Node script. Generated signed test bundles/reports remain in `target/native-probes`;
+the runner removes its own fresh input fixture directory.
+
+This is a test candidate, not the production parser driver. Parent/supervisor
+death, broker-created descendants, the child's complete authority boundary and
+the remaining resource ceilings are still gated. Import is still disabled.
+See `evidence/0.0.0-dev/m2-macos-lifecycle.md`. The user reported all CI passing
+for the prior `723a97f` checkpoint; the new lifecycle checks need the next push.
+
 The preceding Windows log showed both isolated startup and import-storage tests crash
 while opening the encrypted profile. A matching pinned SQLCipher logging defect
 is now mitigated by `.cargo/config.toml`: its native diagnostic logger is compiled
