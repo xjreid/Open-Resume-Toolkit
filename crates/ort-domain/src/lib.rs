@@ -7,7 +7,10 @@ mod resume;
 mod resume_commands;
 mod text_export;
 
-pub use text_export::{ExportSource, ExportTextPayload, ExportTextRequest, ExportTextResponse};
+pub use text_export::{
+    ExportDocxRequest, ExportDocxResponse, ExportSource, ExportTextPayload, ExportTextRequest,
+    ExportTextResponse,
+};
 
 pub use lifecycle::{
     CloseDecision, CloseStatusRequest, CloseStatusResponse, ResolveClosePayload,

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isExportTextCommandResponse } from "../generated/export";
+import {
+  isExportTextCommandResponse,
+  isExportDocxCommandResponse,
+} from "../generated/export";
 
 const receipt = {
   status: "exported",
@@ -38,5 +41,33 @@ describe("text-export response boundary", () => {
       { ...receipt, cleanupPending: "false" },
     ])
       expect(isExportTextCommandResponse({ ok: true, value })).toBe(false);
+  });
+});
+
+describe("DOCX receipt boundary", () => {
+  it("keeps format-specific limits and rejects unrecognized metadata", () => {
+    const wrapped = (value: unknown) => ({ ok: true, value });
+    expect(
+      isExportDocxCommandResponse(wrapped({ ...receipt, byteCount: 2097152 })),
+    ).toBe(true);
+    expect(
+      isExportTextCommandResponse(wrapped({ ...receipt, byteCount: 2097152 })),
+    ).toBe(false);
+    expect(isExportDocxCommandResponse(wrapped({ status: "cancelled" }))).toBe(
+      true,
+    );
+    for (const value of [
+      { ...receipt, byteCount: 2097153 },
+      { ...receipt, byteCount: 0 },
+      { ...receipt, byteCount: NaN },
+      { ...receipt, formatVersion: 2 },
+      { ...receipt, path: "/private" },
+      { ...receipt, bytes: "not permitted" },
+      { ...receipt, source: "unsaved" },
+      { ...receipt, revision: 0 },
+      { ...receipt, cleanupPending: "false" },
+      { status: "cancelled", path: "/private" },
+    ])
+      expect(isExportDocxCommandResponse(wrapped(value))).toBe(false);
   });
 });

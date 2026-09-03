@@ -279,6 +279,7 @@ pub fn run() {
             save_resume,
             publish_resume,
             text_export::export_resume_text,
+            text_export::export_resume_docx,
             close_status,
             resolve_close
         ])

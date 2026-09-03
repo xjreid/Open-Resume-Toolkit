@@ -3,9 +3,12 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use ort_documents::{TEXT_FORMAT_VERSION, render_plain_text};
-use ort_domain::{CommandResponse, ExportSource, ExportTextRequest, ExportTextResponse};
-use ort_platform::{ExportDestination, ExportWriteError};
+use ort_documents::{DOCX_FORMAT_VERSION, TEXT_FORMAT_VERSION, render_docx, render_plain_text};
+use ort_domain::{
+    CommandResponse, ExportDocxRequest, ExportDocxResponse, ExportSource, ExportTextRequest,
+    ExportTextResponse,
+};
+use ort_platform::{ExportDestination, ExportFileType, ExportWriteError};
 use ort_storage::{StorageError, VersionedResume};
 use tauri::{Manager, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -42,6 +45,22 @@ pub(crate) async fn export_resume_text(
     window: WebviewWindow,
     request: ExportTextRequest,
 ) -> CommandResponse<ExportTextResponse> {
+    export_saved(window, request, ExportFileType::Text).await
+}
+
+#[tauri::command]
+pub(crate) async fn export_resume_docx(
+    window: WebviewWindow,
+    request: ExportDocxRequest,
+) -> CommandResponse<ExportDocxResponse> {
+    export_saved(window, request, ExportFileType::Docx).await
+}
+
+async fn export_saved(
+    window: WebviewWindow,
+    request: ExportTextRequest,
+    format: ExportFileType,
+) -> CommandResponse<ExportTextResponse> {
     if window.label() != "main" {
         return window_not_authorized();
     }
@@ -71,7 +90,7 @@ pub(crate) async fn export_resume_text(
     // it is open cannot substitute renderer text into this export.
     match tauri::async_runtime::spawn_blocking(move || {
         let _lease = lease;
-        export_with_dialog(&window, source, &saved)
+        export_with_dialog(&window, source, &saved, format)
     })
     .await
     {
@@ -95,17 +114,34 @@ fn export_with_dialog(
     window: &WebviewWindow,
     source: ExportSource,
     saved: &VersionedResume,
+    format: ExportFileType,
 ) -> CommandResponse<ExportTextResponse> {
-    let Ok(text) = render_plain_text(&saved.document) else {
+    let Ok(bytes) = render_saved(saved, format) else {
         return export_failure("EXPORT_INVALID_CONTENT");
+    };
+    let (title, filename, filter, extension, format_version) = match format {
+        ExportFileType::Text => (
+            "Export unencrypted text — choose a new filename",
+            "resume.txt",
+            "Plain text",
+            "txt",
+            TEXT_FORMAT_VERSION,
+        ),
+        ExportFileType::Docx => (
+            "Export unencrypted DOCX — choose a new filename",
+            "resume.docx",
+            "Word document",
+            "docx",
+            DOCX_FORMAT_VERSION,
+        ),
     };
     let selection = window
         .dialog()
         .file()
         .set_parent(window)
-        .set_title("Export unencrypted text — choose a new filename")
-        .set_file_name("resume.txt")
-        .add_filter("Plain text", &["txt"])
+        .set_title(title)
+        .set_file_name(filename)
+        .add_filter(filter, &[extension])
         .blocking_save_file();
     let Some(selection) = selection else {
         return CommandResponse::success(ExportTextResponse::Cancelled);
@@ -114,14 +150,14 @@ fn export_with_dialog(
         return export_failure("EXPORT_INVALID_DESTINATION");
     };
     // No selected path, token, document text or OS error string is sent to JS.
-    match ExportDestination::from_native_dialog(&path)
-        .and_then(|destination| destination.write(text.as_bytes()))
+    match ExportDestination::for_native_dialog(&path, format)
+        .and_then(|destination| destination.write(&bytes))
     {
         Ok(receipt) => CommandResponse::success(ExportTextResponse::Exported {
             source,
             revision: saved.revision,
-            byte_count: text.len(),
-            format_version: TEXT_FORMAT_VERSION,
+            byte_count: bytes.len(),
+            format_version,
             cleanup_pending: receipt.cleanup_pending,
             durability_unconfirmed: receipt.durability_unconfirmed,
         }),
@@ -131,6 +167,15 @@ fn export_with_dialog(
             ExportWriteError::InvalidContent => "EXPORT_INVALID_CONTENT",
             ExportWriteError::Unavailable => "EXPORT_UNAVAILABLE",
         }),
+    }
+}
+
+fn render_saved(saved: &VersionedResume, format: ExportFileType) -> Result<Vec<u8>, ()> {
+    match format {
+        ExportFileType::Text => render_plain_text(&saved.document)
+            .map(String::into_bytes)
+            .map_err(|_| ()),
+        ExportFileType::Docx => render_docx(&saved.document).map_err(|_| ()),
     }
 }
 
@@ -169,5 +214,22 @@ mod tests {
             Err(StorageError::RevisionConflict)
         ));
         assert_eq!(exact_revision(Some(saved()), 2).unwrap().revision, 2);
+    }
+
+    #[test]
+    fn both_formats_render_only_the_captured_saved_document() {
+        let mut saved = VersionedResume {
+            revision: 1,
+            document: ResumeDocument::empty("Internal"),
+        };
+        saved.document.contact.full_name = "SYNTHETIC_SAVED".into();
+        let mut later = saved.clone();
+        later.document.contact.full_name = "SYNTHETIC_LATER".into();
+        for format in [ExportFileType::Text, ExportFileType::Docx] {
+            let bytes = render_saved(&saved, format).unwrap();
+            assert!(bytes.windows(15).any(|w| w == b"SYNTHETIC_SAVED"));
+            assert!(!bytes.windows(15).any(|w| w == b"SYNTHETIC_LATER"));
+            assert_ne!(bytes, render_saved(&later, format).unwrap());
+        }
     }
 }

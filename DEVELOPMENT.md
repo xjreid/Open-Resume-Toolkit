@@ -4,8 +4,9 @@ Open Resume Toolkit implements the M0 architecture skeleton, the local M1
 encrypted-storage slice, and an M2 offline editor checkpoint. The development
 app can autosave synthetic resume drafts and publish immutable snapshots through
 its OS-vault-backed encrypted database, and export a saved draft or published
-snapshot as unencrypted UTF-8 text through a native Save dialog. PDF/DOCX import
-and output, AI, updater, and browser-native messaging remain gated or unimplemented.
+snapshot as unencrypted UTF-8 text or constrained DOCX through a native Save
+dialog. PDF/DOCX import, PDF preview/output, AI, updater, and browser-native
+messaging remain gated or unimplemented.
 
 ## Prerequisites
 
@@ -91,6 +92,42 @@ a failed export. Windows Save-dialog, ACL, and filesystem behavior still require
 native VM verification; CI compilation alone does not prove those behaviors.
 See `evidence/0.0.0-dev/m2-text-export-smoke.md` for checkpoint evidence.
 
+## DOCX export checkpoint
+
+In **Document export**, choose **Word document (.docx) — plain layout v1**,
+then export either the saved draft or latest published snapshot. The same
+revision checks, native Save dialog, one-operation gate, no-overwrite policy,
+unencrypted-file warning and quit wait apply to both formats. Choose a new
+`.docx` filename; `.docm`, special names and existing entries are refused.
+Unsaved edits never substitute for the selected saved content. Canceling or
+failing an export does not change drafts, snapshots or autosave state.
+
+DOCX format v1 (`plain_docx_v1`) is an intentionally plain, editable,
+single-column layout, not one of the final three template categories or a
+preview of PDF output. It has semantic headings and real bullet lists, visible
+link destinations and clickable allowlisted hyperlinks. Font availability and
+pagination depend on the reader; inspect the document before sending it.
+No font binaries, macros, fields, images or external templates are embedded.
+Exports are capped at 2 MiB, with a separate 1 MiB XML expansion ceiling;
+text exports retain their 256 KiB cap. Recovery/replacement and Windows-native
+Save-dialog/ACL/reader verification remain gated.
+
+Synthetic tests need no desktop launch, OS vault or document-reader installation:
+
+```sh
+cargo test --locked -p ort-documents -p ort-platform -p ort-application -p ort-desktop
+cargo run --locked -p ort-documents --example docx_fixtures -- target/docx-review-fixtures
+python3 tools/verify-docx-fixtures.py target/docx-review-fixtures
+```
+
+Use a **new** output directory each time; the fixture generator deliberately
+refuses an existing directory. Python uses only its standard library (`python`
+on Windows). All four CI jobs now independently check the generated package,
+CRC, XML, source-text parity, heading/list semantics and hyperlink relationships.
+Local headless-render and manual/platform limits are recorded in
+`evidence/0.0.0-dev/m2-docx-export.md`. There is no production Python or
+LibreOffice dependency; the exporter is Rust-only.
+
 ## No-AI import core (backend-only checkpoint)
 
 The deterministic mapper and in-memory review engine now have synthetic tests,
@@ -166,8 +203,9 @@ the runner removes its own fresh input fixture directory.
 This is a test candidate, not the production parser driver. Parent/supervisor
 death, broker-created descendants, the child's complete authority boundary and
 the remaining resource ceilings are still gated. Import is still disabled.
-See `evidence/0.0.0-dev/m2-macos-lifecycle.md`. The user reported all CI passing
-for the prior `723a97f` checkpoint; the new lifecycle checks need the next push.
+See `evidence/0.0.0-dev/m2-macos-lifecycle.md`. The user subsequently confirmed
+all four CI jobs passing for `e978cfe`; this is user-reported, not an independently
+retrieved run. The new DOCX checkpoint needs its own cross-platform CI result.
 
 The preceding Windows log showed both isolated startup and import-storage tests crash
 while opening the encrypted profile. A matching pinned SQLCipher logging defect

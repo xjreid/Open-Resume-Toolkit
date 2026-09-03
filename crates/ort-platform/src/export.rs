@@ -14,9 +14,31 @@ use uuid::Uuid;
 
 const MAX_BYTES: usize = 256 * 1024;
 
+/// Chosen by a fixed native command, never inferred from a renderer path.
+#[derive(Clone, Copy)]
+pub enum ExportFileType {
+    Text,
+    Docx,
+}
+
+impl ExportFileType {
+    const fn extension(self) -> &'static str {
+        match self {
+            Self::Text => ".txt",
+            Self::Docx => ".docx",
+        }
+    }
+    const fn max_bytes(self) -> usize {
+        match self {
+            Self::Text => MAX_BYTES,
+            Self::Docx => 2 * 1024 * 1024,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ExportWriteError {
-    #[error("choose a new regular .txt filename")]
+    #[error("choose a new regular filename with the required extension")]
     InvalidDestination,
     #[error("the destination already exists; choose a new filename")]
     AlreadyExists,
@@ -37,6 +59,7 @@ pub struct ExportWriteReceipt {
 pub struct ExportDestination {
     parent: Dir,
     name: OsString,
+    file_type: ExportFileType,
 }
 
 impl ExportDestination {
@@ -45,6 +68,17 @@ impl ExportDestination {
     /// # Errors
     /// Rejects relative paths, special filenames, existing entries, and I/O errors.
     pub fn from_native_dialog(path: &Path) -> Result<Self, ExportWriteError> {
+        Self::for_native_dialog(path, ExportFileType::Text)
+    }
+
+    /// Creates a one-use destination for the native command's fixed format.
+    ///
+    /// # Errors
+    /// Rejects unsafe names, wrong extensions, existing entries and I/O errors.
+    pub fn for_native_dialog(
+        path: &Path,
+        file_type: ExportFileType,
+    ) -> Result<Self, ExportWriteError> {
         if !path.is_absolute() || path.components().any(|c| matches!(c, Component::ParentDir)) {
             return Err(ExportWriteError::InvalidDestination);
         }
@@ -52,7 +86,7 @@ impl ExportDestination {
             .file_name()
             .and_then(|s| s.to_str())
             .ok_or(ExportWriteError::InvalidDestination)?;
-        if !safe_text_filename(name) {
+        if !safe_filename(name, file_type) {
             return Err(ExportWriteError::InvalidDestination);
         }
         let parent = Dir::open_ambient_dir(
@@ -64,6 +98,7 @@ impl ExportDestination {
         Ok(Self {
             parent,
             name: name.into(),
+            file_type,
         })
     }
 
@@ -74,7 +109,7 @@ impl ExportDestination {
     /// # Errors
     /// Returns a bounded error without replacing any existing target.
     pub fn write(self, bytes: &[u8]) -> Result<ExportWriteReceipt, ExportWriteError> {
-        if bytes.is_empty() || bytes.len() > MAX_BYTES {
+        if bytes.is_empty() || bytes.len() > self.file_type.max_bytes() {
             return Err(ExportWriteError::InvalidContent);
         }
         ensure_absent(&self.parent, Path::new(&self.name))?;
@@ -147,9 +182,9 @@ fn ensure_absent(parent: &Dir, name: &Path) -> Result<(), ExportWriteError> {
     }
 }
 
-fn safe_text_filename(name: &str) -> bool {
+fn safe_filename(name: &str, file_type: ExportFileType) -> bool {
     if name.len() > 240
-        || !name.to_ascii_lowercase().ends_with(".txt")
+        || !name.to_ascii_lowercase().ends_with(file_type.extension())
         || name.starts_with('.')
         || name
             .chars()
@@ -185,6 +220,62 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::TempDir;
+
+    #[test]
+    fn docx_uses_same_no_clobber_capability_with_its_own_bound_and_extension() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("synthetic.DOCX");
+        let bytes = vec![0x42; ExportFileType::Docx.max_bytes()];
+        assert!(ExportDestination::from_native_dialog(&path).is_err());
+        assert!(
+            ExportDestination::for_native_dialog(
+                &dir.path().join("wrong.txt"),
+                ExportFileType::Docx
+            )
+            .is_err()
+        );
+        let receipt = ExportDestination::for_native_dialog(&path, ExportFileType::Docx)
+            .unwrap()
+            .write(&bytes)
+            .unwrap();
+        assert!(!receipt.cleanup_pending);
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+        assert_eq!(
+            ExportDestination::for_native_dialog(&path, ExportFileType::Docx).err(),
+            Some(ExportWriteError::AlreadyExists)
+        );
+        let raced = dir.path().join("race.docx");
+        let token = ExportDestination::for_native_dialog(&raced, ExportFileType::Docx).unwrap();
+        fs::write(&raced, b"keep").unwrap();
+        assert_eq!(
+            token.write(b"replace").err(),
+            Some(ExportWriteError::AlreadyExists)
+        );
+        assert_eq!(fs::read(&raced).unwrap(), b"keep");
+        for data in [vec![], vec![0; ExportFileType::Docx.max_bytes() + 1]] {
+            let token = ExportDestination::for_native_dialog(
+                &dir.path().join("invalid.docx"),
+                ExportFileType::Docx,
+            )
+            .unwrap();
+            assert_eq!(
+                token.write(&data).err(),
+                Some(ExportWriteError::InvalidContent)
+            );
+        }
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 2);
+        for name in [
+            "CON.docx",
+            "LPT1.docx",
+            "name:stream.docx",
+            ".docx",
+            "../x.docx",
+            "macro.docm",
+        ] {
+            assert!(!safe_filename(name, ExportFileType::Docx));
+        }
+    }
 
     #[test]
     fn writes_complete_bytes_and_removes_staging() {
@@ -236,9 +327,9 @@ mod tests {
             "../resume.txt",
             "a\n.txt",
         ] {
-            assert!(!safe_text_filename(name), "{name}");
+            assert!(!safe_filename(name, ExportFileType::Text), "{name}");
         }
-        assert!(safe_text_filename("履歴書.txt"));
+        assert!(safe_filename("履歴書.txt", ExportFileType::Text));
         let dir = TempDir::new().expect("dir");
         let token =
             ExportDestination::from_native_dialog(&dir.path().join("large.txt")).expect("select");

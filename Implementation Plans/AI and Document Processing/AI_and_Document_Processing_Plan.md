@@ -362,9 +362,44 @@ separately reports cleanup failure and unconfirmed directory durability. No
 automatic retry occurs after an uncertain IPC result. Export does not mutate
 resume revisions or clear save errors; guarded quit waits for an active export.
 
+### Implemented M2 constrained DOCX export (2026-09-03 UTC)
+
+`export_resume_docx` is a separate, main-window-only command using the same
+path-free source/revision request and bounded receipt shape as text export.
+Development contract v2 remains additive; the format-specific validators keep
+text at 256 KiB and DOCX at 2 MiB. DOCX `formatVersion: 1` identifies the fixed
+`plain_docx_v1` generator/layout; no historical-renderer record was added.
+
+The output-only Rust encoder writes six fixed ZIP32/store OPC parts with CRC32,
+fixed timestamps/order, semantic Title/Heading1/Heading2 styles, real bullet
+numbering and explicit hyperlink relationships. It never reads a supplied
+archive/XML file, invokes Word, fetches a link or concatenates content into
+markup. Text/attributes are escaped; XML-invalid characters, unsupported URI
+schemes/whitespace and excessive XML expansion fail before opening a Save dialog.
+Blank professional fields, internal titles/IDs, author/timestamp metadata,
+macros, fields, images, embedded files and external templates are absent.
+
+The plain, unbranded Letter layout uses 1-inch margins, 11-point Times New Roman
+with a SimSun East Asian reference, an 18-point name, 12-point section headings,
+11-point entry headings and hanging bullet indents. These are standard font
+references, not embedded fonts or a claim of identical pagination/glyph fallback
+across readers. No Jake's Resume source/assets or final style-category claim is
+included. Local rendered and independent structural evidence is in
+`../../evidence/0.0.0-dev/m2-docx-export.md`.
+
+Export shares the existing native selection lease, captured saved revision,
+no-overwrite publication, post-commit cleanup/durability warnings, and quit wait.
+The UI selects format before choosing saved draft/published snapshot. Stale,
+cancelled, malformed or uncertain results cannot change canonical content or
+trigger an automatic retry. Import stays disabled.
+
 ### Remaining output implementation
 
-DOCX output is a constrained Open XML generator/adapter supporting the semantic elements ORT owns: paragraphs, headings, lists, tables only where approved, links, page breaks, and bundled/standard font references. It does not automate Word. A library such as `docx-rs` may be used only after golden tests prove relationship safety, accessibility semantics, stable packaging, and license acceptability; otherwise `ort-documents` writes the constrained OPC parts directly.
+Final DOCX template categories, approved tables/page-break controls, broader
+Unicode/RTL and accessibility matrices, native Word/macOS/Windows reader tests,
+and historical renderer records remain pending. The current adapter writes
+constrained OPC parts directly; introducing a richer library still requires
+relationship, packaging, license and golden-render review.
 
 Plain text is generated from the same canonical ordering with deterministic whitespace and Unicode. Export writes atomically and never overwrites without user confirmation.
 

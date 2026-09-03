@@ -119,6 +119,16 @@ Current development status:
   This does not prove supervisor-death cleanup, broker descendants or the full
   inherited-child authority boundary. Production parser/UI remain disabled.
   See `../../evidence/0.0.0-dev/m2-macos-lifecycle.md`;
+- subsequent CI status: the user confirmed all four jobs passing for `e978cfe`
+  before the DOCX checkpoint began; no run URL was independently retrieved;
+- added locally: a constrained, output-only DOCX generator and main-window
+  saved-draft/published-snapshot export integration. Fixed OPC parts, literal
+  escaped content, semantic headings/lists and allowlisted links use a versioned
+  plain layout. It shares the native one-operation/no-clobber export boundary,
+  not the gated hostile-input worker. Synthetic encrypted-restart/file-write,
+  negative-content, package/semantic and headless-render checks accompany it.
+  Cross-platform CI and native document-reader/dialog verification remain pending.
+  See `../../evidence/0.0.0-dev/m2-docx-export.md`;
 - Windows CI repair passed per user report after `bdc3e10`: stage logs narrowed the
   stack overflow to encrypted-profile opening. A matching upstream SQLCipher
   Windows logging-recursion defect is mitigated by compiling out its native
@@ -130,7 +140,7 @@ Current development status:
 - still gated: macOS Dock/system-shutdown quit protection, Windows native editor
   verification, local PDF/DOCX parsing, hostile-worker containment, review
   UI/session integration, private binary staging, richer entry/date/link mapping,
-  Typst preview/PDF rendering, DOCX export, confirmed replacement and
+  Typst preview/PDF rendering, final DOCX template/reader verification, confirmed replacement and
   crash-cleanup policy for exports, historical render metadata, Windows native
   Save-dialog/ACL/filesystem proof, storage management, and complete offline
   journey evidence. M2 is not complete; do not enable hostile-file parsing or

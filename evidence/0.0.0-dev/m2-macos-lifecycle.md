@@ -8,6 +8,10 @@ The user confirmed all four CI jobs passed for the preceding hard-limit
 checkpoint. That report was not independently retrieved from GitHub. The new
 lifecycle probe has not yet run on the two macOS CI runners.
 
+Follow-up at the next checkpoint: the user reported all four jobs passing for
+`e978cfe` before further implementation. That report was not independently
+retrieved; it does not change the containment limitations below.
+
 ## Test candidate and security scope
 
 `just probe-document-lifecycle-macos` builds three separate executables from

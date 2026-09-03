@@ -21,14 +21,31 @@ export type ExportTextResult =
       durabilityUnconfirmed: boolean;
     };
 export type ExportTextCommandResponse = CommandResponse<ExportTextResult>;
+// Separate fixed command: DOCX formatVersion 1 always means plain_docx_v1.
+export type ExportDocxRequest = ExportTextRequest;
+export type ExportDocxCommandResponse = CommandResponse<ExportTextResult>;
+export type ExportFormat = "txt" | "docx";
+
+export function isExportDocxCommandResponse(
+  value: unknown,
+): value is ExportDocxCommandResponse {
+  return isCommandResponse(value, (result): result is ExportTextResult =>
+    isExportResult(result, 2097152),
+  );
+}
 
 export function isExportTextCommandResponse(
   value: unknown,
 ): value is ExportTextCommandResponse {
-  return isCommandResponse(value, isExportTextResult);
+  return isCommandResponse(value, (result): result is ExportTextResult =>
+    isExportResult(result, 262144),
+  );
 }
 
-function isExportTextResult(value: unknown): value is ExportTextResult {
+function isExportResult(
+  value: unknown,
+  maxBytes: number,
+): value is ExportTextResult {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return false;
   const record = value as Record<string, unknown>;
@@ -44,7 +61,7 @@ function isExportTextResult(value: unknown): value is ExportTextResult {
     typeof record.byteCount === "number" &&
     Number.isSafeInteger(record.byteCount) &&
     record.byteCount > 0 &&
-    record.byteCount <= 262144 &&
+    record.byteCount <= maxBytes &&
     record.formatVersion === 1 &&
     typeof record.cleanupPending === "boolean" &&
     typeof record.durabilityUnconfirmed === "boolean"

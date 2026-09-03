@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import type { HealthResponse } from "@ort/contracts/health";
-import type { ExportSource } from "@ort/contracts/export";
+import type { ExportSource, ExportFormat } from "@ort/contracts/export";
 import { exportFeedback } from "./text-export";
 import type {
   Link,
@@ -37,7 +37,7 @@ import {
   requestHealth,
   requestResumeWorkspace,
   saveResume,
-  exportResumeText,
+  exportResumeDocument,
 } from "./command-client";
 import {
   createBullet,
@@ -66,6 +66,7 @@ function ResumeEditor() {
   const [editor, dispatch] = useReducer(editorReducer, initialEditorState);
   const close = useCloseGuard(editor);
   const [confirmReload, setConfirmReload] = useState(false);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("txt");
   const ioBusy = useRef(false);
   const loadGeneration = useRef(0);
   const { document, notice } = editor;
@@ -190,7 +191,7 @@ function ResumeEditor() {
     ioBusy.current = false;
   }
 
-  async function exportText(source: ExportSource) {
+  async function exportDocument(source: ExportSource) {
     const selected = source === "saved_draft" ? editor.saved : editor.published;
     if (
       !selected ||
@@ -204,8 +205,15 @@ function ResumeEditor() {
       return;
     ioBusy.current = true;
     dispatch({ type: "exporting" });
-    const result = await exportResumeText(source, selected.revision);
-    dispatch({ type: "export-finished", notice: exportFeedback(result) });
+    const result = await exportResumeDocument(
+      source,
+      selected.revision,
+      exportFormat,
+    );
+    dispatch({
+      type: "export-finished",
+      notice: exportFeedback(result, exportFormat),
+    });
     ioBusy.current = false;
   }
 
@@ -314,18 +322,40 @@ function ResumeEditor() {
         </div>
       </section>
 
-      <section className="editor-tools" aria-label="Plain-text export">
+      <section className="editor-tools" aria-label="Document export">
         <p>
-          Text exports are unencrypted and can be read by anyone with access to
-          the destination, including synced-folder services. Choose a private
-          local folder and a new .txt filename. Export uses the selected saved
-          revision, not unsaved edits. Existing files are never replaced.
+          Exports are unencrypted and can be read by anyone with access to the
+          destination, including synced-folder services. Choose a private local
+          folder and a new filename. Export uses the selected saved revision,
+          not unsaved edits. Existing files are never replaced.
         </p>
+        <label>
+          Export format
+          <select
+            value={exportFormat}
+            disabled={busy || close.pending}
+            onChange={(event) =>
+              setExportFormat(event.target.value === "docx" ? "docx" : "txt")
+            }
+          >
+            <option value="txt">Plain text (.txt)</option>
+            <option value="docx">
+              Word document (.docx) — plain layout v1
+            </option>
+          </select>
+        </label>
+        {exportFormat === "docx" ? (
+          <p>
+            DOCX uses a simple, editable layout. Pagination and font
+            substitution depend on your document reader; this is not a PDF
+            preview.
+          </p>
+        ) : null}
         <div className="move-controls">
           <button
             type="button"
             className="button--secondary"
-            onClick={() => void exportText("saved_draft")}
+            onClick={() => void exportDocument("saved_draft")}
             disabled={
               !storageReady ||
               !editor.saved ||
@@ -336,12 +366,12 @@ function ResumeEditor() {
               close.pending
             }
           >
-            Export saved draft (.txt)
+            Export saved draft (.{exportFormat})
           </button>
           <button
             type="button"
             className="button--secondary"
-            onClick={() => void exportText("published_snapshot")}
+            onClick={() => void exportDocument("published_snapshot")}
             disabled={
               !storageReady ||
               !editor.published ||
@@ -351,7 +381,7 @@ function ResumeEditor() {
               close.pending
             }
           >
-            Export published snapshot (.txt)
+            Export published snapshot (.{exportFormat})
           </button>
         </div>
         {editor.status === "exporting" ? (

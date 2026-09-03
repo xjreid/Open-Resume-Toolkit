@@ -132,6 +132,14 @@ If supported public OS mechanisms cannot enforce these properties without admini
   ceilings or full process-tree cleanup. Windows containment
   is unproven. Import stays disabled; probe completion is not full containment.
 - External DOCX relationships, macros, embedded packages, scripts, and active content are never executed or fetched.
+- The M2 DOCX exporter emits six fixed OPC parts from an exact saved revision.
+  Content is escaped XML text, never fields or markup; external relationships
+  are only domain-validated HTTP/HTTPS/mailto hyperlinks with visible destinations.
+  It has a 2 MiB package/1 MiB per-XML-buffer ceiling and no archive-reader,
+  template-path, network or shell authority. The main-window-only native command
+  shares the text export's held-directory, one-operation and no-clobber boundary.
+  Unencrypted staging/recovery and Windows ACL/reader gates remain applicable.
+  This output generator is unrelated to the disabled hostile-document importer.
 - Render templates are bundled and addressed by known IDs; user content cannot inject Typst source.
 - Resume/cover-letter file drags expose only validated PDFs materialized in a random private ORT session directory. Paths cannot be supplied by web content; Finish/discard and startup recovery remove only containment-verified ORT-owned files. Download uses a separate one-use native dialog token.
 - Links are parsed as data, allow only approved schemes, and are escaped by the renderer.

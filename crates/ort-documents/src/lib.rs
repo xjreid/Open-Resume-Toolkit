@@ -2,8 +2,14 @@
 
 use ort_domain::{DocumentLimits, Link, ResumeDocument};
 
+mod docx;
 pub mod import;
 pub mod import_transport;
+mod opc;
+
+pub use docx::{
+    DOCX_FORMAT_VERSION, DOCX_TEMPLATE_ID, DocxExportError, MAX_DOCX_BYTES, render_docx,
+};
 
 pub const IMPORT_ENABLED: bool = false;
 pub const TEXT_FORMAT_VERSION: u16 = 1;

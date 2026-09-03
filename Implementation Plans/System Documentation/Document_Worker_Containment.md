@@ -191,8 +191,9 @@ spawn file actions and `POSIX_SPAWN_CLOEXEC_DEFAULT`; it passes no inherited
 environment secrets. Only a validated read-only synthetic file is passed as input.
 No worker-provided output becomes a command, path, PID or profile mutation.
 
-Evidence: `../../evidence/0.0.0-dev/m2-macos-lifecycle.md`. Both macOS CI jobs now
-run this new probe; that cross-runner result is pending. The result is **direct-child
+Evidence: `../../evidence/0.0.0-dev/m2-macos-lifecycle.md`. The user subsequently
+reported all four CI jobs passing for `e978cfe`, including both macOS probes;
+the run was not independently retrieved. The result is **direct-child
 supervision evidence**, not proof of full process-tree containment, cleanup after
 supervisor/client death, or the inherited child's complete filesystem, credential,
 network, broker and IPC boundary. Those gates remain mandatory before integration.
@@ -231,3 +232,9 @@ and network denial, hostile-code cleanup, release signing and supported OS/CPU
 matrices remain unproven. Windows has no native containment evidence yet.
 Production input staging, real pipe drivers, sandbox adapters, PDFium/DOCX
 parsers and the import-review UI remain unimplemented.
+
+The subsequent M2 DOCX **export** checkpoint is an output-only fixed OPC/XML
+generator over validated saved records. It neither opens supplied DOCX files
+nor links an input parser into the desktop. `IMPORT_ENABLED=false` and the
+worker exit-78 gate remain unchanged. Export evidence does not satisfy any
+missing containment proof.

@@ -1,14 +1,20 @@
-import type { ExportTextCommandResponse } from "@ort/contracts/export";
+import type {
+  ExportFormat,
+  ExportTextCommandResponse,
+} from "@ort/contracts/export";
 
-export function exportFeedback(result: ExportTextCommandResponse): string {
+export function exportFeedback(
+  result: ExportTextCommandResponse,
+  format: ExportFormat = "txt",
+): string {
   if (!result.ok) {
     switch (result.error.code) {
       case "EXPORT_ALREADY_EXISTS":
         return "Nothing was overwritten. Export again with a new filename.";
       case "EXPORT_INVALID_DESTINATION":
-        return "Choose a new regular .txt filename; special names are not supported.";
+        return `Choose a new regular .${format} filename; special names are not supported.`;
       case "EXPORT_INVALID_CONTENT":
-        return "There is no exportable content, or the saved content contains unsupported control characters. Review the resume before exporting.";
+        return "The saved content is empty, contains unsupported characters or links, or is too large for this format. Review the resume before exporting.";
       case "REVISION_CONFLICT":
         return "The saved revision changed. Reload the workspace before exporting; keep any unsaved edits first.";
       case "EXPORT_BUSY":
@@ -27,9 +33,9 @@ export function exportFeedback(result: ExportTextCommandResponse): string {
       ? "saved draft revision"
       : "published snapshot";
   return (
-    `Exported ${source} ${value.revision} as unencrypted UTF-8 text (${value.byteCount} bytes).` +
+    `Exported ${source} ${value.revision} as unencrypted ${format === "docx" ? "DOCX (plain layout v1)" : "UTF-8 text"} (${value.byteCount} bytes).` +
     (value.cleanupPending
-      ? " A hidden .ort-export-* staging folder remains in the chosen folder; it contains the same unencrypted text."
+      ? " A hidden .ort-export-* staging folder remains in the chosen folder; it contains the same unencrypted document."
       : "") +
     (value.durabilityUnconfirmed
       ? " File written, but this filesystem could not confirm directory durability against power loss."

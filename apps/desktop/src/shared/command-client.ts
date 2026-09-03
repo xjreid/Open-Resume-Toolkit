@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
   isExportTextCommandResponse,
+  isExportDocxCommandResponse,
+  type ExportFormat,
   type ExportSource,
   type ExportTextCommandResponse,
   type ExportTextRequest,
@@ -122,13 +124,27 @@ export async function exportResumeText(
   source: ExportSource,
   expectedRevision: number,
 ): Promise<ExportTextCommandResponse> {
+  return exportResumeDocument(source, expectedRevision, "txt");
+}
+
+export async function exportResumeDocument(
+  source: ExportSource,
+  expectedRevision: number,
+  format: ExportFormat,
+): Promise<ExportTextCommandResponse> {
   try {
     const request: ExportTextRequest = requestEnvelope({
       source,
       expectedRevision,
     });
-    const response: unknown = await invoke("export_resume_text", { request });
-    if (!isExportTextCommandResponse(response)) return invalidCommandResponse();
+    const command =
+      format === "docx" ? "export_resume_docx" : "export_resume_text";
+    const validate =
+      format === "docx"
+        ? isExportDocxCommandResponse
+        : isExportTextCommandResponse;
+    const response: unknown = await invoke(command, { request });
+    if (!validate(response)) return invalidCommandResponse();
     if (
       response.ok &&
       response.value.status === "exported" &&

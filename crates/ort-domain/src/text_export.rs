@@ -40,6 +40,12 @@ pub enum ExportTextResponse {
     },
 }
 
+// DOCX uses the same path-free saved-revision selection and receipt structure.
+// Its command and separate response validator fix format v1 = plain_docx_v1,
+// with a 2 MiB bound (text remains format v1 with a 256 KiB bound).
+pub type ExportDocxRequest = ExportTextRequest;
+pub type ExportDocxResponse = ExportTextResponse;
+
 impl ExportTextRequest {
     /// Validates metadata and a JavaScript-safe saved revision. No path or
     /// renderer-provided document is part of this command contract.

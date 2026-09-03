@@ -2673,6 +2673,7 @@ version = "0.0.0-dev"
 dependencies = [
  "ort-documents",
  "ort-domain",
+ "ort-platform",
  "ort-storage",
  "ort-vault",
  "serde_json",
@@ -2729,7 +2730,9 @@ version = "0.0.0-dev"
 name = "ort-documents"
 version = "0.0.0-dev"
 dependencies = [
+ "crc32fast",
  "ort-domain",
+ "quick-xml",
  "serde",
  "serde_json",
  "thiserror 2.0.20",

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { exportResumeText } from "./command-client";
+import { exportResumeText, exportResumeDocument } from "./command-client";
 import { exportFeedback } from "./text-export";
 import {
   editorReducer,
@@ -24,6 +24,36 @@ const receipt = {
 beforeEach(() => vi.clearAllMocks());
 
 describe("text export command", () => {
+  it("dispatches DOCX through its fixed command without passing format, content or path", async () => {
+    vi.mocked(invoke).mockResolvedValue({
+      ok: true,
+      value: { ...receipt, byteCount: 300000 },
+    });
+    const result = await exportResumeDocument("saved_draft", 2, "docx");
+    expect(result.ok).toBe(true);
+    expect(invoke).toHaveBeenCalledWith("export_resume_docx", {
+      request: {
+        contractVersion: 2,
+        requestId: expect.any(String),
+        payload: { source: "saved_draft", expectedRevision: 2 },
+      },
+    });
+    expect(exportFeedback(result, "docx")).toContain("DOCX (plain layout v1)");
+    expect((await exportResumeDocument("saved_draft", 3, "docx")).ok).toBe(
+      false,
+    );
+    expect(
+      (await exportResumeDocument("published_snapshot", 2, "docx")).ok,
+    ).toBe(false);
+    expect((await exportResumeText("saved_draft", 2)).ok).toBe(false);
+  });
+  it("does not retry failed DOCX operations or expose native details", async () => {
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("private OS detail"));
+    const result = await exportResumeDocument("published_snapshot", 2, "docx");
+    expect(result.ok).toBe(false);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(exportFeedback(result, "docx")).not.toContain("private OS detail");
+  });
   it("sends only the exact source and revision and validates the returned identity", async () => {
     vi.mocked(invoke).mockResolvedValue({ ok: true, value: receipt });
     expect((await exportResumeText("saved_draft", 2)).ok).toBe(true);

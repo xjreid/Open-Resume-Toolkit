@@ -1,9 +1,10 @@
 use std::{fs, path::PathBuf};
 
 use ort_domain::{
-    CloseStatusRequest, CloseStatusResponse, DocumentLimits, ExportTextRequest, ExportTextResponse,
-    HealthRequest, HealthResponse, LoadResumeRequest, PublishResumeRequest, PublishResumeResponse,
-    ResolveCloseRequest, ResumeWorkspaceResponse, SaveResumeRequest, VersionedResumeResponse,
+    CloseStatusRequest, CloseStatusResponse, DocumentLimits, ExportDocxRequest, ExportDocxResponse,
+    ExportTextRequest, ExportTextResponse, HealthRequest, HealthResponse, LoadResumeRequest,
+    PublishResumeRequest, PublishResumeResponse, ResolveCloseRequest, ResumeWorkspaceResponse,
+    SaveResumeRequest, VersionedResumeResponse,
 };
 use schemars::schema_for;
 
@@ -17,6 +18,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(&output)?;
     write_schema::<ExportTextRequest>(&output.join("export.text.request.schema.json"))?;
     write_schema::<ExportTextResponse>(&output.join("export.text.response.schema.json"))?;
+    write_schema::<ExportDocxRequest>(&output.join("export.docx.request.schema.json"))?;
+    write_schema::<ExportDocxResponse>(&output.join("export.docx.response.schema.json"))?;
     fs::write(output.join("export.ts"), include_str!("export.ts.template"))?;
 
     write_schema::<HealthRequest>(&output.join("health.request.schema.json"))?;
