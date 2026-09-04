@@ -199,7 +199,11 @@ Requests contain only the minimized prompt data through app-server messages. Par
 
 Account/rate-limit information from app-server is normalized into timestamped snapshots with source method, runtime version, bucket identity, reset time, and freshness. Local token totals are never presented as provider account quota.
 
-Codex remains a runtime-disabled feature until the process-level network/filesystem containment proof in the threat model passes for both operating systems. Compatibility loss disables new Codex operations but preserves local activity and documents.
+Codex remains runtime-disabled until the process-level network/filesystem
+containment proof in the threat model passes on macOS arm64. Windows and
+Intel-Mac builds must keep it disabled until each later platform repeats the
+complete proof. Compatibility loss disables new Codex operations but preserves
+local activity and documents.
 
 ## Import pipeline
 

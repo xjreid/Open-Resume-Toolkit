@@ -9,6 +9,10 @@
 
 Non-goals include cloud sync, a remote database, multiple signed-in profiles, backing up credentials, and attempting guaranteed secure erasure from SSD media.
 
+M1-M2 native storage qualification is currently macOS Apple Silicon only. The
+Windows adapter contract and portable format remain in source, but Windows and
+Intel-Mac native matrices are deferred and are not inferred from shared tests.
+
 ## Storage layout
 
 Resolve all paths through the operating-system application-data APIs. Never derive them from the current working directory.
@@ -268,12 +272,17 @@ Normal uninstall removes application binaries and native-host registration but p
 
 ## Rollout and rollback
 
-M1 initially ships to development profiles only. Preview release requires cross-platform encryption and restore evidence. Schema versions are enabled in stable only after a preview cohort has completed upgrade/restart/backup/restore tests. A failed migration prevents app use but preserves both source and safety copy with a support code.
+M1 initially ships to development profiles only. A macOS-arm64 preview requires
+native encryption plus clean-account and clean-profile restore evidence. Schema
+versions are enabled in stable only after a preview cohort has completed
+upgrade/restart/backup/restore tests. A failed migration prevents app use but
+preserves both source and safety copy with a support code. Later platforms must
+separately prove format and native-vault compatibility.
 
 ## Completion criteria
 
 - All canonical records and policy state survive clean restart and injected process termination.
 - Database, journal, and indexes expose no seeded plaintext at rest.
-- Backup restores across Windows and macOS while excluding all credentials and device-bound secrets.
+- Backup restores into a clean macOS account/profile while excluding all credentials and device-bound secrets. Windows/Intel-Mac restore qualification is deferred.
 - Clearing activity, deleting a workspace, and resetting a cap affect only their approved records.
 - Low-disk, vault-failure, corruption, and newer-version paths preserve recoverability.

@@ -8,6 +8,13 @@
 
 The Quiet Navy/Open Frame application and website direction is approved under `../../Aesthetic/`. Early milestones still use semantic, minimally styled controls and a deliberately plain renderer fixture so security, contracts, accessibility, and data behavior stabilize first. Production component polish and the non-default document-template details may be tested and refined during development, but the three promised style categories must pass their functional, accessibility, licensing, and golden-render gates before release.
 
+M0, M1, and M2 now use macOS Apple Silicon as their only active native
+qualification target. References below to Windows, Intel Mac, universal builds,
+or cross-platform native evidence describe preserved later expansion work unless
+the text explicitly identifies a shared CI portability check. Milestone
+completion in this phase always means completion for macOS arm64, not global
+cross-platform completion.
+
 ## Reasoning-effort routing
 
 - **[HIGH]** marks work that requires high reasoning because an error could cross
@@ -29,15 +36,16 @@ Current development status: the repository skeleton, contracts, isolated
 development profile, static web/capability checks, and four-target CI are in
 place. The 2026-09-04 tooling checkpoint adds a fail-closed Rust/JavaScript SPDX
 allowlist, deterministic dependency inventory, and contract-regeneration drift
-to the canonical `just check` path. Native clean-checkout, installed-window,
-profile-isolation, and production-bundle evidence still gate formal M0 signoff.
+to the canonical `just check` path. Native macOS-arm64 clean-checkout,
+installed-window, profile-isolation, and production-bundle evidence still gate
+formal M0 signoff.
 
 Deliver:
 
 - Cargo/pnpm workspaces, pinned toolchains, Tauri/React shell, and isolated dev profile;
 - **[HIGH]** domain error envelope, command/event transport, generated schemas,
   and compatibility manifest;
-- CI for Windows/macOS build, tests, formatting, license/vulnerability scanning, and schema drift;
+- CI for the macOS-arm64 qualification target plus retained Windows/Intel-Mac portability builds, tests, formatting, license/vulnerability scanning, and schema drift;
 - synthetic fixture policy and evidence layout;
 - **[HIGH]** initial architecture decision records for Tauri/Rust, SQLCipher,
   Typst, native messaging, and external Codex.
@@ -63,16 +71,18 @@ Current development status:
   same-device checkpoints, and a password-protected portable backup/restore
   prototype that creates a fresh device key, plus a verified arm64 macOS local
   preview `.app`/DMG with an isolated identity and explicit ad-hoc signing;
-- **[HIGH]** still release-gated: native macOS and Windows vault matrices,
-  signed-build access behavior, platform crash/migration/low-disk suites,
-  cross-platform backup files, and expanded hostile restore/fuzz tests.
+- **[HIGH]** still M1-gated for macOS arm64: native Keychain matrices using a
+  stable local development identity, cross-account denial, development/preview
+  access behavior, macOS crash/migration/low-disk suites, clean-account backup
+  restore, and expanded hostile restore/fuzz tests. Windows vault and
+  cross-platform-file qualification are deferred.
 
 Deliver:
 
 - **[HIGH]** OS vault abstraction and database-key lifecycle;
-- **[HIGH]** platform vault-boundary matrix, including Windows same-user
-  limitations and macOS desktop/native-host access behavior across preview,
-  signed, moved, and updated builds;
+- **[HIGH]** macOS vault-boundary matrix, including cross-account denial and
+  desktop/native-host access behavior across locally self-signed development,
+  preview, moved, and updated builds; Windows same-user proof is deferred;
 - **[HIGH]** SQLCipher schema v1, migrations, repositories, transactions, and
   startup recovery;
 - profile, master draft, published snapshot, settings, and diagnostic records;
@@ -85,8 +95,8 @@ Exit evidence:
 
 - **[HIGH]** synthetic resume survives restart and cannot be read from the
   database/WAL without the key;
-- **[HIGH]** vault namespace/cross-user/cross-process tests match the documented
-  Windows and macOS boundaries without plaintext fallback;
+- **[HIGH]** vault namespace/cross-account/cross-process tests match the
+  documented macOS boundary without plaintext fallback;
 - **[HIGH]** vault-unavailable and corrupt-database paths are safe and actionable;
 - **[HIGH]** migration and backup corruption suites pass.
 
@@ -114,14 +124,10 @@ superseded-draft and superseded-renderer-binary replay.
 
 ### Current status
 
-As of 2026-09-04, M2 is **about 72% complete** by stage-gate weighting after
-the all-local-data deletion, retained-published and portable archived-source
-render replay, expanded desktop accessibility, output-golden, and
-dependency-policy checkpoints: approximately 87% of the implementation
-foundation, 71% of end-to-end functionality, and 59% of release/exit evidence.
-The estimate gives security,
-recovery, accessibility, cross-platform behavior, and the complete offline
-journey more weight than raw feature count.
+As of 2026-09-04, M2 remains incomplete for macOS arm64. The earlier weighted
+cross-platform percentage is retired rather than mechanically increased when
+Windows and Intel-Mac gates move later; completion is determined by the explicit
+active exit gates below.
 
 Portable-backup export, storage inventory, and authenticated backup validation
 are committed through `0a706b2`. Restart-staged replacement and retained
@@ -132,7 +138,8 @@ replay and dependency policy are committed in `1087aef`, for which the user
 reported all five hosted CI jobs passing. Portable archived-source replay was
 committed in `bc0712f`; the supervision core, source envelope, private staging,
 and inert DOCX/PDF parser checkpoints followed through `7a8cda1`. M2 is not
-release-ready. Native and cross-platform evidence remains pending.
+macOS-arm64 preview-ready. Required native macOS evidence remains pending;
+Windows and Intel-Mac evidence is deferred rather than treated as done.
 The bounded **current-bundle verified render-history replay** checkpoint now
 regenerates an exact current draft or any retained immutable published revision,
 verifies the complete receipt before exposing bytes, supplies bounded accessible
@@ -158,9 +165,9 @@ are explicitly outside the approved history model.
   fail-closed cross-platform production supervision
   coordinator/adapter contract, constrained disabled DOCX and pinned PDFium
   text parsers, and
-  partial macOS containment/lifecycle probes. Windows private staging, native
-  macOS/Windows adapters, PDFium packaging, production parser invocation and
-  import UI remain disabled.
+  partial macOS containment/lifecycle probes. The native macOS adapter, PDFium
+  packaging, production parser invocation and import UI remain disabled.
+  Windows private staging and its native adapter are deferred.
 - **[HIGH]** **Backup and recovery:** encrypted portable export, authenticated
   read-only validation, confirmed restart-staged replacement,
   retained safety-copy status/rollback, exact confirmed safety-copy cleanup, and
@@ -188,16 +195,17 @@ are explicitly outside the approved history model.
   supported multilingual content, literal code-like text, PDF structure tags,
   fixed one/two/four-page boundaries, active-content absence, and rendered-page
   layout. The DOCX accessibility audit reports zero findings across all cases.
-  This does not enable the HIGH-tagged import path or replace native Word,
-  assistive-technology, cross-platform, or final-template qualification.
+  This does not enable the HIGH-tagged import path or replace native reader,
+  assistive-technology, or final-template qualification. Later platforms must
+  repeat the corpus and native-reader checks before qualification.
 - **Desktop accessibility automation:** axe-core semantic checks cover the full
   reachable main/overlay routes, PDF preview, quit decision, backup/recovery,
   storage/deletion, and populated published-review surfaces, with a failing
   positive control. Live component checks cover the loaded editor, associated
   validation errors, announced revision conflict, quit-dialog focus restoration,
   exact destructive confirmation feedback, recovery/deletion busy states, and
-  deletion-outcome focus. Native assistive-technology, interruption, and
-  cross-platform interaction matrices remain pending.
+  deletion-outcome focus. Native macOS assistive-technology, interruption, and
+  interaction matrices remain pending; later-platform matrices are deferred.
 
 ### Detailed checkpoint evidence
 
@@ -234,22 +242,27 @@ are explicitly outside the approved history model.
 
 ### Remaining release gates
 
-- **[HIGH]** Implement and prove the native macOS XPC/App-Sandbox and Windows
-  AppContainer/Job adapters behind the common supervisor, including real bounded
-  pipe drivers and complete hostile lifecycle matrices; then integrate the file
-  picker, review UI, private binary staging, parsers, and richer deterministic mapping.
-- **[HIGH]** Finish native/cross-platform vault, filesystem, quit, low-disk, and
-  injected crash/failure verification.
+- **[HIGH]** Implement and prove the native macOS XPC/App-Sandbox adapter behind
+  the common supervisor, including real bounded pipe drivers and the complete
+  hostile lifecycle matrix; then integrate the file picker, review UI, private
+  binary staging, parsers, and richer deterministic mapping.
+- **[HIGH]** Finish native macOS vault, filesystem, quit, low-disk, and injected
+  crash/failure verification, including the separate standard-account matrix.
 - Finish the complete product-plan editor, native dialogs and accessibility,
   all three final PDF/DOCX style categories, truthfully labeled current-renderer
   regeneration for retained historical structured sources, and native reader
   verification.
-- **[HIGH]** Complete native macOS/Windows vault, interruption, filesystem and
-  assistive-technology evidence for all-local-data deletion. Extend its exact
+- **[HIGH]** Complete native macOS vault, interruption, filesystem and
+  VoiceOver/keyboard evidence for all-local-data deletion. Extend its exact
   cleanup inventory when later milestones add credentials, native IPC state,
   workspace records, or ORT-owned import/drag temporary files.
 - **[HIGH]** Pass the complete offline journey and all M2 exit evidence.
   Hostile-file parsing must remain disabled until its containment gate passes.
+
+Deferred platform-expansion gates, which do not block macOS-arm64 M2, are the
+Windows AppContainer/Job adapter and private staging, Windows vault/filesystem/UI
+and accessibility matrices, Intel-Mac native dependencies and containment, and
+Windows/Intel clean-machine package qualification.
 
 Deliver:
 

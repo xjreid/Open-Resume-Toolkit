@@ -12,7 +12,7 @@ baseline. The development build supports encrypted structured editing,
 publication, local exports/rendering, portable backup/recovery, storage reporting
 and exact crash-resumable local-profile deletion. A common fail-closed
 parser-supervision coordinator is implemented, but hostile document import remains
-disabled pending native macOS/Windows adapters and containment proof; AI, browser messaging,
+disabled pending the native macOS adapter and containment proof; AI, browser messaging,
 updates and release hardening remain later milestones. Quiet Navy/Open Frame is
 the approved application direction. M2 completion includes the complete manual
 master-editor behavior in the authoritative resume-editor plan and all three
@@ -21,6 +21,12 @@ that gate. Historical replay retains immutable structured sources and uses a
 truthfully identified current renderer when the original tuple is unavailable,
 without retaining superseded drafts or old executable renderer bundles solely
 for replay.
+
+M0-M2 are currently qualified only on macOS Apple Silicon. Windows and Intel
+Mac remain later platform-expansion goals. Their shared builds may remain in CI
+as portability regression signals, but native implementation and manual evidence
+on those platforms do not block macOS-arm64 milestone completion and must not be
+represented as current support.
 
 ## Authority and precedence
 
@@ -57,11 +63,12 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - Finish Application optionally creates a local tracker entry with the selected final resume, cover letter, and approved answer set as structured snapshots, then deletes unselected temporary material and resets the workspace.
 - Structured JSON is the canonical document format. PDF, DOCX, and plain text are locally rendered derived artifacts and are not retained by default.
 - There are no ORT plan-based application, import, AI, or storage quotas. Practical safety limits prevent malformed or excessively large inputs, and optional user-defined AI guardrails protect the user's provider budget or subscription quota.
-- Chrome and Edge on Windows and macOS are the initial browser/platform targets. Firefox, Safari, Linux, mobile, OCR, local AI models, job-board notifications, and automatic form submission are not initial commitments.
+- Chrome and Edge on macOS Apple Silicon are the active browser/platform target. Windows and Intel Mac are later platform expansions; Firefox, Safari, Linux, mobile, OCR, local AI models, job-board notifications, and automatic form submission are not initial commitments.
 - Codex subscription mode requires a separately installed compatible Codex runtime; ORT does not bundle Codex in the initial release. ORT detects and validates the runtime, launches and stops `codex app-server` automatically over local `stdio`, and keeps its configuration, authentication, keyring, and temporary-data boundary separate from the user's general Codex environment.
-- The preferred stable Windows channel is a SignPath Foundation-signed direct package published through canonical GitHub Releases after the project meets SignPath eligibility and is accepted. Before trusted signing is available, direct Windows artifacts are clearly labeled previews. Microsoft Store MSIX is the fallback stable channel if SignPath is unavailable or declined. The app performs or verifies per-user native-messaging registration without requiring manual registry editing in the normal flow.
+- When Windows development resumes, the preferred stable channel is a SignPath Foundation-signed direct package published through canonical GitHub Releases after the project meets eligibility and is accepted. Microsoft Store MSIX remains the fallback. This is deferred platform design, not a current channel.
 - Signed direct installations may check canonical GitHub Releases; a fallback Store edition uses Microsoft Store update APIs. Update channels must never overwrite one another.
 - Initial macOS GitHub artifacts are explicitly unsigned previews with checksums, provenance, Gatekeeper instructions, and authenticated update metadata. A stable macOS release requires Apple Developer ID signing and notarization once usage, support burden, organizational adoption, or funding justifies the recurring membership cost.
+- A local self-signed Code Signing identity may be used only for development tests that require stable macOS code identity or Keychain access across rebuilds. It is never a distribution identity and does not replace Developer ID signing or notarization.
 
 ## Authoritative document catalog
 

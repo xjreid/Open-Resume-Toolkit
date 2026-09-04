@@ -9,6 +9,10 @@
 
 This plan defines functional structure and interaction contracts only. It expressly does not select the application aesthetic.
 
+The active native implementation and qualification target through M2 is macOS
+Apple Silicon with WKWebView. Windows WebView2 and Intel-Mac verification remain
+later platform-expansion work; shared UI behavior must not intentionally diverge.
+
 ## Framework decision
 
 Use Tauri 2 with a Rust backend and a React/TypeScript/Vite frontend.
@@ -21,7 +25,9 @@ Why it fits:
 - official installer/updater integration exists for the planned Windows/macOS channels;
 - the UI remains conventional, testable TypeScript while privileged work stays outside the webview.
 
-The tradeoff is platform WebView variance. Supported Windows builds require WebView2; macOS uses WKWebView. UI and accessibility tests must run on both rather than assuming Chromium-only behavior.
+The tradeoff is platform WebView variance. macOS uses WKWebView and is the current
+test target. Later Windows builds require WebView2 and must repeat UI and
+accessibility qualification rather than inheriting the macOS result.
 
 ## Window model
 
@@ -89,7 +95,7 @@ claim of complete close protection. The UI warns users to wait for Saved on
 these paths. Avoid unsafe runtime method replacement or widening frontend
 process privileges to work around it. Follow-up must prove an OS-supported
 termination hook or bounded encrypted recovery of unfinished edits, including
-invalid forms. Windows needs native close/quit/logoff verification separately.
+invalid forms. Windows native close/quit/logoff verification is deferred.
 
 Tauri command functions:
 
@@ -212,7 +218,9 @@ Errors show a plain-language summary, safe support code, retry eligibility, and 
 - OS scaling, text zoom, high-contrast/forced-colors, and reduced motion are supported structurally. ORT ships one light color scheme; forced-colors support is an accessibility behavior, not a second theme.
 - Minimum target size and non-color status indicators are enforced by automated component tests later, independent of the final visual theme.
 
-Manual release coverage includes NVDA with Windows WebView2 and VoiceOver with WKWebView, keyboard-only use, 200% text scaling, and reduced motion.
+Current manual coverage includes VoiceOver with WKWebView, keyboard-only use,
+200% text scaling, and reduced motion on macOS arm64. NVDA with Windows WebView2
+must repeat the full matrix when Windows qualification resumes.
 
 ## Performance and resource behavior
 
@@ -237,4 +245,8 @@ Manual release coverage includes NVDA with Windows WebView2 and VoiceOver with W
 
 Offline routes are enabled first. Direct AI, extension, updater, and Codex appear only when their backend capability reports the relevant gate as passed. Disabled capability explanations are local and actionable; they do not link users into unsupported workarounds.
 
-Complete when all critical journeys work in keyboard and screen-reader testing on both platforms, state survives restart/crash as specified, no webview has broad privileged capability, and functional behavior is independent of the later aesthetic layer.
+Complete for the active phase when all critical journeys work in keyboard and
+VoiceOver testing on macOS arm64, state survives restart/crash as specified, no
+webview has broad privileged capability, and functional behavior is independent
+of the later aesthetic layer. Each deferred platform must later satisfy the same
+applicable standard before being called supported.

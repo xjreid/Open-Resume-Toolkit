@@ -9,12 +9,18 @@
 
 This document turns the architecture, repository, roadmap, security, and distribution plans into one build-and-release outline. It does not create four independent applications. ORT uses one shared desktop codebase and one shared browser-extension codebase, producing platform- and Store-specific artifacts through narrow adapters and packaging configuration.
 
+For the current M0-M2 phase, the only qualified native target is macOS Apple
+Silicon. Windows and Intel-Mac outputs below are retained future artifact designs;
+their CI builds are portability signals and their native/package matrices are
+not current milestone blockers.
+
 ## Source and artifact model
 
 ```text
 Shared desktop source (React/TypeScript + Tauri/Rust)
-  +-- Windows x64 desktop/native-host/document-worker build
-  `-- macOS Apple Silicon + Intel/universal desktop/native-host/document-worker build
+  +-- macOS Apple Silicon desktop/native-host/document-worker build [active]
+  +-- Windows desktop/native-host/document-worker build [later]
+  `-- macOS Intel/universal desktop/native-host/document-worker build [later]
 
 Shared Manifest V3 extension source
   +-- Chrome package with Chrome ID/manifest/Store metadata
@@ -73,13 +79,17 @@ Platform folders contain operating-system integration, entitlements, manifests, 
 
 | Target | Initial architecture | Output | Includes | Distribution state |
 |---|---|---|---|---|
-| Windows desktop direct | x64 | per-user NSIS installer and updater payload | desktop, native host, document worker, renderer/assets | preview until trusted SignPath signature; stable after signing |
-| Windows Store fallback | x64 | approved Store/MSIX or documented packaged-Win32 form | same components, Store-owned updater | stable only after native-host/package proof |
-| macOS desktop | Apple Silicon and Intel; universal when dependencies permit | DMG; later updater archive | app bundle, native host, document worker, renderer/assets | unsigned preview initially; stable requires Developer ID and notarization |
+| macOS desktop | Apple Silicon (`arm64`) | app bundle/DMG; later updater archive | desktop, native host, document worker, renderer/assets | active development and unsigned preview; stable requires Developer ID and notarization |
+| Windows desktop direct | architecture to revalidate later | per-user NSIS installer and updater payload | desktop, native host, document worker, renderer/assets | deferred; preview until trusted signature, stable after signing |
+| Windows Store fallback | architecture to revalidate later | approved Store/MSIX or documented packaged-Win32 form | same components, Store-owned updater | deferred; stable only after native-host/package proof |
+| macOS Intel/universal | `x86_64` or universal | DMG; later updater archive | same macOS components | deferred pending dependency and native-matrix qualification |
 | Chrome extension | current compatibility window | Store ZIP/package | shared extension plus Chrome manifest/ID | release coordinated after compatible desktop/host |
 | Edge extension | current compatibility window | Store ZIP/package | shared extension plus Edge manifest/ID | release coordinated after compatible desktop/host |
 
-If a universal macOS build is not supported by every native dependency, CI produces separate `arm64` and `x86_64` artifacts from the same commit and version. Architecture differences do not permit schema or behavior differences.
+When Intel-Mac work resumes, a universal build is preferred only if every native
+dependency supports it; otherwise separate `arm64` and `x86_64` artifacts come
+from the same commit and version. Architecture differences never permit schema
+or behavior differences.
 
 ## Identities and environments
 
@@ -121,7 +131,7 @@ Commands are platform-neutral intents even when their underlying implementation 
 1. validate pinned Rust/Node/pnpm toolchains and lockfiles;
 2. regenerate contracts into a temporary tree and fail on drift;
 3. format, lint, static-analyze, test, and scan dependencies/licenses/secrets;
-4. build the shared desktop source on Windows x64 and macOS Apple Silicon/Intel targets;
+4. build the macOS-arm64 qualification target and retained Windows/Intel-Mac shared-source portability targets;
 5. build Chrome and Edge extension variants and compare shared bundles for unintended behavior drift;
 6. run synthetic storage, document, No-AI import, IPC, AI, and accessibility suites;
 7. verify production Tauri capabilities/CSP contain no broad privilege or remote asset;
@@ -135,10 +145,10 @@ Nightly or scheduled jobs run fuzz corpora, parser-worker sandbox tests, vault a
 
 `preview.yml` builds one immutable artifact set from an approved commit:
 
-1. compile Windows, macOS, Chrome, and Edge preview targets;
+1. compile the macOS-arm64 preview and Chrome/Edge targets; deferred platform artifacts may be attached as non-qualified CI evidence but are not published as supported previews;
 2. create checksums, SBOMs, license inventory, provenance, compatibility manifest, and preview update metadata where allowed;
-3. run clean-machine install/launch/repair/uninstall and extension interoperability tests on those exact artifacts;
-4. label unsigned Windows/macOS outputs prominently and prevent stable-channel update ownership;
+3. run clean-account install/launch/repair/uninstall and extension interoperability tests on the exact macOS-arm64 artifacts;
+4. label unsigned macOS outputs prominently and prevent stable-channel update ownership;
 5. publish only to a draft/prerelease after required evidence passes.
 
 ### Stable release workflow
@@ -182,7 +192,7 @@ The desktop product version may be shared across Windows and macOS even when pac
 - Direct-provider contract, privacy, accounting, and guardrail gates before enabling each provider/model preset.
 - Codex executable-identity and OS-containment gate before showing Codex as available.
 - Renderer/DOCX fidelity, license, and accessibility gates before calling an export format supported.
-- Trusted-signing/channel gate before labeling Windows or macOS artifacts stable.
+- Trusted-signing/channel gate before labeling macOS artifacts stable; later platforms repeat their own gate.
 
 A failed optional-feature gate disables only that feature where the product plans allow it. It does not authorize a weaker fallback.
 
@@ -204,7 +214,7 @@ M0 may start without SignPath approval, final Store acceptance, final parser lib
 
 - [x] Product and technical authority order documented.
 - [x] Shared desktop and extension ownership decided.
-- [x] Windows/macOS and Chrome/Edge target responsibilities separated.
+- [x] Active macOS-arm64 and deferred platform responsibilities separated; Chrome/Edge responsibilities separated.
 - [x] Repository tree and dependency direction proposed.
 - [x] Security/privacy threat model and fail-closed feature gates documented.
 - [x] Versioned contract generation and drift policy documented.
@@ -226,7 +236,7 @@ The first implementation pull request should contain only the M0 skeleton:
 5. Chrome/Edge manifest-generation skeletons with development IDs and no broad host permission;
 6. temporary/synthetic profile isolation;
 7. `just bootstrap`, `just generate`, `just check`, and `just dev` intents;
-8. Windows/macOS CI builds, tests, contract drift, license/vulnerability, secret, and remote-asset checks;
+8. macOS-arm64 qualification CI plus Windows/Intel-Mac portability builds, tests, contract drift, license/vulnerability, secret, and remote-asset checks;
 9. initial ADRs and an empty versioned evidence manifest.
 
 It should not yet implement real credentials, parsing, AI, updater installation, signing, or production native-host registration. Those enter only with their milestone-specific controls and evidence.

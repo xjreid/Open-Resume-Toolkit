@@ -9,6 +9,10 @@
 
 The product stores unusually sensitive employment material and user-supplied credentials. The design therefore assumes job pages, imports, AI output, local IPC peers, backup files, and update infrastructure may be malicious or compromised.
 
+Native security qualification through M2 is limited to macOS Apple Silicon.
+Windows and Intel-Mac control designs remain requirements for later platform
+expansion, but they are not inferred from shared tests or current CI builds.
+
 ## Protected assets
 
 1. Resume/profile content, job descriptions, application answers, tracker history, and exports.
@@ -92,7 +96,7 @@ Application-level prompting is not sufficient containment. Before stable Codex s
 5. outbound network access is limited to the required Codex authentication/service endpoints at process level;
 6. app-server tool and approval requests are rejected and treated as a security event;
 7. termination kills the full child process tree and removes temporary state;
-8. bypass attempts pass on supported Windows and macOS versions.
+8. bypass attempts pass on the active macOS-arm64 matrix; every later platform repeats the complete proof before the capability is enabled there.
 
 The executable gate is independent of the protocol/version gate. Resolve the canonical file and every parent, reject symlink/reparse redirection and unsafe ownership/write permissions, and verify the expected official distribution provenance using the strongest stable platform evidence available (code-signing/notarization identity, package receipt, and/or release-manifest digest). A manual picker can locate a runtime but cannot waive these checks. Test a counterfeit executable that prints the expected version and protocol handshake; it must never be launched beyond a non-executing identity check, or—when a bounded version probe is unavoidable—must already be inside the external sandbox with no user-data access.
 

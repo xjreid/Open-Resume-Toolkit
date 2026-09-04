@@ -11,6 +11,11 @@ Codex is not included in any ORT installer. Users who select Codex mode install 
 
 Cross-platform source ownership, build targets, environment identities, CI stages, desktop-before-extension deployment order, and the M0 handoff are centralized in `../System Documentation/Development_and_Deployment_Outline.md`. This plan remains authoritative for packaging, signing, update trust, publication, and rollback mechanics.
 
+Only macOS Apple Silicon is an active development and preview-qualification
+target through M2. Windows and Intel/universal Mac sections are retained as
+future channel designs. They do not create present native-test obligations or
+support claims, and their artifacts must not be published as qualified previews.
+
 ## Channel identities
 
 | Channel | Application identity | Package/update owner |
@@ -73,7 +78,11 @@ The Store performs distribution signing. No stable-direct update metadata is emb
 
 ## macOS initial channel
 
-Build a universal DMG where dependencies support universal output; otherwise publish separate Apple Silicon and Intel DMGs with explicit names. The initial release is unsigned and not notarized, distributed through GitHub Releases with SHA-256 checksums, SBOM, provenance, and candid Gatekeeper/quarantine instructions.
+Build an Apple Silicon DMG for the active preview. When Intel-Mac work resumes,
+prefer a universal DMG where dependencies support it; otherwise publish separate
+Apple Silicon and Intel DMGs with explicit names. The initial preview is unsigned
+and not notarized, distributed through GitHub Releases with SHA-256 checksums,
+SBOM, provenance, and candid Gatekeeper/quarantine instructions.
 
 Unsigned macOS preview builds do not silently auto-install updates. `Check for updates` verifies authenticated metadata and opens the exact GitHub release/download guidance. Tauri updater signatures may protect metadata/artifact integrity but are not represented as Apple code signing or notarization.
 
@@ -109,7 +118,9 @@ Workflows are separated:
 
 ### `ci.yml`
 
-Unprivileged pull-request build/test on supported Windows/macOS. No secrets and no publishing permissions.
+Unprivileged pull-request build/test on the qualified macOS-arm64 target plus
+retained deferred-platform portability targets. No secrets and no publishing
+permissions; deferred-target success is not native qualification.
 
 ### `preview.yml`
 

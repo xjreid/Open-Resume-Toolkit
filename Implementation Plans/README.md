@@ -6,22 +6,31 @@ These plans are **implementation-ready for the first development milestone**. Th
 
 Implementation may refine library versions and internal names without changing product behavior. Any change to privacy promises, supported AI modes, data ownership, release channels, or the user-visible lifecycle must first be approved in `../Product Plans/`.
 
+## Active platform scope
+
+M0-M2 development and qualification currently target macOS Apple Silicon only.
+The architecture continues to isolate operating-system code so Windows and Intel
+Mac can be added later without forking contracts, schemas, or product behavior.
+Existing non-arm64 CI builds remain useful portability regression signals, but
+they are not current native qualification and do not add Windows or Intel-Mac
+work to the M0-M2 exit gates.
+
 ## Selected implementation baseline
 
 | Area | Initial decision |
 |---|---|
-| Desktop shell | Tauri 2 on Windows and macOS |
+| Desktop shell | Tauri 2 on macOS Apple Silicon now; Windows and Intel Mac retained as later adapters |
 | Desktop UI | React, TypeScript, and Vite, rendered entirely from bundled assets |
 | Core/application services | Rust workspace; UI commands are thin adapters over testable use cases |
 | Local database | SQLite encrypted with SQLCipher Community Edition; key held in the OS credential vault |
-| Secrets | Windows Credential Manager and macOS Keychain through a narrow Rust vault abstraction |
+| Secrets | macOS Keychain through a narrow Rust vault abstraction now; Windows Credential Manager adapter retained for later qualification |
 | Document model | Versioned Rust domain types with generated JSON Schema and TypeScript contracts |
 | Preview/PDF | One pinned Typst rendering pipeline; bundled fonts and templates |
 | DOCX | Constrained Open XML importer/exporter behind a document adapter |
 | Direct AI | Rust HTTPS adapters for OpenAI, Anthropic, and Gemini; no provider SDK in the core contract |
 | Codex | Optional, separately installed Codex app-server over `stdio`; never bundled with ORT |
 | Browser bridge | Shared Manifest V3 extension plus a Rust native-messaging host and authenticated local IPC |
-| Packaging | Tauri NSIS/DMG packages; SignPath-first Windows signing; unsigned macOS preview initially |
+| Packaging | Tauri macOS-arm64 app/DMG preview initially; NSIS/Windows signing and Intel/universal Mac packages later |
 | Updates | Signed ORT update metadata and GitHub Release assets, with channel separation |
 | Website | Static Astro/TypeScript site on Cloudflare Pages, documented in the private repository |
 
@@ -61,10 +70,10 @@ Exact dependency versions are chosen and locked when the workspace is bootstrapp
 
 The following are not invitations to silently weaken the product requirements. If a gate fails, the affected feature remains disabled or the release channel changes as already allowed by the product plans.
 
-- **SQLCipher packaging:** reproducible Windows/macOS builds, encrypted WAL/temp behavior, and license attribution must pass before real user data is stored.
-- **Vault boundary:** exact Windows and macOS credential behavior, desktop/native-host access separation, signed/preview identity, move/update/repair behavior, and no-plaintext fallback must pass before real secrets are stored.
+- **SQLCipher packaging:** reproducible macOS-arm64 builds, encrypted WAL/temp behavior, and license attribution must pass before real user data is stored. Each later platform repeats the gate.
+- **Vault boundary:** exact macOS credential behavior, cross-account and desktop/native-host access separation, development/preview identity, move/update/repair behavior, and no-plaintext fallback must pass before real secrets are stored. Windows proof is deferred with Windows qualification.
 - **Hostile-document isolation:** PDF/DOCX import must run only in the disposable OS-sandboxed worker. If a platform/package cannot deny user files, secrets, network, and subprocesses and kill the worker tree reliably, import remains disabled there.
-- **Codex containment:** ORT must prove that an app-server child cannot use tools, read arbitrary files, execute commands, or make network requests outside the approved Codex service path. Codex mode remains disabled in stable builds until this is demonstrated on both platforms.
+- **Codex containment:** ORT must prove that an app-server child cannot use tools, read arbitrary files, execute commands, or make network requests outside the approved Codex service path. During the active phase, macOS-arm64 proof gates the feature; later platforms must repeat it before enabling Codex there.
 - **SignPath approval:** signed GitHub distribution is the preferred Windows stable channel. Until approval, Windows artifacts are clearly labeled preview; the Microsoft Store path remains the fallback.
 - **Native host registration:** direct and Store-style Windows installation paths must each prove install, repair, update, and uninstall behavior before their extension integration is advertised.
 - **Document fidelity:** the renderer/importer must pass the golden corpus and accessibility checks before PDF/DOCX formats are called supported.

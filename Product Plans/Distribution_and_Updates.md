@@ -1,5 +1,12 @@
 # Distribution and updates
 
+## Current platform scope
+
+The active development and preview-qualification channel is macOS Apple Silicon.
+The Windows channel design and Intel-Mac packaging requirements below are
+retained for later platform expansion and do not gate M0-M2 macOS-arm64
+completion. A shared CI build is not a supported distribution.
+
 ## Distribution principles
 
 - Every official binary maps to a tagged public source revision and documented build workflow.

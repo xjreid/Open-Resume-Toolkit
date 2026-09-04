@@ -7,6 +7,10 @@
 - Milestone: M0
 - Non-goal: visual component design or aesthetic assets
 
+M0-M2 qualify the repository on macOS Apple Silicon. Windows and Intel-Mac
+folders and CI builds preserve the intended adapter boundaries and detect
+portable-code regressions, but their native evidence is deferred.
+
 ## Proposed source tree
 
 The existing planning folders remain at the repository root. Implementation adds:
@@ -141,7 +145,7 @@ Document import is runtime-disabled on a platform/package whose parser-worker sa
 - synthetic import/render golden tests;
 - extension lint/package validation;
 - accessibility automated checks for reachable UI routes;
-- builds on current supported Windows x64 and macOS Intel/Apple Silicon targets.
+- builds on the macOS-arm64 qualification target and retained Windows/Intel-Mac portability targets.
 
 ### Nightly or scheduled
 
@@ -188,7 +192,7 @@ Release notes link to durable public evidence where safe. Sensitive security-rev
 ## Completion criteria
 
 - A clean checkout can bootstrap and run all offline tests using documented commands.
-- Windows and macOS builds use the same generated contracts and domain test suite.
+- macOS-arm64 qualification and deferred-platform portability builds use the same generated contracts and domain test suite; this does not qualify the deferred platforms.
 - CI rejects schema drift, forbidden licenses, unpinned package-manager state, and accidental remote UI assets.
 - Development data cannot be confused with stable-profile data.
 - Every shipped dependency and binary asset appears in the license inventory and SBOM.

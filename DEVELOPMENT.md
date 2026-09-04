@@ -12,9 +12,14 @@ or stage it into a fresh encrypted replacement profile that is activated safely
 on restart. PDF/DOCX import, AI, updater, and browser-native messaging remain
 gated or unimplemented.
 
+The active M0-M2 development and native-test environment is macOS Apple Silicon.
+Windows and Intel Mac remain later platform-expansion goals. Their CI jobs may
+continue to catch shared-code regressions, but they are not current support or
+manual-qualification targets.
+
 ## Prerequisites
 
-- macOS 10.15 or newer with Xcode Command Line Tools, or a supported Windows development environment with WebView2 and Microsoft C++ Build Tools;
+- macOS on Apple Silicon with Xcode Command Line Tools (the exact minimum supported release is not yet frozen);
 - Node.js 24.16.0;
 - pnpm 11.19.0 through Corepack;
 - Rust 1.98.0 through rustup;
@@ -303,8 +308,9 @@ hash outside ORT. Then add a saved draft, published snapshot and PDF render
 receipt. Type the exact deletion phrase and confirm that the editor reloads as a
 new empty profile, storage counts return to zero, and the external backup remains
 byte-for-byte unchanged. Restart once more and confirm the empty profile remains.
-Native macOS/Windows vault failure, locked-vault, reparse/symlink, process-kill
-and assistive-technology verification are still release gates; see
+Native macOS vault failure, locked-vault, symlink, process-kill and
+assistive-technology verification are still active release gates. Windows vault
+and reparse-point verification are deferred with Windows qualification; see
 `evidence/0.0.0-dev/m2-all-local-data-deletion.md`.
 
 The file publisher uses a held-directory capability, mode 0600 on Unix where

@@ -9,7 +9,8 @@ ORT is a tool, not an employment service, employer product, job board, or automa
 ## Intended audience and initial platforms
 
 - Individual job seekers.
-- Windows and macOS desktop computers.
+- macOS Apple Silicon desktop computers are the active development and preview-qualification target.
+- Windows and Intel Mac remain intended later platform expansions; current builds and CI results do not constitute support or qualification for them.
 - Chrome and Microsoft Edge companion extensions.
 - English initial interface and document tooling.
 - Public source code and releases distributed through GitHub and supported stores.
@@ -79,6 +80,7 @@ The software may be used internationally, but documentation must not imply that 
 - Employer/recruiter features, applicant ranking, or hiring decisions.
 - Universal ATS scoring or employment predictions.
 - Firefox, Safari, Linux, or mobile support at initial launch.
+- Windows and Intel-Mac release qualification during the current macOS-arm64 M0-M2 phase.
 - OCR for scanned resumes, local-model bundles, job-board notifications, reminders, calendars, or direct job-board integrations at initial launch.
 
 ## Canonical terms

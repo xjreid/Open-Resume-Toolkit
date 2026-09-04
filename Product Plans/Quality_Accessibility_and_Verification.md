@@ -43,14 +43,18 @@ Required coverage includes:
 
 ## Supported compatibility matrix
 
-Exact minimum versions are chosen during implementation and recorded centrally. Before release, test:
+The active M0-M2 qualification matrix is macOS Apple Silicon only. Exact minimum macOS versions are chosen before distribution and recorded centrally. During the current phase, test:
 
-- Supported Windows versions and architectures
-- Supported macOS versions and Apple/Intel architecture choices
+- The developer-controlled macOS-arm64 version plus any additional macOS-arm64 versions explicitly added to the matrix
 - Current stable Chrome and Edge plus a documented compatibility window
-- Store and direct distribution variants
+- Development and unsigned preview identities; Developer ID/notarized distribution remains a release gate
 - Fresh install, upgrade, repair, uninstall, extension-first installation, and desktop-first installation
 - Multiple browser profiles and distinct Chrome/Edge extension identifiers
+
+Windows and Intel-Mac matrices are retained as later qualification work. Shared
+CI compilation and deterministic tests on them may detect portability regressions,
+but they do not replace native vault, sandbox, installer, WebView, accessibility,
+filesystem, lifecycle, and clean-machine testing.
 
 ## Critical end-to-end journeys
 
@@ -69,7 +73,10 @@ Exact minimum versions are chosen during implementation and recorded centrally. 
 13. Enable weekly/monthly/yearly/all-time direct spending caps and prove warnings, atomic reservation, boundary reset, fail-closed unknown pricing/usage, crash recovery, credential replacement, and the separation between clearing activity and resetting a cap.
 14. Connect and sign out of Codex through browser and device-code paths; discover tested account models; verify isolated no-tool execution, ORT thread tokens where available, account-wide daily/lifetime tokens, exact quota windows, delayed/rounded updates, quota thresholds, bucket changes, and missing telemetry labels.
 15. Switch between Direct API, Codex subscription, and No AI without leaking credentials, changing an active operation, or silently falling back.
-16. Update through a SignPath-signed GitHub channel and, when used, the fallback Microsoft Store channel without mixing channels or losing data/native messaging; verify that unsigned macOS previews remain clearly labeled and do not enable an unauthenticated automatic updater.
+16. Verify that unsigned macOS previews remain clearly labeled and do not enable
+    an unauthenticated automatic updater; later test Developer ID-signed macOS
+    updates without losing data/native messaging. SignPath and Microsoft Store
+    journeys are deferred with Windows qualification.
 
 ## Security and privacy verification
 
@@ -106,7 +113,7 @@ Provider presets are versioned. A provider/model change requires re-evaluation a
 
 A stable release requires:
 
-- All critical journeys pass on the supported matrix.
+- All critical journeys pass on the active macOS-arm64 matrix. Each later platform must pass the full applicable matrix before it is described as supported.
 - Local migrations and backup restoration pass from every supported prior version.
 - Export clipping, link, selectable-text, and font tests pass on representative documents.
 - Store/direct installers register, repair, update, and remove native messaging as documented.
@@ -118,7 +125,7 @@ A stable release requires:
 - Required Qualification Alerts are generated within the existing tailoring call, contain only validated explicit requirement/evidence references, use no fit score or eligibility claim, remain non-blocking and dismissible, and are removed with the workspace rather than retained in the tracker.
 - Direct spending caps cannot be bypassed by retry, concurrency, crash, activity deletion, clock change, or missing data; Codex caps block future operations based on freshly reported stable quota buckets and clearly disclose best-effort limits.
 - Hostile PDF/DOCX inputs cannot escape the disposable parser worker, reach secrets/user files/network, spawn surviving children, or mutate canonical data; No-AI import preserves every extracted block for review.
-- Vault tests demonstrate the documented Windows same-user boundary and macOS desktop/native-host access controls without plaintext fallback or cross-secret access.
+- Vault tests demonstrate macOS desktop/native-host access controls, cross-account denial, and identity continuity without plaintext fallback or cross-secret access. The documented Windows same-user boundary is a later Windows qualification gate.
 - Known limitations and deferred features are documented.
 
 ## Evidence

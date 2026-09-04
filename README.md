@@ -9,7 +9,10 @@ local resume editor with draft/publish lifecycle, guarded quit, text/DOCX export
 local PDF preview/export and render history, encrypted backup validation/restore,
 storage management, and crash-resumable deletion of all currently implemented
 local profile data. Production PDF/DOCX import remains disabled pending its
-cross-platform containment proof. AI, browser messaging, updates, final document
+native macOS containment proof. M0-M2 development and qualification currently
+target macOS Apple Silicon only; Windows and Intel Mac are deferred platform
+expansions, although their shared CI builds remain portability signals. AI,
+browser messaging, updates, final document
 templates, and release hardening are not yet implemented.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) to configure a development machine and run the shell.

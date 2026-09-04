@@ -90,9 +90,10 @@ export shape are covered. See ADR 0010 and
 `../../evidence/0.0.0-dev/m2-docx-worker-parser.md`.
 
 This parser is not containment evidence. The executable continues to exit 78,
-and no application crate depends on the worker. Native adapters, resource and
-lifecycle qualification, real/fuzz corpora and both-platform packaged tests must
-pass before it can be invoked.
+and no application crate depends on the worker. The macOS native adapter,
+resource and lifecycle qualification, real/fuzz corpora, and packaged
+macOS-arm64 tests must pass before it can be invoked in the active target.
+Windows and Intel-Mac invocation remains deferred and disabled.
 
 ## Implemented pinned PDFium text adapter, still unreachable
 
@@ -114,8 +115,8 @@ native synthetic smoke pass. See ADR 0011 and
 `../../evidence/0.0.0-dev/m2-pdf-worker-parser.md`.
 
 This parser is also not containment evidence. Packaging, attestation/license
-verification, native invocation and macOS x64/Windows native parser runs remain
-gated; the executable still exits 78.
+verification, and macOS-arm64 native invocation remain gated; the executable
+still exits 78. macOS x64 and Windows native parser runs are deferred.
 
 ## Implemented common production supervision coordinator
 
@@ -149,7 +150,7 @@ therefore no product call site can launch a parser. See ADR 0007 and
 
 ## Platform candidates and unresolved proof
 
-### Windows
+### Windows (deferred platform expansion)
 
 Investigate a capability-free AppContainer, explicit handle allowlist, child
 process restriction, and a Job Object. Microsoft documents AppContainer as a
@@ -164,7 +165,8 @@ policy and all limits before any parser code executes. Do not inherit parent
 environment secrets, arbitrary handles, profile roots, or shell command lines.
 Use an absolute verified bundled executable, never a PATH search. The public
 creation attributes support capability, handle-list, child-process and job-list
-configuration; verify compatibility on our supported Windows versions.
+configuration; verify compatibility across the selected Windows matrix when
+Windows qualification resumes.
 [Process creation attributes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute)
 
 Use job-wide termination, kill-on-close, active-process limit one, memory and
@@ -178,7 +180,7 @@ Unresolved: exact handle-count enforcement, mandatory ACL/private staging
 behavior, parent-death cleanup, and denied broker/credential/IPC paths. An
 unsupported security primitive must disable imports, not silently weaken limits.
 
-### macOS
+### macOS Apple Silicon (active qualification target)
 
 Investigate a separately signed embedded XPC service with its own minimal App
 Sandbox entitlements and descriptor-only input transfer. Apple documents XPC
@@ -347,13 +349,13 @@ effective policy, allow/deny outcomes, and supervisor cleanup outcome:
 
 The Rust transport tests remain deterministic event simulations. The separate
 macOS probes add the native subsets above, including direct-child kill/reap.
-Forced process-tree termination,
-parent-death handling, memory/CPU/thread/Mach-port ceilings, credentials/brokers, broader filesystem
-and network denial, hostile-code cleanup, release signing and supported OS/CPU
-matrices remain unproven. Windows has no native containment evidence yet.
-Windows private worker staging, native macOS/Windows pipe and containment adapters,
-PDFium parsing, production DOCX invocation and the import-review UI remain
-unimplemented. The common
+Forced process-tree termination, parent-death handling,
+memory/CPU/thread/Mach-port ceilings, credentials/brokers, broader filesystem
+and network denial, hostile-code cleanup, development-identity and preview
+signing, and the macOS-arm64 OS-version matrix remain unproven. The native macOS
+pipe/containment adapter, production PDFium/DOCX invocation and the import-review
+UI remain unimplemented. Windows private worker staging and native containment
+are explicitly deferred and remain disabled. The common
 coordinator and its adapter contract are implemented, but cannot supply or
 validate the missing OS proof by themselves.
 
