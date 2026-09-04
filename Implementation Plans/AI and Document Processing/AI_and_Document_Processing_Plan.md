@@ -217,6 +217,24 @@ Supported initial file inputs: text-based PDF and DOCX. Plain text remains an ex
 
 PDF extraction uses a pinned, hash-verified PDFium build behind a replaceable worker adapter after license/security review. DOCX reads the OPC/Open XML package with a constrained zip/XML parser in the same worker boundary. A parser crash or exploit attempt can fail the import but must not gain the desktop process's user-data or secret authority. Import correctness must not depend on Microsoft Word being installed.
 
+### Disabled parser implementation checkpoint (2026-09-04)
+
+The inert worker library now contains both constrained adapters. DOCX performs
+bounded ZIP/XML extraction. PDF uses `pdfium-render` 0.9.3 with only the
+`pdfium_7881` API and a non-V8/non-XFA PDFium 151.0.7881.0 dynamic library.
+macOS ARM64/x64 and Windows ARM64/x64 archive and extracted-library sizes and
+SHA-256 values are fixed in `crates/ort-document-worker/pdfium-manifest.json`;
+runtime has no system-library fallback. PDF limits are 10 pages, 20,000
+top-level objects per page and the existing 50,000-character extraction cap.
+Pages containing images/forms with fewer than 16 non-whitespace characters are
+rejected as image-dominant; fully unreadable documents remain OCR-unavailable.
+
+Synthetic/adversarial parser tests and a pinned macOS ARM64 native synthetic PDF
+smoke pass. The executable still exits 78 and `IMPORT_ENABLED` remains false.
+Packaging/attestation, native macOS x64 and Windows runs, real/fuzz corpora,
+production XPC/AppContainer adapters, pipe ownership, full resource/lifecycle
+proof and review UI remain gates; this checkpoint is not containment evidence.
+
 ### No-AI import core checkpoint (2026-09-02)
 
 The import core is implemented in `ort-documents::import` and
@@ -286,14 +304,18 @@ exhaustion/recovery and limit-raise denial. Broker launch and other resource
 ceilings remain unproven. A separate trusted XPC supervisor/inherited-child probe
 adds native direct-child kill/reap and bounded-pipe tests for cancellation, timeout,
 floods and bad/incomplete completion. Supervisor death, broker descendants and the
-child's full authority boundary remain unproven. No parser,
-production sandbox adapter or UI was enabled; the gates below remain in force:
+child's full authority boundary remain unproven. Those probes enabled no parser,
+production sandbox adapter or UI. A later constrained DOCX parser remains
+unreachable in the inert worker; the gates below remain in force:
 
 1. Prove supported native worker containment and supervision on macOS/Windows
    without credentials or real documents; do not replace it with a protocol-only
    check or an uncontained parser subprocess.
-2. Add the native input capability, private staging, pinned parser adapters,
-   and bounded pipe reader. It must stop/kill the worker on size overflow before
+2. Complete Windows private staging, then add the pinned PDF parser adapter and
+   bounded native pipe readers. Native input, envelope preflight, Unix
+   operation-owned staging, single-handle transfer, parser-output construction
+   and a constrained DOCX worker parser are implemented but remain disconnected
+   and disabled. Native readers must stop/kill the worker on size overflow before
    collecting an unbounded result; `decode` is a second boundary, not the pipe
    reader. Data validation does not prove a worker's page/format claims.
 3. Bind extraction to an app-owned review session/window and saved revision;

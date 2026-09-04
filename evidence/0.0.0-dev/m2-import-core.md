@@ -70,12 +70,15 @@ of collection policy below, but there is still no native pipe driver/supervisor.
 ## Remaining gates and limitations
 
 - PDF/DOCX import is still unavailable in the desktop app. Native file picking,
-  private staging, supported sandbox primitives, resource-limited process
-  supervision, pinned PDFium and constrained DOCX adapters, and real hostile
-  document fixtures remain prerequisites. A bounded decoder is not a sandbox.
-- The future pipe reader must enforce its byte ceiling before buffer growth;
-  there is no pipe reader/worker supervisor in this checkpoint. PDF text-density
-  or partially scanned detection and reliable DOCX pagination are not implemented.
+  cross-platform private staging, supported sandbox primitives, resource-limited
+  process supervision, packaged PDFium, production parser invocation, and real
+  hostile document fixtures remain prerequisites. Constrained DOCX and pinned
+  PDFium text adapters now exist only behind the inert worker. A bounded decoder
+  or parser is not a sandbox.
+- Native pipe drivers must enforce the transport ceiling before buffer growth;
+  only the common supervision policy exists. PDF image-dominant detection now
+  uses a documented conservative threshold; real corpus validation remains open.
+  Reliable DOCX pagination is not implemented.
 - Mapping does not yet infer/split employment or education entries, date ranges,
   skill items, or link destinations. Ambiguous multi-line contact blocks stay
   literal. Unlabeled names are not guessed. This is not a complete importer or a

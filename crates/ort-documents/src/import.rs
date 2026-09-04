@@ -2,7 +2,7 @@
 //! No binary file, path, worker launch, network, or database authority lives here.
 
 use ort_domain::DocumentLimits;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub const EXTRACTION_VERSION: u16 = 1;
 pub const MAPPING_VERSION: u16 = 1;
@@ -12,14 +12,14 @@ pub const MAX_BLOCK_CHARACTERS: usize = 30_000;
 pub const MAX_BLOCKS: usize = 1_000;
 pub const MAX_PAGES: u16 = 10;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InputFormat {
     Pdf,
     Docx,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockKind {
     Heading,
@@ -36,7 +36,7 @@ struct ExtractionWire {
     blocks: Vec<ExtractedBlock>,
 }
 
-#[derive(Clone, PartialEq, Eq, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExtractedBlock {
     pub page: u16,

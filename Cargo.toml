@@ -28,6 +28,7 @@ repository = "https://github.com/xjreid/Open-Resume-Toolkit"
 cap-std = "=4.0.3"
 cap-primitives = "=4.0.3"
 crc32fast = "=1.5.1"
+flate2 = "=1.1.10"
 argon2 = { version = "=0.6.0", default-features = false, features = ["alloc", "zeroize"] }
 chacha20poly1305 = { version = "=0.11.0", default-features = false, features = ["alloc", "zeroize"] }
 getrandom = "=0.4.3"
@@ -38,6 +39,8 @@ rusqlite = { version = "=0.40.2", default-features = false, features = ["backup"
 schemars = { version = "1.0.4", features = ["uuid1"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
+quick-xml = "=0.41.0"
+pdfium-render = { version = "=0.9.3", default-features = false, features = ["pdfium_7881"] }
 sha2 = "=0.11.0"
 tauri = { version = "2.11.5", default-features = false, features = ["wry"] }
 tauri-build = { version = "2.6.3", features = [] }

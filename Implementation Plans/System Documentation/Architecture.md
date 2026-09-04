@@ -185,6 +185,17 @@ An optional overlay-initiated capture path is gated behind narrowly scoped optio
 5. No-AI mode proceeds directly to complete user review with no network. Direct/Codex mode may offer a separately confirmed AI mapping of the extracted text.
 6. Only explicitly accepted proposals create a normal draft revision; cleanup follows settlement.
 
+The disabled M2 preparation boundary now composes the first step through Unix
+private staging: the same parent-owned snapshot is envelope-validated, written
+under a capability-held random operation directory, and transferred once as a
+read-only handle. The future execution function orders native launch, common
+supervision, adapter destruction and exact stage cleanup, with cleanup failure
+overriding extraction. Constrained DOCX and pinned PDFium text adapters now exist
+only in the inert worker crate and emit the bounded extraction record. The PDF
+adapter verifies a target-specific packaged-library size and digest and has no
+system fallback. Windows staging, native adapters, PDFium packaging and UI remain
+unavailable, so this does not advance the public pipeline past step 1.
+
 ### Codex operation
 
 The logical lifecycle is the same, but the adapter speaks the app-server protocol and records Codex-reported token/quota provenance rather than estimating provider billing. Any tool request, unsupported method, or attempted filesystem/command capability is a containment failure and aborts the operation.

@@ -123,11 +123,14 @@ superseded-renderer binary replay remain later M2 gates.
   persistence with portable-backup compatibility.
 - **[HIGH]** **Import foundations:** bounded extraction decoding, conservative
   No-AI mapping/review logic, revision-safe storage integration, parent-side
-  no-follow/bounded source snapshots and PDF/DOCX envelope preflight, transport
-  policy, a fail-closed cross-platform production supervision
-  coordinator/adapter contract, and partial macOS containment/lifecycle probes.
-  Private staging, native macOS/Windows adapters, production parsing and import UI
-  remain disabled.
+  no-follow/bounded source snapshots, PDF/DOCX envelope preflight, Unix private
+  operation staging, bounded parser-output construction, transport policy, and a
+  fail-closed cross-platform production supervision
+  coordinator/adapter contract, constrained disabled DOCX and pinned PDFium
+  text parsers, and
+  partial macOS containment/lifecycle probes. Windows private staging, native
+  macOS/Windows adapters, PDFium packaging, production parser invocation and
+  import UI remain disabled.
 - **[HIGH]** **Backup and recovery:** encrypted portable export, authenticated
   read-only validation, confirmed restart-staged replacement,
   retained safety-copy status/rollback, exact confirmed safety-copy cleanup, and
@@ -173,6 +176,7 @@ superseded-renderer binary replay remain later M2 gates.
   [text export](../../evidence/0.0.0-dev/m2-text-export-smoke.md).
 - Import security: [import core](../../evidence/0.0.0-dev/m2-import-core.md),
   [source envelope](../../evidence/0.0.0-dev/m2-import-source-envelope.md),
+  [private staging](../../evidence/0.0.0-dev/m2-import-private-staging.md),
   [transport](../../evidence/0.0.0-dev/m2-import-transport.md),
   [production supervision core](../../evidence/0.0.0-dev/m2-parser-supervision-core.md),
   [sandbox probe](../../evidence/0.0.0-dev/m2-native-sandbox-probe.md),

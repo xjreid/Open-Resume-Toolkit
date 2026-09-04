@@ -14,7 +14,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-quick-xml = "=0.41.0"
+quick-xml.workspace = true
 
 [lints]
 workspace = true

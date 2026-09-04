@@ -165,6 +165,13 @@ Prefix/wildcard query features are constrained and parameterized. Returned snipp
 - Resume and cover-letter drag-out copies live only under a random private session directory with recorded owner/workspace/artifact IDs. Finish/discard removes them after commit; startup cleanup removes abandoned owned directories after containment checks.
 - User exports and intentionally retained tracker snapshots are not treated as cache.
 
+The disabled M2 Unix staging subset now implements the fixed `imports` root,
+UUIDv7 operation directories, `0700`/`0600` modes, one transferred read-only
+source handle, exact two-file cleanup and a bounded 24-hour scavenger. The
+scavenger preserves unknown, fresh, symlinked, malformed or additional entries.
+Windows private ACL/reparse enforcement, the desktop startup call site and
+all-local-data deletion integration remain gated before product use.
+
 ## Backup container v1
 
 Extension: `.ort-backup`.

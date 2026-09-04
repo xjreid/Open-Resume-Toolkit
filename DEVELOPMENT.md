@@ -366,9 +366,10 @@ boundary, and their bytes are not included in this active-profile total. See
 
 The deterministic mapper and in-memory review engine now have synthetic tests,
 including an encrypted database commit/restart test. They do not enable a new
-button or file import in the app yet. No PDF/DOCX parser is running: the worker
-remains disabled until native containment is proven. No standalone `.txt`
-importer or AI transmission was added.
+button or file import in the app yet. A constrained DOCX parser is linked only
+into the worker library. A pinned PDFium text adapter is now also linked only
+there, while the worker executable remains inert until native containment is
+proven. No standalone `.txt` importer or AI transmission was added.
 
 Run this checkpoint without starting the desktop or accessing an OS vault:
 
@@ -401,12 +402,41 @@ no-follow, 10 MiB PDF/DOCX snapshot plus signature/container preflight over the
 same bytes. DOCX metadata inspection does not decompress or parse XML and rejects
 unsafe/duplicate paths, encryption, known active parts, ZIP64/multidisk packages
 and declared expansion over 100:1. The real synthetic DOCX output corpus and
-adversarial malformed envelopes are covered. It still does not implement private
-worker staging, native pipes, OS containment or a content parser.
+adversarial malformed envelopes are covered. At that checkpoint it did not yet
+implement private worker staging, native pipes, OS containment or a content parser.
 See `evidence/0.0.0-dev/m2-import-transport.md` and
 `evidence/0.0.0-dev/m2-parser-supervision-core.md`,
 `evidence/0.0.0-dev/m2-import-source-envelope.md`, plus
 `Implementation Plans/System Documentation/Document_Worker_Containment.md`.
+
+The next private-staging subset adds Unix `0700` operation directories, a `0600`
+fixed source, one transferred read-only handle, exact cleanup and a conservative
+24-hour/128-entry startup scavenger. The application binds preflight and staging
+to the same owned bytes and defines future launch/supervision/cleanup ordering;
+the public path still cleans and returns disabled before any launcher call. A
+parser-side builder now enforces the extraction protocol limits before encoding.
+Windows staging deliberately fails closed pending ACL/reparse implementation.
+See `evidence/0.0.0-dev/m2-import-private-staging.md` and ADR 0009.
+
+The next disabled worker-parser checkpoint adds bounded ZIP32 store/deflate and
+streaming WordprocessingML extraction in `ort-document-worker`. It independently
+checks package identity, CRC/local metadata, content types, root/document
+relationships, XML complexity, active content and extraction limits. It parses
+the shipping fixed DOCX export in a round-trip integration test, reports one
+logical page without claiming DOCX layout fidelity, and returns the existing OCR-
+unavailable result for image-only/empty content. The executable still exits 78;
+see `evidence/0.0.0-dev/m2-docx-worker-parser.md` and ADR 0010.
+
+The following disabled PDF checkpoint pins `pdfium-render` 0.9.3 to the
+`pdfium_7881` API and records exact non-V8/non-XFA PDFium 151.0.7881.0 archive
+and extracted-library identities for macOS ARM64/x64 and Windows ARM64/x64.
+The adapter loads only an absolute target-matching library whose size and hash
+match, with no system fallback. It parses only bounded in-memory input, caps
+pages, top-level objects and text, maps literal lines conservatively, and rejects
+image-only or partially scanned content without OCR. Pure adversarial tests and
+an opt-in pinned macOS ARM64 native smoke pass. The binary is not packaged and
+the worker remains inert; see `evidence/0.0.0-dev/m2-pdf-worker-parser.md` and
+ADR 0011.
 
 The next checkpoint adds a separate synthetic macOS App Sandbox/XPC test:
 

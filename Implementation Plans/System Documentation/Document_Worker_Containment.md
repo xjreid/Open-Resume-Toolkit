@@ -1,7 +1,8 @@
 # Document worker containment implementation gate
 
-Status: source-envelope preflight, transport policy, common production supervision
-coordinator, and macOS sandbox/hard-limit and lifecycle probes, 2026-09-04.
+Status: source-envelope preflight, Unix private staging, transport policy, common
+production supervision coordinator, and macOS sandbox/hard-limit and lifecycle
+probes, 2026-09-04.
 **Not a production native
 sandbox or permission to enable import.** The parser worker still exits 78.
 This refines M2; it does not introduce an additional milestone.
@@ -42,10 +43,79 @@ parts and declared expansion beyond 100:1. PDF inspection is limited to supporte
 header versions and terminal EOF. See ADR 0008 and
 `../../evidence/0.0.0-dev/m2-import-source-envelope.md`.
 
-This is deliberately not a content parser or private staging implementation.
-Structurally valid input remains hostile. The user path is not reread after the
-snapshot, but the future native adapter must still create and clean a private
-read-only staged handle and prove its OS permissions before parser integration.
+The source-envelope layer is deliberately not a content parser. Structurally
+valid input remains hostile. The user path is not reread after the snapshot;
+the staging subset below owns the Unix read-only handle, while Windows must still
+implement and prove equivalent private ACL/reparse behavior before integration.
+
+## Implemented private staging subset
+
+`ort-platform::ImportStagingRoot` now creates operation-owned UUIDv7 stages under
+the fixed application-data `imports` root. Unix stages require `0700`
+directories, two exact fixed regular files, a bounded ownership marker, a `0600`
+source and one transferred read-only handle. Explicit cleanup removes only that
+inventory. A 128-entry startup scavenger removes only exact stages older than 24
+hours and preserves unknown, fresh, symlinked, malformed or additional content.
+
+`ort-application::document_import` binds envelope inspection to staging of the
+same bytes and defines the future launch → supervision → adapter destruction →
+exact stage cleanup ordering. Cleanup failure withholds output. The public path
+still checks `IMPORT_ENABLED=false` and cleans without invoking a launcher.
+`ort-documents::worker_output` symmetrically bounds parser-produced pages,
+blocks, characters, controls and JSON before the parent decoder sees it. See ADR
+0009 and `../../evidence/0.0.0-dev/m2-import-private-staging.md`.
+
+Windows staging remains unavailable until its private ACL/reparse implementation
+and native evidence exist. No desktop call site creates stages. Constrained DOCX
+and pinned PDFium text parsers are now isolated in the worker crate, but remain
+unreachable from the inert executable. PDFium packaging remains absent.
+
+## Implemented constrained DOCX parser, still unreachable
+
+`ort-document-worker::extract_docx` accepts only an already-open reader and
+returns extraction wire v1. It independently rechecks the bounded DOCX envelope,
+ZIP local/central metadata, CRC/data descriptors, the non-macro main content
+type and fixed root document relationship. It inflates only fixed metadata,
+document and optional relationship parts. Streaming XML limits depth, events,
+relationships, blocks and characters; active elements/relationship types,
+DTD/PI/CDATA, unknown entities, unsafe targets and external non-hyperlink
+relationships fail closed. Targets are never resolved or fetched.
+
+The parser preserves source-order paragraphs, built-in headings, list hints,
+Unicode, breaks and tabs while ignoring deleted text. It deliberately reports
+one logical DOCX page because layout pagination is not trustworthy here. Empty
+or image-only input returns the existing OCR-unavailable result. Stored and
+deflated synthetic packages, adversarial structures and the shipping DOCX
+export shape are covered. See ADR 0010 and
+`../../evidence/0.0.0-dev/m2-docx-worker-parser.md`.
+
+This parser is not containment evidence. The executable continues to exit 78,
+and no application crate depends on the worker. Native adapters, resource and
+lifecycle qualification, real/fuzz corpora and both-platform packaged tests must
+pass before it can be invoked.
+
+## Implemented pinned PDFium text adapter, still unreachable
+
+`ort-document-worker::extract_pdf` independently rechecks the bounded PDF
+envelope and parses only in-memory bytes through `pdfium-render` 0.9.3's explicit
+`pdfium_7881` API. It accepts no password and does not render, execute script,
+traverse attachments/forms, fetch a URI or perform OCR. The target library must
+match the exact filename, size and extracted-library SHA-256 recorded for the
+immutable non-V8/non-XFA PDFium 151.0.7881.0 macOS ARM64/x64 or Windows ARM64/x64
+artifact; system-library fallback is forbidden.
+
+The adapter caps pages at 10, top-level page objects at 20,000 per page and
+extracted text at the shared 50,000-character limit. Literal line content is
+returned in PDF definition/page order with only line-ending normalization and
+conservative known-heading/list hints. Image-bearing pages below the documented
+16-character threshold fail as partially scanned, while completely unreadable
+input fails as OCR-unavailable. Pure/adversarial tests and one pinned macOS ARM64
+native synthetic smoke pass. See ADR 0011 and
+`../../evidence/0.0.0-dev/m2-pdf-worker-parser.md`.
+
+This parser is also not containment evidence. Packaging, attestation/license
+verification, native invocation and macOS x64/Windows native parser runs remain
+gated; the executable still exits 78.
 
 ## Implemented common production supervision coordinator
 
@@ -250,8 +320,9 @@ network, broker and IPC boundary. Those gates remain mandatory before integratio
 
 ## Remaining executable proof
 
-Build synthetic probe helpers, not PDF/DOCX parsers. Use only temporary seeded
-files and disposable test credentials; never probe a real browser profile,
+Keep native containment probes synthetic and do not link the production parser
+into them. Use only temporary seeded files and disposable test credentials;
+never probe a real browser profile,
 user document, development database or personal credential. Start with one
 platform adapter, keep the other explicitly unsupported, and enable no importer
 until both advertised platforms meet the gate.
@@ -280,8 +351,9 @@ Forced process-tree termination,
 parent-death handling, memory/CPU/thread/Mach-port ceilings, credentials/brokers, broader filesystem
 and network denial, hostile-code cleanup, release signing and supported OS/CPU
 matrices remain unproven. Windows has no native containment evidence yet.
-Private worker input staging, native macOS/Windows pipe and containment adapters,
-PDFium/DOCX parsers and the import-review UI remain unimplemented. The common
+Windows private worker staging, native macOS/Windows pipe and containment adapters,
+PDFium parsing, production DOCX invocation and the import-review UI remain
+unimplemented. The common
 coordinator and its adapter contract are implemented, but cannot supply or
 validate the missing OS proof by themselves.
 

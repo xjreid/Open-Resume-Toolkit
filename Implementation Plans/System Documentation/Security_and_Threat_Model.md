@@ -121,9 +121,26 @@ If supported public OS mechanisms cannot enforce these properties without admini
   unsafe/duplicate names, encryption, known active parts, missing minimum OPC
   parts and declared expansion over 100:1. This does not make content trusted or
   replace worker-side parser limits; private staging and native adapters remain gated.
+- The subsequent Unix staging subset uses a fixed private application-data root,
+  random operation directories, `0700`/`0600` modes, two fixed entries, a bounded
+  ownership marker and one transferred read-only handle. Exact cleanup and a
+  bounded age-based scavenger never recurse or remove unknown/tampered entries.
+  The application binds preflight and staging to the same bytes; cleanup failure
+  withholds extraction. Windows private ACL/reparse enforcement remains unavailable.
 - PDF/DOCX parsing runs in a new disposable worker process for each import. The OS sandbox denies network, subprocess creation, vault/keychain/credential-manager access, database/application-data access, browser/native IPC, and reads outside the already-open staged input. The worker can write only to a randomized private result directory and returns a bounded versioned extraction message over an inherited pipe.
 - The parent opens and validates the staged file before worker launch, passes a handle rather than trusting a worker-supplied path where supported, revalidates all returned data, and kills the entire worker process tree after success, timeout, crash, protocol violation, or cancellation. Worker exit cannot commit or mutate canonical data.
 - PDF/DOCX parsers also enforce page, relationship, nesting, decompression, image, object, handle, memory, CPU, and wall-time limits. Fuzzing/resource limits do not substitute for the sandbox.
+- The disabled constrained DOCX worker parser now independently validates ZIP
+  metadata/CRC, fixed OPC identity, content types, relationships, XML complexity
+  and extraction bounds before emitting extraction wire v1. It never resolves a
+  relationship and remains unreachable from the inert worker executable. This
+  parser-level defense does not replace native containment or authorize import.
+- The disabled PDF worker adapter pins `pdfium-render` to API build 7881 and
+  accepts only the exact target-specific non-V8/non-XFA PDFium dynamic library
+  size and SHA-256 recorded for the immutable release. It has no system-library
+  fallback, loads bounded bytes from memory, caps pages/top-level page objects
+  and extracted text, and returns OCR-unavailable for unreadable or
+  image-dominant pages. These parser checks do not establish OS containment.
 - Native implementation candidates and the required positive-control/access-denial
   test matrix are in `Document_Worker_Containment.md`. The implemented bounded
   transport policy has only synthetic-event evidence; it cannot enforce OS
@@ -141,8 +158,8 @@ If supported public OS mechanisms cannot enforce these properties without admini
   and rejects output before successful OS exit. It does not prove supervisor-death
   cleanup, inherited-child credential/broker isolation, memory/CPU/thread/Mach-port
   ceilings or full process-tree cleanup. Bounded source acquisition/envelope
-  preflight is implemented, but private worker staging, production native adapters
-  and real pipe drivers are still absent. Windows containment
+  preflight and Unix private staging are implemented, but Windows staging,
+  production native adapters and real pipe drivers are still absent. Windows containment
   is unproven. Import stays disabled; probe completion is not full containment.
 - External DOCX relationships, macros, embedded packages, scripts, and active content are never executed or fetched.
 - The M2 DOCX exporter emits six fixed OPC parts from an exact saved revision.

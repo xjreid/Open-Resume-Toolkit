@@ -9,12 +9,13 @@ repository.workspace = true
 [dependencies]
 ort-domain = { path = "../ort-domain" }
 ort-documents = { path = "../ort-documents" }
+ort-platform = { path = "../ort-platform" }
 thiserror.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 ort-backup = { path = "../ort-backup" }
 ort-render = { path = "../ort-render" }
-ort-platform = { path = "../ort-platform" }
 serde_json.workspace = true
 ort-storage = { path = "../ort-storage" }
 ort-vault = { path = "../ort-vault", features = ["test-support"] }

@@ -7,6 +7,7 @@ pub mod import;
 pub mod import_source;
 pub mod import_transport;
 mod opc;
+pub mod worker_output;
 pub mod worker_supervisor;
 
 pub use docx::{
