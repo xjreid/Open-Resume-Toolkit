@@ -130,7 +130,9 @@ Archived-source and superseded-renderer binary replay remains a later M2 gate.
 - **[HIGH]** **Storage and restart safety:** no-clobber native file boundaries,
   encrypted restart tests, and Windows SQLCipher logging mitigation.
 - **Reliability:** generated contracts, deterministic output/golden tests, and
-  passing full local checks for the latest checkpoint.
+  passing full local checks for the latest checkpoint. The production dependency
+  audit now uses bounded retries for npm advisory-endpoint timeouts while still
+  failing on advisories or persistent endpoint unavailability.
 - **Output-only golden corpus:** one shared eight-case synthetic source set now
   pins DOCX, PDF and plain-text bytes and verifies exact cross-format text,
   semantic ordering, omitted optional data, safe HTTP/HTTPS/mailto links,

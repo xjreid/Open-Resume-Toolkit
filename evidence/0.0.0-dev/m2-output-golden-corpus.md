@@ -78,4 +78,17 @@ node tools/verify-pdf-fixtures.mjs target/pdf-review-fixtures
 python3 tools/verify-pdf-fonts.py target/pdf-review-fixtures
 ```
 
+## CI follow-up
+
+The first pushed run for commit `52fa408` reached the quality job after every
+contract, formatting, JavaScript, Rust, storage, and DOCX/text check passed. The
+job then failed because all three of pnpm's requests to npm's advisory endpoint
+timed out; the log contained no vulnerability finding. The audit step now wraps
+the unchanged high-severity production audit in three 75-second process bounds
+with short backoff. A successful audit still passes immediately, while an actual
+advisory or a persistently unavailable endpoint remains a nonzero failure. This
+prevents a single long-lived request sequence from consuming the remainder of
+the quality job without weakening the security gate. The repaired CI result is
+pending.
+
 The user handles commit and push.
