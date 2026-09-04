@@ -107,6 +107,13 @@ Contains bounded non-content troubleshooting facts needed beyond the durable AI 
 - The tracker retains structured snapshots rather than generated binaries by default.
 - A render manifest makes historical material reproducible within reasonable compatibility bounds.
 - ORT may state that a document is semantically reproducible; it must not promise byte-identical output after renderer, font, or operating-system changes unless that property is specifically implemented and tested.
+- When a retained structured snapshot references a renderer/template/font tuple
+  that is no longer installed, ORT may regenerate it with the current supported
+  tuple only when the interface and new receipt identify that substitution
+  clearly. It must never describe the result as the historical bytes. ORT does
+  not retain superseded master drafts or ship superseded executable renderer or
+  font bundles solely to provide replay; immutable published and tracker
+  snapshots are the durable historical sources.
 - Exact submitted-file archiving is deferred and would require separate storage, privacy, and user-experience approval.
 
 ## Backup, restore, and device migration

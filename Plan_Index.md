@@ -14,8 +14,13 @@ and exact crash-resumable local-profile deletion. A common fail-closed
 parser-supervision coordinator is implemented, but hostile document import remains
 disabled pending native macOS/Windows adapters and containment proof; AI, browser messaging,
 updates and release hardening remain later milestones. Quiet Navy/Open Frame is
-the approved application direction, while final document-template work remains
-incomplete under `Aesthetic/`.
+the approved application direction. M2 completion includes the complete manual
+master-editor behavior in the authoritative resume-editor plan and all three
+qualified PDF/DOCX style categories; the current plain fixtures do not satisfy
+that gate. Historical replay retains immutable structured sources and uses a
+truthfully identified current renderer when the original tuple is unavailable,
+without retaining superseded drafts or old executable renderer bundles solely
+for replay.
 
 ## Authority and precedence
 

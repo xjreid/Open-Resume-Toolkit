@@ -45,7 +45,7 @@
     "m2ImportTransportPolicy": "passed-local-nine-synthetic-event-tests-macos-arm64",
     "m2ImportProductionSupervisorCore": "passed-local-cross-platform-policy-with-adversarial-mock-adapters-macos-arm64",
     "m2ImportSourceEnvelope": "passed-local-no-follow-bounded-snapshot-and-adversarial-pdf-docx-envelope-tests-macos-arm64",
-    "m2ImportPrivateStaging": "passed-local-unix-private-operation-staging-exact-cleanup-and-disabled-launch-composition-macos-arm64-windows-pending",
+    "m2ImportPrivateStaging": "passed-local-unix-private-operation-staging-exact-cleanup-and-disabled-launch-composition-macos-arm64-linux-o-path-directory-sync-repair-passed-local-focused-tests-ci-rerun-pending-windows-pending",
     "m2ImportDocxWorkerParser": "passed-local-bounded-zip-xml-relationship-extraction-and-adversarial-tests-macos-arm64-native-invocation-pending",
     "m2ImportPdfWorkerParser": "passed-local-pinned-pdfium-7881-bounded-text-and-adversarial-tests-plus-native-synthetic-smoke-macos-arm64-other-targets-packaging-and-containment-pending",
     "m2ImportMacosNativeAdapter": "pending-xpc-app-sandbox-production-implementation-and-full-matrix",
@@ -72,11 +72,11 @@
     "m2PdfRenderHistory": "passed-local-encrypted-deduplicated-bounded-restart-contract-ui-and-full-workspace-check-macos-arm64",
     "m2PdfRenderHistoryNative": "pending-refreshed-application-after-cross-platform-ci",
     "m2CurrentRendererReplay": "passed-local-exact-current-source-full-receipt-match-and-no-substitution-macos-arm64",
-    "m2ArchivedRendererReplay": "pending-retained-source-and-superseded-renderer-bundles",
+    "m2ArchivedRendererReplay": "exact-current-bundle-retained-source-replay-passed-truthfully-labeled-current-renderer-fallback-pending-superseded-drafts-and-renderer-bundles-out-of-scope",
     "m2AllLocalDataDeletion": "passed-local-synthetic-exact-target-rekey-restart-recovery-contract-ui-macos-arm64",
     "m2AllLocalDataDeletionNative": "pending-installed-macos-and-windows-vault-filesystem-interruption-accessibility",
     "macosPreviewPackage": "296610a-arm64-app-built-installed-hash-matched-and-codesign-deep-strict-passed-dmg-not-refreshed",
-    "platformBuilds": "296610a-all-four-ci-jobs-user-reported-passed-not-independently-retrieved"
+    "platformBuilds": "7a8cda1-four-of-five-hosted-jobs-passed-ubuntu-quality-failed-o-path-directory-sync-repair-local-ci-rerun-pending"
   },
   "releaseEligible": false
 }

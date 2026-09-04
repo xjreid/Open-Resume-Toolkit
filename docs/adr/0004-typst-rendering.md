@@ -25,7 +25,10 @@ This keeps a small fixed rendering interface but adds a substantial transitive
 compiler dependency graph. The renderer is in-process, serialized, document-bound
 and has post-layout/output caps; those are not hard CPU/memory/OS isolation.
 Import remains disabled. Arbitrary templates, cover letters, images, scripts,
-packages, historical replay and release template categories are not supported.
+packages and release template categories are not supported. Current-bundle
+replay is supported for exact retained sources whose complete receipt still
+matches; truthfully labeled current-renderer regeneration for retained sources
+whose original tuple is unavailable remains an M2 gate.
 
 The plain fixture is original repository work (US Letter, 1 in margins, 11 pt
 Libertinus Serif, 18 pt name, 12/11 pt headings, English layout language). It is
@@ -34,11 +37,12 @@ over-limit layouts fail explicitly. Session receipts identify the document hash
 and schema, exact PDF hash/size/page count, engine version, template/font hashes
 and generation time. The M2 schema-v2 checkpoint now stores those content-free
 receipts in the encrypted profile, deduplicated by exact source revision and PDF
-identity with bounded retention. It does not persist PDF bytes, source content,
-paths or preview tickets, and it does not yet provide historical binary replay or
-historical binary replay. Portable backup format 1.1 now carries the same
-bounded, content-free manifests while continuing to exclude PDF bytes and source
-content.
+identity with bounded retention. It does not persist PDF bytes, paths or preview
+tickets. Retained immutable publication sources can be replayed from the active
+profile or portable backup. Superseded master drafts and executable historical
+renderer/font bundles are not retained solely for replay. Portable backup format
+1.1 carries bounded manifests and eligible retained structured sources while
+continuing to exclude PDF bytes.
 
 See [checkpoint evidence](../../evidence/0.0.0-dev/m2-pdf-preview.md) and
 [dependency/font provenance](../dependencies/pdf/README.md). Golden and native

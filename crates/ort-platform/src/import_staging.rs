@@ -13,7 +13,7 @@ use std::{
 };
 
 #[cfg(unix)]
-use cap_std::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+use cap_std::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use cap_std::{
     ambient_authority,
     fs::{Dir, DirBuilder, File, OpenOptions},
@@ -56,6 +56,11 @@ pub struct ImportCleanupReport {
 /// Held capability for the fixed private `imports` directory.
 pub struct ImportStagingRoot {
     directory: Dir,
+    // `cap_std::fs::Dir` deliberately uses an `O_PATH` descriptor on Linux.
+    // Keep a separately verified, non-following directory handle for durable
+    // `fsync` operations; calling `sync_all` on the capability descriptor
+    // fails with `EBADF` on Linux.
+    sync_directory: std::fs::File,
 }
 
 impl ImportStagingRoot {
@@ -93,7 +98,12 @@ impl ImportStagingRoot {
             .map_err(|_| ImportStageError::Unavailable)?;
         let result = self.stage_created(&directory_name, operation_id, format, &bytes);
         if result.is_err()
-            && cleanup_partial_stage(&self.directory, Path::new(&directory_name)).is_err()
+            && cleanup_partial_stage(
+                &self.directory,
+                &self.sync_directory,
+                Path::new(&directory_name),
+            )
+            .is_err()
         {
             return Err(ImportStageError::CleanupIncomplete);
         }
@@ -116,13 +126,16 @@ impl ImportStagingRoot {
         write_private_file(&stage, MARKER_NAME, marker.as_bytes())?;
         write_private_file(&stage, SOURCE_NAME, bytes)?;
         let input = open_verified_source(&stage, bytes.len())?;
-        stage
-            .into_std_file()
+        open_syncable_directory(&self.directory, Path::new(directory_name), &stage)?
             .sync_all()
             .map_err(|_| ImportStageError::Unavailable)?;
         Ok(StagedImport {
             parent: self
                 .directory
+                .try_clone()
+                .map_err(|_| ImportStageError::Unavailable)?,
+            parent_sync: self
+                .sync_directory
                 .try_clone()
                 .map_err(|_| ImportStageError::Unavailable)?,
             directory_name: directory_name.into(),
@@ -172,7 +185,7 @@ impl ImportStagingRoot {
                 report.preserved += 1;
                 continue;
             }
-            if cleanup_known_stage(&self.directory, path).is_ok() {
+            if cleanup_known_stage(&self.directory, &self.sync_directory, path).is_ok() {
                 report.removed += 1;
             } else {
                 report.preserved += 1;
@@ -186,6 +199,7 @@ impl ImportStagingRoot {
 /// code receives only the transferred read-only file handle and expected format.
 pub struct StagedImport {
     parent: Dir,
+    parent_sync: std::fs::File,
     directory_name: OsString,
     operation_id: Uuid,
     format: NativeDocumentFormat,
@@ -233,7 +247,11 @@ impl StagedImport {
     /// exact cleanup cannot be established.
     pub fn cleanup(mut self) -> Result<(), ImportStageError> {
         self.input.take();
-        cleanup_known_stage(&self.parent, Path::new(&self.directory_name))?;
+        cleanup_known_stage(
+            &self.parent,
+            &self.parent_sync,
+            Path::new(&self.directory_name),
+        )?;
         self.cleaned = true;
         Ok(())
     }
@@ -243,7 +261,12 @@ impl Drop for StagedImport {
     fn drop(&mut self) {
         self.input.take();
         if !self.cleaned
-            && cleanup_known_stage(&self.parent, Path::new(&self.directory_name)).is_ok()
+            && cleanup_known_stage(
+                &self.parent,
+                &self.parent_sync,
+                Path::new(&self.directory_name),
+            )
+            .is_ok()
         {
             self.cleaned = true;
         }
@@ -289,11 +312,51 @@ fn supported_staging_root(app_data: &Path) -> Result<ImportStagingRoot, ImportSt
         .open_dir(IMPORTS_DIRECTORY)
         .map_err(|_| ImportStageError::InvalidRoot)?;
     verify_private_directory(&directory)?;
-    Ok(ImportStagingRoot { directory })
+    let sync_directory = open_syncable_directory(&app, Path::new(IMPORTS_DIRECTORY), &directory)?;
+    Ok(ImportStagingRoot {
+        directory,
+        sync_directory,
+    })
 }
 
 #[cfg(not(unix))]
 fn supported_staging_root(_app_data: &Path) -> Result<ImportStagingRoot, ImportStageError> {
+    Err(ImportStageError::PlatformSecurityUnavailable)
+}
+
+#[cfg(unix)]
+fn open_syncable_directory(
+    parent: &Dir,
+    name: &Path,
+    expected: &Dir,
+) -> Result<std::fs::File, ImportStageError> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    options._cap_fs_ext_follow(cap_primitives::fs::FollowSymlinks::No);
+    let directory = parent
+        .open_with(name, &options)
+        .map_err(|_| ImportStageError::Unavailable)?;
+    let metadata = directory
+        .metadata()
+        .map_err(|_| ImportStageError::Unavailable)?;
+    let expected_metadata = expected
+        .dir_metadata()
+        .map_err(|_| ImportStageError::Unavailable)?;
+    if !metadata.file_type().is_dir()
+        || metadata.dev() != expected_metadata.dev()
+        || metadata.ino() != expected_metadata.ino()
+    {
+        return Err(ImportStageError::InvalidRoot);
+    }
+    Ok(directory.into_std())
+}
+
+#[cfg(not(unix))]
+fn open_syncable_directory(
+    _parent: &Dir,
+    _name: &Path,
+    _expected: &Dir,
+) -> Result<std::fs::File, ImportStageError> {
     Err(ImportStageError::PlatformSecurityUnavailable)
 }
 
@@ -410,7 +473,11 @@ fn expired(directory: &Dir, path: &Path, now: SystemTime, minimum_age: Duration)
             .is_some_and(|age| age >= minimum_age)
 }
 
-fn cleanup_known_stage(parent: &Dir, name: &Path) -> Result<(), ImportStageError> {
+fn cleanup_known_stage(
+    parent: &Dir,
+    parent_sync: &std::fs::File,
+    name: &Path,
+) -> Result<(), ImportStageError> {
     if !owned_stage_name(name) {
         return Err(ImportStageError::CleanupIncomplete);
     }
@@ -464,13 +531,16 @@ fn cleanup_known_stage(parent: &Dir, name: &Path) -> Result<(), ImportStageError
     parent
         .remove_dir(name)
         .map_err(|_| ImportStageError::CleanupIncomplete)?;
-    parent
-        .try_clone()
-        .and_then(|directory| directory.into_std_file().sync_all())
+    parent_sync
+        .sync_all()
         .map_err(|_| ImportStageError::CleanupIncomplete)
 }
 
-fn cleanup_partial_stage(parent: &Dir, name: &Path) -> Result<(), ImportStageError> {
+fn cleanup_partial_stage(
+    parent: &Dir,
+    parent_sync: &std::fs::File,
+    name: &Path,
+) -> Result<(), ImportStageError> {
     if !owned_stage_name(name) {
         return Err(ImportStageError::CleanupIncomplete);
     }
@@ -515,6 +585,9 @@ fn cleanup_partial_stage(parent: &Dir, name: &Path) -> Result<(), ImportStageErr
     drop(stage);
     parent
         .remove_dir(name)
+        .map_err(|_| ImportStageError::CleanupIncomplete)?;
+    parent_sync
+        .sync_all()
         .map_err(|_| ImportStageError::CleanupIncomplete)
 }
 

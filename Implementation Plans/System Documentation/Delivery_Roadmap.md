@@ -85,6 +85,26 @@ Exit evidence:
 
 ## M2 — complete offline resume path
 
+### Completion scope decision (2026-09-04)
+
+M2 is complete only when the whole manual master-resume path in
+`../../Product Plans/Resume_Editor_and_Schema.md` is implemented. This includes
+the build/import starting choice, optional starting profiles, navigable
+document-centered editor, focused editing, the specified entry/date/link and
+validation behavior, and all three initial selectable document style
+categories. The Technical/Engineering, Professional/Business, and
+Modern/Marketing and Sales styles require qualified PDF and DOCX output; the
+plain development fixtures do not satisfy that gate.
+
+Historical rendering follows the product retention boundary. ORT retains
+immutable structured published/tracker sources, not superseded master drafts or
+old executable renderer/font bundles solely for replay. When an original tuple
+is unavailable, M2 must regenerate the retained structured source with the
+current supported tuple and label the effective tuple truthfully. Exact-byte
+replay may be claimed only while the original tuple is installed and the full
+receipt matches. This replaces the earlier roadmap wording that required
+superseded-draft and superseded-renderer-binary replay.
+
 ### Current status
 
 As of 2026-09-04, M2 is **about 72% complete** by stage-gate weighting after
@@ -102,17 +122,20 @@ safety-copy management are committed in `96fc983`; all-local-data deletion and
 initial current-bundle replay are committed in `91e7e54`; expanded output and
 accessibility checks are committed through `9a14985`; retained-publication
 replay and dependency policy are committed in `1087aef`, for which the user
-reported all five hosted CI jobs passing. Portable archived-source replay is
-implemented locally after that commit. M2 is not release-ready. Native and
-cross-platform evidence remains pending.
+reported all five hosted CI jobs passing. Portable archived-source replay was
+committed in `bc0712f`; the supervision core, source envelope, private staging,
+and inert DOCX/PDF parser checkpoints followed through `7a8cda1`. M2 is not
+release-ready. Native and cross-platform evidence remains pending.
 The bounded **current-bundle verified render-history replay** checkpoint now
 regenerates an exact current draft or any retained immutable published revision,
 verifies the complete receipt before exposing bytes, supplies bounded accessible
 text for retained sources, and permits exact-byte export from that verified
 preview. An authenticated format-1.1 backup can now provide a bounded,
 ten-minute, read-only source session for the same verification without restoring
-or mutating the active profile. Superseded drafts absent from the backup and
-superseded-renderer binary replay remain later M2 gates.
+or mutating the active profile. Regeneration of retained structured sources with
+a truthfully identified current renderer when the historical tuple is absent
+remains an M2 gate. Superseded draft retention and old renderer-binary bundling
+are explicitly outside the approved history model.
 
 ### Completed or working locally
 
@@ -210,8 +233,9 @@ superseded-renderer binary replay remain later M2 gates.
   picker, review UI, private binary staging, parsers, and richer deterministic mapping.
 - **[HIGH]** Finish native/cross-platform vault, filesystem, quit, low-disk, and
   injected crash/failure verification.
-- Finish native/cross-platform editor, dialog, accessibility, final PDF/DOCX
-  templates, superseded-draft and superseded-renderer replay, and native reader
+- Finish the complete product-plan editor, native dialogs and accessibility,
+  all three final PDF/DOCX style categories, truthfully labeled current-renderer
+  regeneration for retained historical structured sources, and native reader
   verification.
 - **[HIGH]** Complete native macOS/Windows vault, interruption, filesystem and
   assistive-technology evidence for all-local-data deletion. Extend its exact
@@ -228,8 +252,10 @@ Deliver:
   configured backend in M3/M4;
 - **[HIGH]** disposable OS-sandboxed parser worker plus deterministic No-AI
   mapping that preserves unfamiliar content as reviewable custom/simple sections;
-- pinned Typst preview/PDF renderer and constrained DOCX/plain-text exporters;
-- accessible preview, save dialogs, atomic export, and historical renderer metadata;
+- pinned Typst preview/PDF renderer, all three qualified PDF/DOCX style
+  categories, and constrained plain-text export;
+- accessible preview, save dialogs, atomic export, historical renderer metadata,
+  and truthfully labeled current-renderer regeneration for retained sources;
 - **[HIGH]** destructive storage deletion and full portable export;
 - content-free storage usage reporting.
 

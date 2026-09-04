@@ -211,7 +211,10 @@ bundle and exposes a preview only when every receipt field matches. An older
 publication can be reviewed through bounded accessible text and exported from
 the verified expiring preview. It never substitutes a newer revision or
 different output. Superseded draft bodies are not retained, superseded renderer
-binaries are not bundled, so those cases remain inspection-only.
+binaries are not bundled, so those cases currently remain inspection-only. M2
+still requires retained structured publications to be regenerable with the
+current supported renderer under a new receipt that clearly identifies the
+effective tuple and does not claim historical bytes.
 
 Use **Replay from an encrypted portable backup** to select a format-1.1 backup
 and enter its passphrase. ORT authenticates the complete archive on a blocking

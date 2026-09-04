@@ -1,8 +1,7 @@
 # M2 private import staging and parser-output boundary
 
-Date: 2026-09-04. Base commit: `53d9402`. Implementation changes are
-uncommitted. Local verification platform: macOS arm64. All document content is
-synthetic.
+Date: 2026-09-04. Base implementation committed in `7a8cda1`. Local
+verification platform: macOS arm64. All document content is synthetic.
 
 ## Implemented production slice
 
@@ -52,6 +51,23 @@ production builds, static web/secret checks, workspace Rustfmt, strict Clippy,
 remained ignored. The inert worker regression passed with exit 78. Contract
 regeneration completed with no generated-file drift; `git diff --check` passed.
 
+## Linux CI failure and repair
+
+The Ubuntu quality job for `7a8cda1` failed four application tests while
+creating a private stage. `cap-std 4.0.3` opens capability directories with
+Linux `O_PATH`; calling `sync_all` on that descriptor returns `EBADF`, which the
+content-free boundary correctly reduced to `Staging(Unavailable)`. macOS lacks
+that descriptor behavior, so the same tests passed locally and in the macOS
+jobs.
+
+The repair keeps the capability directory for relative operations and also
+opens a no-follow, device/inode-matched read-only directory handle solely for
+durable directory synchronization. Stage creation, partial cleanup, explicit
+cleanup, Drop cleanup, and the expired-stage scavenger use that verified sync
+handle. This does not relax modes, symlink refusal, exact inventory, or cleanup
+failure semantics. The focused platform/application suites pass locally; an
+Ubuntu CI rerun remains required.
+
 ## Gates deliberately still open
 
 - Windows staging returns `PlatformSecurityUnavailable` until current-user-only
@@ -60,8 +76,9 @@ regeneration completed with no generated-file drift; `git diff --check` passed.
 - No desktop command, file-picker token, import state, review UI or startup call
   site is exposed. The all-local-data deletion inventory must include the fixed
   import root before a product call site can create persistent stages.
-- A later combined checkpoint adds constrained DOCX decompression/XML parsing,
-  but no `PDFium` binary/version/hash/license decision. The worker still exits 78.
+- Constrained DOCX and pinned PDFium parser libraries now exist behind the inert
+  worker; PDFium packaging and native cross-platform verification remain open.
+  The worker still exits 78.
 - Production macOS XPC/App Sandbox and Windows AppContainer/Job adapters,
   cancellable native pipes, hostile parser corpora, resource/death matrices,
   release signing and supported-platform verification remain mandatory.
