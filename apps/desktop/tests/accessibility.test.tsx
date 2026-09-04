@@ -11,25 +11,10 @@ import {
   createSection,
 } from "../src/shared/resume-editor";
 
-async function audit(
-  markup: string,
-  excludedSelectors: string[] = [],
-): Promise<AxeResults> {
+async function audit(markup: string): Promise<AxeResults> {
   const dom = new JSDOM(
     `<!doctype html><html lang="en"><head><title>Open Resume Toolkit</title></head><body>${markup}</body></html>`,
   );
-  for (const selector of excludedSelectors) {
-    const elements = dom.window.document.querySelectorAll(selector);
-    if (elements.length !== 1) {
-      throw new Error(
-        `Expected one explicitly excluded ${selector} surface, found ${elements.length}`,
-      );
-    }
-    for (const element of elements) {
-      element.remove();
-    }
-  }
-
   return axe.run(dom.window.document.documentElement, {
     // jsdom does not calculate layout or resolved colors. Native WebView color
     // and zoom behavior remains part of the manual macOS/Windows matrix.
@@ -48,11 +33,8 @@ function violationSummary(results: AxeResults): string {
     .join("\n\n");
 }
 
-async function expectNoViolations(
-  markup: string,
-  excludedSelectors: string[] = [],
-) {
-  const results = await audit(markup, excludedSelectors);
+async function expectNoViolations(markup: string) {
+  const results = await audit(markup);
   expect(violationSummary(results)).toBe("");
 }
 
@@ -66,11 +48,8 @@ describe("M2 reachable desktop accessibility", () => {
     );
   });
 
-  it("keeps the medium-routed main shell and overlay free of detectable violations", async () => {
-    await expectNoViolations(renderToStaticMarkup(<App surface="main" />), [
-      ".backup-panel",
-      ".storage-panel",
-    ]);
+  it("keeps the complete main shell and overlay free of detectable violations", async () => {
+    await expectNoViolations(renderToStaticMarkup(<App surface="main" />));
     await expectNoViolations(renderToStaticMarkup(<App surface="overlay" />));
   });
 

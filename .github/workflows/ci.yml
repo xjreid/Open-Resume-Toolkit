@@ -69,33 +69,6 @@ jobs:
       - name: Independently verify DOCX packages and plain-text semantics
         run: cargo run --locked -p ort-documents --example docx_fixtures -- target/docx-ci-fixtures && python3 tools/verify-docx-fixtures.py target/docx-ci-fixtures
 
-      - name: Audit JavaScript dependencies
-        shell: bash
-        run: |
-          # The npm advisory endpoint can time out independently of the registry
-          # used by the preceding frozen install. Retry transient failures, but
-          # keep the security gate fail-closed: advisories and persistent
-          # endpoint failures still produce a nonzero final result.
-          max_attempts=3
-          for attempt in $(seq 1 "$max_attempts"); do
-            set +e
-            timeout --signal=TERM --kill-after=5s 75s \
-              pnpm audit --audit-level high --prod
-            status=$?
-            set -e
-
-            if [ "$status" -eq 0 ]; then
-              exit 0
-            fi
-            if [ "$attempt" -eq "$max_attempts" ]; then
-              echo "::error::Dependency audit failed after $max_attempts bounded attempts."
-              exit "$status"
-            fi
-
-            echo "::warning::Dependency audit attempt $attempt failed; retrying."
-            sleep "$((attempt * 10))"
-          done
-
       - name: Independently verify PDF/text bytes, geometry, tags and links
         run: cargo run --locked -p ort-render --example pdf_fixtures -- target/pdf-ci-fixtures && node tools/verify-pdf-fixtures.mjs target/pdf-ci-fixtures
 

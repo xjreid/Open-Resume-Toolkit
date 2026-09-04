@@ -92,6 +92,15 @@ export function BackupPanel({
     !recovery.restartOperationPending &&
     !recovery.safetyCleanupPending &&
     deleteConfirmation === DELETE_SAFETY_CONFIRMATION_PHRASE;
+  const rollbackConfirmationInvalid =
+    rollbackConfirmation.length > 0 &&
+    rollbackConfirmation !== ROLLBACK_CONFIRMATION_PHRASE;
+  const deleteConfirmationInvalid =
+    deleteConfirmation.length > 0 &&
+    deleteConfirmation !== DELETE_SAFETY_CONFIRMATION_PHRASE;
+  const restoreConfirmationInvalid =
+    restoreConfirmation.length > 0 &&
+    restoreConfirmation !== RESTORE_CONFIRMATION_PHRASE;
 
   async function refreshRecovery() {
     const result = await requestBackupRecoveryStatus();
@@ -227,7 +236,11 @@ export function BackupPanel({
         after restart. The replaced encrypted profile remains on this device as
         a safety copy; external exports and backups are never changed.
       </p>
-      <form className="backup-form" onSubmit={(event) => void submit(event)}>
+      <form
+        className="backup-form"
+        aria-busy={operation === "export"}
+        onSubmit={(event) => void submit(event)}
+      >
         <label className="field">
           Backup passphrase
           <input
@@ -286,6 +299,7 @@ export function BackupPanel({
         </p>
         <form
           className="backup-form"
+          aria-busy={operation === "validate"}
           onSubmit={(event) => void validate(event)}
         >
           <label className="field backup-validation__passphrase">
@@ -355,6 +369,7 @@ export function BackupPanel({
         </p>
         <form
           className="backup-form"
+          aria-busy={operation === "rollback"}
           onSubmit={(event) => void rollback(event)}
         >
           <label className="field">
@@ -363,7 +378,10 @@ export function BackupPanel({
               type="text"
               value={rollbackConfirmation}
               autoComplete="off"
-              aria-describedby="rollback-guidance"
+              aria-describedby={`rollback-guidance${
+                rollbackConfirmationInvalid ? " rollback-confirmation" : ""
+              }`}
+              aria-invalid={rollbackConfirmationInvalid || undefined}
               disabled={blocked || running || !recovery?.safetyCopyAvailable}
               onChange={(event) => setRollbackConfirmation(event.target.value)}
             />
@@ -373,6 +391,11 @@ export function BackupPanel({
               ? "Preparing rollback…"
               : "Roll back after restart"}
           </button>
+          {rollbackConfirmationInvalid ? (
+            <p className="field-error" id="rollback-confirmation">
+              Enter the complete rollback phrase exactly as shown.
+            </p>
+          ) : null}
         </form>
         <p className="description" id="safety-delete-guidance">
           Deleting the safety copy is permanent and removes its exact encrypted
@@ -381,6 +404,7 @@ export function BackupPanel({
         </p>
         <form
           className="backup-form"
+          aria-busy={operation === "delete-safety"}
           onSubmit={(event) => void removeSafety(event)}
         >
           <label className="field">
@@ -389,7 +413,10 @@ export function BackupPanel({
               type="text"
               value={deleteConfirmation}
               autoComplete="off"
-              aria-describedby="safety-delete-guidance"
+              aria-describedby={`safety-delete-guidance${
+                deleteConfirmationInvalid ? " safety-delete-confirmation" : ""
+              }`}
+              aria-invalid={deleteConfirmationInvalid || undefined}
               disabled={blocked || running || !recovery?.safetyCopyAvailable}
               onChange={(event) => setDeleteConfirmation(event.target.value)}
             />
@@ -399,6 +426,11 @@ export function BackupPanel({
               ? "Deleting safety copy…"
               : "Permanently delete safety copy"}
           </button>
+          {deleteConfirmationInvalid ? (
+            <p className="field-error" id="safety-delete-confirmation">
+              Enter the complete deletion phrase exactly as shown.
+            </p>
+          ) : null}
         </form>
       </section>
 
@@ -413,7 +445,11 @@ export function BackupPanel({
           selected archive and imports it into a separately keyed encrypted
           staging profile before scheduling any replacement.
         </p>
-        <form className="backup-form" onSubmit={(event) => void restore(event)}>
+        <form
+          className="backup-form"
+          aria-busy={operation === "restore"}
+          onSubmit={(event) => void restore(event)}
+        >
           <label className="field backup-validation__passphrase">
             Backup passphrase
             <input
@@ -432,6 +468,12 @@ export function BackupPanel({
               type="text"
               value={restoreConfirmation}
               autoComplete="off"
+              aria-describedby={
+                restoreConfirmationInvalid
+                  ? "backup-restore-guidance restore-confirmation"
+                  : "backup-restore-guidance"
+              }
+              aria-invalid={restoreConfirmationInvalid || undefined}
               disabled={blocked || running || restoreStaged}
               onChange={(event) => setRestoreConfirmation(event.target.value)}
             />
@@ -443,6 +485,11 @@ export function BackupPanel({
             Merge restore is not supported. Restart promptly after staging; the
             current profile remains active until then.
           </p>
+          {restoreConfirmationInvalid ? (
+            <p className="field-error" id="restore-confirmation">
+              Enter the complete replacement phrase exactly as shown.
+            </p>
+          ) : null}
           {restoreByteCount > MAX_BACKUP_PASSPHRASE_BYTES ? (
             <p className="field-error" role="alert">
               The passphrase is over the 1,024-byte limit.

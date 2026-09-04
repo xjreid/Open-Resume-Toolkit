@@ -71,21 +71,24 @@ main window currently quits the whole development workspace; closing the overlay
 alone does not quit the editor.
 See `evidence/0.0.0-dev/m2-close-guard-smoke.md` for verified paths and limitations.
 
-The desktop test suite includes axe-core semantic checks for the initial main
-and overlay routes, the PDF preview, the quit dialog, and populated published
-content. Live component cases cover the loaded editor, required-field feedback,
-revision-conflict announcement/recovery, and quit-dialog focus restoration.
-HIGH-tagged backup/recovery and all-local-data deletion panels are excluded from
-this medium-reasoning checkpoint. Run the checks with:
+The desktop test suite includes axe-core semantic checks for the complete
+initial main and overlay routes, including PDF preview, quit, encrypted-backup,
+recovery, storage, and all-local-data deletion controls. Live component cases
+cover the loaded editor, required-field feedback, revision-conflict recovery,
+quit-dialog focus restoration, exact destructive confirmation feedback,
+announced recovery/deletion progress, and focus placement after a local-data
+deletion outcome. Run the checks with:
 
 ```sh
 pnpm --filter @ort/desktop test
 ```
 
 The harness has a failing unnamed-button positive control and disables only the
-color-contrast rule because jsdom cannot resolve native layout or colors. These
-checks do not replace keyboard, zoom, forced-color, reduced-motion, VoiceOver,
-NVDA, WKWebView, WebView2, or native-dialog testing. See
+color-contrast rule because jsdom cannot resolve native layout or colors. The
+destructive commands remain synthetic and never access a profile or vault.
+These checks do not replace keyboard, zoom, forced-color, reduced-motion,
+VoiceOver, NVDA, WKWebView, WebView2, native-dialog, interruption, or
+cross-platform testing. See
 `evidence/0.0.0-dev/m2-desktop-accessibility-automation.md`.
 
 For the M2 text-export check:

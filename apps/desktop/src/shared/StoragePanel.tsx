@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   DELETE_ALL_LOCAL_DATA_CONFIRMATION_PHRASE,
   type DeleteAllLocalDataCommandResponse,
@@ -25,6 +31,7 @@ export function StoragePanel({
   const [deleting, setDeleting] = useState(false);
   const [deletionCommitted, setDeletionCommitted] = useState(false);
   const [deletionMessage, setDeletionMessage] = useState<string | null>(null);
+  const deletionResult = useRef<HTMLParagraphElement>(null);
 
   const refresh = useCallback(async (isCurrent: () => boolean = () => true) => {
     setState({ kind: "loading" });
@@ -50,6 +57,13 @@ export function StoragePanel({
     !deleting &&
     !deletionCommitted &&
     confirmation === DELETE_ALL_LOCAL_DATA_CONFIRMATION_PHRASE;
+  const confirmationInvalid =
+    confirmation.length > 0 &&
+    confirmation !== DELETE_ALL_LOCAL_DATA_CONFIRMATION_PHRASE;
+
+  useEffect(() => {
+    if (deletionMessage) deletionResult.current?.focus();
+  }, [deletionMessage]);
 
   async function removeAllLocalData(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -161,6 +175,7 @@ export function StoragePanel({
         </p>
         <form
           className="backup-form"
+          aria-busy={deleting}
           onSubmit={(event) => void removeAllLocalData(event)}
         >
           <label className="field">
@@ -169,7 +184,10 @@ export function StoragePanel({
               type="text"
               value={confirmation}
               autoComplete="off"
-              aria-describedby="delete-all-local-data-guidance"
+              aria-describedby={`delete-all-local-data-guidance${
+                confirmationInvalid ? " delete-all-local-data-confirmation" : ""
+              }`}
+              aria-invalid={confirmationInvalid || undefined}
               disabled={!enabled || deleting || deletionCommitted}
               onChange={(event) => setConfirmation(event.target.value)}
             />
@@ -185,13 +203,22 @@ export function StoragePanel({
                 ? "Local data deletion committed"
                 : "Permanently delete all local data"}
           </button>
+          {confirmationInvalid ? (
+            <p className="field-error" id="delete-all-local-data-confirmation">
+              Enter the complete confirmation phrase exactly as shown.
+            </p>
+          ) : null}
           {deleting ? (
             <p role="status">
               Closing the encrypted profile and deleting exact local records…
             </p>
           ) : null}
           {deletionMessage ? (
-            <p role={deletionCommitted ? "status" : "alert"}>
+            <p
+              ref={deletionResult}
+              role={deletionCommitted ? "status" : "alert"}
+              tabIndex={-1}
+            >
               {deletionMessage}
             </p>
           ) : null}

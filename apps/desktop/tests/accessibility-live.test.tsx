@@ -4,7 +4,9 @@ import { act, useState } from "react";
 import type { Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/shared/App";
+import { BackupPanel } from "../src/shared/BackupPanel";
 import { CloseDialog } from "../src/shared/CloseDialog";
+import { StoragePanel } from "../src/shared/StoragePanel";
 import { createResumeDocument } from "../src/shared/resume-editor";
 
 const native = vi.hoisted(() => ({
@@ -108,17 +110,10 @@ async function render(element: React.ReactNode) {
   return container;
 }
 
-async function expectMediumSurfaceAccessible(container: Element) {
+async function expectSurfaceAccessible(container: Element) {
   const snapshot = new JSDOM(
     `<!doctype html><html lang="en"><head><title>Open Resume Toolkit</title></head><body>${container.innerHTML}</body></html>`,
   );
-  for (const selector of [".backup-panel", ".storage-panel"]) {
-    const elements = snapshot.window.document.querySelectorAll(selector);
-    expect(elements, `one excluded HIGH surface for ${selector}`).toHaveLength(
-      1,
-    );
-    elements[0]?.remove();
-  }
   const results = await axe.run(snapshot.window.document.documentElement, {
     rules: { "color-contrast": { enabled: false } },
   });
@@ -145,6 +140,23 @@ function inputValue(input: HTMLInputElement, value: string) {
       data: value,
     }),
   );
+}
+
+function inputInLabel(container: Element, text: string): HTMLInputElement {
+  const label = Array.from(container.querySelectorAll("label")).find((value) =>
+    value.textContent?.includes(text),
+  );
+  const input = label?.querySelector("input");
+  if (!input) throw new Error(`Input labelled ${text} is missing`);
+  return input;
+}
+
+function buttonNamed(container: Element, text: string): HTMLButtonElement {
+  const button = Array.from(container.querySelectorAll("button")).find(
+    (value) => value.textContent?.trim() === text,
+  );
+  if (!button) throw new Error(`Button ${text} is missing`);
+  return button;
 }
 
 beforeEach(() => {
@@ -204,7 +216,7 @@ describe("M2 live editor accessibility", () => {
       (input) => input.value === "Synthetic Person",
     );
     expect(fullName).toBeTruthy();
-    await expectMediumSurfaceAccessible(container);
+    await expectSurfaceAccessible(container);
   });
 
   it("associates validation feedback with the invalid editor field", async () => {
@@ -222,7 +234,7 @@ describe("M2 live editor accessibility", () => {
     expect(container.textContent).toContain(
       "Correct these items before saving",
     );
-    await expectMediumSurfaceAccessible(container);
+    await expectSurfaceAccessible(container);
   });
 
   it("announces a revision conflict without hiding or disabling the editor", async () => {
@@ -244,7 +256,7 @@ describe("M2 live editor accessibility", () => {
     );
     expect(alert?.textContent).toContain("changed after it was loaded");
     expect(title.disabled).toBe(false);
-    await expectMediumSurfaceAccessible(container);
+    await expectSurfaceAccessible(container);
   });
 
   it("places focus in the quit dialog and restores it after cancellation", async () => {
@@ -284,5 +296,154 @@ describe("M2 live editor accessibility", () => {
     const keep = document.activeElement as HTMLButtonElement;
     await act(async () => keep.click());
     expect(document.activeElement).toBe(opener);
+  });
+
+  it("labels, announces, and focuses the destructive local-data lifecycle", async () => {
+    let finishDeletion: ((value: unknown) => void) | undefined;
+    native.invoke.mockImplementation(async (command: string) => {
+      if (command === "load_storage_usage") {
+        return {
+          ok: true,
+          value: {
+            databaseSchema: 2,
+            drafts: 1,
+            publishedSnapshots: 1,
+            settings: 0,
+            renderManifests: 1,
+            diagnosticEvents: 0,
+            databaseBytes: 100,
+            walBytes: 0,
+            sharedMemoryBytes: 0,
+            manifestBytes: 10,
+            recoveryMetadataBytes: 0,
+            totalProfileBytes: 110,
+          },
+        };
+      }
+      if (command === "delete_all_local_data") {
+        return new Promise((resolve) => {
+          finishDeletion = resolve;
+        });
+      }
+      return unavailable;
+    });
+    const onDeleteFinish = vi.fn();
+    const container = await render(
+      <StoragePanel
+        enabled
+        onDeleteBegin={() => true}
+        onDeleteFinish={onDeleteFinish}
+      />,
+    );
+    const confirmation = inputInLabel(container, "DELETE ALL LOCAL ORT DATA");
+    await act(async () => inputValue(confirmation, "DELETE ALL"));
+    expect(confirmation.getAttribute("aria-invalid")).toBe("true");
+    expect(
+      document.getElementById("delete-all-local-data-confirmation")
+        ?.textContent,
+    ).toContain("exactly as shown");
+
+    await act(async () =>
+      inputValue(confirmation, "DELETE ALL LOCAL ORT DATA"),
+    );
+    expect(confirmation.hasAttribute("aria-invalid")).toBe(false);
+    const remove = buttonNamed(container, "Permanently delete all local data");
+    expect(remove.disabled).toBe(false);
+    await act(async () => remove.click());
+    expect(container.querySelector("form[aria-busy='true']")).toBeTruthy();
+    expect(container.textContent).toContain(
+      "Closing the encrypted profile and deleting exact local records",
+    );
+
+    await act(async () => {
+      finishDeletion?.({
+        ok: true,
+        value: { status: "cleanup_pending", restartRequired: true },
+      });
+      await Promise.resolve();
+    });
+    await settle();
+    const outcome = Array.from(
+      container.querySelectorAll('[role="status"]'),
+    ).find((value) => value.textContent?.includes("Deletion was committed"));
+    expect(document.activeElement).toBe(outcome);
+    expect(onDeleteFinish).toHaveBeenCalledWith(true, false);
+    await expectSurfaceAccessible(container);
+  });
+
+  it("exposes exact recovery confirmations and an announced busy state", async () => {
+    let finishSafetyDeletion: ((value: unknown) => void) | undefined;
+    native.invoke.mockImplementation(async (command: string) => {
+      if (command === "load_backup_recovery_status") {
+        return {
+          ok: true,
+          value: {
+            safetyCopyAvailable: true,
+            restartOperationPending: false,
+            safetyCleanupPending: false,
+          },
+        };
+      }
+      if (command === "delete_safety_copy") {
+        return new Promise((resolve) => {
+          finishSafetyDeletion = resolve;
+        });
+      }
+      return unavailable;
+    });
+    const onFinish = vi.fn();
+    const container = await render(
+      <BackupPanel
+        blocked={false}
+        dirty={false}
+        onBegin={() => true}
+        onFinish={onFinish}
+      />,
+    );
+    const rollbackConfirmation = inputInLabel(
+      container,
+      "ROLL BACK SAVED PROFILE",
+    );
+    const restoreConfirmation = inputInLabel(
+      container,
+      "REPLACE SAVED PROFILE",
+    );
+    await act(async () => {
+      inputValue(rollbackConfirmation, "ROLL BACK");
+      inputValue(restoreConfirmation, "REPLACE");
+    });
+    expect(rollbackConfirmation.getAttribute("aria-invalid")).toBe("true");
+    expect(restoreConfirmation.getAttribute("aria-invalid")).toBe("true");
+    expect(
+      document.getElementById("rollback-confirmation")?.textContent,
+    ).toContain("exactly as shown");
+    expect(
+      document.getElementById("restore-confirmation")?.textContent,
+    ).toContain("exactly as shown");
+
+    const confirmation = inputInLabel(container, "DELETE SAFETY COPY");
+    await act(async () => inputValue(confirmation, "DELETE"));
+    expect(confirmation.getAttribute("aria-invalid")).toBe("true");
+    expect(
+      document.getElementById("safety-delete-confirmation")?.textContent,
+    ).toContain("exactly as shown");
+
+    await act(async () => inputValue(confirmation, "DELETE SAFETY COPY"));
+    const remove = buttonNamed(container, "Permanently delete safety copy");
+    expect(remove.disabled).toBe(false);
+    await act(async () => remove.click());
+    expect(container.querySelector("form[aria-busy='true']")).toBeTruthy();
+    expect(container.textContent).toContain("Deleting safety copy");
+
+    await act(async () => {
+      finishSafetyDeletion?.({ ok: true, value: { deleted: true } });
+      await Promise.resolve();
+    });
+    await settle();
+    expect(onFinish).toHaveBeenCalledWith(
+      expect.stringContaining("external exports or backups"),
+    );
+    expect(remove.disabled).toBe(true);
+    await expectSurfaceAccessible(container);
   });
 });

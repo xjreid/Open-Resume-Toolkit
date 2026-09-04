@@ -87,11 +87,11 @@ Exit evidence:
 
 ### Current status
 
-As of 2026-09-03, M2 is **about 66% complete** by stage-gate weighting after
-the all-local-data deletion, current-bundle render-replay, desktop accessibility,
-and expanded output-golden checkpoints:
-approximately 82% of the implementation foundation, 64% of end-to-end
-functionality, and 54% of release/exit evidence.
+As of 2026-09-04, M2 is **about 68% complete** by stage-gate weighting after
+the all-local-data deletion, current-bundle render-replay, expanded desktop
+accessibility, and output-golden checkpoints:
+approximately 83% of the implementation foundation, 65% of end-to-end
+functionality, and 59% of release/exit evidence.
 The estimate gives security,
 recovery, accessibility, cross-platform behavior, and the complete offline
 journey more weight than raw feature count.
@@ -130,9 +130,9 @@ Archived-source and superseded-renderer binary replay remains a later M2 gate.
 - **[HIGH]** **Storage and restart safety:** no-clobber native file boundaries,
   encrypted restart tests, and Windows SQLCipher logging mitigation.
 - **Reliability:** generated contracts, deterministic output/golden tests, and
-  passing full local checks for the latest checkpoint. The production dependency
-  audit now uses bounded retries for npm advisory-endpoint timeouts while still
-  failing on advisories or persistent endpoint unavailability.
+  passing full local checks for the latest checkpoint. Dependency scanning is
+  isolated from the build/test job and uses a SHA-pinned OSV full scan of both
+  JavaScript and Rust lockfiles; findings or scanner failure remain blocking.
 - **Output-only golden corpus:** one shared eight-case synthetic source set now
   pins DOCX, PDF and plain-text bytes and verifies exact cross-format text,
   semantic ordering, omitted optional data, safe HTTP/HTTPS/mailto links,
@@ -141,13 +141,14 @@ Archived-source and superseded-renderer binary replay remains a later M2 gate.
   layout. The DOCX accessibility audit reports zero findings across all cases.
   This does not enable the HIGH-tagged import path or replace native Word,
   assistive-technology, cross-platform, or final-template qualification.
-- **Desktop accessibility automation:** axe-core semantic checks cover the
-  medium-routed main/overlay, PDF preview, quit-decision and populated published
-  review surfaces, with a failing positive control. Live component checks cover
-  the loaded editor, associated validation errors, announced revision conflict,
-  and quit-dialog focus restoration. HIGH-tagged recovery and deletion panels
-  are excluded; native assistive-technology and interaction matrices remain
-  pending.
+- **Desktop accessibility automation:** axe-core semantic checks cover the full
+  reachable main/overlay routes, PDF preview, quit decision, backup/recovery,
+  storage/deletion, and populated published-review surfaces, with a failing
+  positive control. Live component checks cover the loaded editor, associated
+  validation errors, announced revision conflict, quit-dialog focus restoration,
+  exact destructive confirmation feedback, recovery/deletion busy states, and
+  deletion-outcome focus. Native assistive-technology, interruption, and
+  cross-platform interaction matrices remain pending.
 
 ### Detailed checkpoint evidence
 
@@ -167,7 +168,8 @@ Archived-source and superseded-renderer binary replay remains a later M2 gate.
   [render history](../../evidence/0.0.0-dev/m2-render-history.md),
   [portable render history](../../evidence/0.0.0-dev/m2-portable-render-history.md),
   and [verified current-bundle replay](../../evidence/0.0.0-dev/m2-current-render-replay.md).
-- Accessibility automation: [desktop semantic checks](../../evidence/0.0.0-dev/m2-desktop-accessibility-automation.md).
+- Accessibility automation: [desktop semantic and destructive-state checks](../../evidence/0.0.0-dev/m2-desktop-accessibility-automation.md).
+- CI reliability: [lockfile vulnerability scan](../../evidence/0.0.0-dev/m2-ci-dependency-scan.md).
 - Storage and backup: [portable export](../../evidence/0.0.0-dev/m2-portable-backup-export.md),
   [storage usage](../../evidence/0.0.0-dev/m2-storage-usage.md),
   [backup validation](../../evidence/0.0.0-dev/m2-backup-validation.md),
