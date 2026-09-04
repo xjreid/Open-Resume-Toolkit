@@ -395,9 +395,17 @@ only after verified reaping, empty-tree, pipe/handle closure and teardown.
 Adversarial mocks cover missing launch controls, weak resource ceilings,
 cancellation, silence, floods, malformed/failed output, native event failure,
 termination failure and every missing cleanup fact on both platform profiles.
-It still does not implement native pipes, OS containment, staging or a parser.
+The following bounded source-envelope checkpoint also adds
+`ort-platform::read_native_document` and `ort-documents::import_source`: a held,
+no-follow, 10 MiB PDF/DOCX snapshot plus signature/container preflight over the
+same bytes. DOCX metadata inspection does not decompress or parse XML and rejects
+unsafe/duplicate paths, encryption, known active parts, ZIP64/multidisk packages
+and declared expansion over 100:1. The real synthetic DOCX output corpus and
+adversarial malformed envelopes are covered. It still does not implement private
+worker staging, native pipes, OS containment or a content parser.
 See `evidence/0.0.0-dev/m2-import-transport.md` and
-`evidence/0.0.0-dev/m2-parser-supervision-core.md`, plus
+`evidence/0.0.0-dev/m2-parser-supervision-core.md`,
+`evidence/0.0.0-dev/m2-import-source-envelope.md`, plus
 `Implementation Plans/System Documentation/Document_Worker_Containment.md`.
 
 The next checkpoint adds a separate synthetic macOS App Sandbox/XPC test:

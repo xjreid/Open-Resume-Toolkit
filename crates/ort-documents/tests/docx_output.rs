@@ -1,5 +1,8 @@
 mod support;
-use ort_documents::{DocxExportError, MAX_DOCX_BYTES, render_docx};
+use ort_documents::{
+    DocxExportError, MAX_DOCX_BYTES, import::InputFormat, import_source::inspect_source,
+    render_docx,
+};
 use ort_domain::{Link, ResumeDocument};
 use quick_xml::{Reader, events::Event};
 use std::collections::BTreeMap;
@@ -39,6 +42,9 @@ fn fixed_parts_well_formed_xml_and_deterministic_bytes_for_whole_corpus() {
     for kind in support::OUTPUT_FIXTURE_KINDS {
         let doc = support::fixture(kind);
         let bytes = render_docx(&doc).unwrap();
+        let inspection = inspect_source(&bytes, InputFormat::Docx).unwrap();
+        assert_eq!(inspection.byte_count, bytes.len());
+        assert_eq!(inspection.package_entries, Some(6));
         assert_eq!(bytes, render_docx(&doc).unwrap());
         assert!(bytes.len() <= MAX_DOCX_BYTES);
         let parts = parts(&bytes);

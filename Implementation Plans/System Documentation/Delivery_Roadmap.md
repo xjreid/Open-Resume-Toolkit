@@ -123,9 +123,11 @@ superseded-renderer binary replay remain later M2 gates.
   persistence with portable-backup compatibility.
 - **[HIGH]** **Import foundations:** bounded extraction decoding, conservative
   No-AI mapping/review logic, revision-safe storage integration, parent-side
-  transport policy, a fail-closed cross-platform production supervision
+  no-follow/bounded source snapshots and PDF/DOCX envelope preflight, transport
+  policy, a fail-closed cross-platform production supervision
   coordinator/adapter contract, and partial macOS containment/lifecycle probes.
-  Native macOS/Windows adapters, production parsing and import UI remain disabled.
+  Private staging, native macOS/Windows adapters, production parsing and import UI
+  remain disabled.
 - **[HIGH]** **Backup and recovery:** encrypted portable export, authenticated
   read-only validation, confirmed restart-staged replacement,
   retained safety-copy status/rollback, exact confirmed safety-copy cleanup, and
@@ -170,6 +172,7 @@ superseded-renderer binary replay remain later M2 gates.
   [close guard](../../evidence/0.0.0-dev/m2-close-guard-smoke.md), and
   [text export](../../evidence/0.0.0-dev/m2-text-export-smoke.md).
 - Import security: [import core](../../evidence/0.0.0-dev/m2-import-core.md),
+  [source envelope](../../evidence/0.0.0-dev/m2-import-source-envelope.md),
   [transport](../../evidence/0.0.0-dev/m2-import-transport.md),
   [production supervision core](../../evidence/0.0.0-dev/m2-parser-supervision-core.md),
   [sandbox probe](../../evidence/0.0.0-dev/m2-native-sandbox-probe.md),

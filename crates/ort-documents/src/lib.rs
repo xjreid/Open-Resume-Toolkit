@@ -4,6 +4,7 @@ use ort_domain::{DocumentLimits, Link, ResumeDocument};
 
 mod docx;
 pub mod import;
+pub mod import_source;
 pub mod import_transport;
 mod opc;
 pub mod worker_supervisor;

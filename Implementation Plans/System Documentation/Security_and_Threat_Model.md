@@ -114,6 +114,13 @@ If supported public OS mechanisms cannot enforce these properties without admini
 ## Import, rendering, and archive controls
 
 - File type is determined from magic bytes/container structure, not extension alone.
+- The disabled M2 source-envelope boundary now reads a dialog-selected PDF/DOCX
+  once through a held parent-directory capability with no final symlink follow
+  and a shared 10 MiB ceiling. Parent preflight checks supported PDF signature/EOF
+  or bounded DOCX ZIP metadata without decompression, rejecting ZIP64/multidisk,
+  unsafe/duplicate names, encryption, known active parts, missing minimum OPC
+  parts and declared expansion over 100:1. This does not make content trusted or
+  replace worker-side parser limits; private staging and native adapters remain gated.
 - PDF/DOCX parsing runs in a new disposable worker process for each import. The OS sandbox denies network, subprocess creation, vault/keychain/credential-manager access, database/application-data access, browser/native IPC, and reads outside the already-open staged input. The worker can write only to a randomized private result directory and returns a bounded versioned extraction message over an inherited pipe.
 - The parent opens and validates the staged file before worker launch, passes a handle rather than trusting a worker-supplied path where supported, revalidates all returned data, and kills the entire worker process tree after success, timeout, crash, protocol violation, or cancellation. Worker exit cannot commit or mutate canonical data.
 - PDF/DOCX parsers also enforce page, relationship, nesting, decompression, image, object, handle, memory, CPU, and wall-time limits. Fuzzing/resource limits do not substitute for the sandbox.
@@ -133,8 +140,9 @@ If supported public OS mechanisms cannot enforce these properties without admini
   proves local direct-child termination/reaping on cancellation, timeout and floods,
   and rejects output before successful OS exit. It does not prove supervisor-death
   cleanup, inherited-child credential/broker isolation, memory/CPU/thread/Mach-port
-  ceilings or full process-tree cleanup. Production native adapters and real pipe
-  drivers are still absent. Windows containment
+  ceilings or full process-tree cleanup. Bounded source acquisition/envelope
+  preflight is implemented, but private worker staging, production native adapters
+  and real pipe drivers are still absent. Windows containment
   is unproven. Import stays disabled; probe completion is not full containment.
 - External DOCX relationships, macros, embedded packages, scripts, and active content are never executed or fetched.
 - The M2 DOCX exporter emits six fixed OPC parts from an exact saved revision.

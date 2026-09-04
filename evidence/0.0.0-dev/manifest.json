@@ -44,6 +44,7 @@
     "m2ImportWorkerDisabledRegression": "passed-local-macos-arm64",
     "m2ImportTransportPolicy": "passed-local-nine-synthetic-event-tests-macos-arm64",
     "m2ImportProductionSupervisorCore": "passed-local-cross-platform-policy-with-adversarial-mock-adapters-macos-arm64",
+    "m2ImportSourceEnvelope": "passed-local-no-follow-bounded-snapshot-and-adversarial-pdf-docx-envelope-tests-macos-arm64",
     "m2ImportMacosNativeAdapter": "pending-xpc-app-sandbox-production-implementation-and-full-matrix",
     "m2ImportWindowsNativeAdapter": "pending-appcontainer-job-production-implementation-and-full-matrix",
     "nativeCipherStartupProbe": "passed-local-and-user-reported-all-desktop-ci-after-bdc3e10",

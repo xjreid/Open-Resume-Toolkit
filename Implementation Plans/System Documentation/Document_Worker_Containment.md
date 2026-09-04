@@ -1,7 +1,8 @@
 # Document worker containment implementation gate
 
-Status: transport policy, common production supervision coordinator, and macOS
-sandbox/hard-limit and lifecycle probes, 2026-09-04. **Not a production native
+Status: source-envelope preflight, transport policy, common production supervision
+coordinator, and macOS sandbox/hard-limit and lifecycle probes, 2026-09-04.
+**Not a production native
 sandbox or permission to enable import.** The parser worker still exits 78.
 This refines M2; it does not introduce an additional milestone.
 
@@ -27,6 +28,24 @@ the monotonic deadline independently of output, and terminate/reap the whole
 contained job on **every** completion or failure. `finish` is a data validator,
 not proof of containment: discard the result if cleanup fails. Never use an
 unbounded output collector or allocate according to a worker-provided length.
+
+## Implemented parent source envelope
+
+`ort-platform::read_native_document` acquires a dialog-selected PDF/DOCX once
+through a held parent-directory capability, refuses final-component symlinks and
+non-regular files, and returns a parent-owned snapshot bounded to 10 MiB.
+`ort-documents::import_source` checks that same snapshot's selected-format magic
+and bounded outer structure. DOCX inspection parses no XML and decompresses no
+entry; it rejects malformed/multidisk/ZIP64 packages, unsafe or duplicate names,
+unsupported flags/methods, encryption, known active parts, missing minimum OPC
+parts and declared expansion beyond 100:1. PDF inspection is limited to supported
+header versions and terminal EOF. See ADR 0008 and
+`../../evidence/0.0.0-dev/m2-import-source-envelope.md`.
+
+This is deliberately not a content parser or private staging implementation.
+Structurally valid input remains hostile. The user path is not reread after the
+snapshot, but the future native adapter must still create and clean a private
+read-only staged handle and prove its OS permissions before parser integration.
 
 ## Implemented common production supervision coordinator
 
@@ -261,7 +280,7 @@ Forced process-tree termination,
 parent-death handling, memory/CPU/thread/Mach-port ceilings, credentials/brokers, broader filesystem
 and network denial, hostile-code cleanup, release signing and supported OS/CPU
 matrices remain unproven. Windows has no native containment evidence yet.
-Production input staging, native macOS/Windows pipe and containment adapters,
+Private worker input staging, native macOS/Windows pipe and containment adapters,
 PDFium/DOCX parsers and the import-review UI remain unimplemented. The common
 coordinator and its adapter contract are implemented, but cannot supply or
 validate the missing OS proof by themselves.

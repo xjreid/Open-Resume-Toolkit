@@ -55,6 +55,7 @@ pub use storage_usage::{
 };
 
 pub const CONTRACT_VERSION: u16 = 2;
+pub const MAX_IMPORT_SOURCE_BYTES: usize = 10 * 1024 * 1024;
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
