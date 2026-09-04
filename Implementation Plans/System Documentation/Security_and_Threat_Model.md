@@ -120,7 +120,11 @@ If supported public OS mechanisms cannot enforce these properties without admini
 - Native implementation candidates and the required positive-control/access-denial
   test matrix are in `Document_Worker_Containment.md`. The implemented bounded
   transport policy has only synthetic-event evidence; it cannot enforce OS
-  isolation, wake blocked I/O, kill a process or prove cleanup. A separate native
+  isolation. The shared production coordinator now requires an exact macOS-XPC
+  or Windows-AppContainer launch profile, polls cancellation/deadline, requests
+  whole-containment termination on every path, and withholds output until reaping,
+  empty-tree, pipe/handle closure and teardown are reported. Its adversarial mocks
+  are lifecycle-policy evidence, not native enforcement evidence. A separate native
   macOS probe verifies read-only descriptor transfer, seeded sibling/symlink
   restrictions and loopback denial locally. Plain App Sandbox allows children;
   the helper-only zero hard NPROC limit additionally denied direct spawn/fork
@@ -129,7 +133,8 @@ If supported public OS mechanisms cannot enforce these properties without admini
   proves local direct-child termination/reaping on cancellation, timeout and floods,
   and rejects output before successful OS exit. It does not prove supervisor-death
   cleanup, inherited-child credential/broker isolation, memory/CPU/thread/Mach-port
-  ceilings or full process-tree cleanup. Windows containment
+  ceilings or full process-tree cleanup. Production native adapters and real pipe
+  drivers are still absent. Windows containment
   is unproven. Import stays disabled; probe completion is not full containment.
 - External DOCX relationships, macros, embedded packages, scripts, and active content are never executed or fetched.
 - The M2 DOCX exporter emits six fixed OPC parts from an exact saved revision.

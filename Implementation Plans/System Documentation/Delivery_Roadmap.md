@@ -123,8 +123,9 @@ superseded-renderer binary replay remain later M2 gates.
   persistence with portable-backup compatibility.
 - **[HIGH]** **Import foundations:** bounded extraction decoding, conservative
   No-AI mapping/review logic, revision-safe storage integration, parent-side
-  transport policy, and partial macOS containment/lifecycle probes. Production
-  parsing and import UI remain disabled.
+  transport policy, a fail-closed cross-platform production supervision
+  coordinator/adapter contract, and partial macOS containment/lifecycle probes.
+  Native macOS/Windows adapters, production parsing and import UI remain disabled.
 - **[HIGH]** **Backup and recovery:** encrypted portable export, authenticated
   read-only validation, confirmed restart-staged replacement,
   retained safety-copy status/rollback, exact confirmed safety-copy cleanup, and
@@ -170,6 +171,7 @@ superseded-renderer binary replay remain later M2 gates.
   [text export](../../evidence/0.0.0-dev/m2-text-export-smoke.md).
 - Import security: [import core](../../evidence/0.0.0-dev/m2-import-core.md),
   [transport](../../evidence/0.0.0-dev/m2-import-transport.md),
+  [production supervision core](../../evidence/0.0.0-dev/m2-parser-supervision-core.md),
   [sandbox probe](../../evidence/0.0.0-dev/m2-native-sandbox-probe.md),
   [hard limits](../../evidence/0.0.0-dev/m2-macos-hard-limits.md), and
   [worker lifecycle](../../evidence/0.0.0-dev/m2-macos-lifecycle.md).
@@ -195,9 +197,10 @@ superseded-renderer binary replay remain later M2 gates.
 
 ### Remaining release gates
 
-- **[HIGH]** Complete and prove production PDF/DOCX parser containment on macOS
-  and Windows; then integrate the file picker, review UI, private binary staging,
-  and richer deterministic mapping.
+- **[HIGH]** Implement and prove the native macOS XPC/App-Sandbox and Windows
+  AppContainer/Job adapters behind the common supervisor, including real bounded
+  pipe drivers and complete hostile lifecycle matrices; then integrate the file
+  picker, review UI, private binary staging, parsers, and richer deterministic mapping.
 - **[HIGH]** Finish native/cross-platform vault, filesystem, quit, low-disk, and
   injected crash/failure verification.
 - Finish native/cross-platform editor, dialog, accessibility, final PDF/DOCX

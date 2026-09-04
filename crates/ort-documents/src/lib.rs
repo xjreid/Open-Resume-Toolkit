@@ -6,6 +6,7 @@ mod docx;
 pub mod import;
 pub mod import_transport;
 mod opc;
+pub mod worker_supervisor;
 
 pub use docx::{
     DOCX_FORMAT_VERSION, DOCX_TEMPLATE_ID, DocxExportError, MAX_DOCX_BYTES, render_docx,

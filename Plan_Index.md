@@ -10,8 +10,9 @@ The product direction and core workflows are defined. Implementation is underway
 at M2 on the selected Tauri 2, React/TypeScript, Rust, SQLCipher and Typst
 baseline. The development build supports encrypted structured editing,
 publication, local exports/rendering, portable backup/recovery, storage reporting
-and exact crash-resumable local-profile deletion. Hostile document import remains
-disabled pending its macOS/Windows containment proof; AI, browser messaging,
+and exact crash-resumable local-profile deletion. A common fail-closed
+parser-supervision coordinator is implemented, but hostile document import remains
+disabled pending native macOS/Windows adapters and containment proof; AI, browser messaging,
 updates and release hardening remain later milestones. Quiet Navy/Open Frame is
 the approved application direction, while final document-template work remains
 incomplete under `Aesthetic/`.

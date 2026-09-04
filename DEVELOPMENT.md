@@ -387,8 +387,17 @@ exercise this backend checkpoint.
 
 The following transport-policy checkpoint adds bounded output collection,
 discarded/capped stderr, deadline/cancellation checks and successful-exit/EOF
-gating. It does not yet implement native pipes, process termination or a sandbox.
+gating. The subsequent production coordinator in
+`ort-documents::worker_supervisor` composes that policy with a native-adapter
+contract for macOS XPC/App Sandbox and Windows AppContainer/Job containment.
+It always requests whole-containment termination and accepts valid extraction
+only after verified reaping, empty-tree, pipe/handle closure and teardown.
+Adversarial mocks cover missing launch controls, weak resource ceilings,
+cancellation, silence, floods, malformed/failed output, native event failure,
+termination failure and every missing cleanup fact on both platform profiles.
+It still does not implement native pipes, OS containment, staging or a parser.
 See `evidence/0.0.0-dev/m2-import-transport.md` and
+`evidence/0.0.0-dev/m2-parser-supervision-core.md`, plus
 `Implementation Plans/System Documentation/Document_Worker_Containment.md`.
 
 The next checkpoint adds a separate synthetic macOS App Sandbox/XPC test:

@@ -1,7 +1,8 @@
 # Document worker containment implementation gate
 
-Status: transport policy plus macOS sandbox/hard-limit and lifecycle probes, 2026-09-02. **Not a
-production sandbox or permission to enable import.** The parser worker still exits 78.
+Status: transport policy, common production supervision coordinator, and macOS
+sandbox/hard-limit and lifecycle probes, 2026-09-04. **Not a production native
+sandbox or permission to enable import.** The parser worker still exits 78.
 This refines M2; it does not introduce an additional milestone.
 
 ## Implemented parent transport policy
@@ -19,13 +20,43 @@ The first transport failure is terminal and releases its buffer. Release is
 not a guarantee that all allocator/OS copies of text have been securely erased.
 No transcript is persisted, sent to telemetry, or included in Debug output.
 
-This policy cannot kill a process, wake a blocked read, restrict memory/CPU,
-validate source-file type, or verify cleanup. The native adapter must use
+This transport policy alone cannot kill a process, wake a blocked read, restrict
+memory/CPU, validate source-file type, or verify cleanup. The native adapter must use
 bounded nonblocking/cancellable reads, drain both pipes, poll cancellation and
 the monotonic deadline independently of output, and terminate/reap the whole
 contained job on **every** completion or failure. `finish` is a data validator,
 not proof of containment: discard the result if cleanup fails. Never use an
 unbounded output collector or allocate according to a worker-provided length.
+
+## Implemented common production supervision coordinator
+
+`ort-documents::worker_supervisor` now owns the cross-platform lifecycle above
+the native adapters. It accepts only one of two exact launch profiles: a macOS
+App Sandbox/XPC supervisor with an inherited fixed child, or a Windows
+zero-capability AppContainer child bound to a kill-on-close/no-breakaway Job
+Object before execution. Both profiles enumerate common executable, environment,
+handle, input/output, filesystem, network, child-process, credential and IPC
+controls rather than accepting a generic `sandboxed` flag. Resource receipts may
+be stricter than the 512 MiB memory, 30-second CPU and 64-handle ceilings, but
+cannot be weaker; wall time is the existing absolute 60 seconds and core output
+must be disabled.
+
+The coordinator polls a parent cancellation token and the monotonic deadline at
+25 ms intervals independently of pipe output, translates only owned bounded
+native events into the existing transport, and always requests termination of
+the complete containment object. It then grants a five-second cleanup budget and
+requires parent-observed worker reaping, an empty process tree, both pipe closures,
+input/output-handle closure and containment teardown. Any missing launch control,
+native event failure, termination failure or missing cleanup fact withholds even
+otherwise valid extraction bytes. A nonzero parent-owned operation nonce binds
+cleanup to the exact launch and rejects stale/replayed cleanup evidence. Adapter
+and debug errors are content-free.
+
+This is production orchestration code but not a native implementation. A launch
+receipt is a trusted-adapter precondition, not an untrusted worker claim or OS
+proof. No macOS XPC or Windows AppContainer/Job adapter implements the trait yet;
+therefore no product call site can launch a parser. See ADR 0007 and
+`../../evidence/0.0.0-dev/m2-parser-supervision-core.md`.
 
 ## Platform candidates and unresolved proof
 
@@ -230,8 +261,10 @@ Forced process-tree termination,
 parent-death handling, memory/CPU/thread/Mach-port ceilings, credentials/brokers, broader filesystem
 and network denial, hostile-code cleanup, release signing and supported OS/CPU
 matrices remain unproven. Windows has no native containment evidence yet.
-Production input staging, real pipe drivers, sandbox adapters, PDFium/DOCX
-parsers and the import-review UI remain unimplemented.
+Production input staging, native macOS/Windows pipe and containment adapters,
+PDFium/DOCX parsers and the import-review UI remain unimplemented. The common
+coordinator and its adapter contract are implemented, but cannot supply or
+validate the missing OS proof by themselves.
 
 The subsequent M2 DOCX **export** checkpoint is an output-only fixed OPC/XML
 generator over validated saved records. It neither opens supplied DOCX files
