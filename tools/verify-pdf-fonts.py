@@ -3,7 +3,16 @@ from pathlib import Path
 import sys
 from pypdf import PdfReader
 
-for kind in ("standard", "sparse", "unicode", "hostile", "dense"):
+for kind in (
+    "standard",
+    "sparse",
+    "unicode",
+    "hostile",
+    "dense",
+    "optional",
+    "structured",
+    "paginated",
+):
     reader = PdfReader(Path(sys.argv[1]) / f"{kind}.pdf", strict=True)
     assert not reader.is_encrypted
     assert not any(key in reader.metadata for key in ("/Author", "/Creator", "/CreationDate", "/ModDate"))

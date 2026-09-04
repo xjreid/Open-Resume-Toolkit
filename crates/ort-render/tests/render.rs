@@ -5,7 +5,7 @@ use ort_render::{PdfRenderError, render_pdf, sha256};
 
 #[test]
 fn fixed_output_is_repeatable_and_receipt_describes_exact_bytes() {
-    for kind in ["standard", "sparse", "hostile", "dense"] {
+    for kind in support::OUTPUT_FIXTURE_KINDS {
         let document = support::fixture(kind);
         let first = render_pdf(&document).unwrap_or_else(|error| panic!("{kind}: {error}"));
         let second = render_pdf(&document).unwrap();
@@ -13,15 +13,22 @@ fn fixed_output_is_repeatable_and_receipt_describes_exact_bytes() {
         assert_eq!(first.receipt, second.receipt);
         assert_eq!(first.receipt.pdf_sha256, sha256(&first.bytes));
         assert_eq!(first.receipt.byte_count, first.bytes.len());
-        assert!((1..=5).contains(&first.receipt.page_count));
+        let expected_pages = match kind {
+            "dense" => 4,
+            "paginated" => 2,
+            _ => 1,
+        };
+        assert_eq!(first.receipt.page_count, expected_pages, "{kind}");
         assert!(first.bytes.starts_with(b"%PDF-"));
     }
 }
 
 #[test]
 fn refuses_missing_glyphs_invalid_documents_and_excess_pages() {
+    let mut missing_glyph = support::fixture("unicode");
+    missing_glyph.contact.full_name.push_str(" 示例");
     assert!(matches!(
-        render_pdf(&support::fixture("unicode")),
+        render_pdf(&missing_glyph),
         Err(PdfRenderError::UnsupportedGlyph)
     ));
     let mut doc = support::fixture("standard");

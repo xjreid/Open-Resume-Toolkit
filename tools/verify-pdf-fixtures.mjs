@@ -19,6 +19,34 @@ const goldens = JSON.parse(
     "utf8",
   ),
 );
+const textGoldens = JSON.parse(
+  readFileSync(
+    new URL("../fixtures/documents/text-v1.sha256.json", import.meta.url),
+    "utf8",
+  ),
+);
+const kinds = [
+  "standard",
+  "sparse",
+  "unicode",
+  "hostile",
+  "dense",
+  "optional",
+  "structured",
+  "paginated",
+];
+const expectedPageCounts = {
+  standard: 1,
+  sparse: 1,
+  unicode: 1,
+  hostile: 1,
+  dense: 4,
+  optional: 1,
+  structured: 1,
+  paginated: 2,
+};
+assert.deepEqual(Object.keys(goldens).sort(), [...kinds].sort());
+assert.deepEqual(Object.keys(textGoldens).sort(), [...kinds].sort());
 const normalized = (value) =>
   value
     .replace(/^\s*- /gm, "")
@@ -34,8 +62,22 @@ const expectedManifest = {
   fontBundleSha256:
     "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
 };
-for (const kind of ["standard", "sparse", "unicode", "hostile", "dense"]) {
+for (const kind of kinds) {
   const bytes = readFileSync(join(directory, `${kind}.pdf`));
+  const source = JSON.parse(
+    readFileSync(join(directory, `${kind}.source.json`), "utf8"),
+  );
+  const expectedBytes = readFileSync(join(directory, `${kind}.txt`));
+  const expected = expectedBytes.toString("utf8");
+  assert(!expectedBytes.includes(13), `${kind}: text contains CR bytes`);
+  assert(expected.endsWith("\n") && !expected.endsWith("\n\n"));
+  assert(!expected.includes(source.title));
+  assert(!expected.includes(source.documentId));
+  assert.equal(
+    createHash("sha256").update(expectedBytes).digest("hex"),
+    textGoldens[kind],
+    `${kind}: reviewed plain-text golden changed`,
+  );
   const receipt = JSON.parse(
     readFileSync(join(directory, `${kind}.json`), "utf8"),
   );
@@ -57,6 +99,7 @@ for (const kind of ["standard", "sparse", "unicode", "hostile", "dense"]) {
   try {
     const pdf = await task.promise;
     assert.equal(pdf.numPages, receipt.pageCount);
+    assert.equal(pdf.numPages, expectedPageCounts[kind]);
     assert(pdf.numPages > 0 && pdf.numPages <= 5);
     assert.equal(await pdf.getJSActions(), null);
     assert.equal(await pdf.getAttachments(), null);
@@ -68,10 +111,18 @@ for (const kind of ["standard", "sparse", "unicode", "hostile", "dense"]) {
     assert(!JSON.stringify(metadata).includes("INTERNAL_SYNTHETIC"));
     let text = "";
     const urls = [];
+    const structureRoles = new Set();
+    const collectRoles = (node) => {
+      if (node?.role) structureRoles.add(node.role);
+      for (const child of node?.children ?? [])
+        if (typeof child === "object") collectRoles(child);
+    };
     for (let number = 1; number <= pdf.numPages; number++) {
       const page = await pdf.getPage(number);
       assert.deepEqual(page.view, [0, 0, 612, 792]);
-      assert(await page.getStructTree(), "tagged reading structure");
+      const structure = await page.getStructTree();
+      assert(structure, "tagged reading structure");
+      collectRoles(structure);
       const content = await page.getTextContent();
       for (const item of content.items) {
         if (!("str" in item)) continue;
@@ -95,18 +146,28 @@ for (const kind of ["standard", "sparse", "unicode", "hostile", "dense"]) {
         urls.push(annotation.url);
       }
     }
-    const expected = readFileSync(join(directory, `${kind}.txt`), "utf8");
     assert.equal(
       normalized(text),
       normalized(expected),
       `${kind}: visible text/order parity`,
     );
-    assert.deepEqual(
-      urls,
-      kind === "sparse"
-        ? []
-        : ["https://example.org/work?a=1&b=2", "https://example.org/project"],
-    );
+    const expectedUrls = [
+      ...source.contact.links.map((link) => link.url),
+      ...source.sections.flatMap((section) =>
+        section.entries.flatMap((entry) => entry.links.map((link) => link.url)),
+      ),
+    ];
+    assert.deepEqual(urls, expectedUrls);
+    assert(structureRoles.has("Root") && structureRoles.has("Document"));
+    const entries = source.sections.flatMap((section) => section.entries);
+    if (entries.length) {
+      assert(structureRoles.has("H1") && structureRoles.has("H2"));
+    }
+    if (entries.some((entry) => entry.bullets.length)) {
+      for (const role of ["L", "LI", "Lbl", "LBody"])
+        assert(structureRoles.has(role), `${kind}: missing ${role} list tag`);
+    }
+    if (expectedUrls.length) assert(structureRoles.has("Link"));
     console.log(
       `${kind}: exact golden, ${pdf.numPages} page(s), text/order, geometry, tags, safe links, no active content`,
     );

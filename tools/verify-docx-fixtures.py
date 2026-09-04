@@ -18,7 +18,8 @@ REL = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 CT = "{http://schemas.openxmlformats.org/package/2006/content-types}"
 PARTS = {"[Content_Types].xml", "_rels/.rels", "word/document.xml",
          "word/_rels/document.xml.rels", "word/styles.xml", "word/numbering.xml"}
-KINDS = ("standard", "sparse", "unicode", "hostile", "dense")
+KINDS = ("standard", "sparse", "unicode", "hostile", "dense", "optional",
+         "structured", "paginated")
 
 
 def normalized(value):
@@ -61,6 +62,54 @@ def expected_paragraphs(source):
         if len(paragraphs) > begin:
             paragraphs.insert(begin, (normalized(section["heading"]), "Heading1", False))
     return paragraphs, links
+
+
+def expected_text(source):
+    blocks = []
+
+    def link(value):
+        label, url = normalized(value["label"]), normalized(value["url"])
+        return url if not label or label == url else f"{label}: {url}"
+
+    contact = []
+    for value in (source["contact"][key] for key in ("fullName", "email", "phone", "location")):
+        value = normalized(value)
+        if value:
+            contact.append(value)
+    contact.extend(link(value) for value in source["contact"]["links"] if normalized(value["url"]))
+    if contact:
+        blocks.append("\n".join(contact))
+
+    for section in source["sections"]:
+        entries = []
+        for entry in section["entries"]:
+            lines = []
+            for key in ("heading", "subheading", "dateRange", "location"):
+                value = normalized(entry[key])
+                if value:
+                    lines.append(value)
+            for field in entry["fields"]:
+                value, label = normalized(field["value"]), normalized(field["label"])
+                if value:
+                    lines.append(f"{label}: {value}" if label else value)
+            for bullet in entry["bullets"]:
+                value = normalized(bullet["text"])
+                if value:
+                    lines.append("- " + value.replace("\n", "\n  "))
+            lines.extend(link(value) for value in entry["links"] if normalized(value["url"]))
+            if lines:
+                entries.append("\n".join(lines))
+        if entries:
+            blocks.append(normalized(section["heading"]) + "\n" + "\n\n".join(entries))
+    return "\n\n".join(blocks) + "\n"
+
+
+def verify_text(data, source):
+    assert 0 < len(data) <= 262144, "plain-text bound"
+    assert b"\r" not in data and data.endswith(b"\n") and not data.endswith(b"\n\n")
+    text = data.decode("utf-8")
+    assert text == expected_text(source), "exact plain-text semantic and whitespace parity"
+    assert source["title"] not in text and source["documentId"] not in text
 
 
 def verify(data, source):
@@ -164,15 +213,21 @@ def main():
         raise SystemExit("usage: verify-docx-fixtures.py SYNTHETIC_DIRECTORY")
     root = Path(sys.argv[1])
     goldens = json.loads((Path(__file__).resolve().parent.parent / "fixtures/documents/docx-v1.sha256.json").read_text(encoding="utf-8"))
+    text_goldens = json.loads((Path(__file__).resolve().parent.parent / "fixtures/documents/text-v1.sha256.json").read_text(encoding="utf-8"))
     assert set(goldens) == set(KINDS), "complete golden corpus"
+    assert set(text_goldens) == set(KINDS), "complete plain-text golden corpus"
     for name in KINDS:
         data = (root / (name + ".docx")).read_bytes()
         source = json.loads((root / (name + ".json")).read_text(encoding="utf-8"))
+        text = (root / (name + ".txt")).read_bytes()
         verify(data, source)
+        verify_text(text, source)
         digest = hashlib.sha256(data).hexdigest()
         assert digest == goldens[name], f"{name}: review required: deterministic DOCX bytes changed; expected {goldens[name]}, got {digest} ({len(data)} bytes)"
+        text_digest = hashlib.sha256(text).hexdigest()
+        assert text_digest == text_goldens[name], f"{name}: reviewed plain-text golden changed"
     rejection_checks((root / "standard.docx").read_bytes(), json.loads((root / "standard.json").read_text(encoding="utf-8")))
-    print("Five DOCX fixtures: golden SHA-256, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; seven negative controls rejected.")
+    print("Eight DOCX/text fixtures: golden SHA-256, exact text, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; seven negative controls rejected.")
 
 
 if __name__ == "__main__":

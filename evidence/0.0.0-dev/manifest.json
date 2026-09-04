@@ -29,6 +29,8 @@
     "m2EditorContracts": "passed-local",
     "m2DraftPublishFlow": "passed-local-synthetic-macos-arm64",
     "m2NativeUiInteraction": "passed-local-synthetic-macos-arm64",
+    "m2DesktopAccessibilityAutomation": "passed-local-static-and-live-axe-loaded-validation-conflict-focus-positive-control-high-panels-excluded",
+    "m2OutputGoldenCorpus": "passed-local-eight-synthetic-docx-pdf-text-byte-semantic-link-pagination-structure-accessibility-and-24-page-visual-checks-macos-arm64",
     "m2EditorAutosaveRecovery": "passed-local-unit-and-native-macos-arm64",
     "m2NativeUnsavedCloseProtection": "partial-main-close-and-app-menu-shortcut-passed-macos-arm64",
     "m2NativeSystemQuitProtection": "pending-macos-dock-and-system-termination",

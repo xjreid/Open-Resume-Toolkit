@@ -36,7 +36,7 @@ fn parts(bytes: &[u8]) -> BTreeMap<String, String> {
 
 #[test]
 fn fixed_parts_well_formed_xml_and_deterministic_bytes_for_whole_corpus() {
-    for kind in ["standard", "sparse", "unicode", "hostile", "dense"] {
+    for kind in support::OUTPUT_FIXTURE_KINDS {
         let doc = support::fixture(kind);
         let bytes = render_docx(&doc).unwrap();
         assert_eq!(bytes, render_docx(&doc).unwrap());

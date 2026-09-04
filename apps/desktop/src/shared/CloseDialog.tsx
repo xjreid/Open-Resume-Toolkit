@@ -25,14 +25,31 @@ export function CloseDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const keep = useRef<HTMLButtonElement>(null);
+  const restoreFocus = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const element = dialog.current;
     if (!element) return;
     if (open && !element.open) {
+      restoreFocus.current =
+        document.activeElement instanceof HTMLElement &&
+        document.activeElement !== document.body
+          ? document.activeElement
+          : null;
       element.showModal();
       keep.current?.focus();
-    } else if (!open && element.open) element.close();
+    } else if (!open && element.open) {
+      element.close();
+      if (restoreFocus.current?.isConnected) restoreFocus.current.focus();
+      restoreFocus.current = null;
+    }
   }, [open]);
+
+  useEffect(
+    () => () => {
+      if (restoreFocus.current?.isConnected) restoreFocus.current.focus();
+    },
+    [],
+  );
 
   return (
     <dialog

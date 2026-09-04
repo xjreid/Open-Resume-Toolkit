@@ -71,6 +71,23 @@ main window currently quits the whole development workspace; closing the overlay
 alone does not quit the editor.
 See `evidence/0.0.0-dev/m2-close-guard-smoke.md` for verified paths and limitations.
 
+The desktop test suite includes axe-core semantic checks for the initial main
+and overlay routes, the PDF preview, the quit dialog, and populated published
+content. Live component cases cover the loaded editor, required-field feedback,
+revision-conflict announcement/recovery, and quit-dialog focus restoration.
+HIGH-tagged backup/recovery and all-local-data deletion panels are excluded from
+this medium-reasoning checkpoint. Run the checks with:
+
+```sh
+pnpm --filter @ort/desktop test
+```
+
+The harness has a failing unnamed-button positive control and disables only the
+color-contrast rule because jsdom cannot resolve native layout or colors. These
+checks do not replace keyboard, zoom, forced-color, reduced-motion, VoiceOver,
+NVDA, WKWebView, WebView2, or native-dialog testing. See
+`evidence/0.0.0-dev/m2-desktop-accessibility-automation.md`.
+
 For the M2 text-export check:
 
 1. Wait for **Saved**, then choose **Export saved draft (.txt)**. Alternatively,
@@ -127,11 +144,16 @@ python3 tools/verify-docx-fixtures.py target/docx-review-fixtures
 
 Use a **new** output directory each time; the fixture generator deliberately
 refuses an existing directory. Python uses only its standard library (`python`
-on Windows). All four CI jobs now independently check the generated package,
-CRC, XML, source-text parity, heading/list semantics and hyperlink relationships.
+on Windows). The shared eight-case output corpus covers standard, sparse,
+supported multilingual, code-like literal, dense four-page, omitted optional
+data, multi-section/field/link ordering, and exact two-page resumes. All four CI
+jobs independently check deterministic DOCX and plain-text bytes, package/CRC/
+XML integrity, exact source-text parity, heading/list semantics and hyperlink
+relationships. The shared plain-text golden also has to match the PDF fixture
+path, so the three output formats cannot silently diverge.
 Local headless-render and manual/platform limits are recorded in
-`evidence/0.0.0-dev/m2-docx-export.md`. There is no production Python or
-LibreOffice dependency; the exporter is Rust-only.
+`evidence/0.0.0-dev/m2-output-golden-corpus.md`. There is no production Python
+or LibreOffice dependency; the exporter is Rust-only.
 
 The first DOCX CI run passed three jobs but Windows failed the golden-byte
 check after its Rust tests passed. Git's CRLF checkout conversion changed the
@@ -170,8 +192,8 @@ reloads can leave that bounded cache until its next access or process exit; this
 is not guaranteed timed memory erasure. No preview file is staged on disk.
 
 Current development limits are 4 MiB, five pages, 800 content blocks and 200 hard
-line breaks, in addition to document limits. Overflow, uncovered glyphs (including
-the current CJK/emoji fixture), compile warnings, and unsupported layouts are
+line breaks, in addition to document limits. Overflow, uncovered glyphs (covered
+by an explicit negative control), compile warnings, and unsupported layouts are
 explicit failures, never silent truncation or font substitution. Tabs become four
 spaces. Text and DOCX remain alternatives. This original plain fixture is not the
 final template catalogue. The fixed typography/language options and full bundled
@@ -197,13 +219,16 @@ node tools/verify-pdf-fixtures.mjs target/pdf-review-fixtures
 python3 tools/verify-pdf-fonts.py target/pdf-review-fixtures
 ```
 
-Every CI runner now checks PDF golden bytes, visible text/order, page geometry,
-tags and safe links. New template sources also retain LF bytes under Windows
+Every CI runner checks all eight PDF golden bytes, exact shared plain-text parity,
+fixed page counts, visible text/order, page geometry, semantic structure roles,
+safe links, and absence of active content. New template sources retain LF bytes under Windows
 checkout conversion. `tools/smoke-pdf-browser.mjs` performs optional headless
 Chromium QA against a loopback production frontend with synthetic mocked native
 commands; supply `ORT_PLAYWRIGHT_MODULE` / `ORT_BROWSER_EXECUTABLE` if needed.
 It never proves native IPC, WKWebView/WebView2, save dialogs, vaults or ACLs.
-See `evidence/0.0.0-dev/m2-pdf-preview.md` for actual checks and manual gates.
+See `evidence/0.0.0-dev/m2-output-golden-corpus.md` for the expanded output
+checkpoint and `evidence/0.0.0-dev/m2-pdf-preview.md` for preview behavior and
+manual gates.
 
 ## Encrypted portable backup export
 

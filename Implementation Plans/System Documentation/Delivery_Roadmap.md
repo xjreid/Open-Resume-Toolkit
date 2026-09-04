@@ -87,10 +87,11 @@ Exit evidence:
 
 ### Current status
 
-As of 2026-09-03, M2 is **about 64% complete** by stage-gate weighting after
-the all-local-data deletion and current-bundle render-replay checkpoints:
+As of 2026-09-03, M2 is **about 66% complete** by stage-gate weighting after
+the all-local-data deletion, current-bundle render-replay, desktop accessibility,
+and expanded output-golden checkpoints:
 approximately 82% of the implementation foundation, 64% of end-to-end
-functionality, and 48% of release/exit evidence.
+functionality, and 54% of release/exit evidence.
 The estimate gives security,
 recovery, accessibility, cross-platform behavior, and the complete offline
 journey more weight than raw feature count.
@@ -130,6 +131,21 @@ Archived-source and superseded-renderer binary replay remains a later M2 gate.
   encrypted restart tests, and Windows SQLCipher logging mitigation.
 - **Reliability:** generated contracts, deterministic output/golden tests, and
   passing full local checks for the latest checkpoint.
+- **Output-only golden corpus:** one shared eight-case synthetic source set now
+  pins DOCX, PDF and plain-text bytes and verifies exact cross-format text,
+  semantic ordering, omitted optional data, safe HTTP/HTTPS/mailto links,
+  supported multilingual content, literal code-like text, PDF structure tags,
+  fixed one/two/four-page boundaries, active-content absence, and rendered-page
+  layout. The DOCX accessibility audit reports zero findings across all cases.
+  This does not enable the HIGH-tagged import path or replace native Word,
+  assistive-technology, cross-platform, or final-template qualification.
+- **Desktop accessibility automation:** axe-core semantic checks cover the
+  medium-routed main/overlay, PDF preview, quit-decision and populated published
+  review surfaces, with a failing positive control. Live component checks cover
+  the loaded editor, associated validation errors, announced revision conflict,
+  and quit-dialog focus restoration. HIGH-tagged recovery and deletion panels
+  are excluded; native assistive-technology and interaction matrices remain
+  pending.
 
 ### Detailed checkpoint evidence
 
@@ -144,10 +160,12 @@ Archived-source and superseded-renderer binary replay remains a later M2 gate.
 - Documents and rendering: [DOCX](../../evidence/0.0.0-dev/m2-docx-export.md),
   [Windows checkout repair](../../evidence/0.0.0-dev/windows-docx-checkout.md),
   [PDF preview](../../evidence/0.0.0-dev/m2-pdf-preview.md),
+  [expanded output golden corpus](../../evidence/0.0.0-dev/m2-output-golden-corpus.md),
   [installed PDF smoke](../../evidence/0.0.0-dev/m2-installed-pdf-smoke.md),
   [render history](../../evidence/0.0.0-dev/m2-render-history.md),
   [portable render history](../../evidence/0.0.0-dev/m2-portable-render-history.md),
   and [verified current-bundle replay](../../evidence/0.0.0-dev/m2-current-render-replay.md).
+- Accessibility automation: [desktop semantic checks](../../evidence/0.0.0-dev/m2-desktop-accessibility-automation.md).
 - Storage and backup: [portable export](../../evidence/0.0.0-dev/m2-portable-backup-export.md),
   [storage usage](../../evidence/0.0.0-dev/m2-storage-usage.md),
   [backup validation](../../evidence/0.0.0-dev/m2-backup-validation.md),

@@ -7,18 +7,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .ok_or("provide a QA output directory")?;
     std::fs::create_dir_all(&directory)?;
-    for kind in ["standard", "sparse", "unicode", "hostile", "dense"] {
-        let mut doc = support::fixture(kind);
-        if kind == "unicode" {
-            doc.contact.full_name = "Zoë García — Élise".into();
-            doc.sections[0].heading = "Expérience / Ελληνικά".into();
-            doc.sections[0].entries[0].fields[0].value =
-                "Français, Español, Ελληνικά, Русский".into();
-        }
-        if kind == "hostile" {
-            doc.sections[0].entries[0].bullets[0].text =
-                r#"#read("/secret") #include "secret" #panic("fail") <script> & literal"#.into();
-        }
+    for kind in support::OUTPUT_FIXTURE_KINDS {
+        let doc = support::fixture(kind);
         let artifact = ort_render::render_pdf(&doc)?;
         let root = std::path::Path::new(&directory);
         std::fs::write(root.join(format!("{kind}.pdf")), &artifact.bytes)?;
