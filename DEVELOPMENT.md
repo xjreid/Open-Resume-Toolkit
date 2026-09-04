@@ -36,6 +36,13 @@ just check
 just dev
 ```
 
+`just check` is the canonical offline-capable repository gate after bootstrap.
+It validates the checked-in JavaScript and Rust dependency licenses against
+`config/dependency-license-policy.json`, writes a machine-readable inventory to
+`target/licenses/dependency-inventory.json`, regenerates contracts, and fails if
+the checked-in bindings drift. License metadata for every locked target must
+already be available locally when running without network access.
+
 `just dev` always verifies the `com.openresumetoolkit.dev` identity before it starts. Development and test builds must use only synthetic data.
 
 The main window reports `ready` after it opens the isolated development profile

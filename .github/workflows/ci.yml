@@ -54,6 +54,9 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify dependency licenses
+        run: pnpm check:licenses
+
       - name: Verify generated contracts
         run: cargo run --locked -p ort-contract-generator && git diff --exit-code -- packages/contracts/generated
 
@@ -104,6 +107,9 @@ jobs:
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify target JavaScript dependency licenses
+        run: node tools/check-licenses.mjs --javascript-only
 
       - name: Build frontend and Rust desktop shell
         id: desktop-build

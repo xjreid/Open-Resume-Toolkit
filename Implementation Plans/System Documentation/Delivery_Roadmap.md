@@ -25,6 +25,13 @@ The Quiet Navy/Open Frame application and website direction is approved under `.
 
 ## M0 — architecture skeleton and contracts
 
+Current development status: the repository skeleton, contracts, isolated
+development profile, static web/capability checks, and four-target CI are in
+place. The 2026-09-04 tooling checkpoint adds a fail-closed Rust/JavaScript SPDX
+allowlist, deterministic dependency inventory, and contract-regeneration drift
+to the canonical `just check` path. Native clean-checkout, installed-window,
+profile-isolation, and production-bundle evidence still gate formal M0 signoff.
+
 Deliver:
 
 - Cargo/pnpm workspaces, pinned toolchains, Tauri/React shell, and isolated dev profile;

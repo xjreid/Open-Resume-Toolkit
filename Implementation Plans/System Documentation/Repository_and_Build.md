@@ -78,6 +78,15 @@ Cross-language integer counters use bounded integers whose JSON range is safe in
 
 ## Dependency policy
 
+The M0 license gate is implemented through
+`../../config/dependency-license-policy.json` and
+`../../tools/check-licenses.mjs`. It checks the complete locked Cargo metadata
+graph plus every pnpm lock package, rejects missing/unknown licenses, and writes
+the deterministic inventory under `target/licenses/`. Platform-specific
+JavaScript packages are rechecked on each supported CI target. The policy has no
+package exceptions as of 2026-09-04. Binary-asset notices and the release SBOM
+remain separate packaging gates.
+
 Before adding a runtime dependency, record:
 
 1. purpose and why standard-library/current dependencies are insufficient;

@@ -10,7 +10,8 @@
   },
   "scripts": {
     "build": "pnpm --recursive --if-present build",
-    "check": "pnpm format:check && pnpm lint && pnpm test && pnpm build && pnpm check:security",
+    "check": "pnpm format:check && pnpm lint && pnpm test && pnpm build && pnpm check:security && pnpm check:licenses",
+    "check:licenses": "node tools/check-licenses.mjs",
     "check:security": "node tools/check-web-security.mjs && node tools/check-secrets.mjs",
     "dev": "pnpm --filter @ort/desktop tauri dev",
     "dev:extension:chrome": "pnpm --filter @ort/extension dev:chrome",

@@ -2,6 +2,7 @@
   "name": "@ort/extension",
   "version": "0.0.0-dev",
   "private": true,
+  "license": "GPL-3.0-only",
   "type": "module",
   "scripts": {
     "build": "pnpm build:chrome && pnpm build:edge",

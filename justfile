@@ -10,8 +10,13 @@ bootstrap:
 generate:
 	pnpm generate
 
+verify-contracts:
+	cargo run --locked -p ort-contract-generator
+	git diff --exit-code -- packages/contracts/generated
+
 check:
 	pnpm check
+	just verify-contracts
 	cargo fmt --all --check
 	cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 	cargo test --workspace --all-targets --locked

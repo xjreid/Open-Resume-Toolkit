@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "allowedLicenses": [
+    "0BSD",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "BlueOak-1.0.0",
+    "CC0-1.0",
+    "GPL-3.0-only",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib"
+  ],
+  "allowedLicenseExceptions": ["LLVM-exception"],
+  "javascriptPlatformFamilies": [
+    {
+      "prefix": "@napi-rs/canvas-",
+      "version": "1.0.8",
+      "license": "MIT"
+    },
+    {
+      "prefix": "@rolldown/binding-",
+      "version": "1.2.6",
+      "license": "MIT"
+    },
+    {
+      "prefix": "@tauri-apps/cli-",
+      "version": "2.11.4",
+      "license": "Apache-2.0 OR MIT"
+    },
+    {
+      "prefix": "@typescript/typescript-",
+      "version": "7.0.2",
+      "license": "Apache-2.0"
+    },
+    {
+      "prefix": "lightningcss-",
+      "version": "1.33.0",
+      "license": "MPL-2.0"
+    }
+  ],
+  "packageExceptions": []
+}

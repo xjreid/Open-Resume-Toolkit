@@ -1,7 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "version": "0.0.0-dev",
-  "commit": "296610a49461363ff47da6353558ea5b35ebf3f4",
+  "sourceBaselineCommit": "5f4b33ed9b257c534daabac86e79bc2a97246de7",
+  "sourceCheckpoint": "m0-license-and-contract-gates-local-macos-arm64-containing-commit-is-authoritative",
+  "installedArtifactCommit": "296610a49461363ff47da6353558ea5b35ebf3f4",
   "channel": "development",
   "profileIdentity": "com.openresumetoolkit.dev",
   "artifacts": [
@@ -17,6 +19,8 @@
   ],
   "checks": {
     "contracts": "passed-local",
+    "dependencyLicenses": "passed-local-727-rust-and-167-javascript-workspace-packages-zero-exceptions-macos-arm64",
+    "canonicalLocalGate": "passed-local-after-m0-license-and-contract-wiring-macos-arm64",
     "typescript": "passed-local",
     "rust": "passed-local-macos-arm64",
     "security": "passed-local-static",
@@ -45,7 +49,7 @@
     "m2ImportTransportPolicy": "passed-local-nine-synthetic-event-tests-macos-arm64",
     "m2ImportProductionSupervisorCore": "passed-local-cross-platform-policy-with-adversarial-mock-adapters-macos-arm64",
     "m2ImportSourceEnvelope": "passed-local-no-follow-bounded-snapshot-and-adversarial-pdf-docx-envelope-tests-macos-arm64",
-    "m2ImportPrivateStaging": "passed-local-unix-private-operation-staging-exact-cleanup-and-disabled-launch-composition-macos-arm64-linux-o-path-directory-sync-repair-passed-local-focused-tests-ci-rerun-pending-windows-pending",
+    "m2ImportPrivateStaging": "passed-local-unix-private-operation-staging-exact-cleanup-and-disabled-launch-composition-macos-arm64-linux-o-path-directory-sync-repair-passed-hosted-ubuntu-windows-pending",
     "m2ImportDocxWorkerParser": "passed-local-bounded-zip-xml-relationship-extraction-and-adversarial-tests-macos-arm64-native-invocation-pending",
     "m2ImportPdfWorkerParser": "passed-local-pinned-pdfium-7881-bounded-text-and-adversarial-tests-plus-native-synthetic-smoke-macos-arm64-other-targets-packaging-and-containment-pending",
     "m2ImportMacosNativeAdapter": "pending-xpc-app-sandbox-production-implementation-and-full-matrix",
@@ -76,7 +80,7 @@
     "m2AllLocalDataDeletion": "passed-local-synthetic-exact-target-rekey-restart-recovery-contract-ui-macos-arm64",
     "m2AllLocalDataDeletionNative": "pending-installed-macos-and-windows-vault-filesystem-interruption-accessibility",
     "macosPreviewPackage": "296610a-arm64-app-built-installed-hash-matched-and-codesign-deep-strict-passed-dmg-not-refreshed",
-    "platformBuilds": "7a8cda1-four-of-five-hosted-jobs-passed-ubuntu-quality-failed-o-path-directory-sync-repair-local-ci-rerun-pending"
+    "platformBuilds": "5f4b33e-user-reported-all-five-hosted-jobs-passed"
   },
   "releaseEligible": false
 }
