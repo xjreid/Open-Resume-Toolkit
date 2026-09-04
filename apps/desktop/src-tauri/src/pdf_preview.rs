@@ -8,8 +8,8 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use ort_domain::{
     CommandResponse, ExportSource, MAX_PDF_RENDER_HISTORY, PDF_PREVIEW_TTL_SECONDS,
     PdfExportResponse, PdfPreviewResponse, PdfReleaseResponse, PdfRenderHistoryRequest,
-    PdfRenderHistoryResponse, PdfRenderManifest, PdfReplayRequest, PdfTicketRequest,
-    RenderPdfRequest,
+    PdfRenderHistoryResponse, PdfRenderManifest, PdfReplayRequest, PdfReplayResponse,
+    PdfTicketRequest, RenderPdfRequest,
 };
 use ort_platform::{ExportDestination, ExportFileType, ExportWriteError};
 use ort_render::{PdfArtifact, PdfRenderError};
@@ -65,7 +65,7 @@ impl PdfState {
     }
 }
 
-fn load_exact(
+fn load_current_exact(
     state: &DesktopState,
     source: ExportSource,
     revision: i64,
@@ -76,6 +76,44 @@ fn load_exact(
             ExportSource::PublishedSnapshot => store.load_latest_published(),
         }?;
         exact_revision(value, revision)
+    })
+}
+
+fn load_retained_exact(
+    state: &DesktopState,
+    source: ExportSource,
+    revision: i64,
+) -> Result<VersionedResume, StorageError> {
+    state.with_store(|store| match source {
+        ExportSource::SavedDraft => exact_revision(store.load_draft()?, revision),
+        ExportSource::PublishedSnapshot => store
+            .load_published_revision(revision)?
+            .ok_or(StorageError::NotFound),
+    })
+}
+
+fn load_replay_source(
+    state: &DesktopState,
+    manifest_id: uuid::Uuid,
+) -> Result<(StoredRenderManifest, VersionedResume), StorageError> {
+    state.with_store(|store| {
+        let manifest = store
+            .load_render_manifest(manifest_id)?
+            .ok_or(StorageError::NotFound)?;
+        let saved = match manifest.source {
+            ExportSource::SavedDraft => {
+                exact_revision(store.load_draft()?, manifest.source_revision).map_err(|error| {
+                    match error {
+                        StorageError::RevisionConflict => StorageError::NotFound,
+                        other => other,
+                    }
+                })?
+            }
+            ExportSource::PublishedSnapshot => store
+                .load_published_revision(manifest.source_revision)?
+                .ok_or(StorageError::NotFound)?,
+        };
+        Ok((manifest, saved))
     })
 }
 
@@ -96,7 +134,7 @@ pub(crate) async fn render_resume_pdf(
     };
     let state = app.state::<DesktopState>();
     let source = request.payload.source;
-    let saved = match load_exact(&state, source, request.payload.expected_revision) {
+    let saved = match load_current_exact(&state, source, request.payload.expected_revision) {
         Ok(saved) => saved,
         Err(error) => return storage_failure(&error),
     };
@@ -229,7 +267,7 @@ fn render_matching_receipt(
 pub(crate) async fn replay_resume_pdf(
     window: WebviewWindow,
     request: PdfReplayRequest,
-) -> CommandResponse<PdfPreviewResponse> {
+) -> CommandResponse<PdfReplayResponse> {
     if window.label() != "main" {
         return window_not_authorized();
     }
@@ -243,17 +281,7 @@ pub(crate) async fn replay_resume_pdf(
     let Ok(manifest_id) = uuid::Uuid::parse_str(&request.payload.manifest_id) else {
         return failure("PDF_REPLAY_UNAVAILABLE");
     };
-    let replay = app.state::<DesktopState>().with_store(|store| {
-        let manifest = store
-            .load_render_manifest(manifest_id)?
-            .ok_or(StorageError::NotFound)?;
-        let source = match manifest.source {
-            ExportSource::SavedDraft => store.load_draft(),
-            ExportSource::PublishedSnapshot => store.load_latest_published(),
-        }?;
-        let saved = exact_revision(source, manifest.source_revision)?;
-        Ok((manifest, saved))
-    });
+    let replay = load_replay_source(&app.state::<DesktopState>(), manifest_id);
     let (manifest, saved) = match replay {
         Ok(value) => value,
         Err(StorageError::NotFound) => return failure("PDF_REPLAY_SOURCE_UNAVAILABLE"),
@@ -303,7 +331,7 @@ pub(crate) async fn replay_resume_pdf(
         }) {
             return storage_failure(&error);
         }
-        let response = PdfPreviewResponse {
+        let preview_response = PdfPreviewResponse {
             render_id: preview.id.clone(),
             source: preview.source,
             revision: preview.revision,
@@ -311,12 +339,18 @@ pub(crate) async fn replay_resume_pdf(
             receipt: preview.artifact.receipt.clone(),
             pdf_base64: STANDARD.encode(&preview.artifact.bytes),
         };
+        let Ok(accessible_text) = ort_documents::render_plain_text(&saved.document) else {
+            return failure("PDF_INVALID_CONTENT");
+        };
         let cache = app.state::<PdfState>();
         let Ok(mut slot) = cache.0.lock() else {
             return failure("PDF_UNAVAILABLE");
         };
         *slot = Some(preview);
-        CommandResponse::success(response)
+        CommandResponse::success(PdfReplayResponse {
+            preview: preview_response,
+            accessible_text,
+        })
     })
     .await
     {
@@ -365,7 +399,7 @@ pub(crate) async fn export_resume_pdf(
     else {
         return failure("PDF_PREVIEW_EXPIRED");
     };
-    if let Err(error) = load_exact(
+    if let Err(error) = load_retained_exact(
         &app.state::<DesktopState>(),
         preview.source,
         preview.revision,
@@ -421,6 +455,9 @@ fn failure<T: serde::Serialize>(code: &str) -> CommandResponse<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::DesktopStorage;
+    use ort_vault::testing::MemoryDatabaseKeyVault;
+    use tempfile::TempDir;
     fn preview() -> Arc<Preview> {
         let mut document = ort_domain::ResumeDocument::empty("Private title");
         document.contact.full_name = "Synthetic".into();
@@ -477,6 +514,51 @@ mod tests {
         assert_eq!(
             render_matching_receipt(&changed, &original.receipt).err(),
             Some(ReplayRenderError::Incompatible)
+        );
+    }
+
+    #[test]
+    fn replay_loads_an_exact_older_publication_but_not_an_old_draft() {
+        let temporary = TempDir::new().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store =
+            ort_storage::EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+                .unwrap();
+        let mut document = ort_domain::ResumeDocument::empty("First publication");
+        document.contact.full_name = "Synthetic First".into();
+        let first_draft = store.create_draft(&document).unwrap();
+        let first_published = store.publish_draft(first_draft.revision).unwrap();
+        let artifact = ort_render::render_pdf(&first_published.document).unwrap();
+        let published_manifest = store
+            .record_render_manifest(
+                ExportSource::PublishedSnapshot,
+                first_published.revision,
+                1_000,
+                &artifact.receipt,
+            )
+            .unwrap();
+        let draft_manifest = store
+            .record_render_manifest(
+                ExportSource::SavedDraft,
+                first_draft.revision,
+                1_001,
+                &artifact.receipt,
+            )
+            .unwrap();
+        document.contact.full_name = "Synthetic Second".into();
+        let second_draft = store.save_draft(first_draft.revision, &document).unwrap();
+        store.publish_draft(second_draft.revision).unwrap();
+        let state = DesktopState {
+            storage: Mutex::new(DesktopStorage::Ready(store)),
+        };
+
+        let (loaded_manifest, loaded_source) =
+            load_replay_source(&state, published_manifest.manifest_id).unwrap();
+        assert_eq!(loaded_manifest, published_manifest);
+        assert_eq!(loaded_source, first_published);
+        assert_eq!(
+            load_replay_source(&state, draft_manifest.manifest_id),
+            Err(StorageError::NotFound)
         );
     }
 }

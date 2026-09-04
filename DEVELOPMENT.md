@@ -205,13 +205,14 @@ receipt in the encrypted profile before the PDF is exposed to the UI. Repeated
 identical source/revision/PDF identities increment a counter instead of adding
 duplicate rows. Storage keeps the newest 100 identities and the UI shows the
 newest 20; resume text, PDF bytes, paths and preview tickets are not retained.
-For a receipt whose exact revision is still the current draft or latest
-published snapshot, **Verify & replay** regenerates with the installed bundle
-and exposes a preview only when every receipt field matches. It never substitutes
-a newer revision or different output. Older source revisions remain
-inspection-only, and superseded renderer binaries are not bundled, so this is
-not yet a universal historical replay guarantee. The bounded, content-free
-manifests are included in portable backup format 1.1.
+For a receipt whose exact revision is still the current draft or any retained
+immutable published snapshot, **Verify & replay** regenerates with the installed
+bundle and exposes a preview only when every receipt field matches. An older
+publication can be reviewed through bounded accessible text and exported from
+the verified expiring preview. It never substitutes a newer revision or
+different output. Superseded draft bodies are not retained, superseded renderer
+binaries are not bundled, and portable backup 1.1 carries only the content-free
+manifest plus the latest publication, so those cases remain inspection-only.
 
 Headless structural verification, without launching the app or OS vault:
 

@@ -22,6 +22,7 @@ import {
 } from "@ort/contracts/backup";
 import {
   isPdfPreviewCommandResponse,
+  isPdfReplayCommandResponse,
   isPdfExportCommandResponse,
   isPdfRenderHistoryCommandResponse,
   type PdfPreview,
@@ -394,12 +395,12 @@ export async function replayPdfRender(
       manifestId: manifest.manifestId,
     });
     const response: unknown = await invoke("replay_resume_pdf", { request });
-    if (!isPdfPreviewCommandResponse(response)) return invalidCommandResponse();
+    if (!isPdfReplayCommandResponse(response)) return invalidCommandResponse();
     if (
       response.ok &&
-      (response.value.source !== manifest.source ||
-        response.value.revision !== manifest.sourceRevision ||
-        !samePdfReceipt(response.value.receipt, manifest.receipt))
+      (response.value.preview.source !== manifest.source ||
+        response.value.preview.revision !== manifest.sourceRevision ||
+        !samePdfReceipt(response.value.preview.receipt, manifest.receipt))
     )
       return invalidCommandResponse();
     return response;

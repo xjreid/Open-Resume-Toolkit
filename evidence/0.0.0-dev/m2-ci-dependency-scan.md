@@ -1,8 +1,8 @@
 # M2 lockfile vulnerability-scan repair
 
-Date: 2026-09-04. Base commit: `28401b0`; implementation changes are
-uncommitted. Status: workflow repair implemented and locally inspected; first
-GitHub Actions result pending.
+Date: 2026-09-04. Base commit: `28401b0`; follow-up base commit: `9a14985`.
+Status: workflow and reviewed exception policy implemented and locally
+inspected; next GitHub Actions result pending.
 
 ## Failure diagnosis
 
@@ -50,3 +50,33 @@ establish that the lockfiles are vulnerability-free.
 - The npm endpoint remained unavailable during implementation, so no claim is
   made from the failed npm requests about current vulnerability status.
 - The user handles commit and push.
+
+## First full-scan result and follow-up
+
+The first pushed OSV run successfully scanned all 163 pnpm packages and 719
+Cargo packages, then blocked as designed. It reported 21 affected Rust packages
+and 22 advisory IDs: 19 informational/unmaintained dependencies, the Linux-only
+`glib::VariantStrIter` unsoundness, and two high-severity `quick-xml` denial-of-
+service advisories. Three findings advertised a nominal fixed version, but none
+has an in-range top-level lockfile update:
+
+- GTK/ATK/GLib and `proc-macro-error` enter through Tauri's Linux WebKit graph.
+  Linux is a compile/test host, not a supported or distributed ORT target, and
+  ORT does not call the affected GLib iterator.
+- Five unmaintained `rust-unic` crates enter through Tauri's `urlpattern`.
+- The other informational notices enter through pinned Typst dependencies.
+- `quick-xml 0.38.4` enters through `citationberg`/`hayagriva`. The vulnerable
+  parser handles bibliography XML. ORT supplies only bounded structured resume
+  data to a fixed embedded Typst template, has no bibliography input, and its
+  renderer World denies every external file/package/plugin.
+
+`osv-scanner.toml` now lists only those exact IDs, each with a concrete reason
+and a 2026-12-04 expiry. The workflow passes that config explicitly while
+retaining `fail-on-vuln`. `tools/tests/osv-policy.test.mjs` pins the reviewed ID
+set, expiry, reasons, both lockfiles, and absence of broad package overrides or
+a disabled failure gate. Newly published advisory IDs still fail immediately;
+the current exceptions stop working at their review deadline.
+
+Local verification passed the OSV policy regression test. The GitHub-hosted
+scanner is the authority for the next full result; this evidence does not claim
+that pending run has passed.

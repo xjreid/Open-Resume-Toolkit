@@ -40,6 +40,15 @@ pub struct PdfPreviewResponse {
     pub pdf_base64: String,
 }
 
+#[derive(Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PdfReplayResponse {
+    pub preview: PdfPreviewResponse,
+    /// Bounded plain text from the exact retained source, used when an older
+    /// published revision is no longer present in the editor's current state.
+    pub accessible_text: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PdfRenderManifest {

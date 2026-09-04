@@ -44,6 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &output.join("pdf.history.response.schema.json"),
     )?;
     write_schema::<ort_domain::PdfReplayRequest>(&output.join("pdf.replay.request.schema.json"))?;
+    write_schema::<ort_domain::PdfReplayResponse>(&output.join("pdf.replay.response.schema.json"))?;
     fs::write(
         output.join("pdf.ts"),
         include_str!("pdf.ts.template")

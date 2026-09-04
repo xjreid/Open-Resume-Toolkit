@@ -73,6 +73,15 @@ fn restart_render_and_export_preserve_exact_saved_and_published_revisions() {
     assert_eq!(after_published.revision, published.revision);
     assert_eq!(after_published.document, published.document);
     assert_eq!(std::fs::read_dir(output.path()).unwrap().count(), 2);
+    let newer_published = store.publish_draft(draft.revision).unwrap();
+    assert_ne!(newer_published.revision, published.revision);
+    let retained = store
+        .load_published_revision(published.revision)
+        .unwrap()
+        .expect("older immutable publication remains retained");
+    assert_eq!(retained, published);
+    let retained_artifact = render_pdf(&retained.document).unwrap();
+    assert_eq!(retained_artifact.receipt.pdf_sha256, hashes[1]);
     drop(store);
     let reopened = EncryptedStore::open_or_initialize(profile.path(), "test", &vault).unwrap();
     let manifests = reopened.load_recent_render_manifests(20).unwrap();

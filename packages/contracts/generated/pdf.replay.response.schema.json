@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PdfReplayResponse",
+  "type": "object",
+  "properties": {
+    "accessibleText": {
+      "description": "Bounded plain text from the exact retained source, used when an older\npublished revision is no longer present in the editor's current state.",
+      "type": "string"
+    },
+    "preview": {
+      "$ref": "#/$defs/PdfPreviewResponse"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "preview",
+    "accessibleText"
+  ],
+  "$defs": {
+    "ExportSource": {
+      "type": "string",
+      "enum": [
+        "saved_draft",
+        "published_snapshot"
+      ]
+    },
+    "PdfPreviewResponse": {
+      "type": "object",
+      "properties": {
+        "generatedAtUnixMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "pdfBase64": {
+          "type": "string"
+        },
+        "receipt": {
+          "$ref": "#/$defs/PdfRenderReceipt"
+        },
+        "renderId": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "source": {
+          "$ref": "#/$defs/ExportSource"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "renderId",
+        "source",
+        "revision",
+        "generatedAtUnixMs",
+        "receipt",
+        "pdfBase64"
+      ]
+    },
+    "PdfRenderReceipt": {
+      "type": "object",
+      "properties": {
+        "byteCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "documentSchemaVersion": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "documentSha256": {
+          "type": "string"
+        },
+        "fontBundleId": {
+          "type": "string"
+        },
+        "fontBundleSha256": {
+          "type": "string"
+        },
+        "pageCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "pdfSha256": {
+          "type": "string"
+        },
+        "rendererVersion": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        },
+        "templateSha256": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "documentSha256",
+        "documentSchemaVersion",
+        "pdfSha256",
+        "rendererVersion",
+        "templateId",
+        "templateSha256",
+        "fontBundleId",
+        "fontBundleSha256",
+        "pageCount",
+        "byteCount"
+      ]
+    }
+  }
+}

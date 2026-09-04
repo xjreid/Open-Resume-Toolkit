@@ -3,6 +3,7 @@ import {
   isPdfPreviewCommandResponse,
   isPdfExportCommandResponse,
   isPdfRenderHistoryCommandResponse,
+  isPdfReplayCommandResponse,
   MAX_PDF_BYTES,
   MAX_PDF_RENDER_HISTORY,
 } from "../generated/pdf";
@@ -105,4 +106,16 @@ it("accepts bounded content-free render history and rejects unexpected fields", 
     { manifests: [], pdfBytes: "forbidden" },
   ])
     expect(isPdfRenderHistoryCommandResponse(wrap(value))).toBe(false);
+});
+it("accepts bounded accessible text for an exact replay", () => {
+  const replay = { preview, accessibleText: "Synthetic replay\n" };
+  expect(isPdfReplayCommandResponse(wrap(replay))).toBe(true);
+  for (const value of [
+    { ...replay, sourcePath: "/private" },
+    { ...replay, accessibleText: "" },
+    { ...replay, accessibleText: "missing terminal newline" },
+    { ...replay, accessibleText: "invalid\u0000text\n" },
+    { ...replay, accessibleText: `${"x".repeat(262144)}\n` },
+  ])
+    expect(isPdfReplayCommandResponse(wrap(value))).toBe(false);
 });

@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import type { PdfPreview } from "@ort/contracts/pdf";
-import { PdfPreviewPanel, replayableDocument } from "./PdfPreview";
+import {
+  PdfPreviewPanel,
+  replayAvailable,
+  replayableDocument,
+} from "./PdfPreview";
 import {
   previewExpired,
   previewIsStale,
@@ -90,6 +94,10 @@ it("never substitutes a different current revision for replay", () => {
   expect(replayableDocument(manifest, { revision: 2, document }, null)).toBe(
     document,
   );
+  expect(replayAvailable(manifest, { revision: 1, document })).toBe(false);
+  expect(
+    replayAvailable({ ...manifest, source: "published_snapshot" }, null),
+  ).toBe(true);
 });
 it("native requests contain no path, document, PDF bytes or template", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({ ok: true, value: preview });
@@ -126,7 +134,10 @@ it("native requests contain no path, document, PDF bytes or template", async () 
     renderCount: 1,
     receipt: preview.receipt,
   };
-  vi.mocked(invoke).mockResolvedValueOnce({ ok: true, value: preview });
+  vi.mocked(invoke).mockResolvedValueOnce({
+    ok: true,
+    value: { preview, accessibleText: "Synthetic replay\n" },
+  });
   expect((await replayPdfRender(manifest)).ok).toBe(true);
   expect(invoke).toHaveBeenLastCalledWith("replay_resume_pdf", {
     request: expect.objectContaining({
@@ -136,8 +147,11 @@ it("native requests contain no path, document, PDF bytes or template", async () 
   vi.mocked(invoke).mockResolvedValueOnce({
     ok: true,
     value: {
-      ...preview,
-      receipt: { ...preview.receipt, pdfSha256: "f".repeat(64) },
+      preview: {
+        ...preview,
+        receipt: { ...preview.receipt, pdfSha256: "f".repeat(64) },
+      },
+      accessibleText: "Synthetic replay\n",
     },
   });
   expect((await replayPdfRender(manifest)).ok).toBe(false);

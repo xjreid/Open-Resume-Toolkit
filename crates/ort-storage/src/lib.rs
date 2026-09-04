@@ -796,6 +796,37 @@ impl EncryptedStore {
             .transpose()
     }
 
+    /// Loads one exact immutable published revision. Unlike the editor-facing
+    /// latest snapshot query, this is intended for retained render replay and
+    /// never substitutes a newer publication.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid revision, unavailable storage, or
+    /// malformed persisted content.
+    pub fn load_published_revision(
+        &self,
+        revision: i64,
+    ) -> Result<Option<VersionedResume>, StorageError> {
+        if !(1..=9_007_199_254_740_991).contains(&revision) {
+            return Err(StorageError::InvalidData);
+        }
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        connection
+            .query_row(
+                "SELECT published_revision, document_json FROM published_resumes \
+                 WHERE profile_id = ?1 AND published_revision = ?2",
+                params![self.manifest.profile_id.to_string(), revision],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?)),
+            )
+            .optional()
+            .map_err(|_| StorageError::Unavailable)?
+            .map(|(stored_revision, json)| parse_versioned_resume(stored_revision, &json))
+            .transpose()
+    }
+
     /// Creates or updates a bounded JSON setting with optimistic revision checks.
     ///
     /// # Errors
@@ -3392,6 +3423,44 @@ mod tests {
                 .load_render_manifest(Uuid::now_v7())
                 .expect("unknown identity is not an error")
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn exact_published_revisions_remain_loadable_without_newer_substitution() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("initialize encrypted store");
+        let mut document = ResumeDocument::empty("First synthetic publication");
+        let first_draft = store.create_draft(&document).expect("create draft");
+        let first = store
+            .publish_draft(first_draft.revision)
+            .expect("publish first revision");
+        document.title = "Second synthetic publication".into();
+        let second_draft = store
+            .save_draft(first_draft.revision, &document)
+            .expect("save second draft");
+        let second = store
+            .publish_draft(second_draft.revision)
+            .expect("publish second revision");
+
+        assert_eq!(
+            store
+                .load_published_revision(first.revision)
+                .expect("load first publication"),
+            Some(first)
+        );
+        assert_eq!(
+            store
+                .load_published_revision(second.revision)
+                .expect("load second publication"),
+            Some(second)
+        );
+        assert!(store.load_published_revision(3).unwrap().is_none());
+        assert_eq!(
+            store.load_published_revision(0),
+            Err(StorageError::InvalidData)
         );
     }
 

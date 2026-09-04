@@ -25,5 +25,6 @@ jobs:
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@880d9b542cc66d36d91d51b3fbcc038f5f28cfc5 # v2.5.1
     with:
       scan-args: |-
+        --config=osv-scanner.toml
         --lockfile=pnpm-lock.yaml
         --lockfile=Cargo.lock

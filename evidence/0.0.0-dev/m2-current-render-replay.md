@@ -1,5 +1,9 @@
 # M2 verified current-bundle render replay
 
+Follow-up: retained immutable published revisions were added on 2026-09-04; see
+[the retained-published replay checkpoint](m2-retained-published-replay.md).
+The limitations below describe this earlier checkpoint.
+
 Date: 2026-09-03. Base commit: `104d8aa`; implementation changes are
 uncommitted. Local verification platform: macOS arm64. Status: implemented and
 synthetically verified; refreshed installed-app and cross-platform evidence

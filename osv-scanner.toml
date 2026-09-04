@@ -1,0 +1,120 @@
+# Every exception is exact, time-bounded, and reviewed by
+# tools/tests/osv-policy.test.mjs. New advisories remain blocking.
+
+# Tauri's Linux CI-only WebKit/GTK graph. ORT's supported desktop targets are
+# macOS and Windows; the Ubuntu job compiles/tests but is not distributed.
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0411"
+ignoreUntil = 2026-12-04
+reason = "Unmaintained gdkwayland-sys is Linux-only through Tauri; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0412"
+ignoreUntil = 2026-12-04
+reason = "Unmaintained gdk is Linux-only through Tauri; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0413"
+ignoreUntil = 2026-12-04
+reason = "Unmaintained atk is Linux-only through Tauri; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0415"
+ignoreUntil = 2026-12-04
+reason = "Unmaintained gtk is Linux-only through Tauri; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0416"
+ignoreUntil = 2026-12-04
+reason = "Unmaintained atk-sys is Linux-only through Tauri; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0418"
+ignoreUntil = 2026-12-04
+reason = "Unmaintained gdk-sys is Linux-only through Tauri; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0419"
+ignoreUntil = 2026-12-04
+reason = "Unmaintained gtk3-macros is Linux-only through Tauri; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0420"
+ignoreUntil = 2026-12-04
+reason = "Unmaintained gtk-sys is Linux-only through Tauri; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0429"
+ignoreUntil = 2026-12-04
+reason = "Affected glib VariantStrIter code is Linux-only and unused by ORT; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"
+ignoreUntil = 2026-12-04
+reason = "Unmaintained proc-macro-error is build-time and enters only through the Linux-only GTK graph."
+
+# Tauri's URL-pattern implementation currently carries informational-only,
+# unmaintained rust-unic crates. Tauri owns the replacement path.
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0075"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained unic-char-range is transitive through Tauri urlpattern; awaiting upstream replacement."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0080"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained unic-common is transitive through Tauri urlpattern; awaiting upstream replacement."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0081"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained unic-char-property is transitive through Tauri urlpattern; awaiting upstream replacement."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0098"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained unic-ucd-version is transitive through Tauri urlpattern; awaiting upstream replacement."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0100"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained unic-ucd-ident is transitive through Tauri urlpattern; awaiting upstream replacement."
+
+# Typst 0.15.1 transitive dependencies. The unmaintained notices have no known
+# vulnerability. The two quick-xml DoS paths parse bibliography XML, while ORT
+# supplies only structured resume data to a fixed template, no bibliography,
+# and a World that denies every external file/package.
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0320"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained yaml-rust is transitive through Typst syntax assets; awaiting Typst replacement."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0436"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained paste is a Typst transitive build macro; awaiting upstream replacement."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0141"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained bincode is transitive through Typst syntect; ORT deserializes no bincode input."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0192"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained ttf-parser is pinned by Typst; ORT uses only reviewed bundled fonts."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0194"
+ignoreUntil = 2026-12-04
+reason = "Vulnerable quick-xml bibliography parsing is unreachable: ORT has a fixed template and denies external files."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0195"
+ignoreUntil = 2026-12-04
+reason = "Vulnerable quick-xml namespace parsing is unreachable: ORT has a fixed template and denies external files."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0206"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained rustybuzz is pinned by Typst; ORT uses bounded text and reviewed bundled fonts."

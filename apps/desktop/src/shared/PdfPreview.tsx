@@ -49,6 +49,16 @@ export function replayableDocument(
     : null;
 }
 
+export function replayAvailable(
+  manifest: PdfRenderManifest,
+  saved: VersionedResume | null,
+): boolean {
+  return (
+    manifest.source === "published_snapshot" ||
+    saved?.revision === manifest.sourceRevision
+  );
+}
+
 export function PdfPreviewPanel({
   saved,
   published,
@@ -60,7 +70,9 @@ export function PdfPreviewPanel({
 }: Props) {
   const [snapshot, setSnapshot] = useState<{
     preview: PdfPreview;
-    document: ResumeDocument;
+    document: ResumeDocument | null;
+    accessibleText: string | null;
+    retained: boolean;
   } | null>(null);
   const [ready, setReady] = useState(false);
   const [history, setHistory] = useState<PdfRenderManifest[] | null>(null);
@@ -126,7 +138,12 @@ export function PdfPreviewPanel({
       return;
     }
     if (result.ok) {
-      setSnapshot({ preview: result.value, document: selected.document });
+      setSnapshot({
+        preview: result.value,
+        document: selected.document,
+        accessibleText: null,
+        retained: false,
+      });
       setMessage("Loading the generated PDF…");
       onFinish("PDF generated locally. Review the preview before exporting.");
       void refreshHistory();
@@ -166,7 +183,7 @@ export function PdfPreviewPanel({
     if (
       blocked ||
       (manifest.source === "saved_draft" && dirty) ||
-      !document ||
+      !replayAvailable(manifest, saved) ||
       !onBegin("rendering")
     )
       return;
@@ -175,11 +192,16 @@ export function PdfPreviewPanel({
     setMessage("Verifying the retained receipt with the installed renderer…");
     const result = await replayPdfRender(manifest);
     if (!mounted.current) {
-      if (result.ok) void releaseResumePdf(result.value.renderId);
+      if (result.ok) void releaseResumePdf(result.value.preview.renderId);
       return;
     }
     if (result.ok) {
-      setSnapshot({ preview: result.value, document });
+      setSnapshot({
+        preview: result.value.preview,
+        document,
+        accessibleText: result.value.accessibleText,
+        retained: manifest.source === "published_snapshot" && document === null,
+      });
       setMessage("Loading the verified replay PDF…");
       onFinish("The installed renderer reproduced the exact retained receipt.");
       void refreshHistory();
@@ -197,9 +219,10 @@ export function PdfPreviewPanel({
 
   const preview = snapshot?.preview;
   const current = preview?.source === "saved_draft" ? saved : published;
-  const stale = preview
-    ? previewIsStale(preview, current?.revision ?? null, dirty)
-    : false;
+  const stale =
+    preview && !snapshot?.retained
+      ? previewIsStale(preview, current?.revision ?? null, dirty)
+      : false;
   return (
     <section className="editor-panel pdf-panel" aria-labelledby="pdf-title">
       <h2 id="pdf-title">PDF preview &amp; export</h2>
@@ -278,7 +301,11 @@ export function PdfPreviewPanel({
           </button>
           <details>
             <summary>Accessible text for this preview</summary>
-            {semantic(snapshot.document)}
+            {snapshot.document ? (
+              semantic(snapshot.document)
+            ) : (
+              <pre>{snapshot.accessibleText}</pre>
+            )}
           </details>
           <details>
             <summary>Render receipt</summary>
@@ -309,7 +336,8 @@ export function PdfPreviewPanel({
             </dl>
             <p>
               This content-free receipt is stored in the encrypted profile.
-              Historical renderer replay is not implemented.
+              Older immutable published revisions can be verified and replayed
+              with the installed renderer when the full receipt still matches.
             </p>
           </details>
         </>
@@ -346,12 +374,12 @@ export function PdfPreviewPanel({
                   disabled={
                     blocked ||
                     (manifest.source === "saved_draft" && dirty) ||
-                    replayDocument(manifest) === null
+                    !replayAvailable(manifest, saved)
                   }
                   title={
-                    replayDocument(manifest) === null
-                      ? "Replay requires this exact revision to be the current draft or latest published snapshot."
-                      : "Regenerate and expose a preview only if every retained receipt field matches."
+                    !replayAvailable(manifest, saved)
+                      ? "Draft replay requires this exact revision to remain current."
+                      : "Regenerate from the exact retained source and expose a preview only if every receipt field matches."
                   }
                   onClick={() => void replay(manifest)}
                 >
@@ -364,9 +392,9 @@ export function PdfPreviewPanel({
         <p>
           The encrypted profile retains at most 100 distinct receipt identities;
           this view shows the newest 20. PDF bytes and resume text are not
-          stored in this history. Replay never substitutes a newer source or a
-          different renderer result; unavailable revisions remain
-          inspection-only.
+          stored in this history. Immutable published source revisions remain
+          encrypted in the profile; draft history does not. Replay never
+          substitutes a newer source or a different renderer result.
         </p>
       </details>
       <PdfNotices />

@@ -48,6 +48,10 @@ export interface PdfReplayRequest {
   requestId: string;
   payload: { manifestId: string };
 }
+export interface PdfReplay {
+  preview: PdfPreview;
+  accessibleText: string;
+}
 export type PdfExportResult =
   | { status: "cancelled" }
   | {
@@ -61,7 +65,7 @@ export type PdfExportResult =
 export type PdfPreviewCommandResponse = CommandResponse<PdfPreview>;
 export type PdfExportCommandResponse = CommandResponse<PdfExportResult>;
 export type PdfRenderHistoryCommandResponse = CommandResponse<PdfRenderHistory>;
-export type PdfReplayCommandResponse = CommandResponse<PdfPreview>;
+export type PdfReplayCommandResponse = CommandResponse<PdfReplay>;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -144,6 +148,26 @@ export function isPdfPreviewCommandResponse(
   value: unknown,
 ): value is PdfPreviewCommandResponse {
   return isCommandResponse(value, isPreview);
+}
+export function isPdfReplayCommandResponse(
+  value: unknown,
+): value is PdfReplayCommandResponse {
+  return isCommandResponse(value, (replay): replay is PdfReplay => {
+    if (
+      !record(replay) ||
+      Object.keys(replay).length !== 2 ||
+      !isPreview(replay.preview) ||
+      typeof replay.accessibleText !== "string"
+    )
+      return false;
+    const text = replay.accessibleText;
+    return (
+      text.length > 0 &&
+      text.endsWith("\n") &&
+      new TextEncoder().encode(text).length <= 262144 &&
+      !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text)
+    );
+  });
 }
 export function isPdfExportCommandResponse(
   value: unknown,

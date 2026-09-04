@@ -23,7 +23,7 @@ pub use pdf::{
     MAX_PDF_BYTES, MAX_PDF_PAGES, MAX_PDF_RENDER_HISTORY, PDF_PREVIEW_TTL_SECONDS,
     PdfExportResponse, PdfPreviewResponse, PdfReleaseResponse, PdfRenderHistoryRequest,
     PdfRenderHistoryResponse, PdfRenderManifest, PdfRenderReceipt, PdfReplayPayload,
-    PdfReplayRequest, PdfTicketPayload, PdfTicketRequest, RenderPdfRequest,
+    PdfReplayRequest, PdfReplayResponse, PdfTicketPayload, PdfTicketRequest, RenderPdfRequest,
 };
 
 pub use text_export::{
