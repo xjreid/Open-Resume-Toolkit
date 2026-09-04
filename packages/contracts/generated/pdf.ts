@@ -48,6 +48,33 @@ export interface PdfReplayRequest {
   requestId: string;
   payload: { manifestId: string };
 }
+export interface OpenPortablePdfHistoryRequest {
+  contractVersion: typeof CONTRACT_VERSION;
+  requestId: string;
+  payload: { passphrase: string };
+}
+export interface PortablePdfReplayRequest {
+  contractVersion: typeof CONTRACT_VERSION;
+  requestId: string;
+  payload: { archiveId: string; manifestId: string };
+}
+export interface PortablePdfArchiveRequest {
+  contractVersion: typeof CONTRACT_VERSION;
+  requestId: string;
+  payload: { archiveId: string };
+}
+export type PortablePdfHistory = {
+  status: "opened";
+  archiveId: string;
+  expiresAtUnixMs: number;
+  totalManifests: number;
+  unavailableSources: number;
+  incompatibleReceipts: number;
+  manifests: PdfRenderManifest[];
+};
+export type PortablePdfHistoryResult =
+  | { status: "cancelled" }
+  | PortablePdfHistory;
 export interface PdfReplay {
   preview: PdfPreview;
   accessibleText: string;
@@ -66,6 +93,11 @@ export type PdfPreviewCommandResponse = CommandResponse<PdfPreview>;
 export type PdfExportCommandResponse = CommandResponse<PdfExportResult>;
 export type PdfRenderHistoryCommandResponse = CommandResponse<PdfRenderHistory>;
 export type PdfReplayCommandResponse = CommandResponse<PdfReplay>;
+export type PortablePdfHistoryCommandResponse =
+  CommandResponse<PortablePdfHistoryResult>;
+export type PortablePdfArchiveReleaseCommandResponse = CommandResponse<{
+  released: boolean;
+}>;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -168,6 +200,60 @@ export function isPdfReplayCommandResponse(
       !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text)
     );
   });
+}
+export function isPortablePdfHistoryCommandResponse(
+  value: unknown,
+): value is PortablePdfHistoryCommandResponse {
+  return isCommandResponse(
+    value,
+    (history): history is PortablePdfHistoryResult => {
+      if (!record(history)) return false;
+      if (history.status === "cancelled")
+        return Object.keys(history).length === 1;
+      if (
+        Object.keys(history).length !== 7 ||
+        history.status !== "opened" ||
+        !ticket(history.archiveId) ||
+        !positive(history.expiresAtUnixMs, MAX_JAVASCRIPT_DATE_MS) ||
+        typeof history.totalManifests !== "number" ||
+        !Number.isSafeInteger(history.totalManifests) ||
+        history.totalManifests < 0 ||
+        history.totalManifests > 100 ||
+        typeof history.unavailableSources !== "number" ||
+        !Number.isSafeInteger(history.unavailableSources) ||
+        history.unavailableSources < 0 ||
+        history.unavailableSources > history.totalManifests ||
+        typeof history.incompatibleReceipts !== "number" ||
+        !Number.isSafeInteger(history.incompatibleReceipts) ||
+        history.incompatibleReceipts < 0 ||
+        history.incompatibleReceipts >
+          history.totalManifests - history.unavailableSources ||
+        !Array.isArray(history.manifests) ||
+        history.manifests.length > MAX_PDF_RENDER_HISTORY ||
+        history.manifests.length >
+          history.totalManifests -
+            history.unavailableSources -
+            history.incompatibleReceipts ||
+        !history.manifests.every(isManifest)
+      )
+        return false;
+      return (
+        new Set(history.manifests.map((manifest) => manifest.manifestId))
+          .size === history.manifests.length
+      );
+    },
+  );
+}
+export function isPortablePdfArchiveReleaseCommandResponse(
+  value: unknown,
+): value is PortablePdfArchiveReleaseCommandResponse {
+  return isCommandResponse(
+    value,
+    (result): result is { released: boolean } =>
+      record(result) &&
+      Object.keys(result).length === 1 &&
+      typeof result.released === "boolean",
+  );
 }
 export function isPdfExportCommandResponse(
   value: unknown,

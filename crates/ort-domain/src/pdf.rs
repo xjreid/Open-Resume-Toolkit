@@ -2,7 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    EmptyPayload, ErrorEnvelope, ExportSource, ExportTextRequest, validate_request_metadata,
+    EmptyPayload, ErrorEnvelope, ExportSource, ExportTextRequest, backup::validate_passphrase,
+    validate_request_metadata,
 };
 
 // Protective development limits, deliberately below the product's 20 MiB ceiling.
@@ -67,6 +68,21 @@ pub struct PdfRenderHistoryResponse {
     pub manifests: Vec<PdfRenderManifest>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PortablePdfHistoryResponse {
+    Cancelled,
+    #[serde(rename_all = "camelCase")]
+    Opened {
+        archive_id: String,
+        expires_at_unix_ms: u64,
+        total_manifests: u16,
+        unavailable_sources: u16,
+        incompatible_receipts: u16,
+        manifests: Vec<PdfRenderManifest>,
+    },
+}
+
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PdfRenderHistoryRequest {
@@ -87,6 +103,77 @@ pub struct PdfReplayRequest {
     pub contract_version: u16,
     pub request_id: String,
     pub payload: PdfReplayPayload,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OpenPortablePdfHistoryPayload {
+    pub passphrase: String,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OpenPortablePdfHistoryRequest {
+    pub contract_version: u16,
+    pub request_id: String,
+    pub payload: OpenPortablePdfHistoryPayload,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortablePdfReplayPayload {
+    pub archive_id: String,
+    pub manifest_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortablePdfReplayRequest {
+    pub contract_version: u16,
+    pub request_id: String,
+    pub payload: PortablePdfReplayPayload,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortablePdfArchivePayload {
+    pub archive_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortablePdfArchiveRequest {
+    pub contract_version: u16,
+    pub request_id: String,
+    pub payload: PortablePdfArchivePayload,
+}
+
+impl OpenPortablePdfHistoryRequest {
+    /// # Errors
+    /// Rejects malformed metadata and passphrases before opening a native dialog.
+    pub fn validate(&self) -> Result<(), ErrorEnvelope> {
+        validate_request_metadata(self.contract_version, &self.request_id)?;
+        validate_passphrase(&self.payload.passphrase)
+    }
+}
+
+impl PortablePdfReplayRequest {
+    /// # Errors
+    /// Rejects noncanonical archive and manifest tickets before cache access.
+    pub fn validate(&self) -> Result<(), ErrorEnvelope> {
+        validate_request_metadata(self.contract_version, &self.request_id)?;
+        validate_v7_id(&self.payload.archive_id, "INVALID_PORTABLE_ARCHIVE_ID")?;
+        validate_v7_id(&self.payload.manifest_id, "INVALID_RENDER_MANIFEST_ID")
+    }
+}
+
+impl PortablePdfArchiveRequest {
+    /// # Errors
+    /// Rejects noncanonical archive tickets before cache access.
+    pub fn validate(&self) -> Result<(), ErrorEnvelope> {
+        validate_request_metadata(self.contract_version, &self.request_id)?;
+        validate_v7_id(&self.payload.archive_id, "INVALID_PORTABLE_ARCHIVE_ID")
+    }
 }
 
 impl PdfReplayRequest {
@@ -158,6 +245,8 @@ pub struct PdfReleaseResponse {
     pub released: bool,
 }
 
+pub type PortablePdfArchiveReleaseResponse = PdfReleaseResponse;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,5 +309,48 @@ mod tests {
         let mut extra = valid;
         extra["payload"]["source"] = serde_json::json!("saved_draft");
         assert!(serde_json::from_value::<PdfReplayRequest>(extra).is_err());
+    }
+
+    #[test]
+    fn portable_replay_accepts_only_passphrases_and_canonical_tickets() {
+        let open = serde_json::json!({
+            "contractVersion": crate::CONTRACT_VERSION,
+            "requestId": "synthetic-portable-open",
+            "payload": {"passphrase": "synthetic portable phrase"}
+        });
+        assert!(
+            serde_json::from_value::<OpenPortablePdfHistoryRequest>(open.clone())
+                .unwrap()
+                .validate()
+                .is_ok()
+        );
+        let mut extra = open;
+        extra["payload"]["path"] = serde_json::json!("/private/archive");
+        assert!(serde_json::from_value::<OpenPortablePdfHistoryRequest>(extra).is_err());
+
+        let replay = serde_json::json!({
+            "contractVersion": crate::CONTRACT_VERSION,
+            "requestId": "synthetic-portable-replay",
+            "payload": {
+                "archiveId": "019abcde-abcd-7abc-8abc-abcdef012345",
+                "manifestId": "019abcde-abcd-7abc-8abc-abcdef012346"
+            }
+        });
+        assert!(
+            serde_json::from_value::<PortablePdfReplayRequest>(replay.clone())
+                .unwrap()
+                .validate()
+                .is_ok()
+        );
+        for field in ["archiveId", "manifestId"] {
+            let mut invalid = replay.clone();
+            invalid["payload"][field] = serde_json::json!("../private");
+            assert!(
+                serde_json::from_value::<PortablePdfReplayRequest>(invalid)
+                    .unwrap()
+                    .validate()
+                    .is_err()
+            );
+        }
     }
 }

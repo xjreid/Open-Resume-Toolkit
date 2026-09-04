@@ -20,10 +20,13 @@ pub use backup::{
     ValidateBackupRequest, ValidateBackupResponse,
 };
 pub use pdf::{
-    MAX_PDF_BYTES, MAX_PDF_PAGES, MAX_PDF_RENDER_HISTORY, PDF_PREVIEW_TTL_SECONDS,
-    PdfExportResponse, PdfPreviewResponse, PdfReleaseResponse, PdfRenderHistoryRequest,
-    PdfRenderHistoryResponse, PdfRenderManifest, PdfRenderReceipt, PdfReplayPayload,
-    PdfReplayRequest, PdfReplayResponse, PdfTicketPayload, PdfTicketRequest, RenderPdfRequest,
+    MAX_PDF_BYTES, MAX_PDF_PAGES, MAX_PDF_RENDER_HISTORY, OpenPortablePdfHistoryPayload,
+    OpenPortablePdfHistoryRequest, PDF_PREVIEW_TTL_SECONDS, PdfExportResponse, PdfPreviewResponse,
+    PdfReleaseResponse, PdfRenderHistoryRequest, PdfRenderHistoryResponse, PdfRenderManifest,
+    PdfRenderReceipt, PdfReplayPayload, PdfReplayRequest, PdfReplayResponse, PdfTicketPayload,
+    PdfTicketRequest, PortablePdfArchivePayload, PortablePdfArchiveReleaseResponse,
+    PortablePdfArchiveRequest, PortablePdfHistoryResponse, PortablePdfReplayPayload,
+    PortablePdfReplayRequest, RenderPdfRequest,
 };
 
 pub use text_export::{

@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import type {
   PDFDocumentProxy,
   PDFDocumentLoadingTask,
@@ -10,7 +16,9 @@ import {
   PDF_PREVIEW_TTL_SECONDS,
   type PdfPreview,
   type PdfRenderManifest,
+  type PortablePdfHistory,
 } from "@ort/contracts/pdf";
+import { MAX_BACKUP_PASSPHRASE_BYTES } from "@ort/contracts/backup";
 import type { ExportSource } from "@ort/contracts/export";
 import type { VersionedResume, ResumeDocument } from "@ort/contracts/resume";
 import {
@@ -19,6 +27,9 @@ import {
   releaseResumePdf,
   replayPdfRender,
   requestPdfRenderHistory,
+  openPortablePdfHistory,
+  releasePortablePdfArchive,
+  replayPortablePdfRender,
 } from "./command-client";
 import {
   pdfFailure,
@@ -77,6 +88,15 @@ export function PdfPreviewPanel({
   const [ready, setReady] = useState(false);
   const [history, setHistory] = useState<PdfRenderManifest[] | null>(null);
   const [historyError, setHistoryError] = useState(false);
+  const [portablePassphrase, setPortablePassphrase] = useState("");
+  const [portableHistory, setPortableHistory] =
+    useState<PortablePdfHistory | null>(null);
+  const [portableMessage, setPortableMessage] = useState(
+    "No encrypted backup is open for replay.",
+  );
+  const portablePassphraseBytes = new TextEncoder().encode(
+    portablePassphrase,
+  ).byteLength;
   const [message, setMessage] = useState(
     "Generate a preview from a saved revision. Unsaved edits are not included.",
   );
@@ -119,6 +139,24 @@ export function PdfPreviewPanel({
       void releaseResumePdf(preview.renderId);
     };
   }, [snapshot]);
+  useEffect(() => {
+    if (!portableHistory) return;
+    const { archiveId, expiresAtUnixMs } = portableHistory;
+    const remaining = Math.max(
+      0,
+      Math.min(PDF_PREVIEW_TTL_SECONDS * 1000, expiresAtUnixMs - Date.now()),
+    );
+    const timer = window.setTimeout(() => {
+      setPortableHistory(null);
+      setPortableMessage(
+        "The authenticated backup session expired. Open the backup again to replay another receipt.",
+      );
+    }, remaining);
+    return () => {
+      window.clearTimeout(timer);
+      void releasePortablePdfArchive(archiveId);
+    };
+  }, [portableHistory]);
 
   async function generate(source: ExportSource) {
     const selected = source === "saved_draft" ? saved : published;
@@ -213,6 +251,90 @@ export function PdfPreviewPanel({
         : result.error.code === "PDF_REPLAY_INCOMPATIBLE"
           ? "The installed renderer could not reproduce the exact historical receipt. No replay was exposed."
           : pdfFailure(result.error.code);
+    setMessage(notice);
+    onFinish(notice);
+  }
+
+  async function openPortableHistory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (
+      blocked ||
+      portablePassphraseBytes === 0 ||
+      portablePassphraseBytes > MAX_BACKUP_PASSPHRASE_BYTES ||
+      !onBegin("rendering")
+    )
+      return;
+    const submittedPassphrase = portablePassphrase;
+    setPortablePassphrase("");
+    setPortableHistory(null);
+    setPortableMessage(
+      "Select and authenticate an encrypted backup. No profile data will be restored.",
+    );
+    const result = await openPortablePdfHistory(submittedPassphrase);
+    if (!mounted.current) {
+      if (result.ok && result.value.status === "opened")
+        void releasePortablePdfArchive(result.value.archiveId);
+      return;
+    }
+    if (result.ok && result.value.status === "opened") {
+      setPortableHistory(result.value);
+      const notice = `Authenticated backup opened for ten minutes. ${result.value.manifests.length} replayable receipt(s) are available in this view.`;
+      setPortableMessage(notice);
+      onFinish(notice);
+      return;
+    }
+    if (result.ok) {
+      const notice = "Backup selection cancelled. No data was read or changed.";
+      setPortableMessage(notice);
+      onFinish(notice);
+      return;
+    }
+    const notice =
+      result.error.code === "BACKUP_INVALID_OR_PASSPHRASE"
+        ? "The backup could not be authenticated. The passphrase may be incorrect, or the file may be damaged or unsupported."
+        : result.error.code === "BACKUP_READ_UNAVAILABLE"
+          ? "The selected backup could not be read. The active profile is unchanged."
+          : pdfFailure(result.error.code);
+    setPortableMessage(notice);
+    onFinish(notice);
+  }
+
+  async function replayPortable(manifest: PdfRenderManifest) {
+    if (!portableHistory || blocked || !onBegin("rendering")) return;
+    setSnapshot(null);
+    setReady(false);
+    setMessage(
+      "Verifying the archived source and receipt with the installed renderer…",
+    );
+    const result = await replayPortablePdfRender(
+      portableHistory.archiveId,
+      manifest,
+    );
+    if (!mounted.current) {
+      if (result.ok) void releaseResumePdf(result.value.preview.renderId);
+      return;
+    }
+    if (result.ok) {
+      setSnapshot({
+        preview: result.value.preview,
+        document: null,
+        accessibleText: result.value.accessibleText,
+        retained: true,
+      });
+      setMessage("Loading the verified archived replay PDF…");
+      onFinish(
+        "The installed renderer reproduced the exact receipt from the authenticated backup.",
+      );
+      return;
+    }
+    const notice =
+      result.error.code === "PORTABLE_PDF_ARCHIVE_EXPIRED"
+        ? "The authenticated backup session expired. Open the backup again before replaying."
+        : result.error.code === "PDF_REPLAY_SOURCE_UNAVAILABLE"
+          ? "That receipt has no exact retained source in the authenticated backup. No substitute was rendered."
+          : result.error.code === "PDF_REPLAY_INCOMPATIBLE"
+            ? "The installed renderer could not reproduce the exact archived receipt. No replay was exposed."
+            : pdfFailure(result.error.code);
     setMessage(notice);
     onFinish(notice);
   }
@@ -396,6 +518,127 @@ export function PdfPreviewPanel({
           encrypted in the profile; draft history does not. Replay never
           substitutes a newer source or a different renderer result.
         </p>
+      </details>
+      <details>
+        <summary>Replay from an encrypted portable backup</summary>
+        <p>
+          Open a format-1.1 backup through the native file dialog. ORT
+          authenticates the complete archive, holds only bounded replay sources
+          in memory for ten minutes, and does not restore or change the active
+          profile. The selected path and resume content are not returned to this
+          interface.
+        </p>
+        <form onSubmit={(event) => void openPortableHistory(event)}>
+          <label className="field">
+            Backup passphrase
+            <input
+              type="password"
+              value={portablePassphrase}
+              autoComplete="current-password"
+              aria-describedby={`portable-replay-guidance${
+                portablePassphraseBytes > MAX_BACKUP_PASSPHRASE_BYTES
+                  ? " portable-replay-passphrase-error"
+                  : ""
+              }`}
+              aria-invalid={
+                portablePassphraseBytes > MAX_BACKUP_PASSPHRASE_BYTES ||
+                undefined
+              }
+              disabled={blocked}
+              onChange={(event) => setPortablePassphrase(event.target.value)}
+            />
+          </label>
+          <p id="portable-replay-guidance">
+            The passphrase is cleared from the form immediately. Wrong
+            passphrases and invalid archives deliberately share one error.
+          </p>
+          {portablePassphraseBytes > MAX_BACKUP_PASSPHRASE_BYTES ? (
+            <p
+              className="field-error"
+              id="portable-replay-passphrase-error"
+              role="alert"
+            >
+              The passphrase is over the 1,024-byte limit.
+            </p>
+          ) : null}
+          <div className="move-controls">
+            <button
+              type="submit"
+              disabled={
+                blocked ||
+                portablePassphraseBytes === 0 ||
+                portablePassphraseBytes > MAX_BACKUP_PASSPHRASE_BYTES
+              }
+            >
+              Select backup and open render history
+            </button>
+            {portableHistory ? (
+              <button
+                type="button"
+                className="button--secondary"
+                disabled={blocked}
+                onClick={() => {
+                  setPortableHistory(null);
+                  setPortableMessage(
+                    "Authenticated backup session cleared from memory.",
+                  );
+                }}
+              >
+                Clear backup session
+              </button>
+            ) : null}
+          </div>
+        </form>
+        <p role="status">{portableMessage}</p>
+        {portableHistory ? (
+          <>
+            <p>
+              Showing {portableHistory.manifests.length} newest replayable
+              receipt(s) out of {portableHistory.totalManifests}. Exact sources
+              are unavailable for {portableHistory.unavailableSources}{" "}
+              receipt(s), and {portableHistory.incompatibleReceipts} receipt(s)
+              require a different renderer bundle.
+            </p>
+            {portableHistory.manifests.length === 0 ? (
+              <p>
+                This backup contains no receipt with an exact retained source.
+              </p>
+            ) : (
+              <ol className="pdf-history">
+                {portableHistory.manifests.map((manifest) => (
+                  <li key={manifest.manifestId}>
+                    <strong>
+                      Archived{" "}
+                      {manifest.source === "saved_draft"
+                        ? "draft"
+                        : "publication"}{" "}
+                      revision {manifest.sourceRevision}
+                    </strong>
+                    <span>
+                      {new Date(manifest.lastGeneratedAtUnixMs).toISOString()} ·{" "}
+                      {manifest.receipt.pageCount} page(s)
+                    </span>
+                    <code>{manifest.receipt.pdfSha256}</code>
+                    <button
+                      type="button"
+                      className="button--secondary button--compact"
+                      disabled={blocked}
+                      onClick={() => void replayPortable(manifest)}
+                    >
+                      Verify archived receipt &amp; replay
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <p>
+              Replay uses the installed renderer and exposes a preview only when
+              every document, PDF, renderer, template, font, page, and byte
+              field matches. Older renderer binaries and PDF bytes are not
+              stored in the backup.
+            </p>
+          </>
+        ) : null}
       </details>
       <PdfNotices />
     </section>

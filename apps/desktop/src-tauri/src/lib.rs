@@ -321,6 +321,7 @@ pub fn run() {
         .manage(CloseGuard::default())
         .manage(text_export::ExportState::default())
         .manage(pdf_preview::PdfState::default())
+        .manage(pdf_preview::PortablePdfState::default())
         .plugin(tauri_plugin_dialog::init())
         .menu(menu::editor_menu)
         .on_menu_event(|app, event| {
@@ -351,6 +352,9 @@ pub fn run() {
             text_export::export_resume_docx,
             pdf_preview::render_resume_pdf,
             pdf_preview::replay_resume_pdf,
+            pdf_preview::open_portable_pdf_render_history,
+            pdf_preview::replay_portable_resume_pdf,
+            pdf_preview::release_portable_pdf_archive,
             pdf_preview::load_pdf_render_history,
             pdf_preview::export_resume_pdf,
             pdf_preview::release_resume_pdf,

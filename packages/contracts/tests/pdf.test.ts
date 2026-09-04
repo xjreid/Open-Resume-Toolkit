@@ -4,6 +4,8 @@ import {
   isPdfExportCommandResponse,
   isPdfRenderHistoryCommandResponse,
   isPdfReplayCommandResponse,
+  isPortablePdfArchiveReleaseCommandResponse,
+  isPortablePdfHistoryCommandResponse,
   MAX_PDF_BYTES,
   MAX_PDF_RENDER_HISTORY,
 } from "../generated/pdf";
@@ -118,4 +120,46 @@ it("accepts bounded accessible text for an exact replay", () => {
     { ...replay, accessibleText: `${"x".repeat(262144)}\n` },
   ])
     expect(isPdfReplayCommandResponse(wrap(value))).toBe(false);
+});
+it("accepts only bounded content-free portable history sessions", () => {
+  const manifest = {
+    manifestId: "019a0000-0000-7000-8000-000000000002",
+    source: "published_snapshot",
+    sourceRevision: 1,
+    generatedAtUnixMs: 1000,
+    lastGeneratedAtUnixMs: 2000,
+    renderCount: 2,
+    receipt: preview.receipt,
+  };
+  const opened = {
+    status: "opened",
+    archiveId: "019a0000-0000-7000-8000-000000000003",
+    expiresAtUnixMs: 700000,
+    totalManifests: 3,
+    unavailableSources: 1,
+    incompatibleReceipts: 0,
+    manifests: [manifest],
+  };
+  expect(isPortablePdfHistoryCommandResponse(wrap(opened))).toBe(true);
+  expect(
+    isPortablePdfHistoryCommandResponse(wrap({ status: "cancelled" })),
+  ).toBe(true);
+  for (const value of [
+    { ...opened, archivePath: "/private/archive" },
+    { ...opened, archiveId: "invalid" },
+    { ...opened, unavailableSources: 4 },
+    { ...opened, incompatibleReceipts: 3 },
+    { ...opened, totalManifests: 101 },
+    { ...opened, manifests: [manifest, manifest] },
+    { ...opened, manifests: [manifest, manifest, manifest] },
+  ])
+    expect(isPortablePdfHistoryCommandResponse(wrap(value))).toBe(false);
+  expect(
+    isPortablePdfArchiveReleaseCommandResponse(wrap({ released: true })),
+  ).toBe(true);
+  expect(
+    isPortablePdfArchiveReleaseCommandResponse(
+      wrap({ released: true, path: "/private" }),
+    ),
+  ).toBe(false);
 });

@@ -211,8 +211,24 @@ bundle and exposes a preview only when every receipt field matches. An older
 publication can be reviewed through bounded accessible text and exported from
 the verified expiring preview. It never substitutes a newer revision or
 different output. Superseded draft bodies are not retained, superseded renderer
-binaries are not bundled, and portable backup 1.1 carries only the content-free
-manifest plus the latest publication, so those cases remain inspection-only.
+binaries are not bundled, so those cases remain inspection-only.
+
+Use **Replay from an encrypted portable backup** to select a format-1.1 backup
+and enter its passphrase. ORT authenticates the complete archive on a blocking
+native worker, then retains at most the newest 20 exact manifest/source pairs in
+one memory-only session for ten minutes. It returns only an opaque archive
+ticket, content-free receipt metadata, and counts for receipts whose source is
+missing or whose renderer bundle differs. The selected path, passphrase, source
+documents, settings, and backup metadata do not cross into the webview.
+
+Choose **Verify archived receipt & replay** to regenerate one retained draft or
+publication with the installed renderer. The preview is exposed only if every
+receipt field matches; otherwise no PDF or accessible text is returned. A
+successful replay supplies bounded accessible text and uses the existing
+expiring, exact-byte, no-overwrite PDF export. Opening or replaying a backup does
+not restore, merge, write to, or add render history to the active profile.
+Clearing or expiring the archive session drops the retained sources; a verified
+preview remains independently bounded by its own ten-minute ticket.
 
 Headless structural verification, without launching the app or OS vault:
 
@@ -232,7 +248,8 @@ commands; supply `ORT_PLAYWRIGHT_MODULE` / `ORT_BROWSER_EXECUTABLE` if needed.
 It never proves native IPC, WKWebView/WebView2, save dialogs, vaults or ACLs.
 See `evidence/0.0.0-dev/m2-output-golden-corpus.md` for the expanded output
 checkpoint and `evidence/0.0.0-dev/m2-pdf-preview.md` for preview behavior and
-manual gates.
+manual gates. Portable archived-source replay is recorded in
+`evidence/0.0.0-dev/m2-portable-archived-source-replay.md`.
 
 ## Encrypted portable backup export
 

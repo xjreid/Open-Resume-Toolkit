@@ -28,37 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_schema::<ExportDocxResponse>(&output.join("export.docx.response.schema.json"))?;
     fs::write(output.join("export.ts"), include_str!("export.ts.template"))?;
 
-    write_schema::<ort_domain::RenderPdfRequest>(&output.join("pdf.render.request.schema.json"))?;
-    write_schema::<ort_domain::PdfPreviewResponse>(
-        &output.join("pdf.preview.response.schema.json"),
-    )?;
-    write_schema::<ort_domain::PdfTicketRequest>(&output.join("pdf.ticket.request.schema.json"))?;
-    write_schema::<ort_domain::PdfExportResponse>(&output.join("pdf.export.response.schema.json"))?;
-    write_schema::<ort_domain::PdfReleaseResponse>(
-        &output.join("pdf.release.response.schema.json"),
-    )?;
-    write_schema::<ort_domain::PdfRenderHistoryRequest>(
-        &output.join("pdf.history.request.schema.json"),
-    )?;
-    write_schema::<ort_domain::PdfRenderHistoryResponse>(
-        &output.join("pdf.history.response.schema.json"),
-    )?;
-    write_schema::<ort_domain::PdfReplayRequest>(&output.join("pdf.replay.request.schema.json"))?;
-    write_schema::<ort_domain::PdfReplayResponse>(&output.join("pdf.replay.response.schema.json"))?;
-    fs::write(
-        output.join("pdf.ts"),
-        include_str!("pdf.ts.template")
-            .replace("__MAX_PDF_BYTES__", &ort_domain::MAX_PDF_BYTES.to_string())
-            .replace("__MAX_PDF_PAGES__", &ort_domain::MAX_PDF_PAGES.to_string())
-            .replace(
-                "__MAX_PDF_RENDER_HISTORY__",
-                &ort_domain::MAX_PDF_RENDER_HISTORY.to_string(),
-            )
-            .replace(
-                "__PDF_TTL__",
-                &ort_domain::PDF_PREVIEW_TTL_SECONDS.to_string(),
-            ),
-    )?;
+    write_pdf_contracts(&output)?;
 
     write_schema::<HealthRequest>(&output.join("health.request.schema.json"))?;
     write_schema::<HealthResponse>(&output.join("health.response.schema.json"))?;
@@ -111,6 +81,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(output.join("compatibility.json"), COMPATIBILITY)?;
 
     println!("Generated development contracts in {}", output.display());
+    Ok(())
+}
+
+fn write_pdf_contracts(output: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    write_schema::<ort_domain::RenderPdfRequest>(&output.join("pdf.render.request.schema.json"))?;
+    write_schema::<ort_domain::PdfPreviewResponse>(
+        &output.join("pdf.preview.response.schema.json"),
+    )?;
+    write_schema::<ort_domain::PdfTicketRequest>(&output.join("pdf.ticket.request.schema.json"))?;
+    write_schema::<ort_domain::PdfExportResponse>(&output.join("pdf.export.response.schema.json"))?;
+    write_schema::<ort_domain::PdfReleaseResponse>(
+        &output.join("pdf.release.response.schema.json"),
+    )?;
+    write_schema::<ort_domain::PdfRenderHistoryRequest>(
+        &output.join("pdf.history.request.schema.json"),
+    )?;
+    write_schema::<ort_domain::PdfRenderHistoryResponse>(
+        &output.join("pdf.history.response.schema.json"),
+    )?;
+    write_schema::<ort_domain::PdfReplayRequest>(&output.join("pdf.replay.request.schema.json"))?;
+    write_schema::<ort_domain::PdfReplayResponse>(&output.join("pdf.replay.response.schema.json"))?;
+    write_schema::<ort_domain::OpenPortablePdfHistoryRequest>(
+        &output.join("pdf.portable-history.request.schema.json"),
+    )?;
+    write_schema::<ort_domain::PortablePdfHistoryResponse>(
+        &output.join("pdf.portable-history.response.schema.json"),
+    )?;
+    write_schema::<ort_domain::PortablePdfReplayRequest>(
+        &output.join("pdf.portable-replay.request.schema.json"),
+    )?;
+    write_schema::<ort_domain::PortablePdfArchiveRequest>(
+        &output.join("pdf.portable-release.request.schema.json"),
+    )?;
+    write_schema::<ort_domain::PortablePdfArchiveReleaseResponse>(
+        &output.join("pdf.portable-release.response.schema.json"),
+    )?;
+    fs::write(
+        output.join("pdf.ts"),
+        include_str!("pdf.ts.template")
+            .replace("__MAX_PDF_BYTES__", &ort_domain::MAX_PDF_BYTES.to_string())
+            .replace("__MAX_PDF_PAGES__", &ort_domain::MAX_PDF_PAGES.to_string())
+            .replace(
+                "__MAX_PDF_RENDER_HISTORY__",
+                &ort_domain::MAX_PDF_RENDER_HISTORY.to_string(),
+            )
+            .replace(
+                "__PDF_TTL__",
+                &ort_domain::PDF_PREVIEW_TTL_SECONDS.to_string(),
+            ),
+    )?;
     Ok(())
 }
 

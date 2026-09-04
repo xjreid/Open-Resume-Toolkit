@@ -87,11 +87,11 @@ Exit evidence:
 
 ### Current status
 
-As of 2026-09-04, M2 is **about 70% complete** by stage-gate weighting after
-the all-local-data deletion, retained-published render replay, expanded desktop
-accessibility, output-golden, and dependency-policy checkpoints:
-approximately 85% of the implementation foundation, 68% of end-to-end
-functionality, and 59% of release/exit evidence.
+As of 2026-09-04, M2 is **about 72% complete** by stage-gate weighting after
+the all-local-data deletion, retained-published and portable archived-source
+render replay, expanded desktop accessibility, output-golden, and
+dependency-policy checkpoints: approximately 87% of the implementation
+foundation, 71% of end-to-end functionality, and 59% of release/exit evidence.
 The estimate gives security,
 recovery, accessibility, cross-platform behavior, and the complete offline
 journey more weight than raw feature count.
@@ -100,14 +100,19 @@ Portable-backup export, storage inventory, and authenticated backup validation
 are committed through `0a706b2`. Restart-staged replacement and retained
 safety-copy management are committed in `96fc983`; all-local-data deletion and
 initial current-bundle replay are committed in `91e7e54`; expanded output and
-accessibility checks are committed through `9a14985`. M2 is not release-ready.
-Native and cross-platform evidence remains pending.
+accessibility checks are committed through `9a14985`; retained-publication
+replay and dependency policy are committed in `1087aef`, for which the user
+reported all five hosted CI jobs passing. Portable archived-source replay is
+implemented locally after that commit. M2 is not release-ready. Native and
+cross-platform evidence remains pending.
 The bounded **current-bundle verified render-history replay** checkpoint now
 regenerates an exact current draft or any retained immutable published revision,
 verifies the complete receipt before exposing bytes, supplies bounded accessible
-text for an older publication, and permits exact-byte export from that verified
-preview. Superseded drafts, portable archived sources, and superseded-renderer
-binary replay remain later M2 gates.
+text for retained sources, and permits exact-byte export from that verified
+preview. An authenticated format-1.1 backup can now provide a bounded,
+ten-minute, read-only source session for the same verification without restoring
+or mutating the active profile. Superseded drafts absent from the backup and
+superseded-renderer binary replay remain later M2 gates.
 
 ### Completed or working locally
 
@@ -127,9 +132,11 @@ binary replay remain later M2 gates.
   and recovery data.
 - **Storage reporting:** content-free storage usage inventory.
 - **Verified retained-source replay:** exact current-draft and retained
-  immutable-published receipts can be regenerated with the installed renderer,
+  immutable-published receipts from either the active encrypted profile or an
+  authenticated portable backup can be regenerated with the installed renderer,
   reviewed accessibly, and exported only when document, PDF, template, font and
-  renderer receipt fields all match.
+  renderer receipt fields all match. Portable sources and passphrases are held
+  only in a bounded memory session and never merged into the active profile.
 - **[HIGH]** **Storage and restart safety:** no-clobber native file boundaries,
   encrypted restart tests, and Windows SQLCipher logging mitigation.
 - **Reliability:** generated contracts, deterministic output/golden tests, and
@@ -174,7 +181,8 @@ binary replay remain later M2 gates.
   [render history](../../evidence/0.0.0-dev/m2-render-history.md),
   [portable render history](../../evidence/0.0.0-dev/m2-portable-render-history.md),
   [verified current-bundle replay](../../evidence/0.0.0-dev/m2-current-render-replay.md),
-  and [retained published replay](../../evidence/0.0.0-dev/m2-retained-published-replay.md).
+  [retained published replay](../../evidence/0.0.0-dev/m2-retained-published-replay.md),
+  and [portable archived-source replay](../../evidence/0.0.0-dev/m2-portable-archived-source-replay.md).
 - Accessibility automation: [desktop semantic and destructive-state checks](../../evidence/0.0.0-dev/m2-desktop-accessibility-automation.md).
 - CI reliability: [lockfile vulnerability scan](../../evidence/0.0.0-dev/m2-ci-dependency-scan.md).
 - Storage and backup: [portable export](../../evidence/0.0.0-dev/m2-portable-backup-export.md),
@@ -193,8 +201,8 @@ binary replay remain later M2 gates.
 - **[HIGH]** Finish native/cross-platform vault, filesystem, quit, low-disk, and
   injected crash/failure verification.
 - Finish native/cross-platform editor, dialog, accessibility, final PDF/DOCX
-  templates, superseded-draft/portable-source and superseded-renderer replay,
-  and native reader verification.
+  templates, superseded-draft and superseded-renderer replay, and native reader
+  verification.
 - **[HIGH]** Complete native macOS/Windows vault, interruption, filesystem and
   assistive-technology evidence for all-local-data deletion. Extend its exact
   cleanup inventory when later milestones add credentials, native IPC state,

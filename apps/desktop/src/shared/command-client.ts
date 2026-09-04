@@ -25,6 +25,8 @@ import {
   isPdfReplayCommandResponse,
   isPdfExportCommandResponse,
   isPdfRenderHistoryCommandResponse,
+  isPortablePdfArchiveReleaseCommandResponse,
+  isPortablePdfHistoryCommandResponse,
   type PdfPreview,
   type PdfPreviewCommandResponse,
   type PdfExportCommandResponse,
@@ -33,6 +35,12 @@ import {
   type PdfRenderHistoryCommandResponse,
   type PdfReplayCommandResponse,
   type PdfReplayRequest,
+  type OpenPortablePdfHistoryRequest,
+  type PortablePdfArchiveRequest,
+  type PortablePdfArchiveReleaseCommandResponse,
+  type PortablePdfHistory,
+  type PortablePdfHistoryCommandResponse,
+  type PortablePdfReplayRequest,
 } from "@ort/contracts/pdf";
 import {
   isExportTextCommandResponse,
@@ -404,6 +412,66 @@ export async function replayPdfRender(
     )
       return invalidCommandResponse();
     return response;
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function openPortablePdfHistory(
+  passphrase: string,
+): Promise<PortablePdfHistoryCommandResponse> {
+  try {
+    const request: OpenPortablePdfHistoryRequest = requestEnvelope({
+      passphrase,
+    });
+    const response: unknown = await invoke("open_portable_pdf_render_history", {
+      request,
+    });
+    return isPortablePdfHistoryCommandResponse(response)
+      ? response
+      : invalidCommandResponse<PortablePdfHistory>();
+  } catch {
+    return commandUnavailable<PortablePdfHistory>();
+  }
+}
+
+export async function replayPortablePdfRender(
+  archiveId: string,
+  manifest: PdfRenderManifest,
+): Promise<PdfReplayCommandResponse> {
+  try {
+    const request: PortablePdfReplayRequest = requestEnvelope({
+      archiveId,
+      manifestId: manifest.manifestId,
+    });
+    const response: unknown = await invoke("replay_portable_resume_pdf", {
+      request,
+    });
+    if (!isPdfReplayCommandResponse(response)) return invalidCommandResponse();
+    if (
+      response.ok &&
+      (response.value.preview.source !== manifest.source ||
+        response.value.preview.revision !== manifest.sourceRevision ||
+        !samePdfReceipt(response.value.preview.receipt, manifest.receipt))
+    )
+      return invalidCommandResponse();
+    return response;
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function releasePortablePdfArchive(
+  archiveId: string,
+): Promise<PortablePdfArchiveReleaseCommandResponse> {
+  try {
+    const request: PortablePdfArchiveRequest = requestEnvelope({ archiveId });
+    const response: unknown = await invoke("release_portable_pdf_archive", {
+      request,
+    });
+    return isPortablePdfArchiveReleaseCommandResponse(response)
+      ? response
+      : invalidCommandResponse();
   } catch {
     return commandUnavailable();
   }

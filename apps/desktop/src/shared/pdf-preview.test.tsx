@@ -22,6 +22,9 @@ import {
   exportResumePdf,
   replayPdfRender,
   requestPdfRenderHistory,
+  openPortablePdfHistory,
+  releasePortablePdfArchive,
+  replayPortablePdfRender,
 } from "./command-client";
 import { invoke } from "@tauri-apps/api/core";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -155,6 +158,48 @@ it("native requests contain no path, document, PDF bytes or template", async () 
     },
   });
   expect((await replayPdfRender(manifest)).ok).toBe(false);
+  const archiveId = "019a0000-0000-7000-8000-000000000003";
+  vi.mocked(invoke).mockResolvedValueOnce({
+    ok: true,
+    value: {
+      status: "opened",
+      archiveId,
+      expiresAtUnixMs: 700000,
+      totalManifests: 1,
+      unavailableSources: 0,
+      incompatibleReceipts: 0,
+      manifests: [manifest],
+    },
+  });
+  expect((await openPortablePdfHistory("synthetic archive phrase")).ok).toBe(
+    true,
+  );
+  expect(invoke).toHaveBeenLastCalledWith("open_portable_pdf_render_history", {
+    request: expect.objectContaining({
+      payload: { passphrase: "synthetic archive phrase" },
+    }),
+  });
+  expect(
+    JSON.stringify(vi.mocked(invoke).mock.calls.at(-1)?.[1]),
+  ).not.toContain("path");
+  vi.mocked(invoke).mockResolvedValueOnce({
+    ok: true,
+    value: { preview, accessibleText: "Synthetic archived replay\n" },
+  });
+  expect((await replayPortablePdfRender(archiveId, manifest)).ok).toBe(true);
+  expect(invoke).toHaveBeenLastCalledWith("replay_portable_resume_pdf", {
+    request: expect.objectContaining({
+      payload: { archiveId, manifestId: manifest.manifestId },
+    }),
+  });
+  vi.mocked(invoke).mockResolvedValueOnce({
+    ok: true,
+    value: { released: true },
+  });
+  expect((await releasePortablePdfArchive(archiveId)).ok).toBe(true);
+  expect(invoke).toHaveBeenLastCalledWith("release_portable_pdf_archive", {
+    request: expect.objectContaining({ payload: { archiveId } }),
+  });
   vi.mocked(invoke).mockResolvedValueOnce({
     ok: true,
     value: { ...preview, revision: 2 },
@@ -205,6 +250,8 @@ it("offers explicit saved-source controls, privacy warning and local license not
   expect(html).toContain("Preview saved draft");
   expect(html).toContain("Preview published snapshot");
   expect(html).toContain("Stored render history");
+  expect(html).toContain("Replay from an encrypted portable backup");
+  expect(html).toContain("does not restore or change the active profile");
   expect(html).toContain("encrypted profile retains at most 100");
   expect(html).toContain("unencrypted");
   expect(html).toContain("SIL OPEN FONT LICENSE");

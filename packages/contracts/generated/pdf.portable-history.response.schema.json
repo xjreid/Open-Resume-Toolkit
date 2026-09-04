@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PortablePdfHistoryResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "cancelled"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "archiveId": {
+          "type": "string"
+        },
+        "expiresAtUnixMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "incompatibleReceipts": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "manifests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PdfRenderManifest"
+          }
+        },
+        "status": {
+          "type": "string",
+          "const": "opened"
+        },
+        "totalManifests": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "unavailableSources": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "archiveId",
+        "expiresAtUnixMs",
+        "totalManifests",
+        "unavailableSources",
+        "incompatibleReceipts",
+        "manifests"
+      ]
+    }
+  ],
+  "$defs": {
+    "ExportSource": {
+      "type": "string",
+      "enum": [
+        "saved_draft",
+        "published_snapshot"
+      ]
+    },
+    "PdfRenderManifest": {
+      "type": "object",
+      "properties": {
+        "generatedAtUnixMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "lastGeneratedAtUnixMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "manifestId": {
+          "type": "string"
+        },
+        "receipt": {
+          "$ref": "#/$defs/PdfRenderReceipt"
+        },
+        "renderCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "source": {
+          "$ref": "#/$defs/ExportSource"
+        },
+        "sourceRevision": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "manifestId",
+        "source",
+        "sourceRevision",
+        "generatedAtUnixMs",
+        "lastGeneratedAtUnixMs",
+        "renderCount",
+        "receipt"
+      ]
+    },
+    "PdfRenderReceipt": {
+      "type": "object",
+      "properties": {
+        "byteCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "documentSchemaVersion": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "documentSha256": {
+          "type": "string"
+        },
+        "fontBundleId": {
+          "type": "string"
+        },
+        "fontBundleSha256": {
+          "type": "string"
+        },
+        "pageCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "pdfSha256": {
+          "type": "string"
+        },
+        "rendererVersion": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        },
+        "templateSha256": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "documentSha256",
+        "documentSchemaVersion",
+        "pdfSha256",
+        "rendererVersion",
+        "templateId",
+        "templateSha256",
+        "fontBundleId",
+        "fontBundleSha256",
+        "pageCount",
+        "byteCount"
+      ]
+    }
+  }
+}

@@ -258,7 +258,7 @@ fn validate_safety_action(
     Ok(())
 }
 
-fn validate_passphrase(passphrase: &str) -> Result<(), ErrorEnvelope> {
+pub(crate) fn validate_passphrase(passphrase: &str) -> Result<(), ErrorEnvelope> {
     if passphrase.is_empty() || passphrase.len() > MAX_BACKUP_PASSPHRASE_BYTES {
         return Err(ErrorEnvelope::new(
             "INVALID_BACKUP_PASSPHRASE",
