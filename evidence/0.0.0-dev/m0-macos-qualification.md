@@ -111,10 +111,32 @@ intermediate clone run correctly refused current-source evidence when the
 verifier source changed during testing. Only the final matching-digest report
 is used here.
 
-M0 formal signoff still requires green hosted CI on the containing commit.
-The attached failures are diagnosed and repaired locally, not yet confirmed
-fixed by a new hosted run. Windows/Intel CI remains a portability signal;
-Windows/Intel native qualification is deferred.
+## M0 signoff — 2026-09-05
+
+**M0 is complete for macOS Apple Silicon development at
+`4bd25940e1a344fdf1ac984ab0a47fbd1a6b60dc`.** The GitHub Actions API independently
+confirmed both hosted workflows completed successfully for that exact commit:
+
+- [CI run 33976735416](https://github.com/xjreid/Open-Resume-Toolkit/actions/runs/33976735416):
+  contracts/tests/security, macOS Apple Silicon, macOS Intel, and Windows jobs
+  all succeeded; the workflow completed at `2026-09-05T16:30:22Z`.
+- [Dependency vulnerability scan 33976735685](https://github.com/xjreid/Open-Resume-Toolkit/actions/runs/33976735685):
+  succeeded at `2026-09-05T16:05:19Z`.
+
+The unchanged installed application passed `just verify-macos-app` again at
+`2026-09-05T16:36:02.930Z`, matching the source digest, executable, signer,
+designated requirement, arm64 architecture, hardened runtime, and entitlements
+recorded above. Verification inside the agent sandbox initially returned
+`CSSMERR_TP_NOT_TRUSTED`; the same read-only command passed in the normal host
+context. No trust setting, key, profile, or installed binary was changed.
+
+Together with the matching-digest clean-checkout result and both installed
+window health observations above, this closes the active M0 exit gates. Later
+implementation changes require fresh qualification of their artifacts. The
+machine harness remains conservative and never grants milestone signoff itself.
+Windows/Intel CI remains a portability signal; Windows/Intel native qualification
+is deferred. Local self-signing does not qualify Developer ID, notarization,
+Gatekeeper download behavior, or production distribution.
 
 The installed health check does not close M1's cross-account/cross-process
 Keychain, moved/updated identity, recovery, migration, low-disk, or hostile

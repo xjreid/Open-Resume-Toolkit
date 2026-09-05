@@ -686,6 +686,9 @@ const fn is_zero(value: &u16) -> bool {
 }
 
 #[cfg(test)]
+mod adversarial_tests;
+
+#[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
 

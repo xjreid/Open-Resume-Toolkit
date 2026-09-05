@@ -10,6 +10,7 @@
 | --- | --- | --- | --- |
 | Encrypted SQLite | `rusqlite 0.40.2` | `backup`, `bundled-sqlcipher-vendored-openssl` | Maintained Rust API with a reproducible SQLCipher/OpenSSL source build on Windows and macOS |
 | OS credential vault | `keyring 4.2.0` | default platform stores | Uses macOS Keychain and Windows Credential Manager without exposing either API to the webview |
+| Exclusive macOS key creation | `security-framework 3.7.0` | macOS-only direct dependency, already pinned transitively | Safe wrapper for native add-only creation in the same User-domain Keychain; duplicate items are refused without an upsert |
 | Random keys | `getrandom 0.4.3` | OS random source | Generates a local 256-bit database key without command-line or environment transport |
 | Secret clearing | `zeroize 1.9.0` | key wrapper and temporary encodings | Clears owned key buffers and temporary raw-key strings on drop/use |
 | Stable identifiers | `uuid 1.24.1` | UUIDv7 | Time-sortable, non-semantic identifiers for install, profile, document, and record identities |
@@ -65,6 +66,25 @@ See `../../evidence/0.0.0-dev/windows-sqlcipher-logging.md`.
 
 ## Vault boundary and remaining proof
 
+The 2026-09-05 M1 review found that `keyring::Entry::set_secret` is an upsert.
+A preceding lookup and a per-instance mutex cannot prevent another adapter or
+process from creating the item between lookup and write. macOS `store_new`
+now calls `SecKeychain::add_generic_password` directly in the same User-domain
+Keychain used by the pinned keyring backend. Native `errSecDuplicateItem`
+maps to `AlreadyExists`; every other creation error maps to `Unavailable`.
+Existing keys are never read or updated by this operation. Loading and deletion
+retain their existing adapter. No namespace, database format, ACL, trust,
+access-group, or accessibility policy changes are claimed.
+
+The direct dependency reuses the already reviewed locked package and its
+MIT/Apache-2.0 license; it adds no package version, unsafe application code, or
+secret transport. The native regression includes a deterministic negative
+control for the old upsert interleaving, followed by competing independent
+adapters using the exclusive operation. Neither is signed-app or cross-process
+access-control qualification. Windows and other non-macOS creation still use
+the old compatibility path and require an exclusive-create design before later
+native qualification; no cross-process overwrite guarantee is claimed there.
+
 - macOS development uses the legacy Keychain adapter because unsigned builds
   cannot honestly claim a signed application access group. Signed preview and
   release builds must prove their code-requirement/access policy across first
@@ -81,6 +101,12 @@ See `../../evidence/0.0.0-dev/windows-sqlcipher-logging.md`.
   guard.
 
 ## References
+
+The Step 4 macOS storage-test target also directly references the same locked
+`security-framework 3.7.0` as a development dependency solely to disable native
+Keychain interaction in test processes. This adds no package version and no
+production dependency beyond the vault adapter's reviewed use. The signed
+native helper and bounded HFS+ image are qualification tools, not app resources.
 
 - [rusqlite feature documentation](https://docs.rs/rusqlite/0.40.2/rusqlite/#optional-features)
 - [keyring platform stores](https://docs.rs/keyring/4.2.0/keyring/)

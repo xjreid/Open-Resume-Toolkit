@@ -131,6 +131,96 @@ need a working connection. Local self-signing never qualifies Developer ID,
 Gatekeeper download behavior, notarization, or production distribution.
 
 Current recorded results: `evidence/0.0.0-dev/m0-macos-qualification.md`.
+M0 is complete for macOS-arm64 development at `4bd2594`: its four hosted CI
+jobs and separate vulnerability scan were independently verified green on
+2026-09-05, and the unchanged installed app passed signature/digest verification
+again. M1 and M2 remain incomplete; this is not distribution qualification.
+
+## Step 4: M1 local macOS storage qualification complete
+
+The local macOS-arm64 matrix is complete; formal M1 signoff still requires hosted
+CI for the containing commit. This checkpoint remains uncommitted. It includes
+user-observed standard-account restore, lock/deny, forced-quit recovery and
+account-only deletion, plus the signed native failure suite described below.
+The final app reopened in both accounts; the test account selected Always Allow
+on first launch after update and had no repeated prompt on reopen.
+
+The first Step 4 review repaired macOS database-key creation: it now uses an
+exclusive native Keychain add operation. The previous lookup followed by an
+upsert could overwrite another caller's newly created key. The public namespace,
+load/delete behavior, and profile format are unchanged. The fix alone does not prove
+signed-app access control; the separate account/identity results are recorded
+in the Step 4 evidence.
+
+Run the focused noninteractive checks with:
+
+```sh
+cargo test --locked -p ort-backup -p ort-storage -p ort-vault
+just test-platform-vault-concurrency
+```
+
+The first command uses memory vaults only. The second must run in the ordinary
+developer session outside an enclosing agent sandbox. It creates/deletes only
+randomized `com.openresumetoolkit.platform-test.database` items, never profile
+keys. Each test process disables Keychain prompts. It fails if the vault is
+unavailable; it does not unlock the Keychain or alter its trust/access policy.
+A deterministic upsert negative control demonstrates the old race, and four
+eight-adapter races require one winner whose bytes remain unchanged. These are
+native Keychain tests in one process, not cross-process ACL or app-signing tests.
+
+Expanded portable-backup tests exercise every truncation, invalid header/KDF
+parameters, oversized/concatenated files, independently authenticated hostile
+JSON and records, unchanged active-profile files/keys after invalid restores,
+and transaction rollback after an injected late write failure. The injected
+failure is not native low-disk evidence.
+
+Before interactive destructive or failure tests, create and validate a portable
+backup of the existing synthetic developer profile using the installed app.
+The user chooses and enters the backup passphrase locally; do not put it in
+commands, environment variables, reports, or this repository. Keep it available
+for the later `orttest` restore. Transfer only the encrypted backup through
+`/Users/Shared`. Never transfer the database key, signing private key, or login
+Keychain. Request the account switch immediately before the standard-account
+tests, and run them from that account's real interactive login session.
+
+Checkpoint evidence and remaining matrix:
+`evidence/0.0.0-dev/m1-macos-storage-qualification.md`.
+
+The extended native failure harness is opt-in:
+
+```sh
+just test-platform-storage "ORT Local Test Signing"
+just test-backup-mutations
+```
+
+The storage recipe signs a separate test executable, creates disposable
+`platform-test` Keychain items and SQLCipher profiles, kills only its own child
+processes at WAL/migration boundaries, and fills a private 64 MiB HFS+ disk image
+to exercise real ENOSPC. The filler has an independent 80 MiB limit; subsequent
+database writes are also bounded. The image is detached afterward and reports
+remain under `target/m1-qualification/native-storage-*`. It does not alter either
+account's application profile, default Keychain, or trust settings. Keychain UI
+is disabled in each test process. Crash hooks compile only into macOS tests and
+expire after 30 seconds if the parent fails to kill the child.
+
+With explicit approval for the installed-key read-denial probe, run
+`node tools/qualify-storage-macos.mjs "ORT Local Test Signing" --installed-key-probe`.
+The helper first confirms the exact installed item's metadata exists, then
+requires its secret read to fail with interaction disabled. It never prints
+secret bytes. This is a specific unapproved-process denial check, not a claim
+that the unlocked account resists all same-user malware.
+
+The mutation recipe runs fixed-seed header mutations and ciphertext/tag changes
+with valid controls. It is bounded and reproducible, not a sustained,
+coverage-guided fuzzing claim. The ordinary full gate skips all native and
+mutation opt-in tests.
+
+`tools/m1-account-check.py` and `tools/m1-locked-check.py` are read-only manual
+qualification helpers for the real `orttest` console login. They inspect
+non-secret manifests, encrypted-file digests/markers, file access denial, and
+Keychain metadata only, and retain receipts in that user's home. They do not
+retrieve passwords, lock/unlock Keychain, delete ORT data, or impersonate an
+account. The user performs the installed-app and Keychain actions explicitly.
 
 ## Development editor checks
 

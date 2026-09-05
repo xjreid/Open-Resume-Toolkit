@@ -60,6 +60,18 @@ probe-document-lifecycle-macos:
 test-platform-vault:
 	ORT_RUN_OS_VAULT_TESTS=1 cargo test -p ort-vault --test os_vault native_database_key_round_trip_and_overwrite_denial -- --ignored --exact --nocapture
 
+# Native synthetic Keychain checks; each process disables interactive prompts.
+test-platform-vault-concurrency:
+	ORT_RUN_OS_VAULT_TESTS=1 cargo test --locked -p ort-vault --test os_vault native_upsert_negative_control_can_replace_a_competing_key -- --ignored --exact --nocapture
+	ORT_RUN_OS_VAULT_TESTS=1 cargo test --locked -p ort-vault --test os_vault native_independent_vaults_cannot_replace_concurrent_winner -- --ignored --exact --nocapture
+
+# Signed helper, disposable native profiles, owned-child SIGKILL and 64 MiB disk image.
+test-platform-storage identity="ORT Local Test Signing":
+	node tools/qualify-storage-macos.mjs "{{identity}}"
+
+test-backup-mutations:
+	ORT_RUN_BACKUP_MUTATION_TESTS=1 cargo test --release --locked -p ort-backup adversarial_tests::bounded_restore_mutation_campaign -- --ignored --exact --nocapture
+
 package-preview:
 	@node tools/assert-dev-profile.mjs
 	pnpm --filter @ort/desktop tauri build --config src-tauri/tauri.preview.conf.json

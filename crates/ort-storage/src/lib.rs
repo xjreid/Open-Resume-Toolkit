@@ -2493,6 +2493,8 @@ fn replace_manifest_atomically(
     }
     drop(file);
     fs::rename(destination, &previous).map_err(|_| StorageError::Unavailable)?;
+    #[cfg(all(test, target_os = "macos"))]
+    native_qualification::crash_checkpoint("manifest-handoff");
     if fs::rename(&temporary, destination).is_err() {
         let _ = fs::rename(&previous, destination);
         let _ = fs::remove_file(&temporary);
@@ -2716,9 +2718,14 @@ fn migrate_schema(connection: &Connection) -> Result<(), StorageError> {
                 params![migration_v2_checksum(), "0.0.0-dev", now_string()],
             )
             .map_err(|_| StorageError::Unavailable)?;
+        #[cfg(all(test, target_os = "macos"))]
+        native_qualification::crash_checkpoint("migration-before-commit");
         connection
             .execute_batch("COMMIT")
-            .map_err(|_| StorageError::Unavailable)
+            .map_err(|_| StorageError::Unavailable)?;
+        #[cfg(all(test, target_os = "macos"))]
+        native_qualification::crash_checkpoint("migration-after-commit");
+        Ok(())
     })();
     if result.is_err() {
         let _ = connection.execute_batch("ROLLBACK");
@@ -2887,6 +2894,9 @@ fn remove_exact_database_files(database_path: &Path) -> Result<(), StorageError>
     }
     Ok(())
 }
+
+#[cfg(all(test, target_os = "macos"))]
+mod native_qualification;
 
 #[cfg(test)]
 mod tests {
@@ -3748,6 +3758,137 @@ mod tests {
             vec![render_manifest]
         );
         destination.verify_integrity().expect("restored integrity");
+    }
+
+    #[test]
+    fn invalid_portable_backups_preserve_existing_records_files_and_key() {
+        let temporary = TempDir::new().unwrap();
+        let root = temporary.path().join("active");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(&root, "test", &vault).unwrap();
+        let draft = store
+            .create_draft(&ResumeDocument::empty(PLAINTEXT_MARKER))
+            .unwrap();
+        store.publish_draft(draft.revision).unwrap();
+        store
+            .save_setting(
+                "appearance.theme",
+                None,
+                &Value::String("system".to_owned()),
+            )
+            .unwrap();
+        let before_profile = store.read_portable_profile().unwrap();
+        let reference = store.manifest().vault_reference().unwrap();
+        let before_key = vault.load(&reference).unwrap();
+        let passphrase =
+            BackupPassphrase::new("synthetic nonmutation passphrase".to_owned()).unwrap();
+        let backup = store
+            .create_portable_backup(&passphrase, "0.0.0-dev")
+            .unwrap();
+        let files: Vec<_> = fs::read_dir(&root)
+            .unwrap()
+            .map(|entry| {
+                let path = entry.unwrap().path();
+                let bytes = fs::read(&path).unwrap();
+                (path, bytes)
+            })
+            .collect();
+        let mut corrupt = backup.clone();
+        *corrupt.last_mut().unwrap() ^= 0x80;
+        let mut excessive_kdf = backup.clone();
+        excessive_kdf[12..16].copy_from_slice(&u32::MAX.to_be_bytes());
+        let mut concatenated = backup.clone();
+        concatenated.extend_from_slice(&backup);
+        for invalid in [
+            &[][..],
+            &backup[..75],
+            &backup[..backup.len() - 1],
+            &corrupt,
+            &excessive_kdf,
+            &concatenated,
+        ] {
+            assert_eq!(
+                store.restore_portable_backup(invalid, &passphrase),
+                Err(StorageError::InvalidData)
+            );
+        }
+        let wrong =
+            BackupPassphrase::new("wrong synthetic nonmutation passphrase".to_owned()).unwrap();
+        assert_eq!(
+            store.restore_portable_backup(&backup, &wrong),
+            Err(StorageError::InvalidData)
+        );
+        assert_eq!(fs::read_dir(&root).unwrap().count(), files.len());
+        for (path, bytes) in files {
+            assert_eq!(
+                fs::read(path).unwrap(),
+                bytes,
+                "invalid backup must not write profile files"
+            );
+        }
+        assert_eq!(store.read_portable_profile().unwrap(), before_profile);
+        let after_key = vault.load(&reference).unwrap();
+        assert!(before_key.expose_for(|before| after_key.expose_for(|after| before == after)));
+        drop(store);
+        let reopened = EncryptedStore::open_or_initialize(&root, "test", &vault).unwrap();
+        assert_eq!(reopened.read_portable_profile().unwrap(), before_profile);
+    }
+
+    #[test]
+    fn portable_restore_rolls_back_earlier_records_when_a_later_write_fails() {
+        let temporary = TempDir::new().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let source =
+            EncryptedStore::open_or_initialize(&temporary.path().join("source"), "test", &vault)
+                .unwrap();
+        source
+            .create_draft(&ResumeDocument::empty(PLAINTEXT_MARKER))
+            .unwrap();
+        source.publish_draft(1).unwrap();
+        source
+            .save_setting(
+                "appearance.theme",
+                None,
+                &Value::String("system".to_owned()),
+            )
+            .unwrap();
+        let passphrase = BackupPassphrase::new("synthetic rollback passphrase".to_owned()).unwrap();
+        let backup = source
+            .create_portable_backup(&passphrase, "0.0.0-dev")
+            .unwrap();
+        let destination = EncryptedStore::open_or_initialize(
+            &temporary.path().join("destination"),
+            "test",
+            &vault,
+        )
+        .unwrap();
+        // Inject a deterministic failure after draft/publication insertion. This
+        // proves transaction rollback, not native ENOSPC or power-loss behavior.
+        destination.connection.lock().unwrap().execute_batch(
+            "CREATE TEMP TRIGGER ort_test_fail_restore BEFORE INSERT ON settings BEGIN SELECT RAISE(ABORT, 'synthetic injected failure'); END;"
+        ).unwrap();
+        assert_eq!(
+            destination.restore_portable_backup(&backup, &passphrase),
+            Err(StorageError::Unavailable)
+        );
+        assert_eq!(
+            destination.read_portable_profile().unwrap(),
+            PortableProfileV1::default()
+        );
+        destination
+            .connection
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER ort_test_fail_restore")
+            .unwrap();
+        destination
+            .restore_portable_backup(&backup, &passphrase)
+            .unwrap();
+        assert_eq!(
+            destination.read_portable_profile().unwrap(),
+            source.read_portable_profile().unwrap()
+        );
+        destination.verify_integrity().unwrap();
     }
 
     #[test]

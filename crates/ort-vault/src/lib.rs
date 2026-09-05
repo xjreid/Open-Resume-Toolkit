@@ -183,19 +183,7 @@ impl DatabaseKeyVault for OsDatabaseKeyVault {
             .operations
             .lock()
             .map_err(|_| VaultError::Unavailable)?;
-        let entry = Self::entry(reference)?;
-
-        match entry.get_secret() {
-            Ok(mut existing) => {
-                existing.zeroize();
-                return Err(VaultError::AlreadyExists);
-            }
-            Err(keyring::Error::NoEntry) => {}
-            Err(_) => return Err(VaultError::Unavailable),
-        }
-
-        key.expose_for(|bytes| entry.set_secret(bytes))
-            .map_err(|_| VaultError::Unavailable)
+        store_new_native(reference, key)
     }
 
     fn delete(&self, reference: &VaultReference) -> Result<(), VaultError> {
@@ -208,6 +196,44 @@ impl DatabaseKeyVault for OsDatabaseKeyVault {
             Err(_) => Err(VaultError::Unavailable),
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+fn store_new_native(reference: &VaultReference, key: &DatabaseKey) -> Result<(), VaultError> {
+    use security_framework::os::macos::keychain::{SecKeychain, SecPreferencesDomain};
+
+    // Resolve the same User-domain keychain as keyring 4.2's macOS backend.
+    // Its set_secret() API is an upsert: a preceding lookup and a per-instance
+    // mutex cannot protect against other instances or processes. The OS add
+    // operation enforces uniqueness without reading or updating an existing key.
+    let keychain = SecKeychain::default_for_domain(SecPreferencesDomain::User)
+        .map_err(|_| VaultError::Unavailable)?;
+    key.expose_for(|bytes| {
+        keychain.add_generic_password(reference.service(), reference.account(), bytes)
+    })
+    .map_err(|error| match error.code() {
+        -25299 => VaultError::AlreadyExists, // errSecDuplicateItem
+        _ => VaultError::Unavailable,
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn store_new_native(reference: &VaultReference, key: &DatabaseKey) -> Result<(), VaultError> {
+    // Other native platforms remain deferred qualification targets. This
+    // compatibility path does not claim cross-process exclusive creation.
+    let entry = OsDatabaseKeyVault::entry(reference)?;
+
+    match entry.get_secret() {
+        Ok(mut existing) => {
+            existing.zeroize();
+            return Err(VaultError::AlreadyExists);
+        }
+        Err(keyring::Error::NoEntry) => {}
+        Err(_) => return Err(VaultError::Unavailable),
+    }
+
+    key.expose_for(|bytes| entry.set_secret(bytes))
+        .map_err(|_| VaultError::Unavailable)
 }
 
 fn map_read_error(error: &keyring::Error) -> VaultError {

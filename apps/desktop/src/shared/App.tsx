@@ -77,6 +77,10 @@ function ResumeEditor() {
   const revision = editor.saved?.revision ?? null;
   const publishedRevision = editor.published?.revision ?? null;
   const dirty = isDirty(editor);
+  // An untouched placeholder has no user edits to save before backup/recovery.
+  // Keep ordinary dirty semantics for save, publication, and quit; never waive
+  // the backup guard after an edit (including undo) or for a stored draft.
+  const backupDirty = dirty && (editor.saved !== null || editor.editEpoch > 0);
   const busy = editor.status !== "idle";
   const mustReload = requiresReload(editor);
   const issues = useMemo(
@@ -424,10 +428,10 @@ function ResumeEditor() {
       />
 
       <BackupPanel
-        dirty={dirty}
+        dirty={backupDirty}
         blocked={
           !storageReady ||
-          dirty ||
+          backupDirty ||
           busy ||
           mustReload ||
           confirmReload ||
@@ -436,7 +440,7 @@ function ResumeEditor() {
         onBegin={() => {
           if (
             ioBusy.current ||
-            dirty ||
+            backupDirty ||
             busy ||
             mustReload ||
             confirmReload ||

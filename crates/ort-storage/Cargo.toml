@@ -24,5 +24,8 @@ zeroize.workspace = true
 ort-vault = { path = "../ort-vault", features = ["test-support"] }
 tempfile.workspace = true
 
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+security-framework = "=3.7.0"
+
 [lints]
 workspace = true

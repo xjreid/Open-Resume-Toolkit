@@ -42,8 +42,14 @@ pre-vault development-identity refusal, and non-mutating synthetic
 cross-channel isolation tests. The Linux/Windows optional-fsevents license-gate
 failure is repaired with an integrity-pinned single-package policy, not a broad
 exception. Current local results and remaining signoff gates are recorded in
-`../../evidence/0.0.0-dev/m0-macos-qualification.md`. Hosted CI on the containing
-commit remains required; M0 is not marked complete by the local harness.
+`../../evidence/0.0.0-dev/m0-macos-qualification.md`. **M0 is complete for the
+macOS-arm64 development scope at `4bd2594` (2026-09-05).** The four CI jobs and
+separate dependency vulnerability scan were independently verified successful
+through the GitHub API. The installed app was reverified against the qualified
+source digest, executable digest, and local signer. Windows/Intel native
+qualification and production signing/notarization remain deferred. This signoff
+applies to that checkpoint; later implementation changes require fresh artifact
+verification and do not inherit its native evidence automatically.
 
 Deliver:
 
@@ -68,6 +74,25 @@ Exit evidence:
 
 Current development status:
 
+- **Step 4 local macOS-arm64 qualification is complete as of 2026-09-05**;
+  formal M1 signoff awaits hosted CI for the containing commit. The changes are
+  uncommitted. Evidence:
+  `../../evidence/0.0.0-dev/m1-macos-storage-qualification.md`.
+  macOS key creation uses a native exclusive add, with an upsert negative
+  control and independent-adapter race tests. The empty-profile backup guard
+  repair passes live UI tests and the real-account restore journey.
+  Signed native tests pass actual WAL/migration process termination, corruption,
+  wrong/missing keys, bounded-image ENOSPC, native key separation and exact-target
+  deletion. An unapproved signed helper cannot read the installed app key.
+  The real standard account passes developer file/key denial, separate active
+  and safety identities, encrypted marker scans, restore/restart, Force Quit,
+  locked-Keychain refusal/nonmutation, and deletion/rekey with the developer
+  profile and shared backup preserved. The final signed build passes installed
+  and moved-app startup with the original path absent during relocation, and
+  empty-account startup/reopen. Its first test-account launch requested Keychain
+  authorization; Always Allow persisted through reopen without another prompt.
+  The canonical gate and bounded backup mutation campaign pass. Native helper
+  evidence and user-observed installed evidence remain explicitly distinguished.
 - implemented locally: narrow vault abstraction, overwrite-safe database-key
   lifecycle, pinned SQLCipher build, schema v1, structured resume validation,
   optimistic draft revisions, immutable published snapshots, settings, integrity
@@ -76,11 +101,10 @@ Current development status:
   same-device checkpoints, and a password-protected portable backup/restore
   prototype that creates a fresh device key, plus a verified arm64 macOS local
   preview `.app`/DMG with an isolated identity and explicit ad-hoc signing;
-- **[HIGH]** still M1-gated for macOS arm64: native Keychain matrices using a
-  stable local development identity, cross-account denial, development/preview
-  access behavior, macOS crash/migration/low-disk suites, clean-account backup
-  restore, and expanded hostile restore/fuzz tests. Windows vault and
-  cross-platform-file qualification are deferred.
+- **[HIGH]** remaining for formal M1 signoff: qualify the containing commit in
+  hosted CI. Sustained release fuzzing and broader distribution/preview/native-host
+  matrices are not claimed by this local development checkpoint. Windows and
+  Intel native qualification remain deferred.
 
 Deliver:
 

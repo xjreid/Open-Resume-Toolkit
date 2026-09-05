@@ -209,6 +209,132 @@ afterEach(async () => {
 });
 
 describe("M2 live editor accessibility", () => {
+  it("allows backup validation and confirmed restore before creating a first draft", async () => {
+    const original = native.invoke.getMockImplementation()!;
+    let finishRestore!: (result: unknown) => void;
+    native.invoke.mockImplementation(
+      async (command: string, ...args: unknown[]) => {
+        if (command === "load_resume")
+          return { ok: true, value: { draft: null, latestPublished: null } };
+        if (command === "validate_portable_backup")
+          return { ok: true, value: { status: "cancelled" } };
+        if (command === "restore_portable_backup")
+          return new Promise((resolve) => {
+            finishRestore = resolve;
+          });
+        return original(command, ...args);
+      },
+    );
+    const container = await render(<App surface="main" />);
+    const check = container.querySelector(
+      '[aria-labelledby="backup-check-heading"]',
+    )!;
+    const restore = container.querySelector(
+      '[aria-labelledby="backup-restore-heading"]',
+    )!;
+    const validationPassphrase = inputInLabel(
+      check,
+      "Existing backup passphrase",
+    );
+    const restorePassphrase = inputInLabel(restore, "Backup passphrase");
+    const confirmation = inputInLabel(restore, "REPLACE SAVED PROFILE");
+    expect(validationPassphrase.disabled).toBe(false);
+    expect(restorePassphrase.disabled).toBe(false);
+    await act(async () =>
+      inputValue(validationPassphrase, "synthetic test passphrase"),
+    );
+    const validate = buttonNamed(check, "Select and check encrypted backup");
+    expect(validate.disabled).toBe(false);
+    await act(async () => validate.click());
+    await settle();
+    expect(container.textContent).toContain("Backup validation canceled");
+    expect(validationPassphrase.value).toBe("");
+    await act(async () =>
+      inputValue(restorePassphrase, "synthetic test passphrase"),
+    );
+    const submit = buttonNamed(
+      restore,
+      "Select backup and replace after restart",
+    );
+    expect(submit.disabled).toBe(true);
+    await act(async () => inputValue(confirmation, "REPLACE SAVED PROFILE"));
+    expect(submit.disabled).toBe(false);
+    await act(async () => submit.click());
+    expect(restorePassphrase.value).toBe("");
+    expect(confirmation.value).toBe("");
+    expect(validationPassphrase.disabled).toBe(true);
+    expect(restorePassphrase.disabled).toBe(true);
+    await act(async () =>
+      finishRestore({
+        ok: true,
+        value: {
+          status: "staged",
+          restartRequired: true,
+          safetyCopyRetained: true,
+        },
+      }),
+    );
+    await settle();
+    expect(container.textContent).toContain("Restart ORT to activate it");
+    expect(container.textContent).toContain("Not saved");
+    expect(container.textContent).toContain("No snapshot");
+    expect(inputInLabel(container, "Full name").value).toBe("");
+    expect(restorePassphrase.disabled).toBe(true);
+    const commands = native.invoke.mock.calls.map(([command]) => command);
+    expect(
+      commands.filter((command) => command === "restore_portable_backup"),
+    ).toHaveLength(1);
+    expect(commands).not.toContain("save_resume");
+    expect(commands).not.toContain("publish_resume");
+  });
+
+  it.each([false, true])(
+    "keeps backup controls blocked after an edit (saved draft: %s)",
+    async (hasSavedDraft) => {
+      if (!hasSavedDraft) {
+        const original = native.invoke.getMockImplementation()!;
+        native.invoke.mockImplementation(
+          async (command: string, ...args: unknown[]) =>
+            command === "load_resume"
+              ? { ok: true, value: { draft: null, latestPublished: null } }
+              : original(command, ...args),
+        );
+      }
+      const container = await render(<App surface="main" />);
+      // An invalid edit cannot autosave and must remain protected from restore.
+      await act(async () =>
+        inputValue(inputInLabel(container, "Resume title"), ""),
+      );
+      expect(
+        inputInLabel(container, "Existing backup passphrase").disabled,
+      ).toBe(true);
+      const restore = container.querySelector(
+        '[aria-labelledby="backup-restore-heading"]',
+      )!;
+      expect(inputInLabel(restore, "Backup passphrase").disabled).toBe(true);
+      expect(
+        buttonNamed(restore, "Select backup and replace after restart")
+          .disabled,
+      ).toBe(true);
+      await act(async () =>
+        restore
+          .querySelector("form")!
+          .dispatchEvent(
+            new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+          ),
+      );
+      expect(
+        native.invoke.mock.calls.map(([command]) => command),
+      ).not.toContain("restore_portable_backup");
+      if (!hasSavedDraft) {
+        await act(async () => buttonNamed(container, "Undo edit").click());
+        expect(
+          inputInLabel(container, "Existing backup passphrase").disabled,
+        ).toBe(true);
+      }
+    },
+  );
+
   it("audits the loaded editor rather than only its loading shell", async () => {
     const container = await render(<App surface="main" />);
     expect(container.textContent).toContain("Identity and contact");
