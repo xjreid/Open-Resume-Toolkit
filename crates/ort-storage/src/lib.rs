@@ -2904,6 +2904,31 @@ mod tests {
 
     const PLAINTEXT_MARKER: &str = "SYNTHETIC-PRIVATE-RESUME-MARKER-9d87f8";
 
+    #[test]
+    fn profile_channel_mismatch_preserves_database_manifest_and_key() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        for original_channel in ["dev", "preview", "stable", "test"] {
+            let root = temporary.path().join(original_channel);
+            let store = EncryptedStore::open_or_initialize(&root, original_channel, &vault)
+                .expect("initialize isolated channel");
+            let reference = store.manifest().vault_reference().expect("vault reference");
+            drop(store);
+            let manifest = fs::read(root.join(MANIFEST_FILENAME)).expect("manifest");
+            let database = fs::read(root.join(DATABASE_FILENAME)).expect("database");
+            for other_channel in ["dev", "preview", "stable", "test"] {
+                if other_channel == original_channel {
+                    continue;
+                }
+                assert!(EncryptedStore::open_or_initialize(&root, other_channel, &vault).is_err());
+                assert_eq!(fs::read(root.join(MANIFEST_FILENAME)).unwrap(), manifest);
+                assert_eq!(fs::read(root.join(DATABASE_FILENAME)).unwrap(), database);
+                assert!(vault.load(&reference).is_ok());
+            }
+            assert!(EncryptedStore::open_or_initialize(&root, original_channel, &vault).is_ok());
+        }
+    }
+
     #[derive(Default)]
     struct FailingDeleteVault {
         inner: MemoryDatabaseKeyVault,

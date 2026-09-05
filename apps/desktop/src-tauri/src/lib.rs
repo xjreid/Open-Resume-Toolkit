@@ -299,6 +299,11 @@ fn storage_failure<T: serde::Serialize>(error: &StorageError) -> CommandResponse
 }
 
 fn initialize_storage(app: &tauri::App) -> DesktopStorage {
+    // This composition root only implements the development channel. Reject a
+    // packaging override before resolving paths or accessing any vault item.
+    if !development_identity_allowed(&app.config().identifier) {
+        return DesktopStorage::Unavailable;
+    }
     let Ok(app_data) = app.path().app_data_dir() else {
         return DesktopStorage::Unavailable;
     };
@@ -308,6 +313,10 @@ fn initialize_storage(app: &tauri::App) -> DesktopStorage {
         Ok((store, _activated_restore)) => DesktopStorage::Ready(store),
         Err(_) => DesktopStorage::Unavailable,
     }
+}
+
+fn development_identity_allowed(identifier: &str) -> bool {
+    identifier == "com.openresumetoolkit.dev"
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -383,6 +392,20 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn development_storage_rejects_other_package_identities() {
+        assert!(development_identity_allowed("com.openresumetoolkit.dev"));
+        for identifier in [
+            "com.openresumetoolkit",
+            "com.openresumetoolkit.preview",
+            "com.openresumetoolkit.test",
+            "com.openresumetoolkit.dev.other",
+            "",
+        ] {
+            assert!(!development_identity_allowed(identifier));
+        }
+    }
 
     #[test]
     fn health_contract_can_report_ready_encrypted_storage() {

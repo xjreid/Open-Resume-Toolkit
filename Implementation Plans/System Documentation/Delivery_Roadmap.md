@@ -36,9 +36,14 @@ Current development status: the repository skeleton, contracts, isolated
 development profile, static web/capability checks, and four-target CI are in
 place. The 2026-09-04 tooling checkpoint adds a fail-closed Rust/JavaScript SPDX
 allowlist, deterministic dependency inventory, and contract-regeneration drift
-to the canonical `just check` path. Native macOS-arm64 clean-checkout,
-installed-window, profile-isolation, and production-bundle evidence still gate
-formal M0 signoff.
+to the canonical `just check` path. The Step 3 checkpoint adds a macOS-arm64
+qualification harness, exact local-certificate release-app verification,
+pre-vault development-identity refusal, and non-mutating synthetic
+cross-channel isolation tests. The Linux/Windows optional-fsevents license-gate
+failure is repaired with an integrity-pinned single-package policy, not a broad
+exception. Current local results and remaining signoff gates are recorded in
+`../../evidence/0.0.0-dev/m0-macos-qualification.md`. Hosted CI on the containing
+commit remains required; M0 is not marked complete by the local harness.
 
 Deliver:
 

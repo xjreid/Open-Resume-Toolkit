@@ -35,6 +35,10 @@ recorded.
 
 ## Remaining M0 evidence
 
+This section describes the original 2026-09-04 checkpoint. For the subsequent
+macOS-only Step 3 results and the exact optional-fsevents CI repair, see
+`m0-macos-qualification.md`. Windows native qualification is now deferred.
+
 This closes the identified M0 tooling implementation gap, not every native exit
 criterion. Clean-checkout bootstrap, installed main/overlay health commands,
 development/stable profile isolation, and installed production-bundle remote

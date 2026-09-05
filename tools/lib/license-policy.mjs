@@ -121,3 +121,52 @@ export function licenseExceptionAllowed(exception, license, today) {
       exception.expiresOn >= today,
   );
 }
+
+// Single-OS optional packages have no installed sibling on other OSes. Their
+// reviewed metadata is bound to an exact lockfile digest and OS restriction.
+export function platformPackageLicense(
+  key,
+  records,
+  lockfile,
+  platform,
+  installed,
+) {
+  const matches = records.filter((record) => record.package === key);
+  if (matches.length === 0) return null;
+  if (matches.length !== 1)
+    throw new Error(`duplicate platform-package policy: ${key}`);
+  const record = matches[0];
+  const section =
+    lockfile.match(/^packages:\s*$([\s\S]*?)^snapshots:\s*$/m)?.[1] ?? "";
+  const blocks = [
+    ...section.matchAll(
+      /^  (['"]?)(\S.*?)\1:[ \t]*\r?\n((?: {4}[^\n]*\n|\r?\n)*)/gm,
+    ),
+  ];
+  const block = blocks.filter((match) => match[2] === key);
+  if (
+    block.length !== 1 ||
+    !block[0][3].includes(`resolution: {integrity: ${record.integrity}}`) ||
+    !block[0][3]
+      .split(/\r?\n/)
+      .some((line) => line.trim() === `os: [${record.os}]`)
+  ) {
+    throw new Error(`${key}: reviewed platform metadata differs from lockfile`);
+  }
+  if (installed) {
+    const { name, version } = splitPackageKey(key);
+    if (
+      installed.name !== name ||
+      installed.version !== version ||
+      installed.license !== record.license ||
+      JSON.stringify(installed.os) !== JSON.stringify([record.os])
+    ) {
+      throw new Error(
+        `${key}: installed metadata differs from reviewed policy`,
+      );
+    }
+  } else if (platform === record.os || !record.absentOn.includes(platform)) {
+    throw new Error(`${key}: package must be installed on ${platform}`);
+  }
+  return record.license;
+}

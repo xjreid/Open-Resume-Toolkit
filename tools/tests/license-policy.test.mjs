@@ -6,12 +6,81 @@ import {
   licenseExceptionAllowed,
   licenseExpressionAllowed,
   platformFamilyLicense,
+  platformPackageLicense,
   pnpmPackageKeys,
   splitPackageKey,
 } from "../lib/license-policy.mjs";
 
 const allowed = new Set(["Apache-2.0", "GPL-3.0-only", "MIT", "Unicode-3.0"]);
 const exceptions = new Set(["LLVM-exception"]);
+
+test("single-OS optional fsevents is verified on macOS and exactly accounted for on Linux/Windows", async () => {
+  const policy = JSON.parse(
+    await readFile(
+      new URL("../../config/dependency-license-policy.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const lockfile = await readFile(
+    new URL("../../pnpm-lock.yaml", import.meta.url),
+    "utf8",
+  );
+  const records = policy.javascriptPlatformPackages;
+  const key = "fsevents@2.3.3";
+  const installed = {
+    name: "fsevents",
+    version: "2.3.3",
+    license: "MIT",
+    os: ["darwin"],
+  };
+  for (const platform of ["linux", "win32"]) {
+    assert.equal(
+      platformPackageLicense(key, records, lockfile, platform),
+      "MIT",
+    );
+  }
+  assert.equal(
+    platformPackageLicense(key, records, lockfile, "darwin", installed),
+    "MIT",
+  );
+  assert.throws(() => platformPackageLicense(key, records, lockfile, "darwin"));
+  assert.throws(() =>
+    platformPackageLicense(key, records, lockfile, "freebsd"),
+  );
+  assert.throws(() =>
+    platformPackageLicense(key, records, lockfile, "darwin", {
+      ...installed,
+      license: "unknown",
+    }),
+  );
+  assert.throws(() =>
+    platformPackageLicense(
+      key,
+      records,
+      lockfile.replace(records[0].integrity, "sha512-changed"),
+      "linux",
+    ),
+  );
+  assert.throws(() =>
+    platformPackageLicense(
+      key,
+      records,
+      lockfile.replaceAll("os: [darwin]", "os: [linux]"),
+      "linux",
+    ),
+  );
+  assert.throws(() =>
+    platformPackageLicense(key, [...records, ...records], lockfile, "linux"),
+  );
+  assert.equal(
+    platformPackageLicense("fsevents@2.3.4", records, lockfile, "linux"),
+    null,
+  );
+  assert.equal(
+    platformPackageLicense("unknown@1.0.0", records, lockfile, "linux"),
+    null,
+  );
+});
 
 test("SPDX policy honors OR, AND, WITH, parentheses, and legacy slash choices", () => {
   assert(licenseExpressionAllowed("MIT OR AGPL-3.0-only", allowed, exceptions));

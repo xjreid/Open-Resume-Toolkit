@@ -33,7 +33,21 @@ test-integration:
 	pnpm test
 
 test-platform:
-	@echo "M1 native vault suites are intentionally gated pending signed macOS and Windows VM harnesses."
+	node tools/qualify-macos.mjs preflight
+	cargo test --locked -p ort-desktop development_storage_rejects_other_package_identities
+	cargo test --locked -p ort-storage profile_channel_mismatch_preserves_database_manifest_and_key
+	@echo "M0 preflight and synthetic isolation passed. Run package-qualification and verify-macos-app; native M1 vault qualification remains separate."
+
+# Local signing only; never exports a key or changes certificate trust.
+package-qualification identity="ORT Local Test Signing":
+	node tools/qualify-macos.mjs build "{{identity}}"
+
+verify-macos-app app:
+	node tools/qualify-macos.mjs verify "{{app}}"
+
+# Requires a committed, clean source tree; retains its disposable checkout/logs.
+qualify-clean-checkout:
+	node tools/qualify-macos.mjs clean-checkout
 
 # Synthetic App Sandbox measurements only; never enables the importer.
 probe-document-sandbox-macos:

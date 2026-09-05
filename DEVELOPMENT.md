@@ -50,6 +50,90 @@ already be available locally when running without network access.
 
 `just dev` always verifies the `com.openresumetoolkit.dev` identity before it starts. Development and test builds must use only synthetic data.
 
+## Step 3: M0 macOS Apple Silicon qualification
+
+Run these commands in the project directory, using the developer account that
+owns the checkout and the local signing certificate. No Apple Developer
+membership, Developer ID certificate, notarization, Windows VM, or second-account
+login is required for this step. A stable, trusted local code-signing identity
+with its private key is required for the signed-artifact checks; ad-hoc signing
+does not substitute for that identity in later Keychain tests.
+
+```sh
+just check
+just test-platform
+just package-qualification "ORT Local Test Signing"
+```
+
+`test-platform` now runs real macOS-arm64 preflight and synthetic isolation
+tests. It checks the development identifier, production CSP, local main/overlay
+entrypoints, and exact Tauri capability policy. The desktop refuses another
+package identifier before resolving profile paths or accessing the vault.
+Storage tests refuse a mismatched dev/preview/stable/test channel without
+changing the synthetic database, manifest, or key. They do not prove OS-vault
+cross-account or cross-process isolation.
+
+`package-qualification` builds a release-profile `.app`, uses the selected local
+certificate without exporting its private key, and verifies arm64 architecture,
+the development bundle identifier, hardened runtime, no signing entitlements,
+the exact signing certificate, and the sealed bundle's strict signature. It
+also inventories generated frontend assets and rejects nonlocal entrypoint
+asset references. This combines reviewed source configuration with the freshly
+built signed artifact; it is not a network-denial test or an arbitrary-binary
+configuration decompiler. Import remains disabled.
+
+Quit the installed development app, preserving any saved synthetic work. Keep a
+recoverable copy of an existing installation, then copy
+`target/release/bundle/macos/Open Resume Toolkit Dev.app` into `/Applications`.
+Verify the installed copy before opening it:
+
+```sh
+just verify-macos-app "/Applications/Open Resume Toolkit Dev.app"
+```
+
+This must match the build's executable digest, certificate, and designated
+requirement. Launch that installed app and observe **Encrypted storage ready**
+in both the main and overlay windows, using the Window menu to select each.
+Those badges require the typed health response. Record the observations
+separately; the verifier deliberately does not mark GUI health or M0 complete.
+Do not delete or reset a profile to make a failed check pass.
+
+For clean-checkout evidence after committing the step:
+
+```sh
+just qualify-clean-checkout
+```
+
+Before committing, an equivalent local implementation check is available with
+`node tools/qualify-macos.mjs clean-snapshot`. It creates a temporary commit of
+the current tracked changes and unignored new files **only in a disposable
+clone**; it does not commit or push the working project. Both modes bootstrap
+fresh dependencies, run `just check` and `just test-platform`, and require no
+tracked-file drift. System toolchains and download caches may be shared, but
+`node_modules` and `target` are not copied. The clone is retained for inspection.
+Run the secret check first and do not leave unrelated unignored files in the
+checkout when taking a snapshot.
+
+Reports are written under `target/m0-qualification/`; they include source and
+artifact digests but no keys or resume contents. Implementation changes make
+build evidence stale and require rebuilding. Documentation/evidence-only edits
+do not. A successful local run still requires green hosted CI on the containing
+commit before M0 signoff. Windows/Intel jobs remain portability checks, not
+native support claims.
+
+The next M1 native-vault step needs an interactive developer session and later
+an interactive standard test-account session. Keep the same local signing
+certificate/private key in the developer account; do not copy its private key
+or the developer's login keychain into the test account. Account switching and
+Keychain prompts will be requested when needed. Offline use is sufficient for
+M0 health and local profile checks; later network-containment positive controls
+need a working connection. Local self-signing never qualifies Developer ID,
+Gatekeeper download behavior, notarization, or production distribution.
+
+Current recorded results: `evidence/0.0.0-dev/m0-macos-qualification.md`.
+
+## Development editor checks
+
 The main window reports `ready` after it opens the isolated development profile
 under the platform application-data directory. Its database key is stored in
 macOS Keychain or Windows Credential Manager. A vault or database failure leaves

@@ -1,9 +1,11 @@
 {
   "schemaVersion": 2,
   "version": "0.0.0-dev",
-  "sourceBaselineCommit": "5f4b33ed9b257c534daabac86e79bc2a97246de7",
-  "sourceCheckpoint": "m0-license-and-contract-gates-local-macos-arm64-containing-commit-is-authoritative",
-  "installedArtifactCommit": "296610a49461363ff47da6353558ea5b35ebf3f4",
+  "sourceBaselineCommit": "0a455e961870b35396d35003e5e4faca6209c574",
+  "sourceCheckpoint": "m0-macos-arm64-local-certificate-qualification-containing-commit-is-authoritative",
+  "sourceImplementationSha256": "faabea8e6127f369e5dbd79a6d9e6b2b985088e2fa06577d26ad94e66432aada",
+  "installedArtifactCommit": null,
+  "installedArtifactSource": "baseline-plus-uncommitted-implementation-digest-see-m0-macos-qualification.md",
   "channel": "development",
   "profileIdentity": "com.openresumetoolkit.dev",
   "artifacts": [
@@ -12,15 +14,21 @@
       "path": "target/release/bundle/macos/Open Resume Toolkit Dev.app",
       "architecture": "arm64",
       "bundleIdentifier": "com.openresumetoolkit.dev",
-      "signing": "adhoc-runtime",
-      "executableSha256": "ecd01fa08ef6e5d82a62b7024dac56d27149bfa426480291dc398c6a8034b88a",
+      "signing": "local-self-signed-certificate-hardened-runtime-no-entitlements-not-notarized",
+      "certificateSha256": "d4fdc787da71f95d9f5455c1a733e9d942d76409a72b92a27dff48da66c2cc49",
+      "executableSha256": "9ab48ab4e234fedfc7708472be10a88907c1ae95a9337cde6cbbedc91e0bd51e",
       "verification": "codesign-deep-strict"
     }
   ],
   "checks": {
     "contracts": "passed-local",
     "dependencyLicenses": "passed-local-727-rust-and-167-javascript-workspace-packages-zero-exceptions-macos-arm64",
-    "canonicalLocalGate": "passed-local-after-m0-license-and-contract-wiring-macos-arm64",
+    "canonicalLocalGate": "passed-local-and-final-source-fresh-clone-step3-macos-arm64",
+    "m0CleanCheckout": "passed-final-implementation-temporary-snapshot-68d561616ab354222baca4c3c500de7e3cc447a9-bootstrap-check-platform-clean-no-copied-node_modules-or-target",
+    "m0InstalledWindowHealth": "passed-local-main-and-overlay-typed-health-final-self-signed-arm64-app",
+    "m0DevelopmentIdentityIsolation": "passed-pre-vault-bundle-identity-refusal-and-synthetic-cross-channel-nonmutation-not-native-acl-proof",
+    "m0ProductionBundlePolicy": "passed-exact-source-policy-local-entrypoint-assets-release-build-and-sealed-installed-artifact-not-network-containment",
+    "m0Signoff": "pending-hosted-ci-containing-commit",
     "typescript": "passed-local",
     "rust": "passed-local-macos-arm64",
     "security": "passed-local-static",
@@ -79,8 +87,9 @@
     "m2ArchivedRendererReplay": "exact-current-bundle-retained-source-replay-passed-truthfully-labeled-current-renderer-fallback-pending-superseded-drafts-and-renderer-bundles-out-of-scope",
     "m2AllLocalDataDeletion": "passed-local-synthetic-exact-target-rekey-restart-recovery-contract-ui-macos-arm64",
     "m2AllLocalDataDeletionNative": "pending-installed-macos-and-windows-vault-filesystem-interruption-accessibility",
-    "macosPreviewPackage": "296610a-arm64-app-built-installed-hash-matched-and-codesign-deep-strict-passed-dmg-not-refreshed",
-    "platformBuilds": "5f4b33e-user-reported-all-five-hosted-jobs-passed"
+    "macosPreviewPackage": "2026-09-05-development-arm64-local-certificate-app-built-installed-hash-matched-and-codesign-deep-strict-passed-dmg-not-refreshed",
+    "platformBuilds": "current-containing-commit-pending-user-attached-linux-and-windows-fsevents-license-failures-repaired-locally",
+    "platformBuildsHistorical": "5f4b33e-user-reported-all-five-hosted-jobs-passed"
   },
   "releaseEligible": false
 }

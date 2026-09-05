@@ -45,5 +45,14 @@
       "license": "MPL-2.0"
     }
   ],
+  "javascriptPlatformPackages": [
+    {
+      "package": "fsevents@2.3.3",
+      "license": "MIT",
+      "os": "darwin",
+      "absentOn": ["linux", "win32"],
+      "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="
+    }
+  ],
   "packageExceptions": []
 }

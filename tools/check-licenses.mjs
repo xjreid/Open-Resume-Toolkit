@@ -13,6 +13,7 @@ import {
   licenseExceptionAllowed,
   licenseExpressionAllowed,
   platformFamilyLicense,
+  platformPackageLicense,
   pnpmPackageKeys,
   splitPackageKey,
 } from "./lib/license-policy.mjs";
@@ -141,9 +142,12 @@ function verifyJavascript() {
     );
   }
   const installed = installedPnpmPackages();
-  const lockKeys = pnpmPackageKeys(
-    readFileSync(join(root, "pnpm-lock.yaml"), "utf8"),
-  );
+  const lockfile = readFileSync(join(root, "pnpm-lock.yaml"), "utf8");
+  const lockKeys = pnpmPackageKeys(lockfile);
+  for (const record of policy.javascriptPlatformPackages ?? []) {
+    if (!lockKeys.includes(record.package))
+      failures.push(`unused platform-package policy: ${record.package}`);
+  }
   if (new Set(lockKeys).size !== lockKeys.length) {
     failures.push("javascript: pnpm lockfile contains duplicate package keys");
   }
@@ -170,8 +174,16 @@ function verifyJavascript() {
   for (const key of lockKeys) {
     const { name, version } = splitPackageKey(key);
     const installedPackage = installed.get(key);
+    const reviewedLicense = platformPackageLicense(
+      key,
+      policy.javascriptPlatformPackages ?? [],
+      lockfile,
+      process.platform,
+      installedPackage,
+    );
     const license =
       installedPackage?.license ??
+      reviewedLicense ??
       platformFamilyLicense(key, policy.javascriptPlatformFamilies);
     if (!license) {
       failures.push(
@@ -191,7 +203,11 @@ function verifyJavascript() {
       name,
       version,
       license,
-      installedPackage ? "installed-lock-package" : "reviewed-platform-family",
+      installedPackage
+        ? "installed-lock-package"
+        : reviewedLicense
+          ? "reviewed-exact-platform-package"
+          : "reviewed-platform-family",
     );
   }
 }
