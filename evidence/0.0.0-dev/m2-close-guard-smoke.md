@@ -49,6 +49,11 @@ Keychain credential value was inspected. The separate installed app in
 
 ## Remaining gates
 
+Source update (2026-09-06): the new
+[native termination bridge](m2-native-termination.md) passes isolated AppKit and
+Tauri event-loop checks. The limitations below describe this older installed
+artifact; refreshed installed and system-termination qualification remains open.
+
 - macOS Dock Quit and logout/shutdown are NOT protected. The pinned Tauri 2.11.5
   / muda 0.19.3 native Quit action invokes `terminate:` outside the usual exit
   callback. The custom app menu fixes its own path, not the OS delegate.

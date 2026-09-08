@@ -12,6 +12,16 @@ const { getDocument } = await import(
   pathToFileURL(require.resolve("pdfjs-dist/legacy/build/pdf.mjs")).href
 );
 const directory = process.argv[2];
+const style = process.argv[3] ?? "plain";
+const schemaV2 = process.argv[4] === "schema-v2";
+assert(
+  process.argv.length <= 5 && (process.argv[4] === undefined || schemaV2),
+  "explicit schema-v2 audit mode only",
+);
+assert(
+  ["plain", "technical", "professional", "modern"].includes(style),
+  "known bundled style only",
+);
 assert(directory, "provide synthetic PDF fixture directory");
 const goldens = JSON.parse(
   readFileSync(
@@ -53,11 +63,22 @@ const normalized = (value) =>
     .replaceAll("•", "")
     .replace(/\s+/g, "");
 const expectedManifest = {
-  documentSchemaVersion: 1,
+  documentSchemaVersion: schemaV2 ? 2 : 1,
   rendererVersion: "typst-0.15.1/ort-1",
-  templateId: "plain_pdf_v1",
+  templateId: `${style}_pdf_v1`,
   templateSha256:
-    "8074983903239c57a2373fbd542b10c7bef70a890a7ef9bb6e98a1b9be799bc3",
+    style === "plain"
+      ? "8074983903239c57a2373fbd542b10c7bef70a890a7ef9bb6e98a1b9be799bc3"
+      : createHash("sha256")
+          .update(
+            readFileSync(
+              new URL(
+                `../templates/resume/${style}_pdf_v1.typ`,
+                import.meta.url,
+              ),
+            ),
+          )
+          .digest("hex"),
   fontBundleId: "libertinus-serif/typst-assets-0.15.1",
   fontBundleSha256:
     "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
@@ -73,16 +94,24 @@ for (const kind of kinds) {
   assert(expected.endsWith("\n") && !expected.endsWith("\n\n"));
   assert(!expected.includes(source.title));
   assert(!expected.includes(source.documentId));
-  assert.equal(
-    createHash("sha256").update(expectedBytes).digest("hex"),
-    textGoldens[kind],
-    `${kind}: reviewed plain-text golden changed`,
-  );
+  assert.equal(source.schemaVersion, schemaV2 ? 2 : 1);
+  if (!schemaV2)
+    assert.equal(
+      createHash("sha256").update(expectedBytes).digest("hex"),
+      textGoldens[kind],
+      `${kind}: reviewed plain-text golden changed`,
+    );
   const receipt = JSON.parse(
     readFileSync(join(directory, `${kind}.json`), "utf8"),
   );
+  assert.equal(
+    receipt.documentSha256,
+    createHash("sha256").update(JSON.stringify(source)).digest("hex"),
+    `${kind}: structured source identity`,
+  );
   const digest = createHash("sha256").update(bytes).digest("hex");
-  assert.equal(digest, goldens[kind], `${kind}: reviewed PDF golden changed`);
+  if (style === "plain" && !schemaV2)
+    assert.equal(digest, goldens[kind], `${kind}: reviewed PDF golden changed`);
   assert.equal(digest, receipt.pdfSha256);
   assert.equal(bytes.length, receipt.byteCount);
   for (const [key, value] of Object.entries(expectedManifest))
@@ -99,7 +128,8 @@ for (const kind of kinds) {
   try {
     const pdf = await task.promise;
     assert.equal(pdf.numPages, receipt.pageCount);
-    assert.equal(pdf.numPages, expectedPageCounts[kind]);
+    if (style === "plain" && !schemaV2)
+      assert.equal(pdf.numPages, expectedPageCounts[kind]);
     assert(pdf.numPages > 0 && pdf.numPages <= 5);
     assert.equal(await pdf.getJSActions(), null);
     assert.equal(await pdf.getAttachments(), null);
@@ -169,7 +199,7 @@ for (const kind of kinds) {
     }
     if (expectedUrls.length) assert(structureRoles.has("Link"));
     console.log(
-      `${kind}: exact golden, ${pdf.numPages} page(s), text/order, geometry, tags, safe links, no active content`,
+      `${style}/${kind}: ${style === "plain" ? "exact golden" : "bundled style audit (golden/native qualification pending)"}, ${pdf.numPages} page(s), text/order, geometry, tags, safe links, no active content`,
     );
   } finally {
     await task.destroy();

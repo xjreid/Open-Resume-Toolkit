@@ -71,3 +71,40 @@ describe("DOCX receipt boundary", () => {
       expect(isExportDocxCommandResponse(wrapped(value))).toBe(false);
   });
 });
+
+it("allows only known styled DOCX receipts and never style metadata on text or cancellation", () => {
+  for (const templateId of [
+    "technical_docx_v1",
+    "professional_docx_v1",
+    "modern_docx_v1",
+  ]) {
+    const value = { ...receipt, templateId };
+    expect(isExportDocxCommandResponse({ ok: true, value })).toBe(true);
+    expect(isExportTextCommandResponse({ ok: true, value })).toBe(false);
+    expect(
+      isExportDocxCommandResponse({
+        ok: true,
+        value: { status: "cancelled", templateId },
+      }),
+    ).toBe(false);
+    expect(
+      isExportDocxCommandResponse({
+        ok: true,
+        value: { ...value, path: "/private" },
+      }),
+    ).toBe(false);
+  }
+  for (const templateId of [
+    undefined,
+    null,
+    "plain_docx_v1",
+    "unknown",
+    "../template",
+  ])
+    expect(
+      isExportDocxCommandResponse({
+        ok: true,
+        value: { ...receipt, templateId },
+      }),
+    ).toBe(false);
+});

@@ -72,3 +72,65 @@ fn overwide_unbreakable_content_is_rejected_not_clipped() {
     doc.contact.full_name = "W".repeat(1900);
     assert!(matches!(render_pdf(&doc), Err(PdfRenderError::LayoutLimit)));
 }
+
+#[test]
+fn styles_are_deterministic_distinct_and_do_not_change_source_identity() {
+    use ort_domain::DocumentStyle;
+    use ort_render::render_pdf_with_style;
+    for kind in support::OUTPUT_FIXTURE_KINDS {
+        let document = support::fixture(kind);
+        let original = render_pdf(&document).unwrap();
+        let mut hashes = std::collections::BTreeSet::new();
+        for style in [
+            DocumentStyle::Plain,
+            DocumentStyle::Technical,
+            DocumentStyle::Professional,
+            DocumentStyle::Modern,
+        ] {
+            let output = render_pdf_with_style(&document, style)
+                .unwrap_or_else(|error| panic!("{kind} {style:?}: {error}"));
+            let repeated = render_pdf_with_style(&document, style).unwrap();
+            assert_eq!(output.bytes, repeated.bytes);
+            assert_eq!(output.receipt, repeated.receipt);
+            assert_eq!(
+                output.receipt.document_sha256,
+                original.receipt.document_sha256
+            );
+            assert_eq!(output.receipt.template_id, style.pdf_template_id());
+            assert_eq!(output.receipt.pdf_sha256, sha256(&output.bytes));
+            assert!(hashes.insert(output.receipt.pdf_sha256.clone()));
+            if style == DocumentStyle::Plain {
+                assert_eq!(output.bytes, original.bytes);
+            }
+        }
+    }
+}
+
+#[test]
+fn every_style_rejects_overflow_missing_glyphs_and_external_links() {
+    use ort_domain::DocumentStyle;
+    for style in [
+        DocumentStyle::Plain,
+        DocumentStyle::Technical,
+        DocumentStyle::Professional,
+        DocumentStyle::Modern,
+    ] {
+        let mut document = support::fixture("standard");
+        document.contact.full_name = "W".repeat(1900);
+        assert!(matches!(
+            ort_render::render_pdf_with_style(&document, style),
+            Err(PdfRenderError::LayoutLimit)
+        ));
+        document.contact.full_name = "示例".into();
+        assert!(matches!(
+            ort_render::render_pdf_with_style(&document, style),
+            Err(PdfRenderError::UnsupportedGlyph)
+        ));
+        document.contact.full_name = "Synthetic".into();
+        document.contact.links[0].url = "file:///private/secret".into();
+        assert!(matches!(
+            ort_render::render_pdf_with_style(&document, style),
+            Err(PdfRenderError::InvalidContent)
+        ));
+    }
+}

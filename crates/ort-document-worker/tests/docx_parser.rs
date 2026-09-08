@@ -15,6 +15,7 @@ fn constrained_parser_reads_the_shipping_docx_export_shape() {
         order: 0,
         heading: "Experience".into(),
         entries: vec![ResumeEntry {
+            dates: None,
             id: EntityId::new(),
             order: 0,
             heading: "Engineer".into(),

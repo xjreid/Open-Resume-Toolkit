@@ -3597,9 +3597,11 @@ name = "ort-desktop"
 version = "0.0.0-dev"
 dependencies = [
  "base64 0.22.1",
+ "ort-application",
  "ort-backup",
  "ort-documents",
  "ort-domain",
+ "ort-macos-lifecycle",
  "ort-platform",
  "ort-render",
  "ort-storage",
@@ -3638,7 +3640,9 @@ dependencies = [
  "quick-xml 0.41.0",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "thiserror 2.0.20",
+ "wasmi",
 ]
 
 [[package]]
@@ -3658,8 +3662,38 @@ name = "ort-ipc"
 version = "0.0.0-dev"
 
 [[package]]
+name = "ort-macos-lifecycle"
+version = "0.0.0-dev"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "ort-native-host"
 version = "0.0.0-dev"
+
+[[package]]
+name = "ort-parser-helper"
+version = "0.0.0-dev"
+dependencies = [
+ "ort-documents",
+ "ort-parser-runtime",
+ "rustix",
+ "sha2 0.11.0",
+]
+
+[[package]]
+name = "ort-parser-runtime"
+version = "0.0.0-dev"
+dependencies = [
+ "jiff",
+ "ort-documents",
+ "ort-domain",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "wasmi",
+]
 
 [[package]]
 name = "ort-platform"
@@ -3667,7 +3701,11 @@ version = "0.0.0-dev"
 dependencies = [
  "cap-primitives",
  "cap-std",
+ "ort-documents",
  "ort-domain",
+ "rustix",
+ "security-framework",
+ "sha2 0.11.0",
  "tempfile",
  "thiserror 2.0.20",
  "uuid",

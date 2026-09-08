@@ -89,13 +89,16 @@ main window may read or resolve an attempt; an event merely asks it to reread
 native state. In-flight mutations must finish before quit, and save failure must
 not implicitly discard edits. Missed listener events are reconciled on startup.
 
-The pinned macOS runtime's system termination path (Dock Quit/logout/shutdown)
-does not yet expose a cancellable callback. This remains a release gate, not a
-claim of complete close protection. The UI warns users to wait for Saved on
-these paths. Avoid unsafe runtime method replacement or widening frontend
-process privileges to work around it. Follow-up must prove an OS-supported
-termination hook or bounded encrypted recovery of unfinished edits, including
-invalid forms. Windows native close/quit/logoff verification is deferred.
+The first-party macOS bridge now implements AppKit's deferred termination
+protocol, adding only an absent delegate method and failing startup if one
+already exists. It never replaces an existing implementation or widens frontend
+privileges. Isolated AppKit and pinned Tauri event-loop checks pass; refreshed
+installed Dock Quit/logout/shutdown qualification remains a release gate. The
+UI still advises waiting for Saved on these paths. The narrow FFI exception and
+scope are recorded in `../../crates/ort-macos-lifecycle/README.md` and
+`../../evidence/0.0.0-dev/m2-native-termination.md`. Force Quit/crash recovery of
+unfinished edits, including invalid forms, is not provided by this hook.
+Windows native close/quit/logoff verification is deferred.
 
 Tauri command functions:
 

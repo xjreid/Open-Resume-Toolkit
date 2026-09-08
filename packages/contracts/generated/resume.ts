@@ -4,8 +4,11 @@ import { CONTRACT_VERSION, type ErrorEnvelope } from "./health";
 
 export { CONTRACT_VERSION };
 export { DOCUMENT_LIMITS } from "./limits";
+export const MAX_RESUME_DATES = 200;
 
 export interface Link {
+  id?: string;
+  order?: number;
   label: string;
   url: string;
 }
@@ -32,12 +35,28 @@ export interface Bullet {
   text: string;
 }
 
+export interface CalendarDate {
+  year: number;
+  month: number | null;
+  expected: boolean;
+}
+export type DateEnd =
+  | { kind: "present" }
+  | { kind: "date"; value: CalendarDate };
+export interface ResumeDate {
+  id: string;
+  order: number;
+  label: string;
+  start: CalendarDate | null;
+  end: DateEnd | null;
+}
 export interface ResumeEntry {
   id: string;
   order: number;
   heading: string;
   subheading: string;
   dateRange: string;
+  dates?: ResumeDate[];
   location: string;
   fields: NamedField[];
   bullets: Bullet[];
@@ -172,16 +191,49 @@ function isResumeDocument(value: unknown): value is ResumeDocument {
       "contact",
       "sections",
     ]) &&
-    value.schemaVersion === 1 &&
+    (value.schemaVersion === 1 || value.schemaVersion === 2) &&
     typeof value.documentId === "string" &&
     typeof value.title === "string" &&
-    isContactDetails(value.contact) &&
+    isContactDetails(value.contact, value.schemaVersion as number) &&
     Array.isArray(value.sections) &&
-    value.sections.every(isResumeSection)
+    value.sections.every((section) =>
+      isResumeSection(section, value.schemaVersion as number),
+    ) &&
+    (value.schemaVersion === 1 ||
+      hasV2Identities(value as unknown as ResumeDocument))
   );
 }
 
-function isContactDetails(value: unknown): value is ContactDetails {
+function hasV2Identities(document: ResumeDocument): boolean {
+  const ids: unknown[] = [document.documentId];
+  let dateCount = 0;
+  function ordered(items: { id?: string; order?: number }[]): boolean {
+    ids.push(...items.map((item) => item.id));
+    return items.every((item, index) => item.order === index);
+  }
+  if (!ordered(document.contact.links) || !ordered(document.sections))
+    return false;
+  for (const section of document.sections) {
+    if (!ordered(section.entries)) return false;
+    for (const entry of section.entries) {
+      if (
+        !ordered(entry.links) ||
+        !ordered(entry.fields) ||
+        !ordered(entry.bullets) ||
+        !ordered(entry.dates ?? [])
+      )
+        return false;
+      dateCount += entry.dates?.length ?? 0;
+      if (dateCount > MAX_RESUME_DATES) return false;
+    }
+  }
+  return ids.every(isEntityId) && new Set(ids).size === ids.length;
+}
+
+function isContactDetails(
+  value: unknown,
+  version: number,
+): value is ContactDetails {
   return (
     isRecord(value) &&
     hasExactKeys(value, ["fullName", "email", "phone", "location", "links"]) &&
@@ -190,11 +242,14 @@ function isContactDetails(value: unknown): value is ContactDetails {
     typeof value.phone === "string" &&
     typeof value.location === "string" &&
     Array.isArray(value.links) &&
-    value.links.every(isLink)
+    value.links.every((link, index) => isLink(link, version, index))
   );
 }
 
-function isResumeSection(value: unknown): value is ResumeSection {
+function isResumeSection(
+  value: unknown,
+  version: number,
+): value is ResumeSection {
   return (
     isRecord(value) &&
     hasExactKeys(value, ["id", "order", "heading", "entries"]) &&
@@ -202,11 +257,11 @@ function isResumeSection(value: unknown): value is ResumeSection {
     isNonNegativeInteger(value.order) &&
     typeof value.heading === "string" &&
     Array.isArray(value.entries) &&
-    value.entries.every(isResumeEntry)
+    value.entries.every((entry) => isResumeEntry(entry, version))
   );
 }
 
-function isResumeEntry(value: unknown): value is ResumeEntry {
+function isResumeEntry(value: unknown, version: number): value is ResumeEntry {
   return (
     isRecord(value) &&
     hasExactKeys(value, [
@@ -215,6 +270,7 @@ function isResumeEntry(value: unknown): value is ResumeEntry {
       "heading",
       "subheading",
       "dateRange",
+      ...(version === 2 ? ["dates"] : []),
       "location",
       "fields",
       "bullets",
@@ -225,13 +281,18 @@ function isResumeEntry(value: unknown): value is ResumeEntry {
     typeof value.heading === "string" &&
     typeof value.subheading === "string" &&
     typeof value.dateRange === "string" &&
+    (version === 1 ||
+      (Array.isArray(value.dates) &&
+        value.dates.length <= MAX_RESUME_DATES &&
+        value.dates.every(isResumeDate) &&
+        (value.dates.length === 0 || value.dateRange.trim() === ""))) &&
     typeof value.location === "string" &&
     Array.isArray(value.fields) &&
     value.fields.every(isNamedField) &&
     Array.isArray(value.bullets) &&
     value.bullets.every(isBullet) &&
     Array.isArray(value.links) &&
-    value.links.every(isLink)
+    value.links.every((link, index) => isLink(link, version, index))
   );
 }
 
@@ -257,12 +318,55 @@ function isBullet(value: unknown): value is Bullet {
   );
 }
 
-function isLink(value: unknown): value is Link {
+function isLink(value: unknown, version: number, index: number): value is Link {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ["label", "url"]) &&
+    hasExactKeys(
+      value,
+      version === 1 ? ["label", "url"] : ["id", "order", "label", "url"],
+    ) &&
+    (version === 1 || (isEntityId(value.id) && value.order === index)) &&
     typeof value.label === "string" &&
     typeof value.url === "string"
+  );
+}
+
+function isEntityId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      value,
+    )
+  );
+}
+function isCalendarDate(value: unknown): value is CalendarDate {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ["year", "month", "expected"]) &&
+    Number.isInteger(value.year) &&
+    (value.year as number) >= 1 &&
+    (value.year as number) <= 9999 &&
+    (value.month === null ||
+      (Number.isInteger(value.month) &&
+        (value.month as number) >= 1 &&
+        (value.month as number) <= 12)) &&
+    typeof value.expected === "boolean"
+  );
+}
+function isResumeDate(value: unknown, index: number): value is ResumeDate {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ["id", "order", "label", "start", "end"]) &&
+    isEntityId(value.id) &&
+    value.order === index &&
+    typeof value.label === "string" &&
+    (value.start === null || isCalendarDate(value.start)) &&
+    (value.end === null ||
+      (isRecord(value.end) &&
+        ((value.end.kind === "present" && hasExactKeys(value.end, ["kind"])) ||
+          (value.end.kind === "date" &&
+            hasExactKeys(value.end, ["kind", "value"]) &&
+            isCalendarDate(value.end.value)))))
   );
 }
 

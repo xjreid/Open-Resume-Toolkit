@@ -75,6 +75,9 @@ jobs:
       - name: Independently verify PDF/text bytes, geometry, tags and links
         run: cargo run --locked -p ort-render --example pdf_fixtures -- target/pdf-ci-fixtures && node tools/verify-pdf-fixtures.mjs target/pdf-ci-fixtures
 
+      - name: Verify all three PDF/DOCX styles with v1 and v2 sources
+        run: python3 tools/check-style-output.py
+
   desktop-build:
     name: Desktop build (${{ matrix.os }})
     strategy:
@@ -126,6 +129,14 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'macOS' && steps.desktop-build.outcome == 'success' }}
         run: node tools/probe-document-lifecycle-macos.mjs
 
+      - name: Check bounded native macOS worker output with sanitizers
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.desktop-build.outcome == 'success' }}
+        run: node tools/check-worker-output-macos.mjs
+
+      - name: Check synthetic AppKit termination and cancellation
+        if: ${{ !cancelled() && runner.os == 'macOS' && steps.desktop-build.outcome == 'success' }}
+        run: node tools/check-termination-macos.mjs
+
       - name: Test storage, import review, text output, and filesystem safety on the target OS
         # Keep the original cold-start/concurrent test process even if the
         # separate startup probe crashes. Neither failure is ignored or masked.
@@ -141,3 +152,8 @@ jobs:
         if: ${{ !cancelled() && steps.desktop-build.outcome == 'success' }}
         shell: bash
         run: cargo run --locked -p ort-render --example pdf_fixtures -- target/pdf-ci-fixtures && node tools/verify-pdf-fixtures.mjs target/pdf-ci-fixtures
+
+      - name: Verify style output regression corpus on the target OS
+        if: ${{ !cancelled() && steps.desktop-build.outcome == 'success' }}
+        shell: bash
+        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/check-style-output.py

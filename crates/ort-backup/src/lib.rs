@@ -21,7 +21,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 const MAGIC: &[u8; 4] = b"ORTB";
 const FORMAT_MAJOR: u16 = 1;
-const FORMAT_MINOR: u16 = 1;
+const FORMAT_MINOR: u16 = 2;
 const DATABASE_SCHEMA_V1_0: u16 = 1;
 const DATABASE_SCHEMA_V1_1: u16 = 2;
 const KDF_ARGON2ID: u8 = 1;
@@ -224,12 +224,17 @@ fn create_backup_with_entropy(
     salt: [u8; SALT_LEN],
     nonce: [u8; NONCE_LEN],
 ) -> Result<Vec<u8>, BackupError> {
+    let format_minor = if profile_document_schema(&request.profile) == 2 {
+        2
+    } else {
+        1
+    };
     create_backup_with_entropy_for_format(
         passphrase,
         request,
         salt,
         nonce,
-        FORMAT_MINOR,
+        format_minor,
         DATABASE_SCHEMA_V1_1,
     )
 }
@@ -244,10 +249,14 @@ fn create_backup_with_entropy_for_format(
 ) -> Result<Vec<u8>, BackupError> {
     validate_export_metadata(&request.app_version, &request.created_at)?;
     validate_profile(&request.profile)?;
+    let document_schema = profile_document_schema(&request.profile);
     let supported_writer = (format_minor == 0
         && database_schema == DATABASE_SCHEMA_V1_0
         && request.profile.render_manifests.is_empty())
-        || (format_minor == FORMAT_MINOR && database_schema == DATABASE_SCHEMA_V1_1);
+        || (matches!(format_minor, 1 | 2) && database_schema == DATABASE_SCHEMA_V1_1);
+    let supported_writer = supported_writer
+        && ((format_minor <= 1 && document_schema == 1)
+            || (format_minor == 2 && document_schema == 2));
     if !supported_writer {
         return Err(BackupError::InvalidContent);
     }
@@ -261,7 +270,7 @@ fn create_backup_with_entropy_for_format(
         format_minor,
         app_version: request.app_version,
         database_schema,
-        document_schema: 1,
+        document_schema,
         created_at: request.created_at,
         inventory: inventory_for(&request.profile)?,
         profile_sha256: hex::encode(Sha256::digest(&profile_json)),
@@ -489,14 +498,15 @@ fn validate_payload(
 ) -> Result<(), BackupError> {
     let expected_database_schema = match header.format_minor {
         0 => DATABASE_SCHEMA_V1_0,
-        FORMAT_MINOR => DATABASE_SCHEMA_V1_1,
+        1 | 2 => DATABASE_SCHEMA_V1_1,
         _ => return Err(BackupError::InvalidBackup),
     };
     if payload.manifest.format_major != FORMAT_MAJOR
         || payload.manifest.format_major != header.format_major
         || payload.manifest.format_minor != header.format_minor
         || payload.manifest.database_schema != expected_database_schema
-        || payload.manifest.document_schema != 1
+        || payload.manifest.document_schema != profile_document_schema(&payload.profile)
+        || payload.manifest.document_schema != if header.format_minor == 2 { 2 } else { 1 }
         || (header.format_minor == 0 && !payload.profile.render_manifests.is_empty())
     {
         return Err(BackupError::InvalidBackup);
@@ -528,6 +538,21 @@ fn validate_export_metadata(app_version: &str, created_at: &str) -> Result<(), B
         return Err(BackupError::InvalidContent);
     }
     Ok(())
+}
+
+fn profile_document_schema(profile: &PortableProfileV1) -> u16 {
+    profile
+        .master_draft
+        .iter()
+        .map(|draft| draft.document.schema_version)
+        .chain(
+            profile
+                .published_resumes
+                .iter()
+                .map(|published| published.document.schema_version),
+        )
+        .max()
+        .unwrap_or(1)
 }
 
 fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
@@ -823,6 +848,36 @@ mod tests {
         assert_eq!(
             create_backup(&passphrase, oversized),
             Err(BackupError::InvalidContent)
+        );
+    }
+
+    #[test]
+    fn version_two_content_cannot_be_written_or_labeled_as_a_legacy_archive() {
+        let passphrase = BackupPassphrase::new("synthetic v2 format".into()).unwrap();
+        let mut request = sample_request();
+        let draft = request.profile.master_draft.as_mut().unwrap();
+        draft.document = draft.document.upgraded_v2().unwrap();
+        assert_eq!(
+            create_backup_with_entropy_for_format(
+                &passphrase,
+                request.clone(),
+                [0x11; 16],
+                [0x22; 24],
+                1,
+                super::DATABASE_SCHEMA_V1_1
+            ),
+            Err(BackupError::InvalidContent)
+        );
+        let bytes =
+            create_backup_with_entropy(&passphrase, request, [0x11; 16], [0x22; 24]).unwrap();
+        let header = inspect_backup(&bytes).unwrap();
+        let mut payload = restore_backup(&bytes, &passphrase).unwrap();
+        assert_eq!(header.format_minor, 2);
+        assert_eq!(payload.manifest.document_schema, 2);
+        payload.manifest.document_schema = 1;
+        assert_eq!(
+            super::validate_payload(&payload, &header),
+            Err(BackupError::InvalidBackup)
         );
     }
 

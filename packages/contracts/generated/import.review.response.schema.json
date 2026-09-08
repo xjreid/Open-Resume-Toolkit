@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ImportReviewSnapshot",
+  "type": "object",
+  "properties": {
+    "baseRevision": {
+      "type": "integer",
+      "format": "int64"
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ImportReviewBlock"
+      }
+    },
+    "contacts": {
+      "$ref": "#/$defs/ImportReviewContacts"
+    },
+    "id": {
+      "type": "string"
+    },
+    "mappingVersion": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ImportReviewSection"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "baseRevision",
+    "mappingVersion",
+    "blocks",
+    "sections",
+    "contacts"
+  ],
+  "$defs": {
+    "ImportReviewBlock": {
+      "type": "object",
+      "properties": {
+        "explanation": {
+          "type": "string"
+        },
+        "page": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "proposedSection": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "source": {
+          "type": "string"
+        },
+        "suggestedTarget": {
+          "$ref": "#/$defs/ImportReviewTarget"
+        },
+        "suggestedValue": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "page",
+        "explanation",
+        "suggestedTarget",
+        "suggestedValue"
+      ]
+    },
+    "ImportReviewContacts": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fullName",
+        "email",
+        "phone",
+        "location"
+      ]
+    },
+    "ImportReviewSection": {
+      "type": "object",
+      "properties": {
+        "heading": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "heading"
+      ]
+    },
+    "ImportReviewTarget": {
+      "type": "string",
+      "enum": [
+        "section",
+        "text",
+        "bullet",
+        "fullName",
+        "email",
+        "phone",
+        "location"
+      ]
+    }
+  }
+}

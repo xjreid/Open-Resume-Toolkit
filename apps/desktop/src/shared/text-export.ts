@@ -1,10 +1,10 @@
 import type {
   ExportFormat,
-  ExportTextCommandResponse,
+  ExportDocxCommandResponse,
 } from "@ort/contracts/export";
 
 export function exportFeedback(
-  result: ExportTextCommandResponse,
+  result: ExportDocxCommandResponse,
   format: ExportFormat = "txt",
 ): string {
   if (!result.ok) {
@@ -32,8 +32,15 @@ export function exportFeedback(
     value.source === "saved_draft"
       ? "saved draft revision"
       : "published snapshot";
+  const docxLayout = value.templateId
+    ? {
+        technical_docx_v1: "Technical / Engineering v1",
+        professional_docx_v1: "Professional / Business v1",
+        modern_docx_v1: "Modern / Marketing & Sales v1",
+      }[value.templateId]
+    : "plain layout v1";
   return (
-    `Exported ${source} ${value.revision} as unencrypted ${format === "docx" ? "DOCX (plain layout v1)" : "UTF-8 text"} (${value.byteCount} bytes).` +
+    `Exported ${source} ${value.revision} as unencrypted ${format === "docx" ? `DOCX (${docxLayout})` : "UTF-8 text"} (${value.byteCount} bytes).` +
     (value.cleanupPending
       ? " A hidden .ort-export-* staging folder remains in the chosen folder; it contains the same unencrypted document."
       : "") +

@@ -3,6 +3,13 @@
 import { CONTRACT_VERSION } from "./health";
 import { isCommandResponse, type CommandResponse } from "./resume";
 
+export const DOCUMENT_STYLE_TEMPLATES = {
+  plain: { pdf: "plain_pdf_v1", docx: "plain_docx_v1" },
+  technical: { pdf: "technical_pdf_v1", docx: "technical_docx_v1" },
+  professional: { pdf: "professional_pdf_v1", docx: "professional_docx_v1" },
+  modern: { pdf: "modern_pdf_v1", docx: "modern_docx_v1" },
+} as const;
+export type DocumentStyle = keyof typeof DOCUMENT_STYLE_TEMPLATES;
 export type ExportSource = "saved_draft" | "published_snapshot";
 export interface ExportTextRequest {
   contractVersion: typeof CONTRACT_VERSION;
@@ -21,17 +28,34 @@ export type ExportTextResult =
       durabilityUnconfirmed: boolean;
     };
 export type ExportTextCommandResponse = CommandResponse<ExportTextResult>;
-// Separate fixed command: DOCX formatVersion 1 always means plain_docx_v1.
-export type ExportDocxRequest = ExportTextRequest;
-export type ExportDocxCommandResponse = CommandResponse<ExportTextResult>;
+// Absent style preserves historical plain output; no path/template source crosses IPC.
+export interface StyledExportRequest
+  extends Omit<ExportTextRequest, "payload"> {
+  payload: ExportTextRequest["payload"] & { style?: DocumentStyle };
+}
+export type ExportDocxRequest = StyledExportRequest;
+export type ExportDocxResult = ExportTextResult & {
+  templateId?: "technical_docx_v1" | "professional_docx_v1" | "modern_docx_v1";
+};
+export type ExportDocxCommandResponse = CommandResponse<ExportDocxResult>;
 export type ExportFormat = "txt" | "docx";
 
 export function isExportDocxCommandResponse(
   value: unknown,
 ): value is ExportDocxCommandResponse {
-  return isCommandResponse(value, (result): result is ExportTextResult =>
-    isExportResult(result, 2097152),
-  );
+  return isCommandResponse(value, (result): result is ExportDocxResult => {
+    if (typeof result !== "object" || result === null || Array.isArray(result))
+      return false;
+    const { templateId, ...receipt } = result as Record<string, unknown>;
+    if (!("templateId" in result)) return isExportResult(result, 2097152);
+    return (
+      receipt.status === "exported" &&
+      (templateId === "technical_docx_v1" ||
+        templateId === "professional_docx_v1" ||
+        templateId === "modern_docx_v1") &&
+      isExportResult(receipt, 2097152)
+    );
+  });
 }
 
 export function isExportTextCommandResponse(

@@ -650,32 +650,86 @@ impl EncryptedStore {
         if expected_revision < 1 {
             return Err(StorageError::InvalidData);
         }
+        self.save_draft_transaction(expected_revision, document, None)
+    }
+
+    /// Saves explicitly reviewed import changes and a content-free audit summary
+    /// in the same optimistic-revision transaction.
+    ///
+    /// # Errors
+    /// Refuses invalid counts, stale revisions or any draft/audit write failure.
+    pub fn save_imported_draft(
+        &self,
+        expected_revision: i64,
+        document: &ResumeDocument,
+        accepted: u16,
+        rejected: u16,
+    ) -> Result<VersionedResume, StorageError> {
+        if accepted == 0 || u32::from(accepted) + u32::from(rejected) > 1000 {
+            return Err(StorageError::InvalidData);
+        }
+        self.save_draft_transaction(expected_revision, document, Some((accepted, rejected)))
+    }
+
+    fn save_draft_transaction(
+        &self,
+        expected_revision: i64,
+        document: &ResumeDocument,
+        import_counts: Option<(u16, u16)>,
+    ) -> Result<VersionedResume, StorageError> {
+        if expected_revision < 0 {
+            return Err(StorageError::InvalidData);
+        }
         let json = serialize_document(document)?;
         let next_revision = expected_revision
             .checked_add(1)
             .ok_or(StorageError::InvalidData)?;
-        let connection = self
+        let mut connection = self
             .connection
             .lock()
             .map_err(|_| StorageError::Unavailable)?;
-        let changed = connection
-            .execute(
-                "UPDATE resume_drafts SET revision = ?1, schema_version = ?2, \
-                 document_json = ?3, updated_at = ?4 \
-                 WHERE profile_id = ?5 AND revision = ?6",
-                params![
-                    next_revision,
-                    i64::from(document.schema_version),
-                    json,
-                    now_string(),
-                    self.manifest.profile_id.to_string(),
-                    expected_revision
-                ],
-            )
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|_| StorageError::Unavailable)?;
+        let changed = if expected_revision == 0 {
+            transaction.execute(
+                "INSERT INTO resume_drafts (profile_id, revision, schema_version, document_json, created_at, updated_at) VALUES (?1, 1, ?2, ?3, ?4, ?4)",
+                params![self.manifest.profile_id.to_string(), i64::from(document.schema_version), json, now_string()],
+            ).map_err(|error| if is_constraint_error(&error) { StorageError::RevisionConflict } else { StorageError::Unavailable })?
+        } else {
+            transaction
+                .execute(
+                    "UPDATE resume_drafts SET revision = ?1, schema_version = ?2, \
+                 document_json = ?3, updated_at = ?4 \
+                 WHERE profile_id = ?5 AND revision = ?6 AND schema_version <= ?2",
+                    params![
+                        next_revision,
+                        i64::from(document.schema_version),
+                        json,
+                        now_string(),
+                        self.manifest.profile_id.to_string(),
+                        expected_revision
+                    ],
+                )
+                .map_err(|_| StorageError::Unavailable)?
+        };
         if changed != 1 {
             return Err(StorageError::RevisionConflict);
         }
+        if let Some((accepted, rejected)) = import_counts {
+            let context = serde_json::to_vec(&serde_json::json!({
+                "accepted": accepted, "rejected": rejected,
+                "mapping_version": 1, "draft_revision": next_revision
+            }))
+            .map_err(|_| StorageError::InvalidData)?;
+            transaction.execute(
+                "INSERT INTO diagnostic_events (event_id, profile_id, event_code, severity, safe_context_json, created_at) VALUES (?1, ?2, 'IMPORT_REVIEW_APPLIED', 'info', ?3, ?4)",
+                params![Uuid::now_v7().to_string(), self.manifest.profile_id.to_string(), context, now_string()],
+            ).map_err(|_| StorageError::Unavailable)?;
+        }
+        transaction
+            .commit()
+            .map_err(|_| StorageError::Unavailable)?;
         set_private_database_permissions(&self.database_path)?;
         Ok(VersionedResume {
             revision: next_revision,
@@ -2913,6 +2967,34 @@ mod tests {
     use super::*;
 
     const PLAINTEXT_MARKER: &str = "SYNTHETIC-PRIVATE-RESUME-MARKER-9d87f8";
+
+    #[test]
+    fn imported_draft_and_safe_summary_commit_atomically() {
+        let temporary = TempDir::new().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault).unwrap();
+        let mut document = ResumeDocument::empty("PRIVATE_SYNTHETIC_IMPORT");
+        assert!(store.save_imported_draft(0, &document, 0, 1).is_err());
+        assert!(store.load_draft().unwrap().is_none());
+        let saved = store.save_imported_draft(0, &document, 2, 1).unwrap();
+        assert_eq!(saved.revision, 1);
+        let events = store.load_recent_diagnostics(10).unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_code, "IMPORT_REVIEW_APPLIED");
+        assert_eq!(events[0].safe_context["accepted"], 2);
+        assert!(!format!("{events:?}").contains("PRIVATE_SYNTHETIC_IMPORT"));
+        assert_eq!(
+            store.save_imported_draft(0, &document, 2, 1),
+            Err(StorageError::RevisionConflict)
+        );
+        store.connection.lock().unwrap().execute_batch(
+            "CREATE TRIGGER reject_import_audit BEFORE INSERT ON diagnostic_events BEGIN SELECT RAISE(ABORT, 'synthetic'); END;"
+        ).unwrap();
+        document.title = "PRIVATE_SYNTHETIC_EDIT".into();
+        assert!(store.save_imported_draft(1, &document, 1, 0).is_err());
+        assert_eq!(store.load_draft().unwrap().unwrap(), saved);
+        assert_eq!(store.load_recent_diagnostics(10).unwrap().len(), 1);
+    }
 
     #[test]
     fn profile_channel_mismatch_preserves_database_manifest_and_key() {

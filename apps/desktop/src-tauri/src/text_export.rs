@@ -1,12 +1,14 @@
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicU8, Ordering},
 };
 
-use ort_documents::{DOCX_FORMAT_VERSION, TEXT_FORMAT_VERSION, render_docx, render_plain_text};
+use ort_documents::{
+    DOCX_FORMAT_VERSION, TEXT_FORMAT_VERSION, render_docx_with_style, render_plain_text,
+};
 use ort_domain::{
-    CommandResponse, ExportDocxRequest, ExportDocxResponse, ExportSource, ExportTextRequest,
-    ExportTextResponse,
+    CommandResponse, DocumentStyle, ExportDocxRequest, ExportDocxResponse, ExportSource,
+    ExportTextRequest, ExportTextResponse,
 };
 use ort_platform::{ExportDestination, ExportFileType, ExportWriteError};
 use ort_storage::{StorageError, VersionedResume};
@@ -16,25 +18,42 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use super::{DesktopState, storage_failure, window_not_authorized};
 
 #[derive(Default)]
-pub(crate) struct ExportState(Arc<AtomicBool>);
+pub(crate) struct ExportState(Arc<AtomicU8>);
 
 impl ExportState {
-    pub(crate) fn is_active(&self) -> bool {
-        self.0.load(Ordering::Acquire)
+    #[cfg(test)]
+    fn is_active(&self) -> bool {
+        self.0.load(Ordering::Acquire) != 0
     }
 
     pub(crate) fn begin(&self) -> Option<ExportLease> {
         self.0
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire)
             .ok()
             .map(|_| ExportLease(Arc::clone(&self.0)))
     }
+
+    // Atomically exclude new operations after a final quit decision. A separate
+    // is_active check followed by exit leaves a race with a new native dialog.
+    pub(crate) fn seal_for_quit(&self) -> bool {
+        self.0
+            .compare_exchange(0, 2, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    pub(crate) fn undo_quit_seal(&self) {
+        let _ = self
+            .0
+            .compare_exchange(2, 0, Ordering::AcqRel, Ordering::Acquire);
+    }
 }
 
-pub(crate) struct ExportLease(Arc<AtomicBool>);
+pub(crate) struct ExportLease(Arc<AtomicU8>);
 impl Drop for ExportLease {
     fn drop(&mut self) {
-        self.0.store(false, Ordering::Release);
+        let _ = self
+            .0
+            .compare_exchange(1, 0, Ordering::AcqRel, Ordering::Acquire);
     }
 }
 
@@ -43,7 +62,7 @@ pub(crate) async fn export_resume_text(
     window: WebviewWindow,
     request: ExportTextRequest,
 ) -> CommandResponse<ExportTextResponse> {
-    export_saved(window, request, ExportFileType::Text).await
+    export_saved(window, request, ExportFileType::Text, DocumentStyle::Plain).await
 }
 
 #[tauri::command]
@@ -51,13 +70,27 @@ pub(crate) async fn export_resume_docx(
     window: WebviewWindow,
     request: ExportDocxRequest,
 ) -> CommandResponse<ExportDocxResponse> {
-    export_saved(window, request, ExportFileType::Docx).await
+    let style = request.payload.style;
+    match export_saved(
+        window,
+        request.saved_selection(),
+        ExportFileType::Docx,
+        style,
+    )
+    .await
+    {
+        CommandResponse::Success { value, .. } => {
+            CommandResponse::success(ExportDocxResponse::from_export(&value, style))
+        }
+        CommandResponse::Failure { error, .. } => CommandResponse::Failure { ok: false, error },
+    }
 }
 
 async fn export_saved(
     window: WebviewWindow,
     request: ExportTextRequest,
     format: ExportFileType,
+    style: DocumentStyle,
 ) -> CommandResponse<ExportTextResponse> {
     if window.label() != "main" {
         return window_not_authorized();
@@ -86,7 +119,7 @@ async fn export_saved(
     // it is open cannot substitute renderer text into this export.
     match tauri::async_runtime::spawn_blocking(move || {
         let _lease = lease;
-        export_with_dialog(&window, source, &saved, format)
+        export_with_dialog(&window, source, &saved, format, style)
     })
     .await
     {
@@ -111,8 +144,9 @@ fn export_with_dialog(
     source: ExportSource,
     saved: &VersionedResume,
     format: ExportFileType,
+    style: DocumentStyle,
 ) -> CommandResponse<ExportTextResponse> {
-    let Ok(bytes) = render_saved(saved, format) else {
+    let Ok(bytes) = render_saved(saved, format, style) else {
         return export_failure("EXPORT_INVALID_CONTENT");
     };
     let (title, filename, filter, extension, format_version) = match format {
@@ -169,12 +203,16 @@ fn export_with_dialog(
     }
 }
 
-fn render_saved(saved: &VersionedResume, format: ExportFileType) -> Result<Vec<u8>, ()> {
+fn render_saved(
+    saved: &VersionedResume,
+    format: ExportFileType,
+    style: DocumentStyle,
+) -> Result<Vec<u8>, ()> {
     match format {
         ExportFileType::Text => render_plain_text(&saved.document)
             .map(String::into_bytes)
             .map_err(|_| ()),
-        ExportFileType::Docx => render_docx(&saved.document).map_err(|_| ()),
+        ExportFileType::Docx => render_docx_with_style(&saved.document, style).map_err(|_| ()),
         ExportFileType::Backup | ExportFileType::Pdf => Err(()),
         // Backup owns a separate encrypted-profile command; PDF consumes a preview ticket.
     }
@@ -197,6 +235,21 @@ mod tests {
         assert!(state.begin().is_none());
         drop(lease);
         assert!(!state.is_active());
+        assert!(state.begin().is_some());
+    }
+
+    #[test]
+    fn quit_seal_cannot_overlap_an_operation_and_excludes_new_operations() {
+        let state = ExportState::default();
+        let lease = state.begin().unwrap();
+        assert!(!state.seal_for_quit());
+        state.undo_quit_seal(); // Cannot clear an active operation.
+        assert!(state.begin().is_none());
+        drop(lease);
+        assert!(state.seal_for_quit());
+        assert!(state.begin().is_none());
+        assert!(!state.seal_for_quit());
+        state.undo_quit_seal();
         assert!(state.begin().is_some());
     }
 
@@ -227,10 +280,13 @@ mod tests {
         let mut later = saved.clone();
         later.document.contact.full_name = "SYNTHETIC_LATER".into();
         for format in [ExportFileType::Text, ExportFileType::Docx] {
-            let bytes = render_saved(&saved, format).unwrap();
+            let bytes = render_saved(&saved, format, DocumentStyle::Plain).unwrap();
             assert!(bytes.windows(15).any(|w| w == b"SYNTHETIC_SAVED"));
             assert!(!bytes.windows(15).any(|w| w == b"SYNTHETIC_LATER"));
-            assert_ne!(bytes, render_saved(&later, format).unwrap());
+            assert_ne!(
+                bytes,
+                render_saved(&later, format, DocumentStyle::Plain).unwrap()
+            );
         }
     }
 }

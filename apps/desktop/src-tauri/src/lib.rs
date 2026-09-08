@@ -15,6 +15,7 @@ use tauri::{
 mod backup_export;
 mod close_guard;
 mod data_deletion;
+mod import_review;
 mod menu;
 mod pdf_preview;
 mod text_export;
@@ -41,10 +42,8 @@ fn close_status(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-fn resolve_close(
+async fn resolve_close(
     window: WebviewWindow,
-    state: State<'_, CloseGuard>,
-    exports: State<'_, text_export::ExportState>,
     request: ResolveCloseRequest,
 ) -> CommandResponse<CloseStatusResponse> {
     if window.label() != "main" {
@@ -53,28 +52,74 @@ fn resolve_close(
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };
     }
-    if request.payload.decision == CloseDecision::Quit && exports.is_active() {
-        return CommandResponse::failure("EXPORT_BUSY", "errors.closeUnavailable", true);
+    let app = window.app_handle().clone();
+    let (send, receive) = std::sync::mpsc::sync_channel(1);
+    let main_app = app.clone();
+    if app
+        .run_on_main_thread(move || {
+            let response = resolve_close_on_main(&main_app, &request);
+            let _ = send.send(response);
+        })
+        .is_err()
+    {
+        return CommandResponse::failure("CLOSE_UNAVAILABLE", "errors.closeUnavailable", true);
     }
-    if let Err(code) = state.resolve(
-        window.label(),
+    match tauri::async_runtime::spawn_blocking(move || receive.recv()).await {
+        Ok(Ok(response)) => response,
+        _ => CommandResponse::failure("CLOSE_UNAVAILABLE", "errors.closeUnavailable", true),
+    }
+}
+
+fn resolve_close_on_main(
+    app: &AppHandle,
+    request: &ResolveCloseRequest,
+) -> CommandResponse<CloseStatusResponse> {
+    let state = app.state::<CloseGuard>();
+    let exports = app.state::<text_export::ExportState>();
+    let quitting = request.payload.decision == CloseDecision::Quit;
+    if let Err(code) = resolve_close_decision(
+        &state,
+        &exports,
         &request.payload.attempt,
         request.payload.decision,
     ) {
         return CommandResponse::failure(code, "errors.closeUnavailable", true);
     }
-    if request.payload.decision == CloseDecision::Quit {
-        window.app_handle().exit(0);
+    #[cfg(target_os = "macos")]
+    let native_reply = ort_macos_lifecycle::reply(quitting);
+    #[cfg(not(target_os = "macos"))]
+    let native_reply = false;
+    if quitting && !native_reply {
+        app.exit(0);
     }
     CommandResponse::success(CloseStatusResponse {
         pending_attempt: None,
     })
 }
 
-fn request_native_close(app: &AppHandle) {
+fn resolve_close_decision(
+    guard: &CloseGuard,
+    operations: &text_export::ExportState,
+    attempt: &str,
+    decision: CloseDecision,
+) -> Result<(), &'static str> {
+    let quitting = decision == CloseDecision::Quit;
+    if quitting && !operations.seal_for_quit() {
+        return Err("EXPORT_BUSY");
+    }
+    if let Err(code) = guard.resolve("main", attempt, decision) {
+        if quitting {
+            operations.undo_quit_seal();
+        }
+        return Err(code);
+    }
+    Ok(())
+}
+
+fn request_native_close(app: &AppHandle) -> bool {
     let guard = app.state::<CloseGuard>();
     if guard.request().is_err() {
-        return;
+        return false;
     } // Poisoned state never authorizes exit.
     if let Some(main) = app.get_webview_window("main") {
         // Quit from the overlay/Dock must surface the editor's confirmation.
@@ -88,7 +133,9 @@ fn request_native_close(app: &AppHandle) {
             "ort:close-requested",
             (),
         );
+        return true;
     }
+    false
 }
 
 enum DesktopStorage {
@@ -98,6 +145,7 @@ enum DesktopStorage {
 
 struct DesktopState {
     storage: Mutex<DesktopStorage>,
+    reviews: std::sync::Arc<import_review::ReviewState>,
 }
 
 impl DesktopState {
@@ -123,6 +171,7 @@ impl DesktopState {
     }
 
     fn take_store(&self) -> Result<EncryptedStore, StorageError> {
+        self.reviews.clear()?;
         let mut storage = self.storage.lock().map_err(|_| StorageError::Unavailable)?;
         match std::mem::replace(&mut *storage, DesktopStorage::Unavailable) {
             DesktopStorage::Ready(store) => Ok(store),
@@ -339,12 +388,29 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                let handle = app.handle().clone();
+                if !ort_macos_lifecycle::install(move || request_native_close(&handle)) {
+                    return Err(
+                        std::io::Error::other("Native termination guard is unavailable").into(),
+                    );
+                }
+            }
             app.manage(DesktopState {
                 storage: Mutex::new(initialize_storage(app)),
+                reviews: std::sync::Arc::default(),
             });
+            import_review::ReviewState::start_expiry(&app.state::<DesktopState>().reviews)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            import_review::begin::begin_document_import,
+            import_review::begin::cancel_document_import,
+            import_review::begin::document_import_available,
+            import_review::read_import_review,
+            import_review::apply_import_review,
+            import_review::cancel_import_review,
             health,
             load_resume,
             load_storage_usage,
@@ -361,8 +427,10 @@ pub fn run() {
             text_export::export_resume_docx,
             pdf_preview::render_resume_pdf,
             pdf_preview::replay_resume_pdf,
+            pdf_preview::regenerate_resume_pdf,
             pdf_preview::open_portable_pdf_render_history,
             pdf_preview::replay_portable_resume_pdf,
+            pdf_preview::regenerate_portable_resume_pdf,
             pdf_preview::release_portable_pdf_archive,
             pdf_preview::load_pdf_render_history,
             pdf_preview::export_resume_pdf,
@@ -385,6 +453,16 @@ pub fn run() {
                 api.prevent_exit();
                 request_native_close(app);
             }
+            RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::Destroyed,
+                ..
+            } if label == "main" => {
+                let _ = app.state::<DesktopState>().reviews.clear();
+            }
+            RunEvent::Exit => {
+                let _ = app.state::<DesktopState>().reviews.clear();
+            }
             _ => {}
         });
 }
@@ -392,6 +470,79 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn quit_decision_waits_for_operations_and_stale_decisions_do_not_seal() {
+        let guard = CloseGuard::default();
+        let operations = text_export::ExportState::default();
+        guard.request().expect("request");
+        let attempt = guard
+            .status("main")
+            .expect("status")
+            .pending_attempt
+            .expect("attempt");
+        let lease = operations.begin().expect("operation");
+        assert_eq!(
+            resolve_close_decision(&guard, &operations, &attempt, CloseDecision::Quit),
+            Err("EXPORT_BUSY")
+        );
+        assert!(!guard.approved());
+        assert_eq!(
+            guard
+                .status("main")
+                .expect("status")
+                .pending_attempt
+                .as_deref(),
+            Some(attempt.as_str())
+        );
+        drop(lease);
+        assert_eq!(
+            resolve_close_decision(&guard, &operations, "stale", CloseDecision::Quit),
+            Err("STALE_CLOSE_ATTEMPT")
+        );
+        drop(
+            operations
+                .begin()
+                .expect("stale decision released its seal"),
+        );
+        resolve_close_decision(&guard, &operations, &attempt, CloseDecision::Quit)
+            .expect("approve");
+        assert!(guard.approved());
+        assert!(operations.begin().is_none());
+        assert!(
+            resolve_close_decision(&guard, &operations, &attempt, CloseDecision::Quit).is_err()
+        );
+        assert!(
+            operations.begin().is_none(),
+            "replayed approval must not unseal"
+        );
+    }
+
+    #[test]
+    fn cancel_can_resolve_while_an_operation_remains_active() {
+        let guard = CloseGuard::default();
+        let operations = text_export::ExportState::default();
+        guard.request().expect("request");
+        let attempt = guard
+            .status("main")
+            .expect("status")
+            .pending_attempt
+            .expect("attempt");
+        let lease = operations.begin().expect("operation");
+        resolve_close_decision(&guard, &operations, &attempt, CloseDecision::Cancel)
+            .expect("cancel");
+        assert!(!guard.approved());
+        assert!(
+            guard
+                .status("main")
+                .expect("status")
+                .pending_attempt
+                .is_none()
+        );
+        assert!(operations.begin().is_none());
+        drop(lease);
+        assert!(operations.begin().is_some());
+    }
 
     #[test]
     fn development_storage_rejects_other_package_identities() {

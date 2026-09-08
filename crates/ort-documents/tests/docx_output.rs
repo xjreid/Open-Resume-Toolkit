@@ -131,6 +131,8 @@ fn empty_invalid_controls_noncharacters_and_unsafe_links_fail_closed() {
     ] {
         let mut doc = support::fixture("standard");
         doc.contact.links = vec![Link {
+            id: None,
+            order: None,
             label: "untrusted".into(),
             url: url.into(),
         }];
@@ -173,4 +175,49 @@ fn newline_heavy_legal_input_hits_xml_limit_without_partial_output() {
         render_docx(&doc).err(),
         Some(DocxExportError::OutputTooLarge)
     );
+}
+
+#[test]
+fn bundled_styles_preserve_all_content_relationships_and_package_constraints() {
+    use ort_domain::DocumentStyle;
+    for kind in support::OUTPUT_FIXTURE_KINDS {
+        let document = support::fixture(kind);
+        let original = render_docx(&document).unwrap();
+        let original_parts = parts(&original);
+        let mut presentations = std::collections::BTreeSet::new();
+        for style in [
+            DocumentStyle::Plain,
+            DocumentStyle::Technical,
+            DocumentStyle::Professional,
+            DocumentStyle::Modern,
+        ] {
+            let bytes = ort_documents::render_docx_with_style(&document, style).unwrap();
+            assert_eq!(
+                bytes,
+                ort_documents::render_docx_with_style(&document, style).unwrap()
+            );
+            assert_eq!(
+                inspect_source(&bytes, InputFormat::Docx)
+                    .unwrap()
+                    .package_entries,
+                Some(6)
+            );
+            let styled_parts = parts(&bytes);
+            for (name, content) in &original_parts {
+                if name != "word/styles.xml" {
+                    assert_eq!(&styled_parts[name], content, "{kind}: {name}");
+                }
+            }
+            assert!(presentations.insert(styled_parts["word/styles.xml"].clone()));
+            let mut reader = Reader::from_str(&styled_parts["word/styles.xml"]);
+            loop {
+                if matches!(reader.read_event().unwrap(), Event::Eof) {
+                    break;
+                }
+            }
+            if style == DocumentStyle::Plain {
+                assert_eq!(bytes, original);
+            }
+        }
+    }
 }

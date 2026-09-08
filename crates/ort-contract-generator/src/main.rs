@@ -22,6 +22,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = root.join("packages/contracts/generated");
     fs::create_dir_all(&output)?;
     write_backup_contracts(&output)?;
+    write_schema::<ort_domain::ImportReviewSnapshot>(
+        &output.join("import.review.response.schema.json"),
+    )?;
+    write_schema::<ort_domain::ImportReviewRequest>(
+        &output.join("import.review.request.schema.json"),
+    )?;
+    write_schema::<ort_domain::BeginImportRequest>(
+        &output.join("import.begin.request.schema.json"),
+    )?;
+    write_schema::<ort_domain::ApplyImportReviewRequest>(
+        &output.join("import.apply.request.schema.json"),
+    )?;
+    write_schema::<ort_domain::ImportChoices>(&output.join("import.choices.schema.json"))?;
+    fs::write(output.join("import.ts"), include_str!("import.ts.template"))?;
     write_schema::<ExportTextRequest>(&output.join("export.text.request.schema.json"))?;
     write_schema::<ExportTextResponse>(&output.join("export.text.response.schema.json"))?;
     write_schema::<ExportDocxRequest>(&output.join("export.docx.request.schema.json"))?;
@@ -46,7 +60,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         include_str!("lifecycle.ts.template"),
     )?;
     fs::write(output.join("health.ts"), TYPESCRIPT)?;
-    fs::write(output.join("resume.ts"), RESUME_TYPESCRIPT)?;
+    fs::write(
+        output.join("resume.ts"),
+        RESUME_TYPESCRIPT.replace(
+            "__MAX_RESUME_DATES__",
+            &ort_domain::MAX_RESUME_DATES.to_string(),
+        ),
+    )?;
     write_schema::<StorageUsageRequest>(&output.join("storage.usage.request.schema.json"))?;
     write_schema::<StorageUsageResponse>(&output.join("storage.usage.response.schema.json"))?;
     write_schema::<DeleteAllLocalDataRequest>(
@@ -99,6 +119,12 @@ fn write_pdf_contracts(output: &std::path::Path) -> Result<(), Box<dyn std::erro
     )?;
     write_schema::<ort_domain::PdfRenderHistoryResponse>(
         &output.join("pdf.history.response.schema.json"),
+    )?;
+    write_schema::<ort_domain::PdfRegenerateRequest>(
+        &output.join("pdf.regenerate.request.schema.json"),
+    )?;
+    write_schema::<ort_domain::PortablePdfRegenerateRequest>(
+        &output.join("pdf.portable-regenerate.request.schema.json"),
     )?;
     write_schema::<ort_domain::PdfReplayRequest>(&output.join("pdf.replay.request.schema.json"))?;
     write_schema::<ort_domain::PdfReplayResponse>(&output.join("pdf.replay.response.schema.json"))?;

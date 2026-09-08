@@ -1,6 +1,6 @@
 //! Constrained, deterministic `WordprocessingML` output. Content is always data.
 //! This does not read ZIP/XML inputs, invoke Word, fetch links, or enable import.
-use ort_domain::{Link, ResumeDocument};
+use ort_domain::{DocumentStyle, Link, ResumeDocument};
 
 use crate::{TextExportError, normalized, opc, render_link, render_plain_text};
 
@@ -36,6 +36,18 @@ impl From<TextExportError> for DocxExportError {
 /// Rejects invalid/empty canonical content, XML-invalid characters and bounded
 /// output overflow. A failed render returns no partial document.
 pub fn render_docx(document: &ResumeDocument) -> Result<Vec<u8>, DocxExportError> {
+    render_docx_with_style(document, DocumentStyle::Plain)
+}
+
+/// Generates the same constrained six-part package with a bundled presentation.
+/// Content order, semantic headings, lists and hyperlinks remain unchanged.
+///
+/// # Errors
+/// Applies the same validation and expansion bounds as plain DOCX output.
+pub fn render_docx_with_style(
+    document: &ResumeDocument,
+    style: DocumentStyle,
+) -> Result<Vec<u8>, DocxExportError> {
     // Shares text normalization/empty-content policy; validates before expansion.
     // This bounded temporary output is never persisted or returned to the UI.
     render_plain_text(document)?;
@@ -61,6 +73,9 @@ pub fn render_docx(document: &ResumeDocument) -> Result<Vec<u8>, DocxExportError
             paragraph(&mut entries, "Heading2", &entry.heading, false)?;
             for text in [&entry.subheading, &entry.date_range, &entry.location] {
                 paragraph(&mut entries, "Normal", text, false)?;
+            }
+            for date in entry.dates.iter().flatten() {
+                paragraph(&mut entries, "Normal", &date.display_text(), false)?;
             }
             for field in &entry.fields {
                 let value = normalized(&field.value)?;
@@ -96,7 +111,15 @@ pub fn render_docx(document: &ResumeDocument) -> Result<Vec<u8>, DocxExportError
         ("_rels/.rels", include_str!("docx/root-rels.xml")),
         ("word/document.xml", &body.0),
         ("word/_rels/document.xml.rels", &relationships.0),
-        ("word/styles.xml", include_str!("docx/styles.xml")),
+        (
+            "word/styles.xml",
+            match style {
+                DocumentStyle::Plain => include_str!("docx/styles.xml"),
+                DocumentStyle::Technical => include_str!("docx/technical_v1.xml"),
+                DocumentStyle::Professional => include_str!("docx/professional_v1.xml"),
+                DocumentStyle::Modern => include_str!("docx/modern_v1.xml"),
+            },
+        ),
         ("word/numbering.xml", include_str!("docx/numbering.xml")),
     ])
 }

@@ -1,5 +1,15 @@
 # Technical delivery roadmap
 
+**2026-09-07 architecture revision:** The user authorized replacing nonviable
+containment assumptions. [ADR 0012](../../docs/adr/0012-metered-wasm-document-parsers.md)
+selects metered, capability-restricted WebAssembly parsers with an isolated
+helper/watchdog. For this path, guest linear-memory and instruction-fuel limits
+replace the unproven whole-native-process 512 MiB / 30 CPU-second requirements.
+Older native-probe requirements below are historical for that architecture;
+no previous failed gate is reclassified as a pass. Production integration and
+qualification remain required, and import remains disabled.
+
+
 ## Status
 
 - Status: implementation sequence approved; dates intentionally unset
@@ -74,9 +84,10 @@ Exit evidence:
 
 Current development status:
 
-- **Step 4 local macOS-arm64 qualification is complete as of 2026-09-05**;
-  formal M1 signoff awaits hosted CI for the containing commit. The changes are
-  uncommitted. Evidence:
+- **M1 is complete for the qualified macOS-arm64 development scope at
+  `65518eb`**. Step 4 local qualification and all four hosted CI jobs plus the
+  dependency scan passed; hosted results were independently verified for that
+  commit. Evidence:
   `../../evidence/0.0.0-dev/m1-macos-storage-qualification.md`.
   macOS key creation uses a native exclusive add, with an upsert negative
   control and independent-adapter race tests. The empty-profile backup guard
@@ -101,9 +112,9 @@ Current development status:
   same-device checkpoints, and a password-protected portable backup/restore
   prototype that creates a fresh device key, plus a verified arm64 macOS local
   preview `.app`/DMG with an isolated identity and explicit ad-hoc signing;
-- **[HIGH]** remaining for formal M1 signoff: qualify the containing commit in
-  hosted CI. Sustained release fuzzing and broader distribution/preview/native-host
-  matrices are not claimed by this local development checkpoint. Windows and
+- M1's current-scope signoff is complete. Sustained release fuzzing and broader
+  distribution/preview/native-host matrices are not claimed by this local
+  development checkpoint. Windows and
   Intel native qualification remain deferred.
 
 Deliver:
@@ -153,6 +164,137 @@ superseded-draft and superseded-renderer-binary replay.
 
 ### Current status
 
+**2026-09-07 completion update:** M0/M1 remain complete and successful.
+Step 5 implementation is complete for macOS arm64, including the metered DOCX/PDF
+runtime, signed disposable helper, native picker/review/cancellation flow,
+empty-profile import and atomic import audit. The complete signed candidate is
+assembled; its nested helper passed exact running-code identity, cancellation,
+parent-death and real 60-second input/output-stall tests. Full local checks pass.
+The new desktop import path is enabled only in a build with both helper identity
+pins; unbundled builds and the superseded native-parser path remain disabled.
+
+Step 6 final native/user acceptance remains open, so the full M2 milestone is not
+yet signed off. See [implementation completion](../../evidence/0.0.0-dev/m2-implementation-completion.md)
+and [Step 6 checklist](../../evidence/0.0.0-dev/m2-final-native-acceptance.md).
+The paragraphs below preserve historical checkpoints, not the current completion
+status or missing-feature inventory.
+
+Step 5 has started from M1-complete `65518eb`. The manual starting screen,
+optional section profiles, contact focus and suggested-section selector are
+implemented locally with desktop regression coverage. Import stays unavailable.
+See `../../evidence/0.0.0-dev/m2-manual-start.md`. The export-style contract and
+bundled PDF/DOCX foundation are also implemented and locally tested, with unchanged
+plain golden output and strict style/replay receipts; see
+`../../evidence/0.0.0-dev/m2-style-foundation.md`. The selector now defaults to
+Technical/Engineering, applies to PDF/DOCX, and labels existing previews/history
+using their actual styles; 77 desktop tests pass. Final style layout/native
+qualification remain open. The HIGH v2 date/link schema foundation now supports
+lossless explicit upgrades, mixed-version backups and unchanged historical
+receipts; see `../../evidence/0.0.0-dev/m2-schema-v2-foundation.md`. The explicit
+editor upgrade, structured date controls and stable link ordering are now locally
+implemented with 80 desktop tests; see
+`../../evidence/0.0.0-dev/m2-date-link-editor.md`. New empty documents still use v1
+until the user enables the upgrade. A collapsible section navigator, full live
+HTML reading view and contact/section focused panel are now locally implemented
+with 81 desktop tests; see `../../evidence/0.0.0-dev/m2-focused-editor.md`.
+Entry collapse, duplication with fresh nested IDs, confirmed entry/section
+removal and keyboard focus now pass 84 desktop tests; see
+`../../evidence/0.0.0-dev/m2-entry-editing.md`. Exact-field validation navigation
+and bullet duplication now pass 85 desktop tests; see
+`../../evidence/0.0.0-dev/m2-validation-navigation.md`. Explicit current-renderer
+regeneration now passes 204 Rust, 87 desktop and 24 contract tests, with retained
+source identity checks and persistent substitution labels; see
+`../../evidence/0.0.0-dev/m2-current-renderer-regeneration.md`. Native qualification,
+final styles and exact page-layout integration remain open. Step 5's first
+subsection is not complete. Reading-entry selection, optional-detail disclosure,
+hidden-field error focus and advisory matching-entry hints now pass 91 desktop
+and 24 contract tests; see `../../evidence/0.0.0-dev/m2-reading-details.md`.
+The expanded style audit now passes 48 v1/v2 PDF/DOCX/text pairs with reviewed
+local regression hashes and 24 LibreOffice DOCX reader checks; see
+`../../evidence/0.0.0-dev/m2-style-parity.md`. CI runs the new corpus, with hosted
+results pending. Native fonts/accessibility, final presentation and exact editor
+pagination remain open. Import and lifecycle boundaries remain High-routed.
+The standalone native output reader now passes real-pipe sanitizer tests and
+has a macOS CI regression. Resource probes found that a 512 MiB `RLIMIT_AS`
+was rejected and an ignored `SIGXCPU` outlived a one-second hard CPU setting;
+plain rlimits therefore have not qualified these containment requirements.
+See `../../evidence/0.0.0-dev/m2-native-output-and-resources.md`. The component
+is not a production XPC adapter, and import remains disabled.
+A Rust platform pipe driver now emits the existing supervisor event types,
+uses its shared byte/timing ceilings and passes real-pipe regression tests
+without adding unsafe Rust; see
+`../../evidence/0.0.0-dev/m2-rust-native-pipes.md`. Production XPC launch, hard
+resource bounds, process-tree cleanup and import integration remain open.
+Reading-view add-entry actions, direct untitled-entry editing and a navigator
+that releases its column are now implemented with 92 desktop tests; see
+`../../evidence/0.0.0-dev/m2-reading-actions.md`. Exact saved-revision PDF pages
+now share the center pane with continuous scrolling, fit-width zoom, opt-in
+refresh after saves and late-result discard. The full local gate passes 101
+desktop tests, with separate real PDF.js browser checks; see
+`../../evidence/0.0.0-dev/m2-center-pdf-preview.md`. Installed WKWebView/VoiceOver
+and lifecycle qualification remain High-routed and pending. Discarding a pending
+preview waits for native rendering to return; it does not interrupt Typst.
+The subsequent Medium presentation pass places recovery/storage below the editor,
+adds keyboard-focusable area shortcuts and discloses text/Word export controls.
+The 101-test full local gate and synthetic browser layout checks pass; details
+are appended to `../../evidence/0.0.0-dev/m2-reading-actions.md`.
+Section-specific entry labels, example placeholders and optional-detail
+shortcuts now pass the 102-desktop-test full local gate. Browser checks cover
+the picker layout and blank-value focus; see
+`../../evidence/0.0.0-dev/m2-entry-guidance.md`. Existing content and schema stay
+unchanged when section guidance changes. Step 5 continues with the production
+worker/import adapter and lifecycle/cleanup implementation. Focused native
+checks validate implementation fixes; the full native qualification matrix
+belongs to Step 6 and has not begun.
+
+The import review presentation now supports explicit per-block decisions,
+original-text comparison, editable classification, existing/new/proposed section
+destinations and contact conflict choices. Six new interaction/accessibility
+tests bring the full local gate to 108 desktop tests. This component is not
+mounted in production and does not save data; native review contracts, lifecycle
+and revision-checked commit integration remain open. See
+`../../evidence/0.0.0-dev/m2-import-review-ui.md`. Import stays disabled.
+
+The native application layer now owns a single review session with separate
+owner/token checks, fixed expiry, teardown and revision-checked commit lifecycle.
+Five regressions include real synthetic encrypted-storage races and failures
+reported after commit. Workspace Rust tests, strict Clippy and the full frontend
+gate pass; see `../../evidence/0.0.0-dev/m2-import-review-sessions.md` for exact
+test scope. Desktop IPC, cleanup timer and UI/storage wiring remain pending;
+this component does not establish parser containment or enable import.
+
+The review panel now submits a generated decision-only payload with a bounded
+native decoder and atomic batch replacement behind the review owner's session
+checks. A shared frontend/Rust fixture verifies mapping; adversarial cases cover
+unknown fields, malformed destinations and resource limits. See
+`../../evidence/0.0.0-dev/m2-import-review-contract.md`. Command registration,
+proposal-response contracts and native dispatch/lifecycle wiring remain open.
+
+The next checkpoint registers gated native apply/cancel handlers and connects
+review state to storage teardown, restore/rollback, main-window destruction,
+exit and an idle-expiry worker. Apply uses the real revision-CAS save under the
+shared operation lease. Import remains disabled; production proposal/begin/read
+and frontend integration remain open. Exact tests and limits are recorded in
+`../../evidence/0.0.0-dev/m2-import-native-dispatch.md`.
+
+Native retained-source proposal snapshots, a gated read handler, validated
+frontend clients and the review-flow controller now connect the proposal and
+apply/cancel surfaces. The flow blocks blind retries after uncertain saves.
+The full local gate passes 111 desktop and 26 contract tests; see
+`../../evidence/0.0.0-dev/m2-import-proposal-flow.md`. The app still cannot start
+an import because native parser containment/creation remains unresolved.
+
+
+
+macOS export publication now removes and syncs staging names before writing
+document bytes, then publishes through no-clobber descriptor-based file cloning.
+Focused SIGKILL tests cover empty staging, unlink completion, partial output,
+flushed output and completed publication. Unsupported filesystems fail closed;
+other platforms retain named staging. This is implementation evidence, not
+power-loss, low-disk or full native filesystem qualification; see
+`../../evidence/0.0.0-dev/m2-unlinked-export.md`. The staged native candidate
+predates this change and the installed M1 app remains unchanged.
+
 As of 2026-09-04, M2 remains incomplete for macOS arm64. The earlier weighted
 cross-platform percentage is retired rather than mechanically increased when
 Windows and Intel-Mac gates move later; completion is determined by the explicit
@@ -175,9 +317,9 @@ verifies the complete receipt before exposing bytes, supplies bounded accessible
 text for retained sources, and permits exact-byte export from that verified
 preview. An authenticated format-1.1 backup can now provide a bounded,
 ten-minute, read-only source session for the same verification without restoring
-or mutating the active profile. Regeneration of retained structured sources with
-a truthfully identified current renderer when the historical tuple is absent
-remains an M2 gate. Superseded draft retention and old renderer-binary bundling
+or mutating the active profile. Explicit current-renderer regeneration of retained
+sources is now implemented locally with source-identity checks and substitution
+labels; its native acceptance remains an M2 gate. Superseded draft retention and old renderer-binary bundling
 are explicitly outside the approved history model.
 
 ### Completed or working locally
@@ -238,6 +380,16 @@ are explicitly outside the approved history model.
 
 ### Detailed checkpoint evidence
 
+- Native macOS termination now has a deferred AppKit bridge with isolated
+  cancellation/approval, failure, and Tauri event-loop evidence. Installed Dock
+  Quit/logout/shutdown and the full editor interruption matrix remain open;
+  see [native termination](../../evidence/0.0.0-dev/m2-native-termination.md).
+  A separately staged, locally signed
+  [native editor candidate](../../evidence/0.0.0-dev/m2-native-editor-candidate.md)
+  now passes build/signature and workspace checks. The user reports the focused
+  standard-account invalid-edit Dock Quit/cancel/discard/reopen checks passed,
+  with an initial Keychain password prompt. This is Step 5 implementation
+  evidence, not Step 6 signoff; the installed M1 app remains unchanged.
 - Editor and lifecycle: [editor smoke](../../evidence/0.0.0-dev/m2-editor-smoke.md),
   [close guard](../../evidence/0.0.0-dev/m2-close-guard-smoke.md), and
   [text export](../../evidence/0.0.0-dev/m2-text-export-smoke.md).
@@ -271,22 +423,22 @@ are explicitly outside the approved history model.
 
 ### Remaining release gates
 
-- **[HIGH]** Implement and prove the native macOS XPC/App-Sandbox adapter behind
-  the common supervisor, including real bounded pipe drivers and the complete
-  hostile lifecycle matrix; then integrate the file picker, review UI, private
-  binary staging, parsers, and richer deterministic mapping.
+- **[HIGH]** Complete Step 6 acceptance of the implemented metered-Wasm import
+  path in the exact signed candidate. The native rlimit/XPC implementation
+  assumption was superseded by ADR 0012; native identity/lifecycle implementation
+  and focused qualification now pass, and no plaintext import staging is needed.
 - **[HIGH]** Finish native macOS vault, filesystem, quit, low-disk, and injected
   crash/failure verification, including the separate standard-account matrix.
-- Finish the complete product-plan editor, native dialogs and accessibility,
-  all three final PDF/DOCX style categories, truthfully labeled current-renderer
-  regeneration for retained historical structured sources, and native reader
-  verification.
+- Complete final human/native-reader and accessibility acceptance of the
+  implemented editor, dialogs, three PDF/DOCX styles and current-renderer
+  regeneration of retained sources.
 - **[HIGH]** Complete native macOS vault, interruption, filesystem and
   VoiceOver/keyboard evidence for all-local-data deletion. Extend its exact
   cleanup inventory when later milestones add credentials, native IPC state,
   workspace records, or ORT-owned import/drag temporary files.
 - **[HIGH]** Pass the complete offline journey and all M2 exit evidence.
-  Hostile-file parsing must remain disabled until its containment gate passes.
+  Only the signed candidate's pinned metered helper may parse imported files;
+  unbundled or identity-invalid builds must refuse import.
 
 Deferred platform-expansion gates, which do not block macOS-arm64 M2, are the
 Windows AppContainer/Job adapter and private staging, Windows vault/filesystem/UI

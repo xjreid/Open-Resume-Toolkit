@@ -15,6 +15,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build.workspace = true
 
 [dependencies]
+ort-application = { path = "../../../crates/ort-application" }
 ort-backup = { path = "../../../crates/ort-backup" }
 ort-render = { path = "../../../crates/ort-render" }
 base64.workspace = true
@@ -27,6 +28,9 @@ ort-vault = { path = "../../../crates/ort-vault" }
 serde.workspace = true
 tauri.workspace = true
 tauri-plugin-dialog.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+ort-macos-lifecycle = { path = "../../../crates/ort-macos-lifecycle" }
 
 [dev-dependencies]
 ort-vault = { path = "../../../crates/ort-vault", features = ["test-support"] }

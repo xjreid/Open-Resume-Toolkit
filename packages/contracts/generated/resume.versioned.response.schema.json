@@ -41,6 +41,35 @@
         "text"
       ]
     },
+    "CalendarDate": {
+      "description": "Precision is explicit: an absent month is a year, never an inferred January.",
+      "type": "object",
+      "properties": {
+        "expected": {
+          "type": "boolean"
+        },
+        "month": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "year": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "year",
+        "expected"
+      ]
+    },
     "ContactDetails": {
       "type": "object",
       "properties": {
@@ -72,11 +101,55 @@
         "links"
       ]
     },
+    "DateEnd": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "present"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "date"
+            },
+            "value": {
+              "$ref": "#/$defs/CalendarDate"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ]
+        }
+      ]
+    },
     "Link": {
       "type": "object",
       "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
         "label": {
           "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
         },
         "url": {
           "type": "string"
@@ -118,6 +191,51 @@
         "label",
         "value",
         "isSkill"
+      ]
+    },
+    "ResumeDate": {
+      "description": "One stable, ordered date or range. Either endpoint may be omitted. The label\ncan describe graduation, certification, or another optional date detail.",
+      "type": "object",
+      "properties": {
+        "end": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateEnd"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "label": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "start": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CalendarDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "label"
       ]
     },
     "ResumeDocument": {
@@ -166,6 +284,12 @@
         },
         "dateRange": {
           "type": "string"
+        },
+        "dates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResumeDate"
+          }
         },
         "fields": {
           "type": "array",

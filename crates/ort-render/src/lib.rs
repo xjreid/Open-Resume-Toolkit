@@ -1,7 +1,9 @@
 //! Fixed-template, memory-only PDF output. No user source, paths or font discovery.
 use std::sync::{LazyLock, Mutex};
 
-use ort_domain::{Link, MAX_PDF_BYTES, MAX_PDF_PAGES, PdfRenderReceipt, ResumeDocument};
+use ort_domain::{
+    DocumentStyle, Link, MAX_PDF_BYTES, MAX_PDF_PAGES, PdfRenderReceipt, ResumeDocument,
+};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use typst::{
@@ -22,6 +24,23 @@ const MAX_LAYOUT_BLOCKS: usize = 800;
 const MAX_HARD_BREAKS: usize = 200;
 static RENDER_LOCK: Mutex<()> = Mutex::new(());
 static SOURCE: LazyLock<Source> = LazyLock::new(|| Source::detached(TEMPLATE));
+static TECHNICAL_SOURCE: LazyLock<Source> =
+    LazyLock::new(|| Source::detached(template(DocumentStyle::Technical)));
+static PROFESSIONAL_SOURCE: LazyLock<Source> =
+    LazyLock::new(|| Source::detached(template(DocumentStyle::Professional)));
+static MODERN_SOURCE: LazyLock<Source> =
+    LazyLock::new(|| Source::detached(template(DocumentStyle::Modern)));
+
+fn template(style: DocumentStyle) -> &'static str {
+    match style {
+        DocumentStyle::Plain => TEMPLATE,
+        DocumentStyle::Technical => include_str!("../../../templates/resume/technical_pdf_v1.typ"),
+        DocumentStyle::Professional => {
+            include_str!("../../../templates/resume/professional_pdf_v1.typ")
+        }
+        DocumentStyle::Modern => include_str!("../../../templates/resume/modern_pdf_v1.typ"),
+    }
+}
 
 // Only the six Libertinus Serif faces, in the pinned asset package's fixed order.
 static FONTS: LazyLock<Vec<Font>> = LazyLock::new(|| {
@@ -119,6 +138,9 @@ fn paragraphs(document: &ResumeDocument) -> Result<Vec<Paragraph>, PdfRenderErro
             for value in [&entry.subheading, &entry.date_range, &entry.location] {
                 add(&mut entries, "text", value);
             }
+            for date in entry.dates.iter().flatten() {
+                add(&mut entries, "text", &date.display_text());
+            }
             for field in &entry.fields {
                 let value = normalized(&field.value);
                 if !value.is_empty() {
@@ -178,13 +200,18 @@ struct MemoryWorld {
 }
 
 impl MemoryWorld {
-    fn new(paragraphs: &[Paragraph]) -> Result<Self, PdfRenderError> {
+    fn new(paragraphs: &[Paragraph], style: DocumentStyle) -> Result<Self, PdfRenderError> {
         let json = serde_json::to_string(paragraphs).map_err(|_| PdfRenderError::InvalidContent)?;
         let mut inputs = Dict::new();
         inputs.insert("resume".into(), Value::Str(json.into()));
         Ok(Self {
             library: LazyHash::new(Library::builder().with_inputs(inputs).build()),
-            source: SOURCE.clone(),
+            source: match style {
+                DocumentStyle::Plain => SOURCE.clone(),
+                DocumentStyle::Technical => TECHNICAL_SOURCE.clone(),
+                DocumentStyle::Professional => PROFESSIONAL_SOURCE.clone(),
+                DocumentStyle::Modern => MODERN_SOURCE.clone(),
+            },
         })
     }
 }
@@ -208,7 +235,7 @@ impl World for MemoryWorld {
     }
     fn file(&self, id: FileId) -> FileResult<Bytes> {
         if id == self.source.id() {
-            Ok(Bytes::new(TEMPLATE.as_bytes()))
+            Ok(Bytes::from_string(self.source.text().to_owned()))
         } else {
             Err(FileError::AccessDenied)
         }
@@ -273,12 +300,24 @@ fn visible_frame(frame: &Frame, origin: Point, depth: usize) -> bool {
 /// Refuses invalid content, uncovered glyphs, layout/output limits, and compiler
 /// warnings. Error messages never contain template diagnostics or resume text.
 pub fn render_pdf(document: &ResumeDocument) -> Result<PdfArtifact, PdfRenderError> {
+    render_pdf_with_style(document, DocumentStyle::Plain)
+}
+
+/// Renders only a reviewed, compiled-in template. Historical plain output stays
+/// byte-identical; receipts identify the selected template and its exact source.
+///
+/// # Errors
+/// Applies the same content, font, geometry, page and byte bounds to every style.
+pub fn render_pdf_with_style(
+    document: &ResumeDocument,
+    style: DocumentStyle,
+) -> Result<PdfArtifact, PdfRenderError> {
     let _guard = RENDER_LOCK
         .lock()
         .map_err(|_| PdfRenderError::Unavailable)?;
     let _eviction = EvictMemoizedContent;
     let content = paragraphs(document)?;
-    let world = MemoryWorld::new(&content)?;
+    let world = MemoryWorld::new(&content, style)?;
     let compiled = typst::compile::<typst_layout::PagedDocument>(&world);
     if !compiled.warnings.is_empty() {
         return Err(PdfRenderError::InvalidContent);
@@ -318,8 +357,8 @@ pub fn render_pdf(document: &ResumeDocument) -> Result<PdfArtifact, PdfRenderErr
         document_schema_version: document.schema_version,
         pdf_sha256: sha256(&bytes),
         renderer_version: RENDERER_VERSION.into(),
-        template_id: TEMPLATE_ID.into(),
-        template_sha256: sha256(TEMPLATE.as_bytes()),
+        template_id: style.pdf_template_id().into(),
+        template_sha256: sha256(template(style).as_bytes()),
         font_bundle_id: FONT_BUNDLE_ID.into(),
         font_bundle_sha256: hex::encode(font_hash.finalize()),
         page_count: output.pages().len(),
@@ -334,11 +373,14 @@ mod tests {
     #[test]
     fn bundled_template_compiles_without_warnings() {
         let _guard = RENDER_LOCK.lock().unwrap();
-        let world = MemoryWorld::new(&[Paragraph {
-            kind: "name",
-            text: "Synthetic".into(),
-            url: None,
-        }])
+        let world = MemoryWorld::new(
+            &[Paragraph {
+                kind: "name",
+                text: "Synthetic".into(),
+                url: None,
+            }],
+            DocumentStyle::Plain,
+        )
         .unwrap();
         let result = typst::compile::<typst_layout::PagedDocument>(&world);
         assert!(result.warnings.is_empty(), "{:?}", result.warnings);
@@ -348,7 +390,7 @@ mod tests {
     #[test]
     fn world_denies_external_files_packages_plugins_and_font_discovery() {
         let _guard = RENDER_LOCK.lock().unwrap();
-        let mut world = MemoryWorld::new(&[]).unwrap();
+        let mut world = MemoryWorld::new(&[], DocumentStyle::Plain).unwrap();
         let other = typst::syntax::RootedPath::new(
             typst::syntax::VirtualRoot::Project,
             typst::syntax::VirtualPath::new("unavailable").unwrap(),

@@ -296,6 +296,7 @@ fn restore_with_dialog(
     let state = window.app_handle().state::<DesktopState>();
     let vault = OsDatabaseKeyVault::new();
     match state.with_store(|store| {
+        state.reviews.clear()?;
         store.stage_portable_restore(&bytes, &passphrase, &store.manifest().channel, &vault)
     }) {
         Ok(()) => CommandResponse::success(RestoreBackupResponse::Staged {
@@ -311,7 +312,10 @@ fn rollback_safety_copy_blocking(
 ) -> CommandResponse<RollbackSafetyCopyResponse> {
     let state = window.app_handle().state::<DesktopState>();
     let vault = OsDatabaseKeyVault::new();
-    match state.with_store(|store| store.stage_safety_rollback(&store.manifest().channel, &vault)) {
+    match state.with_store(|store| {
+        state.reviews.clear()?;
+        store.stage_safety_rollback(&store.manifest().channel, &vault)
+    }) {
         Ok(()) => CommandResponse::success(RollbackSafetyCopyResponse {
             restart_required: true,
             current_profile_retained: true,

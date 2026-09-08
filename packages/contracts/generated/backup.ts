@@ -21,7 +21,7 @@ export type ExportBackupResult =
       status: "exported";
       byteCount: number;
       formatMajor: 1;
-      formatMinor: 1;
+      formatMinor: 1 | 2;
       cleanupPending: boolean;
       durabilityUnconfirmed: boolean;
     };
@@ -38,10 +38,10 @@ export type ValidatedBackup = {
   status: "validated";
   byteCount: number;
   formatMajor: 1;
-  formatMinor: 0 | 1;
+  formatMinor: 0 | 1 | 2;
   appVersion: string;
   databaseSchema: 1 | 2;
-  documentSchema: 1;
+  documentSchema: 1 | 2;
   createdAt: string;
   masterDrafts: number;
   publishedResumes: number;
@@ -125,7 +125,7 @@ export function isExportBackupCommandResponse(
       record.byteCount > 0 &&
       record.byteCount <= MAX_BACKUP_BYTES &&
       record.formatMajor === 1 &&
-      record.formatMinor === 1 &&
+      (record.formatMinor === 1 || record.formatMinor === 2) &&
       typeof record.cleanupPending === "boolean" &&
       typeof record.durabilityUnconfirmed === "boolean"
     );
@@ -145,11 +145,11 @@ export function isValidateBackupCommandResponse(
       record.status !== "validated" ||
       !isBoundedInteger(record.byteCount, 1, MAX_BACKUP_BYTES) ||
       record.formatMajor !== 1 ||
-      (record.formatMinor !== 0 && record.formatMinor !== 1) ||
+      ![0, 1, 2].includes(record.formatMinor as number) ||
       typeof record.appVersion !== "string" ||
       !/^[A-Za-z0-9._+\-]{1,64}$/.test(record.appVersion) ||
-      record.databaseSchema !== record.formatMinor + 1 ||
-      record.documentSchema !== 1 ||
+      record.databaseSchema !== (record.formatMinor === 0 ? 1 : 2) ||
+      record.documentSchema !== (record.formatMinor === 2 ? 2 : 1) ||
       typeof record.createdAt !== "string" ||
       record.createdAt.length === 0 ||
       record.createdAt.length > 64 ||
@@ -160,7 +160,7 @@ export function isValidateBackupCommandResponse(
       !isBoundedInteger(record.renderManifests, 0, 100)
     )
       return false;
-    return record.formatMinor === 1 || record.renderManifests === 0;
+    return record.formatMinor !== 0 || record.renderManifests === 0;
   });
 }
 

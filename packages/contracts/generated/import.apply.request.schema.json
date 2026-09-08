@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ApplyImportReviewRequest",
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "payload": {
+      "$ref": "#/$defs/ApplyImportReviewPayload"
+    },
+    "requestId": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "requestId",
+    "payload"
+  ],
+  "$defs": {
+    "ApplyImportReviewPayload": {
+      "type": "object",
+      "properties": {
+        "decisionsJson": {
+          "description": "Encoded decision-only payload, bounded before its native decode.",
+          "type": "string"
+        },
+        "reviewId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "reviewId",
+        "decisionsJson"
+      ]
+    }
+  }
+}

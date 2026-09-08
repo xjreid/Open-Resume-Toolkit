@@ -22,3 +22,15 @@ IDs. `pdf-v1.sha256.json` pins exact renderer output, while
 plain-text parity. Updating a fixture or generator requires explicit review of
 all affected digests plus semantic, accessibility, and rendered-page evidence;
 baselines are never accepted automatically.
+
+## Provisional style audits
+
+`cargo run --locked -p ort-render --example style_fixtures -- NEW_DIRECTORY`
+generates the same eight synthetic cases for technical, professional and modern
+PDF/DOCX styles. Run `node tools/verify-pdf-fixtures.mjs
+NEW_DIRECTORY/technical/pdf technical` and `python3 tools/verify-docx-fixtures.py
+NEW_DIRECTORY/technical/docx technical`, then repeat for professional and modern.
+The optional style argument checks the selected bundled template and independent
+content/structure constraints. It does not claim a reviewed new golden baseline.
+Omitting the argument still enforces the original plain golden hashes. New style
+goldens require final layout review and native reader qualification.

@@ -108,9 +108,10 @@ impl ExportDestination {
         })
     }
 
-    /// Flushes a sibling staging file and publishes it with a no-clobber link.
-    /// Filesystems without hard-link support fail closed; there is no unsafe
-    /// copy/overwrite fallback. Only the exact owned staging entries are removed.
+    /// Publishes complete bytes without replacing an existing target. macOS
+    /// unlinks staging before writing and uses atomic file cloning; other
+    /// platforms retain sibling staging and no-clobber hard-link publication.
+    /// Unsupported filesystems fail closed without a copy/overwrite fallback.
     ///
     /// # Errors
     /// Returns a bounded error without replacing any existing target.
@@ -119,6 +120,18 @@ impl ExportDestination {
             return Err(ExportWriteError::InvalidContent);
         }
         ensure_absent(&self.parent, Path::new(&self.name))?;
+        #[cfg(target_os = "macos")]
+        {
+            self.write_unlinked(bytes, |_| {})
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            self.write_named(bytes)
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn write_named(self, bytes: &[u8]) -> Result<ExportWriteReceipt, ExportWriteError> {
         let stage_name = format!(".ort-export-{}", Uuid::now_v7());
         let builder = private_directory_builder();
         self.parent
@@ -145,6 +158,7 @@ impl ExportDestination {
         })
     }
 
+    #[cfg(not(target_os = "macos"))]
     fn write_staged(&self, stage: &Dir, bytes: &[u8]) -> Result<(), ExportWriteError> {
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
@@ -167,6 +181,95 @@ impl ExportDestination {
                 }
             })
     }
+
+    #[cfg(target_os = "macos")]
+    fn write_unlinked(
+        self,
+        bytes: &[u8],
+        mut checkpoint: impl FnMut(ExportPhase),
+    ) -> Result<ExportWriteReceipt, ExportWriteError> {
+        let stage_name = format!(".ort-export-{}", Uuid::now_v7());
+        self.parent
+            .create_dir_with(&stage_name, &private_directory_builder())
+            .map_err(|_| ExportWriteError::Unavailable)?;
+        let Ok(stage) = self.parent.open_dir(&stage_name) else {
+            let _ = self.parent.remove_dir(&stage_name);
+            return Err(ExportWriteError::Unavailable);
+        };
+        let mut options = OpenOptions::new();
+        options.read(true).write(true).create_new(true).mode(0o600);
+        let file = stage.open_with("payload", &options);
+        let Ok(mut file) = file else {
+            drop(stage);
+            let _ = self.parent.remove_dir(&stage_name);
+            return Err(ExportWriteError::Unavailable);
+        };
+        checkpoint(ExportPhase::EmptyNamedStage);
+        // No document bytes may be written until every staging name is removed
+        // and those namespace changes have been flushed. Never scan old exports.
+        stage
+            .remove_file("payload")
+            .map_err(|_| ExportWriteError::Unavailable)?;
+        if rustix::fs::fstat(&file)
+            .map_err(|_| ExportWriteError::Unavailable)?
+            .st_nlink
+            != 0
+        {
+            return Err(ExportWriteError::Unavailable);
+        }
+        stage
+            .into_std_file()
+            .sync_all()
+            .map_err(|_| ExportWriteError::Unavailable)?;
+        self.parent
+            .remove_dir(&stage_name)
+            .map_err(|_| ExportWriteError::Unavailable)?;
+        self.parent
+            .try_clone()
+            .and_then(|dir| dir.into_std_file().sync_all())
+            .map_err(|_| ExportWriteError::Unavailable)?;
+        checkpoint(ExportPhase::Unlinked);
+        let (first, rest) = bytes.split_at(bytes.len() / 2);
+        file.write_all(first)
+            .map_err(|_| ExportWriteError::Unavailable)?;
+        checkpoint(ExportPhase::PayloadPartial);
+        file.write_all(rest)
+            .and_then(|()| file.sync_all())
+            .map_err(|_| ExportWriteError::Unavailable)?;
+        checkpoint(ExportPhase::PayloadFlushed);
+        // The held directory remains the native-dialog capability even if its
+        // ambient path changes. clonefile requires a new final name atomically.
+        rustix::fs::fclonefileat(
+            &file,
+            &self.parent,
+            Path::new(&self.name),
+            rustix::fs::CloneFlags::NOOWNERCOPY,
+        )
+        .map_err(|error| {
+            if error == rustix::io::Errno::EXIST {
+                ExportWriteError::AlreadyExists
+            } else {
+                ExportWriteError::Unavailable
+            }
+        })?;
+        checkpoint(ExportPhase::Published);
+        drop(file); // Kernel reclaims the unnamed staging inode, including on process death.
+        let synced = self.parent.into_std_file().sync_all().is_ok();
+        Ok(ExportWriteReceipt {
+            cleanup_pending: false,
+            durability_unconfirmed: !synced,
+        })
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ExportPhase {
+    EmptyNamedStage,
+    Unlinked,
+    PayloadPartial,
+    PayloadFlushed,
+    Published,
 }
 
 fn private_directory_builder() -> DirBuilder {
@@ -378,6 +481,7 @@ mod tests {
         assert_eq!(fs::read_dir(dir.path()).expect("list").count(), 0);
     }
 
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn final_publication_cannot_clobber_a_last_moment_target() {
         let dir = TempDir::new().expect("dir");
@@ -393,6 +497,122 @@ mod tests {
         );
         assert_eq!(fs::read_to_string(&path).expect("read"), "original");
         assert_eq!(stage.read("payload").expect("staged"), b"replacement");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn final_publication_cannot_clobber_a_last_moment_target() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("race.txt");
+        let token = ExportDestination::from_native_dialog(&path).unwrap();
+        let result = token.write_unlinked(b"replacement", |phase| {
+            if phase == ExportPhase::PayloadFlushed {
+                fs::write(&path, "original").unwrap();
+            }
+        });
+        assert_eq!(result.err(), Some(ExportWriteError::AlreadyExists));
+        assert_eq!(fs::read(&path).unwrap(), b"original");
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn export_crash_child() {
+        let Some(root) = std::env::var_os("ORT_EXPORT_CRASH_TEST_ROOT") else {
+            return;
+        };
+        let phase = std::env::var("ORT_EXPORT_CRASH_TEST_PHASE").unwrap();
+        let token =
+            ExportDestination::from_native_dialog(&Path::new(&root).join("resume.txt")).unwrap();
+        token
+            .write_unlinked(b"synthetic export crash fixture", |checkpoint| {
+                let name = match checkpoint {
+                    ExportPhase::EmptyNamedStage => "empty",
+                    ExportPhase::Unlinked => "unlinked",
+                    ExportPhase::PayloadPartial => "partial",
+                    ExportPhase::PayloadFlushed => "flushed",
+                    ExportPhase::Published => "published",
+                };
+                if name == phase {
+                    // SIGKILL skips Rust destructors and application cleanup entirely.
+                    std::process::Command::new("/bin/kill")
+                        .args(["-KILL", &std::process::id().to_string()])
+                        .status()
+                        .unwrap();
+                    panic!("test child survived SIGKILL");
+                }
+            })
+            .unwrap();
+        panic!("test checkpoint was not reached");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn failed_clone_does_not_fall_back_to_a_visible_partial_file() {
+        let root = TempDir::new().unwrap();
+        let parent = root.path().join("selected");
+        fs::create_dir(&parent).unwrap();
+        let token = ExportDestination::from_native_dialog(&parent.join("resume.txt")).unwrap();
+        let result = token.write_unlinked(b"synthetic fixture", |phase| {
+            if phase == ExportPhase::PayloadFlushed {
+                // Remove the now-empty chosen directory while its capability
+                // remains open: publication must fail without another path.
+                fs::remove_dir(&parent).unwrap();
+            }
+        });
+        assert_eq!(result.err(), Some(ExportWriteError::Unavailable));
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn killed_export_leaves_only_empty_staging_or_complete_publication() {
+        use std::os::unix::process::ExitStatusExt;
+        for phase in ["empty", "unlinked", "partial", "flushed", "published"] {
+            let root = TempDir::new().unwrap();
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "export::tests::export_crash_child",
+                    "--nocapture",
+                ])
+                .env("ORT_EXPORT_CRASH_TEST_ROOT", root.path())
+                .env("ORT_EXPORT_CRASH_TEST_PHASE", phase)
+                .output()
+                .unwrap();
+            assert_eq!(output.status.signal(), Some(9), "{phase}: {output:?}");
+            let entries: Vec<_> = fs::read_dir(root.path())
+                .unwrap()
+                .map(Result::unwrap)
+                .collect();
+            match phase {
+                "empty" => {
+                    assert_eq!(entries.len(), 1);
+                    assert!(
+                        entries[0]
+                            .file_name()
+                            .to_str()
+                            .unwrap()
+                            .starts_with(".ort-export-")
+                    );
+                    let files: Vec<_> = fs::read_dir(entries[0].path())
+                        .unwrap()
+                        .map(Result::unwrap)
+                        .collect();
+                    assert_eq!(files.len(), 1);
+                    assert_eq!(files[0].file_name(), "payload");
+                    assert_eq!(files[0].metadata().unwrap().len(), 0);
+                }
+                "published" => {
+                    assert_eq!(entries.len(), 1);
+                    assert_eq!(
+                        fs::read(root.path().join("resume.txt")).unwrap(),
+                        b"synthetic export crash fixture"
+                    );
+                }
+                _ => assert!(entries.is_empty(), "{phase} left a named file"),
+            }
+        }
     }
 
     #[cfg(unix)]

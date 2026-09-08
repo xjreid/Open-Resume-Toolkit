@@ -4,7 +4,13 @@ import {
   isCommandResponse,
   type CommandResponse,
 } from "./resume";
-import type { ExportSource } from "./export";
+import {
+  DOCUMENT_STYLE_TEMPLATES,
+  type DocumentStyle,
+  type ExportSource,
+  type StyledExportRequest,
+} from "./export";
+export type RenderPdfRequest = StyledExportRequest;
 
 export const MAX_PDF_BYTES = __MAX_PDF_BYTES__;
 export const MAX_PDF_PAGES = __MAX_PDF_PAGES__;
@@ -13,7 +19,7 @@ export const PDF_PREVIEW_TTL_SECONDS = __PDF_TTL__;
 const MAX_JAVASCRIPT_DATE_MS = 8640000000000000;
 export interface PdfRenderReceipt {
   documentSha256: string;
-  documentSchemaVersion: 1;
+  documentSchemaVersion: 1 | 2;
   pdfSha256: string;
   rendererVersion: string;
   templateId: string;
@@ -47,6 +53,16 @@ export interface PdfReplayRequest {
   contractVersion: typeof CONTRACT_VERSION;
   requestId: string;
   payload: { manifestId: string };
+}
+export interface PdfRegenerateRequest {
+  contractVersion: typeof CONTRACT_VERSION;
+  requestId: string;
+  payload: { manifestId: string; style: DocumentStyle };
+}
+export interface PortablePdfRegenerateRequest {
+  contractVersion: typeof CONTRACT_VERSION;
+  requestId: string;
+  payload: { archiveId: string; manifestId: string; style: DocumentStyle };
 }
 export interface OpenPortablePdfHistoryRequest {
   contractVersion: typeof CONTRACT_VERSION;
@@ -124,17 +140,36 @@ function ticket(value: unknown): value is string {
     )
   );
 }
-function isReceipt(value: unknown): value is PdfRenderReceipt {
+function bundleId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 128 &&
+    /^[A-Za-z0-9_./-]+$/.test(value)
+  );
+}
+function isReceipt(
+  value: unknown,
+  historical = false,
+): value is PdfRenderReceipt {
   return (
     record(value) &&
     Object.keys(value).length === 10 &&
     hash(value.documentSha256) &&
-    value.documentSchemaVersion === 1 &&
+    (value.documentSchemaVersion === 1 || value.documentSchemaVersion === 2) &&
     hash(value.pdfSha256) &&
-    value.rendererVersion === "typst-0.15.1/ort-1" &&
-    value.templateId === "plain_pdf_v1" &&
+    (historical
+      ? bundleId(value.rendererVersion)
+      : value.rendererVersion === "typst-0.15.1/ort-1") &&
+    (historical
+      ? bundleId(value.templateId)
+      : Object.values(DOCUMENT_STYLE_TEMPLATES).some(
+          (style) => style.pdf === value.templateId,
+        )) &&
     hash(value.templateSha256) &&
-    value.fontBundleId === "libertinus-serif/typst-assets-0.15.1" &&
+    (historical
+      ? bundleId(value.fontBundleId)
+      : value.fontBundleId === "libertinus-serif/typst-assets-0.15.1") &&
     hash(value.fontBundleSha256) &&
     positive(value.pageCount, MAX_PDF_PAGES) &&
     positive(value.byteCount, MAX_PDF_BYTES)
@@ -173,7 +208,7 @@ function isManifest(value: unknown): value is PdfRenderManifest {
     positive(value.lastGeneratedAtUnixMs, MAX_JAVASCRIPT_DATE_MS) &&
     value.lastGeneratedAtUnixMs >= value.generatedAtUnixMs &&
     positive(value.renderCount, 2147483647) &&
-    isReceipt(value.receipt)
+    isReceipt(value.receipt, true)
   );
 }
 export function isPdfPreviewCommandResponse(
@@ -231,9 +266,7 @@ export function isPortablePdfHistoryCommandResponse(
         !Array.isArray(history.manifests) ||
         history.manifests.length > MAX_PDF_RENDER_HISTORY ||
         history.manifests.length >
-          history.totalManifests -
-            history.unavailableSources -
-            history.incompatibleReceipts ||
+          history.totalManifests - history.unavailableSources ||
         !history.manifests.every(isManifest)
       )
         return false;

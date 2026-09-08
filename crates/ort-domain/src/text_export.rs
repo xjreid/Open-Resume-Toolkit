@@ -40,11 +40,53 @@ pub enum ExportTextResponse {
     },
 }
 
-// DOCX uses the same path-free saved-revision selection and receipt structure.
-// Its command and separate response validator fix format v1 = plain_docx_v1,
-// with a 2 MiB bound (text remains format v1 with a 256 KiB bound).
-pub type ExportDocxRequest = ExportTextRequest;
-pub type ExportDocxResponse = ExportTextResponse;
+// Legacy requests and plain receipts retain their original wire shape. Styled
+// DOCX receipts add the exact bundled template identity; format v1 still denotes
+// the constrained OPC format, with no implicit change to the old plain output.
+pub type ExportDocxRequest = crate::StyledExportRequest;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ExportDocxResponse {
+    Cancelled,
+    #[serde(rename_all = "camelCase")]
+    Exported {
+        source: ExportSource,
+        revision: i64,
+        byte_count: usize,
+        format_version: u16,
+        cleanup_pending: bool,
+        durability_unconfirmed: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        template_id: Option<String>,
+    },
+}
+
+impl ExportDocxResponse {
+    #[must_use]
+    pub fn from_export(value: &ExportTextResponse, style: crate::DocumentStyle) -> Self {
+        match *value {
+            ExportTextResponse::Cancelled => Self::Cancelled,
+            ExportTextResponse::Exported {
+                source,
+                revision,
+                byte_count,
+                format_version,
+                cleanup_pending,
+                durability_unconfirmed,
+            } => Self::Exported {
+                source,
+                revision,
+                byte_count,
+                format_version,
+                cleanup_pending,
+                durability_unconfirmed,
+                template_id: (style != crate::DocumentStyle::Plain)
+                    .then(|| style.docx_template_id().to_owned()),
+            },
+        }
+    }
+}
 
 impl ExportTextRequest {
     /// Validates metadata and a JavaScript-safe saved revision. No path or
@@ -70,6 +112,46 @@ mod tests {
     use super::*;
     use crate::CONTRACT_VERSION;
     use serde_json::json;
+
+    #[test]
+    fn docx_plain_receipts_keep_the_legacy_shape_and_styles_name_the_template() {
+        let legacy = ExportTextResponse::Exported {
+            source: ExportSource::SavedDraft,
+            revision: 2,
+            byte_count: 123,
+            format_version: 1,
+            cleanup_pending: true,
+            durability_unconfirmed: false,
+        };
+        assert_eq!(
+            serde_json::to_value(ExportDocxResponse::from_export(
+                &legacy,
+                crate::DocumentStyle::Plain
+            ))
+            .unwrap(),
+            serde_json::to_value(&legacy).unwrap()
+        );
+        for style in [
+            crate::DocumentStyle::Technical,
+            crate::DocumentStyle::Professional,
+            crate::DocumentStyle::Modern,
+        ] {
+            let mut expected = serde_json::to_value(&legacy).unwrap();
+            expected["templateId"] = json!(style.docx_template_id());
+            assert_eq!(
+                serde_json::to_value(ExportDocxResponse::from_export(&legacy, style)).unwrap(),
+                expected
+            );
+            assert_eq!(
+                serde_json::to_value(ExportDocxResponse::from_export(
+                    &ExportTextResponse::Cancelled,
+                    style
+                ))
+                .unwrap(),
+                json!({"status": "cancelled"})
+            );
+        }
+    }
 
     #[test]
     fn no_path_content_or_unknown_source_crosses_export_boundary() {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ExportTextRequest",
+  "title": "StyledExportRequest",
   "type": "object",
   "properties": {
     "contractVersion": {
@@ -10,7 +10,7 @@
       "minimum": 0
     },
     "payload": {
-      "$ref": "#/$defs/ExportTextPayload"
+      "$ref": "#/$defs/StyledExportPayload"
     },
     "requestId": {
       "type": "string"
@@ -23,6 +23,16 @@
     "payload"
   ],
   "$defs": {
+    "DocumentStyle": {
+      "description": "Reviewed, bundled presentation choices. This is never a path or template source.\nPlain remains the default for requests created before style selection existed.",
+      "type": "string",
+      "enum": [
+        "plain",
+        "technical",
+        "professional",
+        "modern"
+      ]
+    },
     "ExportSource": {
       "type": "string",
       "enum": [
@@ -30,7 +40,7 @@
         "published_snapshot"
       ]
     },
-    "ExportTextPayload": {
+    "StyledExportPayload": {
       "type": "object",
       "properties": {
         "expectedRevision": {
@@ -39,6 +49,10 @@
         },
         "source": {
           "$ref": "#/$defs/ExportSource"
+        },
+        "style": {
+          "$ref": "#/$defs/DocumentStyle",
+          "default": "plain"
         }
       },
       "additionalProperties": false,

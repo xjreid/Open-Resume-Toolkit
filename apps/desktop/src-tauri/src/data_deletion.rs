@@ -118,6 +118,7 @@ mod tests {
             .unwrap();
         let previous_profile_id = store.manifest().profile_id;
         let state = DesktopState {
+            reviews: std::sync::Arc::default(),
             storage: Mutex::new(DesktopStorage::Ready(store)),
         };
         let previews = PdfState::default();
@@ -144,6 +145,7 @@ mod tests {
     #[test]
     fn unavailable_storage_cannot_be_misreported_as_deleted() {
         let state = DesktopState {
+            reviews: std::sync::Arc::default(),
             storage: Mutex::new(DesktopStorage::Unavailable),
         };
         let response =
@@ -169,6 +171,7 @@ mod tests {
             .unwrap();
         fs::write(root.join("unknown-entry"), b"do not remove").unwrap();
         let state = DesktopState {
+            reviews: std::sync::Arc::default(),
             storage: Mutex::new(DesktopStorage::Ready(store)),
         };
 

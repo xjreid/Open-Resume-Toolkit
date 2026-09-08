@@ -12,6 +12,7 @@ import type {
   RenderTask,
 } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { createPortal } from "react-dom";
 import {
   PDF_PREVIEW_TTL_SECONDS,
   type PdfPreview,
@@ -19,13 +20,19 @@ import {
   type PortablePdfHistory,
 } from "@ort/contracts/pdf";
 import { MAX_BACKUP_PASSPHRASE_BYTES } from "@ort/contracts/backup";
-import type { ExportSource } from "@ort/contracts/export";
+import {
+  DOCUMENT_STYLE_TEMPLATES,
+  type DocumentStyle,
+  type ExportSource,
+} from "@ort/contracts/export";
+import { DOCUMENT_STYLE_LABELS, pdfStyleLabel } from "./document-styles";
 import type { VersionedResume, ResumeDocument } from "@ort/contracts/resume";
 import {
   renderResumePdf,
   exportResumePdf,
   releaseResumePdf,
   replayPdfRender,
+  regeneratePdfRender,
   requestPdfRenderHistory,
   openPortablePdfHistory,
   releasePortablePdfArchive,
@@ -40,6 +47,9 @@ import {
 import { PdfNotices } from "./PdfNotices";
 
 interface Props {
+  active?: boolean;
+  previewTarget?: HTMLElement | null;
+  style?: DocumentStyle;
   saved: VersionedResume | null;
   published: VersionedResume | null;
   dirty: boolean;
@@ -71,6 +81,9 @@ export function replayAvailable(
 }
 
 export function PdfPreviewPanel({
+  active = true,
+  previewTarget,
+  style = "plain",
   saved,
   published,
   dirty,
@@ -84,8 +97,27 @@ export function PdfPreviewPanel({
     document: ResumeDocument | null;
     accessibleText: string | null;
     retained: boolean;
+    regeneratedFrom?: PdfRenderManifest;
   } | null>(null);
   const [ready, setReady] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const lastAutomaticAttempt = useRef<string | null>(null);
+  const generateCurrent = useRef<() => void>(() => {});
+  generateCurrent.current = () => {
+    void generate("saved_draft");
+  };
+  useEffect(() => {
+    if (!active || !autoRefresh || blocked || dirty || !saved) return;
+    const identity = `${saved.document.documentId}/${saved.revision}/${style}`;
+    if (lastAutomaticAttempt.current === identity) return;
+    const timer = window.setTimeout(() => {
+      // One automatic attempt per source/style. Errors require an explicit
+      // retry, another saved revision, or toggling refresh off and on.
+      lastAutomaticAttempt.current = identity;
+      generateCurrent.current();
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [active, autoRefresh, blocked, dirty, saved, style]);
   const [history, setHistory] = useState<PdfRenderManifest[] | null>(null);
   const [historyError, setHistoryError] = useState(false);
   const [portablePassphrase, setPortablePassphrase] = useState("");
@@ -101,6 +133,10 @@ export function PdfPreviewPanel({
     "Generate a preview from a saved revision. Unsaved edits are not included.",
   );
   const mounted = useRef(false);
+  const currentSelection = useRef({ saved, published, dirty, style });
+  currentSelection.current = { saved, published, dirty, style };
+  const pendingRender = useRef<{ discarded: boolean } | null>(null);
+  const [renderPending, setRenderPending] = useState(false);
   useEffect(() => {
     mounted.current = true;
     void refreshHistory();
@@ -162,17 +198,41 @@ export function PdfPreviewPanel({
     const selected = source === "saved_draft" ? saved : published;
     if (
       blocked ||
+      pendingRender.current !== null ||
       !selected ||
       (source === "saved_draft" && dirty) ||
       !onBegin("rendering")
     )
       return;
+    const operation = { discarded: false };
+    if (source === "published_snapshot") setAutoRefresh(false);
+    pendingRender.current = operation;
+    setRenderPending(true);
     setSnapshot(null);
     setReady(false);
     setMessage("Rendering the saved revision locally…");
-    const result = await renderResumePdf(source, selected.revision);
+    const result = await renderResumePdf(source, selected.revision, style);
+    pendingRender.current = null;
     if (!mounted.current) {
       if (result.ok) void releaseResumePdf(result.value.renderId);
+      return;
+    }
+    setRenderPending(false);
+    const latest = currentSelection.current;
+    const current = source === "saved_draft" ? latest.saved : latest.published;
+    if (
+      operation.discarded ||
+      latest.style !== style ||
+      current?.revision !== selected.revision ||
+      current.document.documentId !== selected.document.documentId ||
+      (source === "saved_draft" && latest.dirty)
+    ) {
+      if (result.ok) void releaseResumePdf(result.value.renderId);
+      const notice = operation.discarded
+        ? "Pending preview discarded. No PDF was displayed or exported."
+        : "The resume or style changed while rendering. Generate a fresh preview; the late result was discarded.";
+      setMessage(notice);
+      onFinish(notice);
       return;
     }
     if (result.ok) {
@@ -228,6 +288,7 @@ export function PdfPreviewPanel({
     setSnapshot(null);
     setReady(false);
     setMessage("Verifying the retained receipt with the installed renderer…");
+    setAutoRefresh(false);
     const result = await replayPdfRender(manifest);
     if (!mounted.current) {
       if (result.ok) void releaseResumePdf(result.value.preview.renderId);
@@ -255,6 +316,52 @@ export function PdfPreviewPanel({
     onFinish(notice);
   }
 
+  async function regenerate(manifest: PdfRenderManifest, archiveId?: string) {
+    if (
+      blocked ||
+      (archiveId === undefined &&
+        ((manifest.source === "saved_draft" && dirty) ||
+          !replayAvailable(manifest, saved))) ||
+      !onBegin("rendering")
+    )
+      return;
+    setSnapshot(null);
+    setReady(false);
+    setMessage("Regenerating the retained source with the current renderer…");
+    setAutoRefresh(false);
+    const result = await regeneratePdfRender(manifest, style, archiveId);
+    if (!mounted.current) {
+      if (result.ok) void releaseResumePdf(result.value.preview.renderId);
+      return;
+    }
+    if (result.ok) {
+      setSnapshot({
+        preview: result.value.preview,
+        document: null,
+        accessibleText: result.value.accessibleText,
+        retained:
+          archiveId !== undefined || manifest.source === "published_snapshot",
+        regeneratedFrom: manifest,
+      });
+      setMessage("Loading the regenerated PDF…");
+      onFinish(
+        "Regenerated with the current renderer. This is a new output; the historical PDF was not reproduced or replaced.",
+      );
+      if (archiveId === undefined) void refreshHistory();
+    } else {
+      const notice =
+        result.error.code === "PDF_REPLAY_INCOMPATIBLE"
+          ? "The retained source does not match the historical document identity. No output was exposed."
+          : result.error.code === "PDF_REPLAY_SOURCE_UNAVAILABLE"
+            ? "The exact historical source is unavailable. No newer source was substituted."
+            : result.error.code === "PORTABLE_PDF_ARCHIVE_EXPIRED"
+              ? "The authenticated backup session expired. Open it again to regenerate."
+              : pdfFailure(result.error.code);
+      setMessage(notice);
+      onFinish(notice);
+    }
+  }
+
   async function openPortableHistory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
@@ -278,7 +385,7 @@ export function PdfPreviewPanel({
     }
     if (result.ok && result.value.status === "opened") {
       setPortableHistory(result.value);
-      const notice = `Authenticated backup opened for ten minutes. ${result.value.manifests.length} replayable receipt(s) are available in this view.`;
+      const notice = `Authenticated backup opened for ten minutes. ${result.value.manifests.length} retained-source receipt(s) are available in this view.`;
       setPortableMessage(notice);
       onFinish(notice);
       return;
@@ -306,6 +413,7 @@ export function PdfPreviewPanel({
     setMessage(
       "Verifying the archived source and receipt with the installed renderer…",
     );
+    setAutoRefresh(false);
     const result = await replayPortablePdfRender(
       portableHistory.archiveId,
       manifest,
@@ -345,14 +453,14 @@ export function PdfPreviewPanel({
     preview && !snapshot?.retained
       ? previewIsStale(preview, current?.revision ?? null, dirty)
       : false;
-  return (
+  const content = (
     <section className="editor-panel pdf-panel" aria-labelledby="pdf-title">
       <h2 id="pdf-title">PDF preview &amp; export</h2>
       <p>
-        Plain layout v1 · US Letter · 11 pt Libertinus Serif · English layout ·
-        five pages maximum. Unsupported characters are reported, not
-        substituted. Export creates an unencrypted file; choose a private local
-        folder and a new filename.
+        New preview style: {DOCUMENT_STYLE_LABELS[style]}. US Letter ·
+        Libertinus Serif · English layout · five pages maximum. Unsupported
+        characters are reported, not substituted. Export creates an unencrypted
+        file; choose a private local folder and a new filename.
       </p>
       <div className="move-controls">
         <button
@@ -384,7 +492,43 @@ export function PdfPreviewPanel({
           </button>
         ) : null}
       </div>
+      <label className="pdf-auto-refresh">
+        <input
+          type="checkbox"
+          checked={autoRefresh}
+          disabled={blocked}
+          onChange={(event) => {
+            lastAutomaticAttempt.current = null;
+            setAutoRefresh(event.target.checked);
+          }}
+        />
+        Automatically refresh saved-draft pages
+      </label>
+      <p>
+        Refresh waits for a valid saved draft and runs only while exact pages
+        are selected. A failed attempt waits for a new save or your retry.
+        Published and historical previews turn automatic refresh off.
+      </p>
+      {dirty ? (
+        <p role="status">
+          Unsaved edits are not in these PDF pages. Waiting for a successful
+          save; the live reading view includes your current edits.
+        </p>
+      ) : null}
       <p role="status">{message}</p>
+      {renderPending ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (pendingRender.current) pendingRender.current.discarded = true;
+            setMessage(
+              "Preview discard requested. Waiting for the local renderer to finish safely.",
+            );
+          }}
+        >
+          Discard pending preview
+        </button>
+      ) : null}
       {snapshot && preview ? (
         <>
           <p>
@@ -393,6 +537,23 @@ export function PdfPreviewPanel({
               : "Published snapshot"}{" "}
             revision {preview.revision} · {preview.receipt.pageCount} page(s).
             This preview expires after ten minutes.
+          </p>
+          {snapshot.regeneratedFrom ? (
+            <p className="notice">
+              Regenerated with current renderer — new output from retained
+              revision {snapshot.regeneratedFrom.sourceRevision}. Original:{" "}
+              {snapshot.regeneratedFrom.receipt.rendererVersion} /{" "}
+              {pdfStyleLabel(snapshot.regeneratedFrom.receipt.templateId)}.
+              Current: {preview.receipt.rendererVersion} /{" "}
+              {pdfStyleLabel(preview.receipt.templateId)}. The historical
+              receipt is preserved; this preview is not an exact replay.
+            </p>
+          ) : null}
+          <p aria-live="polite">
+            Preview style: {pdfStyleLabel(preview.receipt.templateId)}.
+            {preview.receipt.templateId !== DOCUMENT_STYLE_TEMPLATES[style].pdf
+              ? ` The selected style is ${DOCUMENT_STYLE_LABELS[style]}. This existing preview keeps its original style; generate a new preview to use the selected style.`
+              : " Export this preview keeps the style shown here."}
           </p>
           {stale ? (
             <p role="status">
@@ -403,6 +564,7 @@ export function PdfPreviewPanel({
           <PdfCanvas
             key={preview.renderId}
             preview={preview}
+            onPending={() => setReady(false)}
             onReady={() => {
               setReady(true);
               setMessage("Preview ready. Export uses these exact PDF bytes.");
@@ -486,6 +648,7 @@ export function PdfPreviewPanel({
                 </strong>
                 <span>
                   {new Date(manifest.lastGeneratedAtUnixMs).toISOString()} ·{" "}
+                  {pdfStyleLabel(manifest.receipt.templateId)} ·{" "}
                   {manifest.receipt.pageCount} page(s) · rendered{" "}
                   {manifest.renderCount} time(s)
                 </span>
@@ -507,6 +670,18 @@ export function PdfPreviewPanel({
                 >
                   Verify &amp; replay
                 </button>
+                <button
+                  type="button"
+                  className="button--secondary button--compact"
+                  disabled={
+                    blocked ||
+                    (manifest.source === "saved_draft" && dirty) ||
+                    !replayAvailable(manifest, saved)
+                  }
+                  onClick={() => void regenerate(manifest)}
+                >
+                  Regenerate with current renderer
+                </button>
               </li>
             ))}
           </ol>
@@ -517,12 +692,14 @@ export function PdfPreviewPanel({
           stored in this history. Immutable published source revisions remain
           encrypted in the profile; draft history does not. Replay never
           substitutes a newer source or a different renderer result.
+          Regeneration uses the selected new preview style and creates a new
+          output with the installed renderer.
         </p>
       </details>
       <details>
         <summary>Replay from an encrypted portable backup</summary>
         <p>
-          Open a format-1.1 backup through the native file dialog. ORT
+          Open a supported encrypted backup through the native file dialog. ORT
           authenticates the complete archive, holds only bounded replay sources
           in memory for ten minutes, and does not restore or change the active
           profile. The selected path and resume content are not returned to this
@@ -593,11 +770,12 @@ export function PdfPreviewPanel({
         {portableHistory ? (
           <>
             <p>
-              Showing {portableHistory.manifests.length} newest replayable
+              Showing {portableHistory.manifests.length} newest retained-source
               receipt(s) out of {portableHistory.totalManifests}. Exact sources
               are unavailable for {portableHistory.unavailableSources}{" "}
               receipt(s), and {portableHistory.incompatibleReceipts} receipt(s)
-              require a different renderer bundle.
+              refer to a different renderer bundle. These sources can be
+              explicitly regenerated with the current renderer.
             </p>
             {portableHistory.manifests.length === 0 ? (
               <p>
@@ -616,6 +794,7 @@ export function PdfPreviewPanel({
                     </strong>
                     <span>
                       {new Date(manifest.lastGeneratedAtUnixMs).toISOString()} ·{" "}
+                      {pdfStyleLabel(manifest.receipt.templateId)} ·{" "}
                       {manifest.receipt.pageCount} page(s)
                     </span>
                     <code>{manifest.receipt.pdfSha256}</code>
@@ -626,6 +805,16 @@ export function PdfPreviewPanel({
                       onClick={() => void replayPortable(manifest)}
                     >
                       Verify archived receipt &amp; replay
+                    </button>
+                    <button
+                      type="button"
+                      className="button--secondary button--compact"
+                      disabled={blocked}
+                      onClick={() =>
+                        void regenerate(manifest, portableHistory.archiveId)
+                      }
+                    >
+                      Regenerate archived source with current renderer
                     </button>
                   </li>
                 ))}
@@ -643,23 +832,37 @@ export function PdfPreviewPanel({
       <PdfNotices />
     </section>
   );
+  return previewTarget ? createPortal(content, previewTarget) : content;
 }
 
-function PdfCanvas({
+export function PdfCanvas({
   preview,
+  onPending,
   onReady,
   onError,
 }: {
   preview: PdfPreview;
+  onPending?: () => void;
   onReady: () => void;
   onError: () => void;
 }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
+  const canvases = useRef<Array<HTMLCanvasElement | null>>([]);
+  const scrollRegion = useRef<HTMLDivElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
-  const [page, setPage] = useState(1);
-  const [zoom, setZoom] = useState(1);
-  const callbacks = useRef({ onReady, onError });
-  callbacks.current = { onReady, onError };
+  const [zoom, setZoom] = useState<number | "fit">("fit");
+  const [availableWidth, setAvailableWidth] = useState(612);
+  const fitWidth = zoom === "fit" ? availableWidth : null;
+  const callbacks = useRef({ onReady, onError, onPending });
+  callbacks.current = { onReady, onError, onPending };
+  useEffect(() => {
+    if (!scrollRegion.current || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const width = Math.floor(entries[0]?.contentRect.width ?? 0);
+      if (Number.isFinite(width) && width > 0) setAvailableWidth(width);
+    });
+    observer.observe(scrollRegion.current);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     let disposed = false;
     let task: PDFDocumentLoadingTask | undefined;
@@ -718,67 +921,106 @@ function PdfCanvas({
     };
   }, [preview]);
   useEffect(() => {
-    if (!pdf || !canvas.current) return;
+    if (!pdf) return;
     let disposed = false;
     let task: RenderTask | undefined;
-    const element = canvas.current;
+    const elements = canvases.current.slice(0, preview.receipt.pageCount);
+    callbacks.current.onPending?.();
+    const clearCanvases = () => {
+      for (const element of elements) {
+        if (element) {
+          element.width = 0;
+          element.height = 0;
+        }
+      }
+    };
     const timer = window.setTimeout(() => {
       if (!disposed) {
         disposed = true;
         task?.cancel();
+        clearCanvases();
         callbacks.current.onError();
       }
     }, 10_000);
     void (async () => {
-      const current = await pdf.getPage(page);
-      if (disposed) return;
-      const viewport = current.getViewport({ scale: zoom });
-      if (viewport.width * viewport.height > 2_000_000)
-        throw new Error("PDF canvas limit");
-      element.width = Math.ceil(viewport.width);
-      element.height = Math.ceil(viewport.height);
-      task = current.render({ canvas: element, viewport });
-      await task.promise;
+      let totalPixels = 0;
+      for (let index = 0; index < preview.receipt.pageCount; index++) {
+        if (disposed) return;
+        const element = elements[index];
+        if (!element) throw new Error("Missing PDF canvas");
+        const current = await pdf.getPage(index + 1);
+        if (disposed) return;
+        const base = current.getViewport({ scale: 1 });
+        const scale =
+          zoom === "fit" ? Math.min(2, (fitWidth ?? 612) / base.width) : zoom;
+        const viewport = current.getViewport({ scale });
+        const width = Math.ceil(viewport.width),
+          height = Math.ceil(viewport.height);
+        const pixels = width * height;
+        totalPixels += pixels;
+        if (
+          !Number.isSafeInteger(pixels) ||
+          width <= 0 ||
+          height <= 0 ||
+          pixels > 2_000_000 ||
+          totalPixels > 10_000_000
+        )
+          throw new Error("PDF canvas limit");
+        element.width = width;
+        element.height = height;
+        task = current.render({ canvas: element, viewport });
+        await task.promise;
+      }
       if (!disposed) callbacks.current.onReady();
     })()
       .catch(() => {
-        if (!disposed) callbacks.current.onError();
+        if (!disposed) {
+          clearCanvases();
+          callbacks.current.onError();
+        }
       })
       .finally(() => window.clearTimeout(timer));
     return () => {
       disposed = true;
       window.clearTimeout(timer);
       task?.cancel();
-      element.width = 0;
-      element.height = 0;
+      clearCanvases();
     };
-  }, [pdf, page, zoom]);
+  }, [pdf, preview.receipt.pageCount, zoom, fitWidth]);
   return (
     <div>
       <div className="move-controls" aria-label="PDF navigation">
-        <button
-          type="button"
-          disabled={!pdf || page <= 1}
-          onClick={() => setPage(page - 1)}
-        >
-          Previous page
-        </button>
-        <span aria-live="polite">
-          Page {page} of {preview.receipt.pageCount}
-        </span>
-        <button
-          type="button"
-          disabled={!pdf || page >= preview.receipt.pageCount}
-          onClick={() => setPage(page + 1)}
-        >
-          Next page
-        </button>
+        <span>{preview.receipt.pageCount} page(s)</span>
+        {Array.from({ length: preview.receipt.pageCount }, (_, index) => (
+          <button
+            type="button"
+            key={index}
+            disabled={!pdf}
+            onClick={() =>
+              canvases.current[index]?.scrollIntoView({ block: "nearest" })
+            }
+          >
+            Go to page {index + 1}
+          </button>
+        ))}
         <label>
           PDF zoom{" "}
           <select
             value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
+            onChange={(e) => {
+              if (e.target.value === "fit") {
+                callbacks.current.onPending?.();
+                setZoom("fit");
+                return;
+              }
+              const value = Number(e.target.value);
+              if ([1, 1.5, 2].includes(value)) {
+                callbacks.current.onPending?.();
+                setZoom(value);
+              }
+            }}
           >
+            <option value="fit">Fit width</option>
             <option value={1}>100%</option>
             <option value={1.5}>150%</option>
             <option value={2}>200%</option>
@@ -786,16 +1028,26 @@ function PdfCanvas({
         </label>
       </div>
       <div
+        ref={scrollRegion}
         className="pdf-canvas-scroll"
         tabIndex={0}
         role="region"
-        aria-label="Scrollable PDF page"
+        aria-label="Scrollable PDF pages"
       >
-        <canvas
-          ref={canvas}
-          role="img"
-          aria-label={`PDF page ${page}. Equivalent accessible text follows the preview.`}
-        />
+        {Array.from({ length: preview.receipt.pageCount }, (_, index) => (
+          <figure className="pdf-page" key={index}>
+            <figcaption>
+              Page {index + 1} of {preview.receipt.pageCount}
+            </figcaption>
+            <canvas
+              ref={(element) => {
+                canvases.current[index] = element;
+              }}
+              role="img"
+              aria-label={`PDF page ${index + 1}. Equivalent accessible text follows the preview.`}
+            />
+          </figure>
+        ))}
       </div>
     </div>
   );

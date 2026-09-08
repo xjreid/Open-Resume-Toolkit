@@ -1,4 +1,22 @@
+> **2026-09-07 implementation update:** The signed metered-Wasm helper and desktop
+> integration are implemented and locally qualified for macOS arm64. The new
+> packaged path requires both executable and running-code identity pins; the
+> legacy native-parser path remains disabled. Plaintext staging and whole-native
+> process rlimits/XPC are superseded for this path by ADR 0012. Step 6 human/native
+> acceptance remains pending. See [completion evidence](../../evidence/0.0.0-dev/m2-implementation-completion.md).
+> Earlier status/probe paragraphs below are historical.
+
 # Document worker containment implementation gate
+
+**2026-09-07 architecture revision:** The user authorized replacing nonviable
+containment assumptions. [ADR 0012](../../docs/adr/0012-metered-wasm-document-parsers.md)
+selects metered, capability-restricted WebAssembly parsers with an isolated
+helper/watchdog. For this path, guest linear-memory and instruction-fuel limits
+replace the unproven whole-native-process 512 MiB / 30 CPU-second requirements.
+Older native-probe requirements below are historical for that architecture;
+no previous failed gate is reclassified as a pass. Production integration and
+qualification remain required, and import remains disabled.
+
 
 Status: source-envelope preflight, Unix private staging, transport policy, common
 production supervision coordinator, and macOS sandbox/hard-limit and lifecycle

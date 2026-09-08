@@ -1,5 +1,6 @@
 import {
   DOCUMENT_LIMITS as limits,
+  MAX_RESUME_DATES,
   type ResumeDocument,
 } from "@ort/contracts/resume";
 
@@ -12,6 +13,10 @@ export function documentUsage(document: ResumeDocument) {
   const entries = document.sections.flatMap((section) => section.entries);
   return {
     sections: document.sections.length,
+    dates: entries.reduce(
+      (total, entry) => total + (entry.dates?.length ?? 0),
+      0,
+    ),
     entries: entries.length,
     bullets: entries.reduce((sum, entry) => sum + entry.bullets.length, 0),
     links:
@@ -81,6 +86,29 @@ export function validateEditorDocument(
         "location",
       ] as const)
         field(`${entryPath}.${key}`, entry[key]);
+      for (const date of entry.dates ?? []) {
+        field(`date.${date.id}.label`, date.label);
+        for (const value of [
+          date.start,
+          date.end?.kind === "date" ? date.end.value : null,
+        ]) {
+          if (
+            value &&
+            (!Number.isInteger(value.year) ||
+              value.year < 1 ||
+              value.year > 9999 ||
+              (value.month !== null &&
+                (!Number.isInteger(value.month) ||
+                  value.month < 1 ||
+                  value.month > 12)))
+          )
+            issues.push({
+              path: `date.${date.id}`,
+              message:
+                "Use a year from 1 to 9999 and a month from 1 to 12, or leave the month blank.",
+            });
+        }
+      }
       for (const item of entry.fields) {
         field(`field.${item.id}.label`, item.label);
         field(`field.${item.id}.value`, item.value);
@@ -90,6 +118,20 @@ export function validateEditorDocument(
       links(`${entryPath}.links`, entry.links);
     }
   }
+  const dateCount = document.sections.reduce(
+    (total, section) =>
+      total +
+      section.entries.reduce(
+        (count, entry) => count + (entry.dates?.length ?? 0),
+        0,
+      ),
+    0,
+  );
+  if (dateCount > MAX_RESUME_DATES)
+    issues.push({
+      path: "document",
+      message: `Use at most ${MAX_RESUME_DATES} dates across this resume.`,
+    });
   const usage = documentUsage(document);
   for (const key of [
     "sections",

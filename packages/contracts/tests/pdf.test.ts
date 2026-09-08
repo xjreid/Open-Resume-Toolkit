@@ -51,7 +51,7 @@ it("accepts only fixed bounded PDF metadata and encoded byte lengths", () => {
       { templateId: "user_template" },
       { fontBundleId: "system" },
       { pdfSha256: "short" },
-      { documentSchemaVersion: 2 },
+      { documentSchemaVersion: 3 },
       { path: "private" },
     ].map((changes) => ({
       ...preview,
@@ -142,6 +142,11 @@ it("accepts only bounded content-free portable history sessions", () => {
   };
   expect(isPortablePdfHistoryCommandResponse(wrap(opened))).toBe(true);
   expect(
+    isPortablePdfHistoryCommandResponse(
+      wrap({ ...opened, totalManifests: 2, incompatibleReceipts: 1 }),
+    ),
+  ).toBe(true);
+  expect(
     isPortablePdfHistoryCommandResponse(wrap({ status: "cancelled" })),
   ).toBe(true);
   for (const value of [
@@ -162,4 +167,46 @@ it("accepts only bounded content-free portable history sessions", () => {
       wrap({ released: true, path: "/private" }),
     ),
   ).toBe(false);
+});
+
+it("accepts bounded historical bundle identifiers only as history metadata", () => {
+  const receipt = {
+    ...preview.receipt,
+    rendererVersion: "typst-0.14.0/ort-1",
+    templateId: "retired_pdf_v1",
+    fontBundleId: "retired-fonts/v1",
+  };
+  const manifest = {
+    manifestId: "019a0000-0000-7000-8000-000000000002",
+    source: "published_snapshot",
+    sourceRevision: 1,
+    generatedAtUnixMs: 1000,
+    lastGeneratedAtUnixMs: 1000,
+    renderCount: 1,
+    receipt,
+  };
+  expect(
+    isPdfRenderHistoryCommandResponse(wrap({ manifests: [manifest] })),
+  ).toBe(true);
+  expect(isPdfPreviewCommandResponse(wrap({ ...preview, receipt }))).toBe(
+    false,
+  );
+  for (const field of ["rendererVersion", "templateId", "fontBundleId"]) {
+    for (const value of [
+      "",
+      "x".repeat(129),
+      "invalid\nidentifier",
+      "<script>",
+    ]) {
+      expect(
+        isPdfRenderHistoryCommandResponse(
+          wrap({
+            manifests: [
+              { ...manifest, receipt: { ...receipt, [field]: value } },
+            ],
+          }),
+        ),
+      ).toBe(false);
+    }
+  }
 });

@@ -1,3 +1,4 @@
+#![cfg(feature = "native-pdf")]
 use std::path::PathBuf;
 
 use ort_document_worker::extract_pdf;

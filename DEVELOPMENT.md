@@ -121,7 +121,7 @@ do not. A successful local run still requires green hosted CI on the containing
 commit before M0 signoff. Windows/Intel jobs remain portability checks, not
 native support claims.
 
-The next M1 native-vault step needs an interactive developer session and later
+The completed M1 native-vault matrix used an interactive developer session and
 an interactive standard test-account session. Keep the same local signing
 certificate/private key in the developer account; do not copy its private key
 or the developer's login keychain into the test account. Account switching and
@@ -134,12 +134,14 @@ Current recorded results: `evidence/0.0.0-dev/m0-macos-qualification.md`.
 M0 is complete for macOS-arm64 development at `4bd2594`: its four hosted CI
 jobs and separate vulnerability scan were independently verified green on
 2026-09-05, and the unchanged installed app passed signature/digest verification
-again. M1 and M2 remain incomplete; this is not distribution qualification.
+again. M1 is now complete at `65518eb` for the qualified macOS-arm64 scope; M2 remains
+incomplete. This is not distribution qualification.
 
 ## Step 4: M1 local macOS storage qualification complete
 
-The local macOS-arm64 matrix is complete; formal M1 signoff still requires hosted
-CI for the containing commit. This checkpoint remains uncommitted. It includes
+M1 is complete for the qualified macOS-arm64 development scope at `65518eb`.
+The local matrix and all four hosted CI jobs plus the dependency scan passed;
+the hosted results were independently verified against that commit. It includes
 user-observed standard-account restore, lock/deny, forced-quit recovery and
 account-only deletion, plus the signed native failure suite described below.
 The final app reopened in both accounts; the test account selected Always Allow
@@ -224,6 +226,14 @@ account. The user performs the installed-app and Keychain actions explicitly.
 
 ## Development editor checks
 
+The current frontend adds a build-from-scratch starting screen for an untouched
+empty workspace. Optional profiles suggest empty sections only; Custom starts
+with contact information. After building, focus moves to Full name and ordinary
+autosave applies. Backup recovery remains available before building, and import
+is explicitly unavailable. The section selector includes the suggested product
+sections. This frontend checkpoint is not yet installed/native-qualified; see
+`evidence/0.0.0-dev/m2-manual-start.md`.
+
 The main window reports `ready` after it opens the isolated development profile
 under the platform application-data directory. Its database key is stored in
 macOS Keychain or Windows Credential Manager. A vault or database failure leaves
@@ -292,12 +302,15 @@ For the M2 text-export check:
    usable. Select an existing test filename: even if the OS offers **Replace**,
    this checkpoint refuses replacement and asks for a new filename.
 
-Text output is bounded to 256 KiB and requires a filesystem supporting hard
-links (for example APFS/NTFS); unsupported destinations fail closed, not through
-an unsafe overwrite fallback. Normal completion removes its hidden sibling
-`.ort-export-*` staging directory. Interruptions or filesystem errors can leave
-staging plaintext in the chosen folder; automatic crash cleanup is not yet
-implemented. Inspect the chosen folder before retrying an uncertain result.
+Text output is bounded to 256 KiB. The current macOS implementation requires
+descriptor-based file cloning and directory sync (locally tested on APFS).
+It removes and syncs all staging names before writing document bytes, then
+clones the unnamed file to a new destination. Forced termination can leave an
+empty `.ort-export-*` directory/file before unlinking, or the complete chosen
+export after publication; no startup scan removes unknown files. Filesystems
+without these operations fail closed. Other platforms retain hard-link
+publication and can leave staging plaintext after interruption. Inspect the
+chosen folder before retrying an uncertain result.
 Post-write cleanup/durability warnings distinguish an already-written file from
 a failed export. Windows Save-dialog, ACL, and filesystem behavior still require
 native VM verification; CI compilation alone does not prove those behaviors.
@@ -396,13 +409,15 @@ immutable published snapshot, **Verify & replay** regenerates with the installed
 bundle and exposes a preview only when every receipt field matches. An older
 publication can be reviewed through bounded accessible text and exported from
 the verified expiring preview. It never substitutes a newer revision or
-different output. Superseded draft bodies are not retained, superseded renderer
-binaries are not bundled, so those cases currently remain inspection-only. M2
-still requires retained structured publications to be regenerable with the
-current supported renderer under a new receipt that clearly identifies the
-effective tuple and does not claim historical bytes.
+different output. Superseded draft bodies are not retained and superseded renderer
+binaries are not bundled. The separate **Regenerate with current renderer** action
+uses the selected style and exact retained source, verifies document identity,
+and returns a current receipt with a persistent regeneration label. It never
+claims to reproduce historical bytes or automatically replaces a failed replay.
+See `evidence/0.0.0-dev/m2-current-renderer-regeneration.md` for local verification;
+native acceptance is pending.
 
-Use **Replay from an encrypted portable backup** to select a format-1.1 backup
+Use **Replay from an encrypted portable backup** to select a supported encrypted backup
 and enter its passphrase. ORT authenticates the complete archive on a blocking
 native worker, then retains at most the newest 20 exact manifest/source pairs in
 one memory-only session for ten minutes. It returns only an opaque archive
@@ -416,7 +431,10 @@ receipt field matches; otherwise no PDF or accessible text is returned. A
 successful replay supplies bounded accessible text and uses the existing
 expiring, exact-byte, no-overwrite PDF export. Opening or replaying a backup does
 not restore, merge, write to, or add render history to the active profile.
-Clearing or expiring the archive session drops the retained sources; a verified
+**Regenerate archived source with current renderer** also supports receipts for
+historical bundles, uses the selected style, and preserves the same read-only
+boundary with a clearly labeled current receipt. Clearing or expiring the archive
+session drops the retained sources; a generated
 preview remains independently bounded by its own ten-minute ticket.
 
 Headless structural verification, without launching the app or OS vault:
@@ -488,10 +506,12 @@ and reparse-point verification are deferred with Windows qualification; see
 `evidence/0.0.0-dev/m2-all-local-data-deletion.md`.
 
 The file publisher uses a held-directory capability, mode 0600 on Unix where
-supported, an exact generated byte limit, a private sibling staging directory,
-and a no-clobber hard-link commit. Unsupported filesystems fail closed. A crash or
-post-write cleanup error can leave an encrypted `.ort-export-*` staging directory
-in the selected folder; the UI reports that possibility.
+supported, and an exact generated byte limit. macOS uses unnamed staging and
+no-clobber file cloning as described above; other platforms retain a private
+sibling staging directory and hard-link commit. Unsupported filesystems fail
+closed. Old builds and other platforms can leave an encrypted `.ort-export-*`
+staging directory; the UI conservatively reports that possibility. See
+`evidence/0.0.0-dev/m2-unlinked-export.md` for the macOS implementation limits.
 
 Use **Select and check encrypted backup** to choose an existing `.ort-backup`
 through the native Open dialog. The backend holds the selected parent directory,
@@ -650,6 +670,14 @@ were denied, descriptor exhaustion/recovery passed, and the parent was unaffecte
 Do not run this test as root: it is deliberately refused. It never changes the
 desktop, shell or account-wide limits. The helper exits cooperatively; forced
 cleanup and memory/CPU/thread/Mach-port/credential/broker limits are unproven.
+Subsequent isolated measurements rejected the proposed 512 MiB address-space
+limit and demonstrated that ignoring the CPU-limit signal can outlive the
+configured hard CPU value. Run `node tools/check-worker-resources-macos.mjs`
+to record local behavior; successful execution means measurements completed,
+not that containment passed. Run `node tools/check-worker-output-macos.mjs`
+for the separate real-pipe output-reader sanitizer regression. This component
+is not yet linked into the production adapter. See
+`evidence/0.0.0-dev/m2-native-output-and-resources.md` for scope and next gates.
 A green probe invocation or CI job is **not** a full containment pass. Import is
 still disabled. See `evidence/0.0.0-dev/m2-macos-hard-limits.md`. The report printed
 in CI includes the synthetic measurements and hashes, not document content.
@@ -701,9 +729,13 @@ cargo test --locked -p ort-application --test import_storage -- --nocapture
 These probes use only temporary synthetic profiles and an in-memory vault.
 No installer or Keychain/Credential Manager approval is required.
 
-**Current limitations:** macOS Dock Quit and system shutdown are not protected
-by this guard because the pinned runtime does not expose those termination
-requests through its usual exit callback. Wait for **Saved** before using them.
+**Current limitations:** the new macOS termination bridge has passed isolated
+AppKit and Tauri event-loop checks, but installed Dock Quit and logout/shutdown
+qualification remain pending. Wait for **Saved** before using them. The bridge
+adds only an absent delegate method and fails startup if a runtime update makes
+that integration unavailable; it does not replace an existing implementation.
+Run `node tools/check-termination-macos.mjs` for its synthetic regression and
+native static analysis. See `evidence/0.0.0-dev/m2-native-termination.md`.
 Force Quit, crashes, renderer reloads, and power loss can also lose unsaved edits;
 undo history is not crash recovery. Windows native interaction still needs VM
 testing. Keep using synthetic data. On a failed save, autosave pauses; revision conflicts or
@@ -733,3 +765,90 @@ just dev-extension edge
 ```
 
 The generated folders are `apps/extension/dist/chrome` and `apps/extension/dist/edge`. The M0 extension is intentionally inert and requests no host access or native-messaging permission.
+
+## M2 style foundation (local, not installed)
+
+Step 5 now has an optional bundled style in PDF/DOCX requests, versioned template
+receipts, and exact replay for the installed style. Old requests and plain golden
+output remain compatible. See `evidence/0.0.0-dev/m2-style-foundation.md` for
+validation and remaining work. The session-local style selector now defaults to
+Technical / Engineering; existing previews retain their actual style labels.
+Final template layout review and native qualification are pending; this does not
+complete M2.
+
+## M2 date/link schema foundation (local, not installed)
+
+Document readers now support v1 and v2. Schema v2 adds identified, ordered links
+and structured date ranges with explicit precision. Upgrades preserve legacy date
+text and immutable publications. Backups containing v2 documents use format 1.2;
+v1-only profiles continue to write format 1.1. Existing empty-document creation
+stays v1 until the user chooses Enable structured dates and link ordering.
+The date controls support optional precision, expected/Present dates and stable
+reordering; legacy text replacement is explicit. See
+`evidence/0.0.0-dev/m2-schema-v2-foundation.md` for compatibility and
+`evidence/0.0.0-dev/m2-date-link-editor.md` for the 80-test UI checkpoint.
+The installed application is unchanged.
+
+## M2 focused-editor layout (local, not installed)
+
+The editor now keeps a full live draft reading view beside a collapsible section
+navigator and focused contact/section fields. Close editor returns focus to the
+reading view; reading zoom does not change export layout. Exact pages remain in
+PDF preview. See `evidence/0.0.0-dev/m2-focused-editor.md` for the 81-test checkpoint
+and remaining entry-level, layout and native qualification work.
+
+
+## Style output regression audit
+
+Run `python3 tools/check-style-output.py` to generate fresh synthetic v1/v2 corpora
+and independently audit all three PDF/DOCX styles, source hashes, partial dates,
+semantic content, links, geometry and local regression hashes. CI runs the same
+command. The output directory is printed and retained under `target/` for review.
+Original plain goldens are enforced by the existing separate PDF/DOCX audit steps.
+See `evidence/0.0.0-dev/m2-style-parity.md` for evidence and the remaining native
+font, accessibility, presentation and exact editor pagination qualification.
+
+## Exact pages in the editor
+
+Choose **Exact PDF pages** in the center pane's **Resume view** selector. Generate
+a saved-draft preview or enable **Automatically refresh saved-draft pages**.
+Refresh waits for valid autosaved content and pauses in the live reading view.
+Errors do not retry in a loop. All pages scroll continuously; Fit width responds
+to the pane, and explicit zoom leaves exported bytes unchanged. Historical and
+published previews disable automatic draft refresh.
+
+**Discard pending preview** suppresses the result but waits for native rendering
+to finish. Unsaved edits remain labeled and can be read in the live view.
+See `evidence/0.0.0-dev/m2-center-pdf-preview.md` for resource bounds, 101-test
+local coverage, real PDF.js browser checks and pending native qualification.
+
+## M2 metered import integration (2026-09-07)
+
+The earlier native-parser checkpoint above is historical. The current local
+implementation uses `ort-parser-runtime` (Wasmi), a cross-compiled constrained
+DOCX guest, pinned PDFium Wasm, and the one-request `ort-parser-helper`. Desktop
+picker, cancellation, review and atomic audit/save integration are implemented.
+The signed candidate now passes helper identity/lifecycle qualification and enables
+import through compiled helper pins. Ordinary unbundled workspace builds remain
+unavailable. Step 5 implementation is complete; Step 6 final native/user
+acceptance remains pending.
+
+Build prerequisites are the pinned Rust toolchain and `wasm32-wasip1` target.
+`tools/build-parser-guests.py` verifies a previously downloaded immutable PDFium
+archive, builds DOCX and creates `target/parser-guests` with module digests and
+license notices. `--download` explicitly opts into downloading the pinned archive.
+`tools/package-parser-helper.py` builds and ad-hoc signs only a development helper
+under `target`; it does not install or launch the desktop app.
+`tools/package-m2-macos.py --identity FINGERPRINT` assembles the desktop with the
+exact nested helper, compiled `ORT_PARSER_HELPER_SHA256` and
+`ORT_PARSER_HELPER_CDHASH`, then signs and verifies the containing bundle. These
+packaging inputs cannot be supplied through renderer IPC. The legacy native
+parser remains disabled; its `IMPORT_ENABLED` flag is not the new path's gate.
+
+Current local checks include eight runtime callback tests, encrypted atomic import
+audit rollback, empty-profile explicit import commit, native job-slot cancellation,
+and frontend import/review interaction tests. The explicit `guest_corpus` example
+checks repository-generated fixtures and is not a general user-document CLI.
+See `evidence/0.0.0-dev/m2-implementation-completion.md` for final evidence and
+`evidence/0.0.0-dev/m2-final-native-acceptance.md` for the Step 6 checklist.
+M0/M1 completion remains unchanged.

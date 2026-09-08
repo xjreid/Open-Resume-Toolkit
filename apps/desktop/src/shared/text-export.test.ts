@@ -136,3 +136,49 @@ describe("export and editor lifecycle isolation", () => {
     expect(state.autosavePaused).toBe(true);
   });
 });
+
+it("binds styled DOCX receipts to the selected template and keeps text style-free", async () => {
+  for (const style of ["technical", "professional", "modern"] as const) {
+    vi.mocked(invoke).mockResolvedValue({
+      ok: true,
+      value: { ...receipt, templateId: `${style}_docx_v1` },
+    });
+    const result = await exportResumeDocument("saved_draft", 2, "docx", style);
+    expect(result.ok).toBe(true);
+    expect(exportFeedback(result, "docx")).not.toContain("plain layout");
+    expect(invoke).toHaveBeenLastCalledWith("export_resume_docx", {
+      request: expect.objectContaining({
+        payload: { source: "saved_draft", expectedRevision: 2, style },
+      }),
+    });
+    expect((await exportResumeDocument("saved_draft", 2, "docx")).ok).toBe(
+      false,
+    );
+    vi.mocked(invoke).mockResolvedValue({ ok: true, value: receipt });
+    expect(
+      (await exportResumeDocument("saved_draft", 2, "docx", style)).ok,
+    ).toBe(false);
+    expect(
+      (await exportResumeDocument("saved_draft", 2, "txt", style)).ok,
+    ).toBe(true);
+    expect(invoke).toHaveBeenLastCalledWith("export_resume_text", {
+      request: expect.objectContaining({
+        payload: { source: "saved_draft", expectedRevision: 2 },
+      }),
+    });
+  }
+  for (const templateId of [
+    null,
+    "plain_docx_v1",
+    "../template",
+    "modern_docx_v2",
+  ]) {
+    vi.mocked(invoke).mockResolvedValue({
+      ok: true,
+      value: { ...receipt, templateId },
+    });
+    expect(
+      (await exportResumeDocument("saved_draft", 2, "docx", "modern")).ok,
+    ).toBe(false);
+  }
+});

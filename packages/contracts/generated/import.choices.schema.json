@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ImportChoices",
+  "type": "object",
+  "properties": {
+    "choices": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ImportChoice"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "choices"
+  ],
+  "$defs": {
+    "ImportChoice": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "pending"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "reject"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "heading": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "section"
+            },
+            "target": {
+              "$ref": "#/$defs/ImportSectionTarget"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "heading",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "field": {
+              "$ref": "#/$defs/ImportContactField"
+            },
+            "kind": {
+              "type": "string",
+              "const": "contact"
+            },
+            "mode": {
+              "$ref": "#/$defs/ImportContactMode"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field",
+            "value",
+            "mode"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "bullet": {
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string",
+              "const": "text"
+            },
+            "target": {
+              "$ref": "#/$defs/ImportTextTarget"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "text",
+            "bullet",
+            "target"
+          ]
+        }
+      ]
+    },
+    "ImportContactField": {
+      "type": "string",
+      "enum": [
+        "fullName",
+        "email",
+        "phone",
+        "location"
+      ]
+    },
+    "ImportContactMode": {
+      "type": "string",
+      "enum": [
+        "fillEmpty",
+        "replace",
+        "keepExisting"
+      ]
+    },
+    "ImportSectionTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "new"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "kind": {
+              "type": "string",
+              "const": "existing"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ]
+        }
+      ]
+    },
+    "ImportTextTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "index": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "proposed"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "index"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "kind": {
+              "type": "string",
+              "const": "existing"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "heading": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "new"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "heading"
+          ]
+        }
+      ]
+    }
+  }
+}

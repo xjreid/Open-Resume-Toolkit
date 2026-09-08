@@ -197,7 +197,7 @@ fn authenticated_hostile_payloads_share_the_public_invalid_backup_error() {
         let mut nonce = [0x74; NONCE_LEN];
         nonce[..8].copy_from_slice(&u64::try_from(index).unwrap().to_be_bytes());
         let mut container = build_header(
-            FORMAT_MINOR,
+            1, // This authenticated mutation corpus embeds the unchanged v1.1 payload.
             WRITER_MEMORY_KIB,
             WRITER_ITERATIONS,
             WRITER_LANES,

@@ -77,6 +77,25 @@ describe("portable backup contract", () => {
     expect(
       isValidateBackupCommandResponse({
         ok: true,
+        value: { ...current, formatMinor: 2, documentSchema: 2 },
+      }),
+    ).toBe(true);
+    expect(
+      isValidateBackupCommandResponse({
+        ok: true,
+        value: { ...current, formatMinor: 2 },
+      }),
+    ).toBe(false);
+    expect(
+      isValidateBackupCommandResponse({
+        ok: true,
+        value: { ...current, documentSchema: 2 },
+      }),
+    ).toBe(false);
+
+    expect(
+      isValidateBackupCommandResponse({
+        ok: true,
         value: {
           ...current,
           formatMinor: 0,
@@ -186,4 +205,24 @@ describe("portable backup contract", () => {
       }),
     ).toBe(false);
   });
+});
+
+it("accepts explicit v1.2 exports but refuses future backup formats", () => {
+  const receipt = {
+    status: "exported",
+    byteCount: 1000,
+    formatMajor: 1,
+    formatMinor: 2,
+    cleanupPending: false,
+    durabilityUnconfirmed: false,
+  };
+  expect(isExportBackupCommandResponse({ ok: true, value: receipt })).toBe(
+    true,
+  );
+  expect(
+    isExportBackupCommandResponse({
+      ok: true,
+      value: { ...receipt, formatMinor: 3 },
+    }),
+  ).toBe(false);
 });

@@ -11,6 +11,12 @@ import sys
 import xml.etree.ElementTree as ET
 from urllib.parse import urlsplit
 from zipfile import ZIP_STORED, ZipFile
+import importlib.util
+
+_date_spec = importlib.util.spec_from_file_location("output_audit_dates", Path(__file__).with_name("output-audit-dates.py"))
+_dates = importlib.util.module_from_spec(_date_spec)
+_date_spec.loader.exec_module(_dates)
+date_text = _dates.date_text
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
@@ -51,6 +57,8 @@ def expected_paragraphs(source):
             add(entry["heading"], "Heading2")
             for key in ("subheading", "dateRange", "location"):
                 add(entry[key])
+            for date in entry.get("dates", []):
+                add(date_text(date))
             for field in entry["fields"]:
                 if normalized(field["value"]):
                     label, value = normalized(field["label"]), normalized(field["value"])
@@ -88,6 +96,7 @@ def expected_text(source):
                 value = normalized(entry[key])
                 if value:
                     lines.append(value)
+            lines.extend(date_text(date) for date in entry.get("dates", []) if date_text(date))
             for field in entry["fields"]:
                 value, label = normalized(field["value"]), normalized(field["label"])
                 if value:
@@ -194,6 +203,8 @@ def rejection_checks(data, source):
         {"word/_rels/document.xml.rels": original["word/_rels/document.xml.rels"].replace(b"https://example.org/project", b"file:///private/secret")},
         {"word/styles.xml": original["word/styles.xml"].replace(b"\n", b"\r\n")},
     ]
+    if source["schemaVersion"] == 2:
+        changes.append({"word/document.xml": original["word/document.xml"].replace(b"2020", b"2099")})
     for change in changes:
         mutated = io.BytesIO()
         # Preserve valid ZIP metadata so rejection is about the changed content.
@@ -209,9 +220,15 @@ def rejection_checks(data, source):
 
 
 def main():
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: verify-docx-fixtures.py SYNTHETIC_DIRECTORY")
+    if len(sys.argv) not in (2, 3, 4):
+        raise SystemExit("usage: verify-docx-fixtures.py SYNTHETIC_DIRECTORY [plain|technical|professional|modern] [schema-v2]")
     root = Path(sys.argv[1])
+    style = sys.argv[2] if len(sys.argv) >= 3 else "plain"
+    schema_v2 = len(sys.argv) == 4
+    if schema_v2:
+        assert sys.argv[3] == "schema-v2", "explicit v2 audit mode only"
+    assert style in ("plain", "technical", "professional", "modern"), "known bundled style only"
+    styles_path = Path(__file__).resolve().parent.parent / "crates/ort-documents/src/docx" / ("styles.xml" if style == "plain" else f"{style}_v1.xml")
     goldens = json.loads((Path(__file__).resolve().parent.parent / "fixtures/documents/docx-v1.sha256.json").read_text(encoding="utf-8"))
     text_goldens = json.loads((Path(__file__).resolve().parent.parent / "fixtures/documents/text-v1.sha256.json").read_text(encoding="utf-8"))
     assert set(goldens) == set(KINDS), "complete golden corpus"
@@ -220,14 +237,18 @@ def main():
         data = (root / (name + ".docx")).read_bytes()
         source = json.loads((root / (name + ".json")).read_text(encoding="utf-8"))
         text = (root / (name + ".txt")).read_bytes()
+        assert source["schemaVersion"] == (2 if schema_v2 else 1)
         verify(data, source)
         verify_text(text, source)
         digest = hashlib.sha256(data).hexdigest()
-        assert digest == goldens[name], f"{name}: review required: deterministic DOCX bytes changed; expected {goldens[name]}, got {digest} ({len(data)} bytes)"
+        if style == "plain" and not schema_v2:
+            assert digest == goldens[name], f"{name}: review required: deterministic DOCX bytes changed; expected {goldens[name]}, got {digest} ({len(data)} bytes)"
+        with ZipFile(io.BytesIO(data)) as archive:
+            assert archive.read("word/styles.xml") == styles_path.read_bytes(), "exact bundled style XML"
         text_digest = hashlib.sha256(text).hexdigest()
-        assert text_digest == text_goldens[name], f"{name}: reviewed plain-text golden changed"
+        assert schema_v2 or text_digest == text_goldens[name], f"{name}: reviewed plain-text golden changed"
     rejection_checks((root / "standard.docx").read_bytes(), json.loads((root / "standard.json").read_text(encoding="utf-8")))
-    print("Eight DOCX/text fixtures: golden SHA-256, exact text, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; seven negative controls rejected.")
+    print(f"{style}: Eight DOCX/text fixtures: {'golden SHA-256' if style == 'plain' and not schema_v2 else 'bundled style audit (golden/native qualification pending)'}, exact text, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; {8 if schema_v2 else 7} negative controls rejected.")
 
 
 if __name__ == "__main__":

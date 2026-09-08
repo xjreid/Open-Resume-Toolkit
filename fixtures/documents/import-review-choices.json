@@ -1,0 +1,17 @@
+{
+  "choices": [
+    { "kind": "section", "heading": "Projects", "target": { "kind": "new" } },
+    {
+      "kind": "text",
+      "text": "Synthetic contribution",
+      "bullet": true,
+      "target": { "kind": "proposed", "index": 0 }
+    },
+    {
+      "kind": "contact",
+      "field": "fullName",
+      "value": "Synthetic Person",
+      "mode": "replace"
+    }
+  ]
+}

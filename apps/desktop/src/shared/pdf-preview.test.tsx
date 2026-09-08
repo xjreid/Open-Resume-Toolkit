@@ -21,6 +21,7 @@ import {
   renderResumePdf,
   exportResumePdf,
   replayPdfRender,
+  regeneratePdfRender,
   requestPdfRenderHistory,
   openPortablePdfHistory,
   releasePortablePdfArchive,
@@ -256,4 +257,92 @@ it("offers explicit saved-source controls, privacy warning and local license not
   expect(html).toContain("unencrypted");
   expect(html).toContain("SIL OPEN FONT LICENSE");
   expect(html).not.toContain("<iframe");
+});
+
+it("binds each styled preview to the requested template without accepting a substitute", async () => {
+  for (const style of ["technical", "professional", "modern"] as const) {
+    vi.mocked(invoke).mockResolvedValue({
+      ok: true,
+      value: {
+        ...preview,
+        receipt: { ...preview.receipt, templateId: `${style}_pdf_v1` },
+      },
+    });
+    expect((await renderResumePdf("saved_draft", 1, style)).ok).toBe(true);
+    expect(invoke).toHaveBeenLastCalledWith("render_resume_pdf", {
+      request: expect.objectContaining({
+        payload: { source: "saved_draft", expectedRevision: 1, style },
+      }),
+    });
+    expect((await renderResumePdf("saved_draft", 1)).ok).toBe(false);
+    vi.mocked(invoke).mockResolvedValue({ ok: true, value: preview });
+    expect((await renderResumePdf("saved_draft", 1, style)).ok).toBe(false);
+  }
+});
+
+it("binds regenerated responses to the historical source and explicitly requested style", async () => {
+  const manifest = {
+    manifestId: "019a0000-0000-7000-8000-000000000002",
+    source: preview.source,
+    sourceRevision: 1,
+    generatedAtUnixMs: 900,
+    lastGeneratedAtUnixMs: 1000,
+    renderCount: 1,
+    receipt: { ...preview.receipt, rendererVersion: "historical-renderer" },
+  };
+  const regenerated = {
+    ...preview,
+    receipt: { ...preview.receipt, templateId: "modern_pdf_v1" },
+  };
+  for (const archiveId of [undefined, "019a0000-0000-7000-8000-000000000003"]) {
+    vi.mocked(invoke).mockResolvedValueOnce({
+      ok: true,
+      value: {
+        preview: regenerated,
+        accessibleText: "Synthetic retained source\n",
+      },
+    });
+    expect((await regeneratePdfRender(manifest, "modern", archiveId)).ok).toBe(
+      true,
+    );
+    expect(invoke).toHaveBeenLastCalledWith(
+      archiveId ? "regenerate_portable_resume_pdf" : "regenerate_resume_pdf",
+      {
+        request: expect.objectContaining({
+          payload: {
+            manifestId: manifest.manifestId,
+            style: "modern",
+            ...(archiveId ? { archiveId } : {}),
+          },
+        }),
+      },
+    );
+    for (const altered of [
+      { ...regenerated, revision: 2 },
+      { ...regenerated, source: "published_snapshot" },
+      {
+        ...regenerated,
+        receipt: { ...regenerated.receipt, documentSha256: "b".repeat(64) },
+      },
+      {
+        ...regenerated,
+        receipt: { ...regenerated.receipt, documentSchemaVersion: 2 },
+      },
+      {
+        ...regenerated,
+        receipt: { ...regenerated.receipt, templateId: "technical_pdf_v1" },
+      },
+    ]) {
+      vi.mocked(invoke).mockResolvedValueOnce({
+        ok: true,
+        value: {
+          preview: altered,
+          accessibleText: "Synthetic retained source\n",
+        },
+      });
+      expect(
+        (await regeneratePdfRender(manifest, "modern", archiveId)).ok,
+      ).toBe(false);
+    }
+  }
 });

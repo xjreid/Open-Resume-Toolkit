@@ -12,6 +12,7 @@ pub mod worker_supervisor;
 
 pub use docx::{
     DOCX_FORMAT_VERSION, DOCX_TEMPLATE_ID, DocxExportError, MAX_DOCX_BYTES, render_docx,
+    render_docx_with_style,
 };
 
 pub const IMPORT_ENABLED: bool = false;
@@ -62,6 +63,9 @@ pub fn render_plain_text(document: &ResumeDocument) -> Result<String, TextExport
                 &entry.location,
             ] {
                 push_nonempty(&mut lines, value)?;
+            }
+            for date in entry.dates.iter().flatten() {
+                push_nonempty(&mut lines, &date.display_text())?;
             }
             for field in &entry.fields {
                 let value = normalized(&field.value)?;
@@ -148,6 +152,8 @@ mod tests {
         document.contact.full_name = "Zoë Example 示例".to_owned();
         document.contact.email = "example@example.org".to_owned();
         document.contact.links.push(Link {
+            id: None,
+            order: None,
             label: "Portfolio".to_owned(),
             url: "https://example.org".to_owned(),
         });
@@ -156,6 +162,7 @@ mod tests {
             order: 0,
             heading: "Experience".to_owned(),
             entries: vec![ResumeEntry {
+                dates: None,
                 id: EntityId::new(),
                 order: 0,
                 heading: "Engineer".to_owned(),

@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    EmptyPayload, ErrorEnvelope, ExportSource, ExportTextRequest, backup::validate_passphrase,
+    EmptyPayload, ErrorEnvelope, ExportSource, StyledExportRequest, backup::validate_passphrase,
     validate_request_metadata,
 };
 
@@ -12,7 +12,7 @@ pub const MAX_PDF_PAGES: usize = 5;
 pub const PDF_PREVIEW_TTL_SECONDS: u64 = 600;
 pub const MAX_PDF_RENDER_HISTORY: u16 = 20;
 
-pub type RenderPdfRequest = ExportTextRequest;
+pub type RenderPdfRequest = StyledExportRequest;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -103,6 +103,56 @@ pub struct PdfReplayRequest {
     pub contract_version: u16,
     pub request_id: String,
     pub payload: PdfReplayPayload,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PdfRegeneratePayload {
+    pub manifest_id: String,
+    pub style: crate::DocumentStyle,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PdfRegenerateRequest {
+    pub contract_version: u16,
+    pub request_id: String,
+    pub payload: PdfRegeneratePayload,
+}
+
+impl PdfRegenerateRequest {
+    /// # Errors
+    /// Rejects malformed command metadata and tickets before source access.
+    pub fn validate(&self) -> Result<(), ErrorEnvelope> {
+        validate_request_metadata(self.contract_version, &self.request_id)?;
+        validate_v7_id(&self.payload.manifest_id, "INVALID_RENDER_MANIFEST_ID")
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortablePdfRegeneratePayload {
+    pub archive_id: String,
+    pub manifest_id: String,
+    pub style: crate::DocumentStyle,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortablePdfRegenerateRequest {
+    pub contract_version: u16,
+    pub request_id: String,
+    pub payload: PortablePdfRegeneratePayload,
+}
+
+impl PortablePdfRegenerateRequest {
+    /// # Errors
+    /// Rejects malformed command metadata and tickets before source access.
+    pub fn validate(&self) -> Result<(), ErrorEnvelope> {
+        validate_request_metadata(self.contract_version, &self.request_id)?;
+        validate_v7_id(&self.payload.archive_id, "INVALID_PORTABLE_ARCHIVE_ID")?;
+        validate_v7_id(&self.payload.manifest_id, "INVALID_RENDER_MANIFEST_ID")
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -281,6 +331,57 @@ mod tests {
             bad["payload"][key] = json!("untrusted");
             assert!(serde_json::from_value::<PdfTicketRequest>(bad).is_err());
         }
+    }
+
+    #[test]
+    fn regeneration_requires_explicit_known_style_and_canonical_tickets() {
+        let request = serde_json::json!({
+            "contractVersion": crate::CONTRACT_VERSION,
+            "requestId": "synthetic-regeneration",
+            "payload": { "manifestId": uuid::Uuid::now_v7().to_string(), "style": "modern" }
+        });
+        assert!(
+            serde_json::from_value::<PdfRegenerateRequest>(request.clone())
+                .unwrap()
+                .validate()
+                .is_ok()
+        );
+        for field in ["path", "document", "receipt"] {
+            let mut invalid = request.clone();
+            invalid["payload"][field] = serde_json::json!("untrusted");
+            assert!(serde_json::from_value::<PdfRegenerateRequest>(invalid).is_err());
+        }
+        for style in [serde_json::Value::Null, serde_json::json!("unknown")] {
+            let mut invalid = request.clone();
+            invalid["payload"]["style"] = style;
+            assert!(serde_json::from_value::<PdfRegenerateRequest>(invalid).is_err());
+        }
+        let mut invalid = request.clone();
+        invalid["payload"].as_object_mut().unwrap().remove("style");
+        assert!(serde_json::from_value::<PdfRegenerateRequest>(invalid).is_err());
+        let mut invalid = request.clone();
+        invalid["payload"]["manifestId"] = serde_json::json!("not-a-ticket");
+        assert!(
+            serde_json::from_value::<PdfRegenerateRequest>(invalid)
+                .unwrap()
+                .validate()
+                .is_err()
+        );
+        let mut portable = request;
+        portable["payload"]["archiveId"] = serde_json::json!(uuid::Uuid::now_v7().to_string());
+        assert!(
+            serde_json::from_value::<PortablePdfRegenerateRequest>(portable.clone())
+                .unwrap()
+                .validate()
+                .is_ok()
+        );
+        portable["payload"]["archiveId"] = serde_json::json!("not-an-archive");
+        assert!(
+            serde_json::from_value::<PortablePdfRegenerateRequest>(portable)
+                .unwrap()
+                .validate()
+                .is_err()
+        );
     }
 
     #[test]

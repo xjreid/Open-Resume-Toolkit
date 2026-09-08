@@ -286,3 +286,14 @@ separately prove format and native-vault compatibility.
 - Backup restores into a clean macOS account/profile while excluding all credentials and device-bound secrets. Windows/Intel-Mac restore qualification is deferred.
 - Clearing activity, deleting a workspace, and resetting a cap affect only their approved records.
 - Low-disk, vault-failure, corruption, and newer-version paths preserve recoverability.
+
+## M2 document v2 compatibility checkpoint
+
+The local Step 5 reader supports document schemas 1 and 2. Explicit upgrades add
+stable ordered links and date records without parsing legacy date text or
+rewriting publications. Draft saves cannot downgrade the schema. No SQLite table
+migration is required. V1-only profiles retain backup format 1.1; mixed profiles
+containing v2 documents use format 1.2 with authenticated documentSchema 2 and
+existing databaseSchema 2. New document creation stays v1 until structured editor
+activation. Evidence and remaining gates:
+`../../evidence/0.0.0-dev/m2-schema-v2-foundation.md`.

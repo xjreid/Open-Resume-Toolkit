@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PortablePdfRegenerateRequest",
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "payload": {
+      "$ref": "#/$defs/PortablePdfRegeneratePayload"
+    },
+    "requestId": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "requestId",
+    "payload"
+  ],
+  "$defs": {
+    "DocumentStyle": {
+      "description": "Reviewed, bundled presentation choices. This is never a path or template source.\nPlain remains the default for requests created before style selection existed.",
+      "type": "string",
+      "enum": [
+        "plain",
+        "technical",
+        "professional",
+        "modern"
+      ]
+    },
+    "PortablePdfRegeneratePayload": {
+      "type": "object",
+      "properties": {
+        "archiveId": {
+          "type": "string"
+        },
+        "manifestId": {
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/DocumentStyle"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "archiveId",
+        "manifestId",
+        "style"
+      ]
+    }
+  }
+}

@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { App, PublishedResume } from "../src/shared/App";
 import { CloseDialog } from "../src/shared/CloseDialog";
+import { ResumeStart } from "../src/shared/ResumeStart";
 import { PdfPreviewPanel } from "../src/shared/PdfPreview";
 import {
   createEntry,
@@ -39,6 +40,16 @@ async function expectNoViolations(markup: string) {
 }
 
 describe("M2 reachable desktop accessibility", () => {
+  it("labels the build/import starting choice and optional profile selector", async () => {
+    await expectNoViolations(
+      renderToStaticMarkup(
+        <main>
+          <h1>Resume workspace</h1>
+          <ResumeStart disabled={false} onBuild={() => {}} />
+        </main>,
+      ),
+    );
+  });
   it("fails its positive control when an interactive control has no name", async () => {
     const results = await audit(
       "<main><h1>Broken fixture</h1><button></button></main>",

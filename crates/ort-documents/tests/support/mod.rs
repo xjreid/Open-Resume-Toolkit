@@ -18,12 +18,14 @@ pub fn fixture(kind: &str) -> ResumeDocument {
     doc.contact.phone = "+1 202 555 0100".into();
     doc.contact.location = "Example City".into();
     doc.contact.links.push(Link {
+        id: None,
+        order: None,
         label: "Portfolio".into(),
         url: "https://example.org/work?a=1&b=2".into(),
     });
     doc.sections.push(ResumeSection {
         id: EntityId::new(), order: 0, heading: "Experience".into(),
-        entries: vec![ResumeEntry {
+        entries: vec![ResumeEntry { dates: None,
             id: EntityId::new(), order: 0, heading: "Software Engineer".into(),
             subheading: "Synthetic Research Cooperative".into(), date_range: "2023–2026".into(),
             location: "Remote".into(),
@@ -32,7 +34,7 @@ pub fn fixture(kind: &str) -> ResumeDocument {
                 Bullet { id: EntityId::new(), order: 0, text: "Built an offline document workflow with explicit review and recovery.".into() },
                 Bullet { id: EntityId::new(), order: 1, text: "Tested Unicode, links, and multi-line content.\r\nRetained a second line\twith a tab.".into() },
             ],
-            links: vec![Link { label: "Project details".into(), url: "https://example.org/project".into() }],
+            links: vec![Link { id: None, order: None, label: "Project details".into(), url: "https://example.org/project".into() }],
         }],
     });
     match kind {
@@ -101,15 +103,20 @@ pub fn fixture(kind: &str) -> ResumeDocument {
 fn add_structured_content(doc: &mut ResumeDocument) {
     doc.contact.links.extend([
         Link {
+            id: None,
+            order: None,
             label: "Email".into(),
             url: "mailto:synthetic@example.org".into(),
         },
         Link {
+            id: None,
+            order: None,
             label: "Plain profile".into(),
             url: "https://example.org/plain".into(),
         },
     ]);
     doc.sections[0].entries.push(ResumeEntry {
+        dates: None,
         id: EntityId::new(),
         order: 1,
         heading: "Product Analyst".into(),
@@ -135,6 +142,7 @@ fn add_structured_content(doc: &mut ResumeDocument) {
         order: 1,
         heading: "Projects & Community".into(),
         entries: vec![ResumeEntry {
+            dates: None,
             id: EntityId::new(),
             order: 0,
             heading: "Open tooling".into(),
@@ -154,6 +162,8 @@ fn add_structured_content(doc: &mut ResumeDocument) {
                 text: "Preserved résumé ordering, optional values, and links.".into(),
             }],
             links: vec![Link {
+                id: None,
+                order: None,
                 label: "Project mail".into(),
                 url: "mailto:project@example.org".into(),
             }],

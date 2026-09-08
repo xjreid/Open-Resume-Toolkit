@@ -3,12 +3,23 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 mod backup;
+mod document_style;
+mod import_choices;
+mod import_commands;
+mod import_proposal;
+pub use import_commands::*;
+pub use import_proposal::*;
 mod lifecycle;
+pub use import_choices::*;
 mod pdf;
 mod resume;
+mod resume_dates;
+pub use resume_dates::{CalendarDate, DateEnd, ResumeDate};
 mod resume_commands;
 mod storage_usage;
 mod text_export;
+
+pub use document_style::{DocumentStyle, StyledExportPayload, StyledExportRequest};
 
 pub use backup::{
     BackupRecoveryStatusPayload, BackupRecoveryStatusRequest, BackupRecoveryStatusResponse,
@@ -22,11 +33,12 @@ pub use backup::{
 pub use pdf::{
     MAX_PDF_BYTES, MAX_PDF_PAGES, MAX_PDF_RENDER_HISTORY, OpenPortablePdfHistoryPayload,
     OpenPortablePdfHistoryRequest, PDF_PREVIEW_TTL_SECONDS, PdfExportResponse, PdfPreviewResponse,
-    PdfReleaseResponse, PdfRenderHistoryRequest, PdfRenderHistoryResponse, PdfRenderManifest,
-    PdfRenderReceipt, PdfReplayPayload, PdfReplayRequest, PdfReplayResponse, PdfTicketPayload,
-    PdfTicketRequest, PortablePdfArchivePayload, PortablePdfArchiveReleaseResponse,
-    PortablePdfArchiveRequest, PortablePdfHistoryResponse, PortablePdfReplayPayload,
-    PortablePdfReplayRequest, RenderPdfRequest,
+    PdfRegeneratePayload, PdfRegenerateRequest, PdfReleaseResponse, PdfRenderHistoryRequest,
+    PdfRenderHistoryResponse, PdfRenderManifest, PdfRenderReceipt, PdfReplayPayload,
+    PdfReplayRequest, PdfReplayResponse, PdfTicketPayload, PdfTicketRequest,
+    PortablePdfArchivePayload, PortablePdfArchiveReleaseResponse, PortablePdfArchiveRequest,
+    PortablePdfHistoryResponse, PortablePdfRegeneratePayload, PortablePdfRegenerateRequest,
+    PortablePdfReplayPayload, PortablePdfReplayRequest, RenderPdfRequest,
 };
 
 pub use text_export::{
@@ -40,8 +52,8 @@ pub use lifecycle::{
 };
 
 pub use resume::{
-    Bullet, ContactDetails, DocumentLimits, EntityId, Link, NamedField, ResumeDocument,
-    ResumeEntry, ResumeSection, ValidationError,
+    Bullet, ContactDetails, DocumentLimits, EntityId, Link, MAX_RESUME_DATES, NamedField,
+    ResumeDocument, ResumeEntry, ResumeSection, ValidationError,
 };
 pub use resume_commands::{
     EmptyPayload, LoadResumeRequest, PublishResumePayload, PublishResumeRequest,

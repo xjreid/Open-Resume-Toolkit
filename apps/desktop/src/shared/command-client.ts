@@ -35,6 +35,8 @@ import {
   type PdfRenderHistoryCommandResponse,
   type PdfReplayCommandResponse,
   type PdfReplayRequest,
+  type PdfRegenerateRequest,
+  type PortablePdfRegenerateRequest,
   type OpenPortablePdfHistoryRequest,
   type PortablePdfArchiveRequest,
   type PortablePdfArchiveReleaseCommandResponse,
@@ -45,10 +47,13 @@ import {
 import {
   isExportTextCommandResponse,
   isExportDocxCommandResponse,
+  DOCUMENT_STYLE_TEMPLATES,
+  type DocumentStyle,
+  type ExportDocxCommandResponse,
+  type StyledExportRequest,
   type ExportFormat,
   type ExportSource,
   type ExportTextCommandResponse,
-  type ExportTextRequest,
 } from "@ort/contracts/export";
 import {
   isCloseCommandResponse,
@@ -310,11 +315,13 @@ export async function exportResumeDocument(
   source: ExportSource,
   expectedRevision: number,
   format: ExportFormat,
-): Promise<ExportTextCommandResponse> {
+  style: DocumentStyle = "plain",
+): Promise<ExportDocxCommandResponse> {
   try {
-    const request: ExportTextRequest = requestEnvelope({
+    const request: StyledExportRequest = requestEnvelope({
       source,
       expectedRevision,
+      ...(format === "docx" && style !== "plain" ? { style } : {}),
     });
     const command =
       format === "docx" ? "export_resume_docx" : "export_resume_text";
@@ -328,7 +335,11 @@ export async function exportResumeDocument(
       response.ok &&
       response.value.status === "exported" &&
       (response.value.source !== source ||
-        response.value.revision !== expectedRevision)
+        response.value.revision !== expectedRevision ||
+        (format === "docx" &&
+          ("templateId" in response.value
+            ? response.value.templateId
+            : "plain_docx_v1") !== DOCUMENT_STYLE_TEMPLATES[style].docx))
     ) {
       return invalidCommandResponse();
     }
@@ -364,16 +375,23 @@ function requestEnvelope<T>(payload: T) {
 export async function renderResumePdf(
   source: ExportSource,
   expectedRevision: number,
+  style: DocumentStyle = "plain",
 ): Promise<PdfPreviewCommandResponse> {
   try {
     const response: unknown = await invoke("render_resume_pdf", {
-      request: requestEnvelope({ source, expectedRevision }),
+      request: requestEnvelope({
+        source,
+        expectedRevision,
+        ...(style !== "plain" ? { style } : {}),
+      }),
     });
     if (!isPdfPreviewCommandResponse(response)) return invalidCommandResponse();
     if (
       response.ok &&
       (response.value.source !== source ||
-        response.value.revision !== expectedRevision)
+        response.value.revision !== expectedRevision ||
+        response.value.receipt.templateId !==
+          DOCUMENT_STYLE_TEMPLATES[style].pdf)
     )
       return invalidCommandResponse();
     return response;
@@ -409,6 +427,43 @@ export async function replayPdfRender(
       (response.value.preview.source !== manifest.source ||
         response.value.preview.revision !== manifest.sourceRevision ||
         !samePdfReceipt(response.value.preview.receipt, manifest.receipt))
+    )
+      return invalidCommandResponse();
+    return response;
+  } catch {
+    return commandUnavailable();
+  }
+}
+
+export async function regeneratePdfRender(
+  manifest: PdfRenderManifest,
+  style: DocumentStyle,
+  archiveId?: string,
+): Promise<PdfReplayCommandResponse> {
+  try {
+    const request: PdfRegenerateRequest | PortablePdfRegenerateRequest =
+      requestEnvelope({
+        manifestId: manifest.manifestId,
+        style,
+        ...(archiveId === undefined ? {} : { archiveId }),
+      });
+    const response: unknown = await invoke(
+      archiveId === undefined
+        ? "regenerate_resume_pdf"
+        : "regenerate_portable_resume_pdf",
+      { request },
+    );
+    if (!isPdfReplayCommandResponse(response)) return invalidCommandResponse();
+    if (
+      response.ok &&
+      (response.value.preview.source !== manifest.source ||
+        response.value.preview.revision !== manifest.sourceRevision ||
+        response.value.preview.receipt.documentSha256 !==
+          manifest.receipt.documentSha256 ||
+        response.value.preview.receipt.documentSchemaVersion !==
+          manifest.receipt.documentSchemaVersion ||
+        response.value.preview.receipt.templateId !==
+          DOCUMENT_STYLE_TEMPLATES[style].pdf)
     )
       return invalidCommandResponse();
     return response;

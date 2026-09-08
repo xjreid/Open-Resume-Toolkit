@@ -1,0 +1,386 @@
+{
+  "v1/modern/dense": {
+    "docx": "50b4429961b6f3a51b6f224e90ec981404358db93bc311d445d18bf4552f8ae0",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 4,
+    "pdf": "16b35c642934b734b05f471f76ab0ad7494447b975218d7c746fb62a86b00e22",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "153ab69e9351fb7e4bfe5ebeddc2a3a20cc8f8c3f20198586a1a58bac15441c4"
+  },
+  "v1/modern/hostile": {
+    "docx": "701e86d820c859a1ba2f262738bcfe52d2f0a83fbc69bc93aedb3bc759f04c60",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "92dc11c59282e232f2ff079507c5fda9951a3385fa316d5f137b4a069d68c108",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "ed363a67f762e3821a9a446e488ab40fdaf0804ddffdc4f9b8b13a3707fe9dc0"
+  },
+  "v1/modern/optional": {
+    "docx": "0bbe6f5b055e7476d1373e18a7550b685a92037b387bb001a4d55fbb4b376af3",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "36b2527edf5e0171ae959e341c22070b00eb3fb0bb995834fe5c7e7ac80dfaee",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "26771dfda9c24fdf850d127d0627dbe64d0d1bbf18000e21f1e093045483a792"
+  },
+  "v1/modern/paginated": {
+    "docx": "569406be5dd36b8c9c6aebf334ecc3d6810ffcde1460de0c29db7da6bc25acb6",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 2,
+    "pdf": "c6129007ff53e0d25a8dff5606b43d30a95d9171f5a4db3583097393fa0e6788",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "a6953270e939972899e0f97217de65369a7358be82de78184b38e682ba1f7dad"
+  },
+  "v1/modern/sparse": {
+    "docx": "770f958d8759fede704fe75c2501133ec2728b982859ad903f0894be8bd539da",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "a8965995629be0eea65891dc8adaf9c035a2d211fd1c2fe5ef6f4bc4bed6b6d3",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "6d6dea3ba3c73c8860f25aae5d95782333bc52eb55075b332a66dd5f421a061f"
+  },
+  "v1/modern/standard": {
+    "docx": "9eb7b81f017726d1be8516ffea4efee4873f263903aa2f77903b90fabffa8e19",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "07836cff1491131653c2403daf501a93711211d92ce153be89d7f2c870af28c9",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "92eb36211d6d68f9f17bee086538411e989e6799aa75c4ce496b286a05f1ab92"
+  },
+  "v1/modern/structured": {
+    "docx": "186210d9c1d0f0653bed1d12983ba9c81244c16f2bb489ece623a27222c9f6de",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "7abf4263c3173aaa0e6881eafb4f6f8f65a12c714c324dded215f1071a7d8af9",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "0f5666cd5ed3cd499d7556412a86af9b6c796eb807431712c25dc7e749efe9c9"
+  },
+  "v1/modern/unicode": {
+    "docx": "7fb801bf21b6a67388e5c5e2689425b8c1cc8b7d39e9161a893e6c6fff62c62a",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "6a807e156265ae27b6e3606385e832322703ac522070caaeb59921a6304c64ed",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "c9c3852da6712c0fc8f8954db74a1588a136b3430ea6dfe5653997d90ebfbda9"
+  },
+  "v1/professional/dense": {
+    "docx": "d39589036d9530cc0fa7d58313a021fba5813a58792747178dc869a2ae137326",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 4,
+    "pdf": "9f7fdc1b4195b6c7ffce75521ce16d8d9c792a2a1af418fdeea3c7a4b55ccbea",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "153ab69e9351fb7e4bfe5ebeddc2a3a20cc8f8c3f20198586a1a58bac15441c4"
+  },
+  "v1/professional/hostile": {
+    "docx": "7d6d2b0c39f47c2e511a5453ec7a940ce4afc64724a9a989ce35bbc241fbbf3e",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "93597803403b2370532265273fa78fdc0ee8147ad61e645e5c488977749fa45e",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "ed363a67f762e3821a9a446e488ab40fdaf0804ddffdc4f9b8b13a3707fe9dc0"
+  },
+  "v1/professional/optional": {
+    "docx": "da02be2831319a57faf60033b8a3ee61e84980e4e6526d1a87969f668e56936f",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "7b4f635abe805dd94e2837e4fd9dee67ce53746af8ce93c3b93f7ec14aee5673",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "26771dfda9c24fdf850d127d0627dbe64d0d1bbf18000e21f1e093045483a792"
+  },
+  "v1/professional/paginated": {
+    "docx": "7e665306ecd67b61f9c31d6ea9529956f9a0c21ac37562226ac6209b1be451ed",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 2,
+    "pdf": "88eb6085e860c9457b68171bdfb862cdbc1346fb3cbb8e186f08ff1c4a6a255b",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "a6953270e939972899e0f97217de65369a7358be82de78184b38e682ba1f7dad"
+  },
+  "v1/professional/sparse": {
+    "docx": "efbb75f16dda479629dcb1c3dacdf8a32b6e47e19a1a3e0b11062391ae22e308",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "f9aff546d8097826317e16aeb4f62138488dc9cf9ccedcc84b4035ff02bbbacc",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "6d6dea3ba3c73c8860f25aae5d95782333bc52eb55075b332a66dd5f421a061f"
+  },
+  "v1/professional/standard": {
+    "docx": "79484d907f23d043121bdd57043ef0538797efec4bcb1517ac88048a79f68f27",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "180545216341bf47f3d827881bf921d87f1d4c4dd9fbc158d3bdd8e0332ae46e",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "92eb36211d6d68f9f17bee086538411e989e6799aa75c4ce496b286a05f1ab92"
+  },
+  "v1/professional/structured": {
+    "docx": "cf71f113ad645bb2683105358d28bc4820861f679138baf813ca4627f4d46363",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 2,
+    "pdf": "451129f7c589d7c2b938c903faaf2e06ba90a41143a27def4e9927df15ff0b2f",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "0f5666cd5ed3cd499d7556412a86af9b6c796eb807431712c25dc7e749efe9c9"
+  },
+  "v1/professional/unicode": {
+    "docx": "687d335a4f4b1653a814c6e24c9dc2a574cd9ade929e7d2786985a1ba46abc75",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "5363cfa66b74c9f7a56956019d2143081554dd1d6a3b338c1cfd7a15df18181b",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "c9c3852da6712c0fc8f8954db74a1588a136b3430ea6dfe5653997d90ebfbda9"
+  },
+  "v1/technical/dense": {
+    "docx": "2b5bb78aed6a8c4c1e435ddeba0aa1bacb10260e80e65800f967d3bc6d1a1a14",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 3,
+    "pdf": "1dc12b8ea25049559c7d23a7b68c72c34b36061c0ccdd5ff5cd53c3cc5c8fe34",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "153ab69e9351fb7e4bfe5ebeddc2a3a20cc8f8c3f20198586a1a58bac15441c4"
+  },
+  "v1/technical/hostile": {
+    "docx": "8594f24b60fa9f25463b303dc0d9564b52b750763d271fec7d441767cc869da9",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "1e372605a5d4f101cc134eaa2bed414f1e42176c4d82cf7eec1f75986bf8f760",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "ed363a67f762e3821a9a446e488ab40fdaf0804ddffdc4f9b8b13a3707fe9dc0"
+  },
+  "v1/technical/optional": {
+    "docx": "80c69ebb36d1c05f1992e930f4c306c305d18a5af164059a3ec006b9fb574eae",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "89eeb2056c86e7121a4d087b945bde5d6a979d95ae2895ebc670f13c54dd9ce7",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "26771dfda9c24fdf850d127d0627dbe64d0d1bbf18000e21f1e093045483a792"
+  },
+  "v1/technical/paginated": {
+    "docx": "8b50a76a130ad36e02dc1db8d78b17e57db8b16c2f5300170d66b7aa8255c37e",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 2,
+    "pdf": "def11045724fca0951c9c4a5c7d7a3df1f3994f978e61cb6ebc51888810c8b96",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "a6953270e939972899e0f97217de65369a7358be82de78184b38e682ba1f7dad"
+  },
+  "v1/technical/sparse": {
+    "docx": "90281f757a7a3d7c02e53456b2331fec7d12525a55ebb6b22682828c7adf4d94",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "958a8fd7969113a3faf9ccb2f8a6c852d0c421557f1dcff796fe94061af53abb",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "6d6dea3ba3c73c8860f25aae5d95782333bc52eb55075b332a66dd5f421a061f"
+  },
+  "v1/technical/standard": {
+    "docx": "d9d01af25229e9b46dd2ba2c4f0e1d876bb5ea3cc6cef08f63d4758d1f724107",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "d94eb4acc7d2099b4b48f016021e5506889781135d1b7cc1f8aa1090df2570d1",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "92eb36211d6d68f9f17bee086538411e989e6799aa75c4ce496b286a05f1ab92"
+  },
+  "v1/technical/structured": {
+    "docx": "3767a3568a3b5ccf7fa04be9be280c72995ddcb53589cc39763ffab29780d218",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "c10f000626e118629de6fef725b2d10cd8fab5c61c76cc0fec8bcef23d3510e3",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "0f5666cd5ed3cd499d7556412a86af9b6c796eb807431712c25dc7e749efe9c9"
+  },
+  "v1/technical/unicode": {
+    "docx": "42e0699eb587c99ab7c0e5aaf8de38b03702e951fe462bb5b244bbb74c6bae73",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "6825adc7849e8bad08f8e4fdb3f4067ec07be7e3b1acdf41653f78366e659649",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "c9c3852da6712c0fc8f8954db74a1588a136b3430ea6dfe5653997d90ebfbda9"
+  },
+  "v2/modern/dense": {
+    "docx": "ac8be9574b7ac923aeacf8c5efef92241d6ef14735d49a46eeb62de10bcc9be4",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 4,
+    "pdf": "6bbee402925f12a0a0070d57b1023ec4bc6e80993ffa4b93b545edfb02e55bd0",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "787eae77dd52f08b8133112f774b7c2b861434ee57e9f32a5a16294da6e99056"
+  },
+  "v2/modern/hostile": {
+    "docx": "e630a1454e74471eaccbdaf5c575feffa32e032dc1c0aa88448ca443a35e23a1",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "b5957449a2ced6f52506f3e12ebed31d2b3d35ab7542802e6022335d7590afc1",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "297c2d47c87b48ed20dcbde39ce0e4c4222338a8123e970d57a5d419043ea6cf"
+  },
+  "v2/modern/optional": {
+    "docx": "0adf5a6ab7019e1b5e50e31eb2d7d2d56ebeaabff24569b91e068f6d44965518",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "ccbc5b3b6d22c6502c45f3ba2d1b632f37fe11d7415bbefa8227b2dedfc022d6",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "798e8bde71b85475464fdf5b5010d0d552b091dc67826f39799dad4d3982a42b"
+  },
+  "v2/modern/paginated": {
+    "docx": "a3b09185545706386ff570ac773fe8003f01b05deb77edbe5c4967b58c55b79b",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 2,
+    "pdf": "f299a0d9280439821d7aeb3c6ed31a2e34640d937b03c947f6dbc25fa2bd3720",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "f38f395897aed04a084c1a2dd88f27b072b9f61fedc030072defa20ed1a2bc8f"
+  },
+  "v2/modern/sparse": {
+    "docx": "770f958d8759fede704fe75c2501133ec2728b982859ad903f0894be8bd539da",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "a8965995629be0eea65891dc8adaf9c035a2d211fd1c2fe5ef6f4bc4bed6b6d3",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "6d6dea3ba3c73c8860f25aae5d95782333bc52eb55075b332a66dd5f421a061f"
+  },
+  "v2/modern/standard": {
+    "docx": "efefad0acd16d72214ad1df77c9866aedbd46cb4d310105210f26922dc8eb3ff",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "cd72182e6220edca6e4382a101befb74d3b8fff1d57bb01cd070ab6341d20037",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "7dca764d0892a547955d7adaee9cd80116940f64c8d7a8a61f9320d96b5851fe"
+  },
+  "v2/modern/structured": {
+    "docx": "082ff8e067791e8028501ee72def57b5fdc30e0f3a66f6173d1ddf13ad9df311",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 2,
+    "pdf": "3aab7995156b8d5068f11bc289b49f40eb4669c291fe62aaec2aa34c02065844",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "fc20e27c8ee8e049cd06275b175caaf2dabdf2cef9e51ceadc4f1bf429f359ee"
+  },
+  "v2/modern/unicode": {
+    "docx": "04376808b964935994e97da333baf1bfbcb968fb58ee72db3bf50f0fbb35aca1",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "72a7605764813673ea01c78a0afe0afdcacb6719915fccfbbf5df6c28d560bc4",
+    "templateSha256": "e338d5180018953c5a6cf6534722449346f23e71ab57f58c4c014452a7215d1d",
+    "text": "53627b9c3864f5fc0ca9ad67200fd20fe93c98b518136a2e54e293652c55b955"
+  },
+  "v2/professional/dense": {
+    "docx": "48b33c51a7b0c4d90f5e0d42069ffa1bb109ac97ca9b2bb6abe0046f60b78e8d",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 4,
+    "pdf": "9ccdac30f3bf2f637b58b5eebf9779d11e6facab6f372c332377b714afa93aed",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "787eae77dd52f08b8133112f774b7c2b861434ee57e9f32a5a16294da6e99056"
+  },
+  "v2/professional/hostile": {
+    "docx": "94744ff39e701b71e63ea90dbb0158bc62e961ce0a41d567c65f83da64e32ef3",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "8147054cd2b5cbc7775722b7228aa4226ac0d65a6dff52d81010ff9f1544cdf6",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "297c2d47c87b48ed20dcbde39ce0e4c4222338a8123e970d57a5d419043ea6cf"
+  },
+  "v2/professional/optional": {
+    "docx": "e421b4fda15c551defec71ae26ee2cf348f40aa76461f7aa747653d71c712034",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "387a0bbae93edbe096e65c9e6d3bae3656025b1ec98ab3ce54148af52c4ffead",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "798e8bde71b85475464fdf5b5010d0d552b091dc67826f39799dad4d3982a42b"
+  },
+  "v2/professional/paginated": {
+    "docx": "5113b83028678368558013a9402edf9603ab6ff7aa40053c97ec1cb197ee3ab9",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 2,
+    "pdf": "c73fa99c47f30974153d5d36a8d81332c4e400e22289e78381a9c79a7f420d4e",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "f38f395897aed04a084c1a2dd88f27b072b9f61fedc030072defa20ed1a2bc8f"
+  },
+  "v2/professional/sparse": {
+    "docx": "efbb75f16dda479629dcb1c3dacdf8a32b6e47e19a1a3e0b11062391ae22e308",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "f9aff546d8097826317e16aeb4f62138488dc9cf9ccedcc84b4035ff02bbbacc",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "6d6dea3ba3c73c8860f25aae5d95782333bc52eb55075b332a66dd5f421a061f"
+  },
+  "v2/professional/standard": {
+    "docx": "878763c38b79288337f42824200d46d2cde72fc50765d520ec7411de4b652be3",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "9db5b43526cfbccc3c60e118458935ba607919b5572892f3a98e29b814f93e32",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "7dca764d0892a547955d7adaee9cd80116940f64c8d7a8a61f9320d96b5851fe"
+  },
+  "v2/professional/structured": {
+    "docx": "e7ba2ebc7832fa07a16a68cc28ceceade2aac67275847f264706f06fb3c50e3e",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 2,
+    "pdf": "d063653a6f26dbd792c52d618b04e4eeee84f98d6cd36996d11fb9ca078cfea4",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "fc20e27c8ee8e049cd06275b175caaf2dabdf2cef9e51ceadc4f1bf429f359ee"
+  },
+  "v2/professional/unicode": {
+    "docx": "e23e724eb448d91acdf754b44a6ef08ff9ac367af89b2ef4a84f23b5ea2d8020",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "16f2479fb7334b710db578e7b0aa394449754ba6fc4ebe9df472bf1beaa8a3b4",
+    "templateSha256": "acb75b4652c7aa2861f041a9e526cf7037d993cafb797145c5e928410e7dc77f",
+    "text": "53627b9c3864f5fc0ca9ad67200fd20fe93c98b518136a2e54e293652c55b955"
+  },
+  "v2/technical/dense": {
+    "docx": "67a6892432a2a9f3813d413e62980f31ae193050ef1099131720bf9b1c7ed85d",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 3,
+    "pdf": "6bb482e8d040da9af3eeffdb9f2d3b8c680fe29dc68e4157e3f8db0921208e35",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "787eae77dd52f08b8133112f774b7c2b861434ee57e9f32a5a16294da6e99056"
+  },
+  "v2/technical/hostile": {
+    "docx": "01269b5e744183cbc4a2d9a185303c35e6feb4ddb4cbca5720226ed38f49118f",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "ea4417ddf37ac84b5adac02fd2e4909403d17ad83dc1e850220fb3dc92d9f08b",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "297c2d47c87b48ed20dcbde39ce0e4c4222338a8123e970d57a5d419043ea6cf"
+  },
+  "v2/technical/optional": {
+    "docx": "3e55f0f341726c153ba9666134bc5d95c9bbdc3251cc4b87e9764f56014e415b",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "30efb2db31b37e5b34f34c81f600ca65e9d34bff0848940ce0ebcd693e515bc0",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "798e8bde71b85475464fdf5b5010d0d552b091dc67826f39799dad4d3982a42b"
+  },
+  "v2/technical/paginated": {
+    "docx": "273a37092701940fcf14aefb79ff11a2bb1151a69c30ddc16e896bd34eeb4667",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 2,
+    "pdf": "eb3fe7ec60953da97c167e043f31cc4000a865037b4470eeefc1881f63f495dc",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "f38f395897aed04a084c1a2dd88f27b072b9f61fedc030072defa20ed1a2bc8f"
+  },
+  "v2/technical/sparse": {
+    "docx": "90281f757a7a3d7c02e53456b2331fec7d12525a55ebb6b22682828c7adf4d94",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "958a8fd7969113a3faf9ccb2f8a6c852d0c421557f1dcff796fe94061af53abb",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "6d6dea3ba3c73c8860f25aae5d95782333bc52eb55075b332a66dd5f421a061f"
+  },
+  "v2/technical/standard": {
+    "docx": "7abba09bdbdb6ff91108818a26a5da9fc8fa7557713fd6d534e0b4abee7b0fe5",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "8fb26042a371007565a98f275f8316556f1190a3628ce9a31fe334b387909bdb",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "7dca764d0892a547955d7adaee9cd80116940f64c8d7a8a61f9320d96b5851fe"
+  },
+  "v2/technical/structured": {
+    "docx": "cadce584571d8d487c1e3c2d8789d53a8384fff450b21682317666111651b8d6",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "3d80c74f9b48387cebbea21f17f5cdafeacc6111aeb52b4897a03f2df49c53e9",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "fc20e27c8ee8e049cd06275b175caaf2dabdf2cef9e51ceadc4f1bf429f359ee"
+  },
+  "v2/technical/unicode": {
+    "docx": "0c1e836b638811fbe6478f56f827f74775bb8347691d1ee553941ccda35d0bc3",
+    "fontBundleSha256": "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    "pages": 1,
+    "pdf": "0cfd7a743f60ec7735114c64abf8a3b6cc64f553fca99ce109987f4549696529",
+    "templateSha256": "3e055a6d7e935deee504b54b48921d67fc9cf7ff205ebf8a5ad68414608a8b74",
+    "text": "53627b9c3864f5fc0ca9ad67200fd20fe93c98b518136a2e54e293652c55b955"
+  }
+}

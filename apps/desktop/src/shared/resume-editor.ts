@@ -1,5 +1,6 @@
 import type {
   Bullet,
+  Link,
   ResumeDocument,
   ResumeEntry,
   ResumeSection,
@@ -69,11 +70,28 @@ export function moveItem<T extends { id: string }>(
 export function normalizeDocument(document: ResumeDocument): ResumeDocument {
   return {
     ...document,
+    ...(document.schemaVersion === 2
+      ? {
+          contact: {
+            ...document.contact,
+            links: normalizeLinks(document.contact.links),
+          },
+        }
+      : {}),
     sections: document.sections.map((section, sectionOrder) => ({
       ...section,
       order: sectionOrder,
       entries: section.entries.map((entry, entryOrder) => ({
         ...entry,
+        ...(document.schemaVersion === 2
+          ? {
+              dates: (entry.dates ?? []).map((date, order) => ({
+                ...date,
+                order,
+              })),
+              links: normalizeLinks(entry.links),
+            }
+          : {}),
         order: entryOrder,
         fields: entry.fields.map((field, fieldOrder) => ({
           ...field,
@@ -86,6 +104,22 @@ export function normalizeDocument(document: ResumeDocument): ResumeDocument {
       })),
     })),
   };
+}
+
+function normalizeLinks(links: Link[]): Link[] {
+  return links.map((link, order) => ({
+    ...link,
+    id: link.id ?? createEntityId(),
+    order,
+  }));
+}
+
+// Called only by a future explicit edit/upgrade action, never during load or
+// publication display. Free-text dates retain every byte; no precision is guessed.
+export function upgradeDocumentV2(document: ResumeDocument): ResumeDocument {
+  if (document.schemaVersion !== 1 && document.schemaVersion !== 2)
+    throw new Error("Unsupported resume schema; keep the original document.");
+  return normalizeDocument({ ...document, schemaVersion: 2 });
 }
 
 export function createEntityId(now = Date.now()): string {

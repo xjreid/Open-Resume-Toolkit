@@ -1,9 +1,10 @@
 # Step 4: M1 macOS Apple Silicon storage qualification
 
 Date: 2026-09-05. Source baseline: `4bd25940e1a344fdf1ac984ab0a47fbd1a6b60dc`.
-Status: **Step 4 local macOS-arm64 qualification complete; formal M1 signoff
-awaits hosted CI for the containing commit**. Synthetic data only. The changes
-in this checkpoint are uncommitted. No commit or push was performed.
+Status: **M1 complete for the qualified macOS-arm64 development scope** at
+`65518eb9d434a5ff6158810000b8798261d9227c`. The user committed the Step 4 work;
+Codex independently verified all four CI jobs and the dependency scan successful.
+Synthetic data only. Distribution and deferred-platform limits below still apply.
 
 ## M0 baseline
 
@@ -457,9 +458,19 @@ Evidence deliberately distinguishes the helper, installed app, user observations
 and exact build checkpoints. One-time Keychain authorization on the tested
 updates is recorded, not hidden as a prompt-free result.
 
-The containing commit has not been created or pushed; its hosted CI is pending.
-M0 remains complete at `4bd2594`. Formal M1 signoff waits for that CI result;
-M2 remains incomplete and is separate work. Windows/Intel native qualification,
+The containing commit is `65518eb9d434a5ff6158810000b8798261d9227c`.
+GitHub Actions REST API verification confirmed the matching head SHA, completed
+success status, and all four CI jobs (macOS arm64, macOS Intel, Windows and
+contracts/tests/security) successful:
+
+- [CI run](https://github.com/xjreid/Open-Resume-Toolkit/actions/runs/33995882105).
+- [Dependency scan](https://github.com/xjreid/Open-Resume-Toolkit/actions/runs/33995882415).
+
+Local API receipts: `target/m1-qualification/committed-ci-runs.json` and
+`committed-ci-jobs.json`. The commit contains the implementation digest qualified
+above; no implementation changes were made between final qualification and the
+user's commit. M0 remains complete at `4bd2594`; M1 is now complete for this
+macOS-arm64 development checkpoint. M2 remains incomplete and is separate work. Windows/Intel native qualification,
 Developer ID/notarization, broader distribution/preview/native-host tests,
 sustained release fuzzing and APFS/UI-wide low-space qualification are not
 claimed. Hostile-file import remains disabled. The signing private key and login

@@ -5,7 +5,7 @@
   "extensionProtocol": 0,
   "databaseSchema": 1,
   "backupContainer": 1,
-  "documentSchema": 1,
+  "documentSchema": 2,
   "rendererBundle": 0,
   "updateSecurityFloor": 0
 }

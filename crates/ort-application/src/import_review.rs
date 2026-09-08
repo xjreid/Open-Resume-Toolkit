@@ -12,7 +12,7 @@ use ort_domain::{
 
 /// All editable decision strings combined, in Unicode scalar values. Source
 /// text is independently capped at 50,000 characters. This is not a draft limit.
-pub const MAX_REVIEW_CHARACTERS: usize = 100_000;
+pub const MAX_REVIEW_CHARACTERS: usize = ort_domain::MAX_IMPORT_REVIEW_CHARACTERS;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SectionTarget {
@@ -85,12 +85,18 @@ impl ImportReview {
     /// Creates a review bound to one exact saved draft, with no accepted items.
     ///
     /// # Errors
-    /// Rejects an invalid base document or unsaved revision.
+    /// Rejects an invalid base document or negative revision. Revision zero is
+    /// reserved for a native-created empty base; it is never a saved revision.
     pub fn new(
         base: VersionedResumeResponse,
         proposal: ImportProposal,
     ) -> Result<Self, ReviewError> {
-        if base.revision < 1 || base.document.validate(DocumentLimits::default()).is_err() {
+        if base.revision < 0
+            || base.document.validate(DocumentLimits::default()).is_err()
+            || (base.revision == 0
+                && (!base.document.sections.is_empty()
+                    || base.document.contact != ContactDetails::default()))
+        {
             return Err(ReviewError::InvalidContent);
         }
         let decisions = vec![None; proposal.items().len()];
@@ -99,6 +105,97 @@ impl ImportReview {
             proposal,
             decisions,
         })
+    }
+
+    /// Returns only the native-retained empty base when no draft existed.
+    #[must_use]
+    pub fn empty_base(&self) -> Option<VersionedResumeResponse> {
+        (self.base.revision == 0).then(|| self.base.clone())
+    }
+
+    /// Projects only retained native source/base values for the review UI.
+    /// Suggestions do not accept any decisions. The caller supplies its checked token.
+    #[must_use]
+    pub fn snapshot(&self, id: String) -> ort_domain::ImportReviewSnapshot {
+        use ort_documents::import::ReviewReason as R;
+        use ort_domain::{
+            ImportReviewBlock, ImportReviewContacts, ImportReviewSection, ImportReviewSnapshot,
+            ImportReviewTarget as T,
+        };
+        let blocks = self
+            .proposal
+            .items()
+            .iter()
+            .map(|item| {
+                let source = &self.proposal.source().blocks()[item.source_index];
+                let (suggested_target, suggested_value) = match &item.content {
+                    ProposedContent::Section { heading, .. } => (T::Section, heading.clone()),
+                    ProposedContent::Contact { field, value } => (
+                        match field {
+                            ContactField::FullName => T::FullName,
+                            ContactField::Email => T::Email,
+                            ContactField::Phone => T::Phone,
+                            ContactField::Location => T::Location,
+                        },
+                        value.clone(),
+                    ),
+                    ProposedContent::Text { text, is_bullet } => {
+                        (if *is_bullet { T::Bullet } else { T::Text }, text.clone())
+                    }
+                };
+                let explanation = item
+                    .reasons
+                    .iter()
+                    .map(|reason| match reason {
+                        R::RecognizedHeading => "Recognized section heading.",
+                        R::CustomHeading => "Unfamiliar heading; consider a custom section.",
+                        R::ExplicitContactLabel => "Explicit contact label found.",
+                        R::UnclassifiedText => "Text needs a destination.",
+                        R::ListHint => "List formatting suggests a bullet.",
+                        R::EmptyBlock => "No text in this block.",
+                        R::NeedsSplitting => {
+                            "This block may need splitting before it fits the resume."
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                ImportReviewBlock {
+                    source: source.text.clone(),
+                    page: source.page,
+                    explanation,
+                    suggested_target,
+                    suggested_value,
+                    proposed_section: if matches!(item.content, ProposedContent::Text { .. }) {
+                        item.section_index
+                    } else {
+                        None
+                    },
+                }
+            })
+            .collect();
+        let contact = &self.base.document.contact;
+        ImportReviewSnapshot {
+            id,
+            base_revision: self.base.revision,
+            mapping_version: ort_documents::import::MAPPING_VERSION,
+            blocks,
+            sections: self
+                .base
+                .document
+                .sections
+                .iter()
+                .map(|section| ImportReviewSection {
+                    id: section.id,
+                    heading: section.heading.clone(),
+                })
+                .collect(),
+            contacts: ImportReviewContacts {
+                full_name: contact.full_name.clone(),
+                email: contact.email.clone(),
+                phone: contact.phone.clone(),
+                location: contact.location.clone(),
+            },
+        }
     }
 
     #[must_use]
@@ -137,6 +234,24 @@ impl ImportReview {
             .get_mut(index)
             .ok_or(ReviewError::UnknownItem)?;
         *slot = Some(decision);
+        Ok(())
+    }
+
+    /// Replaces the complete decision set atomically after bounded decoding.
+    /// Source blocks and the native base draft remain authoritative.
+    /// # Errors
+    /// Refuses mismatched block counts or limits without changing any decision.
+    pub fn replace_choices(
+        &mut self,
+        choices: ort_domain::ImportChoices,
+    ) -> Result<(), ReviewError> {
+        choices
+            .validate()
+            .map_err(|_| ReviewError::InvalidContent)?;
+        if choices.choices.len() != self.decisions.len() {
+            return Err(ReviewError::IncompleteReview);
+        }
+        self.decisions = choices.choices.into_iter().map(wire_decision).collect();
         Ok(())
     }
 
@@ -274,7 +389,7 @@ impl ImportReview {
             .validate(DocumentLimits::default())
             .map_err(|_| ReviewError::InvalidContent)?;
         Ok(SaveResumePayload {
-            expected_revision: Some(self.base.revision),
+            expected_revision: (self.base.revision > 0).then_some(self.base.revision),
             document,
         })
     }
@@ -367,6 +482,7 @@ fn append_text(
         .find(|section| section.id == id)
         .ok_or(ReviewError::MissingDestination)?;
     let mut entry = ResumeEntry {
+        dates: None,
         id: EntityId::new(),
         order: u16::try_from(section.entries.len()).map_err(|_| ReviewError::InvalidContent)?,
         heading: String::new(),
@@ -440,4 +556,49 @@ fn decision_characters(decision: &ReviewDecision) -> usize {
                 }
         }
     }
+}
+
+fn wire_decision(choice: ort_domain::ImportChoice) -> Option<ReviewDecision> {
+    use ort_domain::{
+        ImportChoice as C, ImportContactField as F, ImportContactMode as M,
+        ImportSectionTarget as S, ImportTextTarget as T,
+    };
+    Some(match choice {
+        C::Pending {} => return None,
+        C::Reject {} => ReviewDecision::Reject,
+        C::Section { heading, target } => ReviewDecision::Section {
+            heading,
+            target: match target {
+                S::New {} => SectionTarget::New,
+                S::Existing { id } => SectionTarget::Existing(id),
+            },
+        },
+        C::Contact { field, value, mode } => ReviewDecision::Contact {
+            value,
+            field: match field {
+                F::FullName => ContactField::FullName,
+                F::Email => ContactField::Email,
+                F::Phone => ContactField::Phone,
+                F::Location => ContactField::Location,
+            },
+            mode: match mode {
+                M::FillEmpty => ContactMode::FillEmpty,
+                M::Replace => ContactMode::Replace,
+                M::KeepExisting => ContactMode::KeepExisting,
+            },
+        },
+        C::Text {
+            text,
+            bullet,
+            target,
+        } => ReviewDecision::Text {
+            text,
+            is_bullet: bullet,
+            target: match target {
+                T::Proposed { index } => TextTarget::ProposedSection(index),
+                T::Existing { id } => TextTarget::ExistingSection(id),
+                T::New { heading } => TextTarget::NewSection(heading),
+            },
+        },
+    })
 }

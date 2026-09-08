@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 use uuid::Uuid;
 
+// New documents stay v1 until the structured editor is enabled. Readers support
+// both versions; upgrades are explicit and never rewrite immutable sources.
 pub const RESUME_SCHEMA_VERSION: u16 = 1;
+pub const MAX_RESUME_DATES: usize = 200;
 
 #[derive(Debug, Clone, Copy)]
 pub struct DocumentLimits {
@@ -52,6 +55,10 @@ pub enum ValidationError {
     EmptyRequiredField,
     #[error("a link uses an unsupported or invalid scheme")]
     InvalidLink,
+    #[error("a structured date is invalid")]
+    InvalidDate,
+    #[error("fields do not match the document schema version")]
+    SchemaMismatch,
     #[error("the serialized document is too large")]
     SerializedDocumentTooLarge,
 }
@@ -128,12 +135,42 @@ impl ResumeDocument {
         }
     }
 
+    /// Creates a v2 copy without interpreting legacy date text or changing
+    /// existing identities. Callers persist it only as an ordinary new revision.
+    ///
+    /// # Errors
+    /// Rejects invalid input and a result that exceeds the serialized bound.
+    pub fn upgraded_v2(&self) -> Result<Self, ValidationError> {
+        self.validate(DocumentLimits::default())?;
+        if self.schema_version == 2 {
+            return Ok(self.clone());
+        }
+        let mut upgraded = self.clone();
+        upgraded.schema_version = 2;
+        for (index, link) in upgraded.contact.links.iter_mut().enumerate() {
+            link.id = Some(EntityId::new());
+            link.order = Some(u16::try_from(index).map_err(|_| ValidationError::LimitExceeded)?);
+        }
+        for section in &mut upgraded.sections {
+            for entry in &mut section.entries {
+                entry.dates = Some(Vec::new());
+                for (index, link) in entry.links.iter_mut().enumerate() {
+                    link.id = Some(EntityId::new());
+                    link.order =
+                        Some(u16::try_from(index).map_err(|_| ValidationError::LimitExceeded)?);
+                }
+            }
+        }
+        upgraded.validate(DocumentLimits::default())?;
+        Ok(upgraded)
+    }
+
     /// Validates identifiers, ordering, links, and all persistence bounds.
     ///
     /// # Errors
     /// Returns a stable, non-sensitive error category for invalid content.
     pub fn validate(&self, limits: DocumentLimits) -> Result<(), ValidationError> {
-        if self.schema_version != RESUME_SCHEMA_VERSION {
+        if !matches!(self.schema_version, 1 | 2) {
             return Err(ValidationError::UnsupportedSchema);
         }
         if self.title.trim().is_empty() {
@@ -153,13 +190,15 @@ impl ResumeDocument {
         }
 
         let mut link_count = self.contact.links.len();
-        for link in &self.contact.links {
+        for (index, link) in self.contact.links.iter().enumerate() {
+            validate_link_identity(link, index, self.schema_version, &mut identifiers)?;
             total_characters += validate_link(link, limits.field_characters)?;
         }
 
         let mut entry_count = 0_usize;
         let mut bullet_count = 0_usize;
         let mut skill_count = 0_usize;
+        let mut date_count = 0_usize;
 
         for (section_index, section) in self.sections.iter().enumerate() {
             if usize::from(section.order) != section_index {
@@ -210,13 +249,19 @@ impl ResumeDocument {
                     check_identifier(bullet.id, &mut identifiers)?;
                     total_characters += bounded_characters(&bullet.text, limits.bullet_characters)?;
                 }
-                for link in &entry.links {
+                let (dates, characters) =
+                    validate_dates(entry, self.schema_version, limits, &mut identifiers)?;
+                date_count += dates;
+                total_characters += characters;
+                for (index, link) in entry.links.iter().enumerate() {
+                    validate_link_identity(link, index, self.schema_version, &mut identifiers)?;
                     total_characters += validate_link(link, limits.field_characters)?;
                 }
             }
         }
 
-        if entry_count > limits.entries
+        if date_count > MAX_RESUME_DATES
+            || entry_count > limits.entries
             || bullet_count > limits.bullets
             || link_count > limits.links
             || skill_count > limits.skills
@@ -251,6 +296,13 @@ pub struct ResumeEntry {
     pub heading: String,
     pub subheading: String,
     pub date_range: String,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_option"
+    )]
+    #[schemars(with = "Vec<crate::ResumeDate>")]
+    pub dates: Option<Vec<crate::ResumeDate>>,
     pub location: String,
     pub fields: Vec<NamedField>,
     pub bullets: Vec<Bullet>,
@@ -278,8 +330,81 @@ pub struct Bullet {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Link {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_option"
+    )]
+    #[schemars(with = "EntityId")]
+    pub id: Option<EntityId>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_option"
+    )]
+    #[schemars(with = "u16")]
+    pub order: Option<u16>,
     pub label: String,
     pub url: String,
+}
+
+fn validate_dates(
+    entry: &ResumeEntry,
+    version: u16,
+    limits: DocumentLimits,
+    identifiers: &mut HashSet<Uuid>,
+) -> Result<(usize, usize), ValidationError> {
+    match (version, &entry.dates) {
+        (1, None) => Ok((0, 0)),
+        (2, Some(dates)) => {
+            if !dates.is_empty() && !entry.date_range.trim().is_empty() {
+                return Err(ValidationError::SchemaMismatch);
+            }
+            if dates.len() > MAX_RESUME_DATES {
+                return Err(ValidationError::LimitExceeded);
+            }
+            let mut characters = 0;
+            for (index, date) in dates.iter().enumerate() {
+                check_identifier(date.id, identifiers)?;
+                if usize::from(date.order) != index {
+                    return Err(ValidationError::InvalidOrder);
+                }
+                date.validate()?;
+                characters += bounded_characters(&date.label, limits.field_characters)?;
+            }
+            Ok((dates.len(), characters))
+        }
+        _ => Err(ValidationError::SchemaMismatch),
+    }
+}
+
+// Absence denotes a v1 field. Explicit null must not be discarded and silently
+// change authenticated document hashes during deserialization.
+fn present_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
+}
+
+fn validate_link_identity(
+    link: &Link,
+    index: usize,
+    version: u16,
+    seen: &mut HashSet<Uuid>,
+) -> Result<(), ValidationError> {
+    match (version, link.id, link.order) {
+        (1, None, None) => Ok(()),
+        (2, Some(id), Some(order)) => {
+            check_identifier(id, seen)?;
+            if usize::from(order) != index {
+                return Err(ValidationError::InvalidOrder);
+            }
+            Ok(())
+        }
+        _ => Err(ValidationError::SchemaMismatch),
+    }
 }
 
 fn check_identifier(identifier: EntityId, seen: &mut HashSet<Uuid>) -> Result<(), ValidationError> {

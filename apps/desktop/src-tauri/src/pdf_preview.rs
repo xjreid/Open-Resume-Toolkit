@@ -242,11 +242,11 @@ fn build_portable_archive(
             continue;
         };
         if manifest.receipt.renderer_version != ort_render::RENDERER_VERSION
-            || manifest.receipt.template_id != ort_render::TEMPLATE_ID
+            || ort_domain::DocumentStyle::from_pdf_template_id(&manifest.receipt.template_id)
+                .is_none()
             || manifest.receipt.font_bundle_id != ort_render::FONT_BUNDLE_ID
         {
             incompatible_receipts = incompatible_receipts.checked_add(1)?;
-            continue;
         }
         if entries.len() < usize::from(MAX_PDF_RENDER_HISTORY) {
             entries.push(ArchivedRenderSource {
@@ -396,18 +396,19 @@ pub(crate) async fn render_resume_pdf(
     }
     match tauri::async_runtime::spawn_blocking(move || {
         let _lease = lease;
-        let artifact = match ort_render::render_pdf(&saved.document) {
-            Ok(value) => value,
-            Err(error) => {
-                return failure(match error {
-                    PdfRenderError::UnsupportedGlyph => "PDF_UNSUPPORTED_GLYPH",
-                    PdfRenderError::LayoutLimit => "PDF_LAYOUT_LIMIT",
-                    PdfRenderError::OutputTooLarge => "PDF_BYTE_LIMIT",
-                    PdfRenderError::InvalidContent => "PDF_INVALID_CONTENT",
-                    PdfRenderError::Unavailable => "PDF_UNAVAILABLE",
-                });
-            }
-        };
+        let artifact =
+            match ort_render::render_pdf_with_style(&saved.document, request.payload.style) {
+                Ok(value) => value,
+                Err(error) => {
+                    return failure(match error {
+                        PdfRenderError::UnsupportedGlyph => "PDF_UNSUPPORTED_GLYPH",
+                        PdfRenderError::LayoutLimit => "PDF_LAYOUT_LIMIT",
+                        PdfRenderError::OutputTooLarge => "PDF_BYTE_LIMIT",
+                        PdfRenderError::InvalidContent => "PDF_INVALID_CONTENT",
+                        PdfRenderError::Unavailable => "PDF_UNAVAILABLE",
+                    });
+                }
+            };
         let Some(generated_at_unix_ms) = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .ok()
@@ -504,7 +505,10 @@ fn render_matching_receipt(
     document: &ort_domain::ResumeDocument,
     expected: &ort_domain::PdfRenderReceipt,
 ) -> Result<PdfArtifact, ReplayRenderError> {
-    let artifact = ort_render::render_pdf(document).map_err(ReplayRenderError::Render)?;
+    let style = ort_domain::DocumentStyle::from_pdf_template_id(&expected.template_id)
+        .ok_or(ReplayRenderError::Incompatible)?;
+    let artifact =
+        ort_render::render_pdf_with_style(document, style).map_err(ReplayRenderError::Render)?;
     if artifact.receipt == *expected {
         Ok(artifact)
     } else {
@@ -512,10 +516,63 @@ fn render_matching_receipt(
     }
 }
 
+// Regeneration may change presentation, never the authenticated structured source.
+fn render_retained_document(
+    document: &ort_domain::ResumeDocument,
+    expected: &ort_domain::PdfRenderReceipt,
+    regeneration_style: Option<ort_domain::DocumentStyle>,
+) -> Result<PdfArtifact, ReplayRenderError> {
+    let Some(style) = regeneration_style else {
+        return render_matching_receipt(document, expected);
+    };
+    let artifact =
+        ort_render::render_pdf_with_style(document, style).map_err(ReplayRenderError::Render)?;
+    if artifact.receipt.document_sha256 != expected.document_sha256
+        || artifact.receipt.document_schema_version != expected.document_schema_version
+    {
+        return Err(ReplayRenderError::Incompatible);
+    }
+    Ok(artifact)
+}
+
 #[tauri::command]
 pub(crate) async fn replay_resume_pdf(
     window: WebviewWindow,
     request: PdfReplayRequest,
+) -> CommandResponse<PdfReplayResponse> {
+    replay_resume_pdf_with_mode(window, request, None).await
+}
+
+#[tauri::command]
+pub(crate) async fn regenerate_resume_pdf(
+    window: WebviewWindow,
+    request: ort_domain::PdfRegenerateRequest,
+) -> CommandResponse<PdfReplayResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    let style = request.payload.style;
+    replay_resume_pdf_with_mode(
+        window,
+        PdfReplayRequest {
+            contract_version: request.contract_version,
+            request_id: request.request_id,
+            payload: ort_domain::PdfReplayPayload {
+                manifest_id: request.payload.manifest_id,
+            },
+        },
+        Some(style),
+    )
+    .await
+}
+
+async fn replay_resume_pdf_with_mode(
+    window: WebviewWindow,
+    request: PdfReplayRequest,
+    regeneration_style: Option<ort_domain::DocumentStyle>,
 ) -> CommandResponse<PdfReplayResponse> {
     if window.label() != "main" {
         return window_not_authorized();
@@ -541,7 +598,11 @@ pub(crate) async fn replay_resume_pdf(
     }
     match tauri::async_runtime::spawn_blocking(move || {
         let _lease = lease;
-        let artifact = match render_matching_receipt(&saved.document, &manifest.receipt) {
+        let artifact = match render_retained_document(
+            &saved.document,
+            &manifest.receipt,
+            regeneration_style,
+        ) {
             Ok(value) => value,
             Err(ReplayRenderError::Incompatible) => return failure("PDF_REPLAY_INCOMPATIBLE"),
             Err(ReplayRenderError::Render(error)) => {
@@ -614,6 +675,41 @@ pub(crate) async fn replay_portable_resume_pdf(
     window: WebviewWindow,
     request: PortablePdfReplayRequest,
 ) -> CommandResponse<PdfReplayResponse> {
+    replay_portable_resume_pdf_with_mode(window, request, None).await
+}
+
+#[tauri::command]
+pub(crate) async fn regenerate_portable_resume_pdf(
+    window: WebviewWindow,
+    request: ort_domain::PortablePdfRegenerateRequest,
+) -> CommandResponse<PdfReplayResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    let style = request.payload.style;
+    replay_portable_resume_pdf_with_mode(
+        window,
+        PortablePdfReplayRequest {
+            contract_version: request.contract_version,
+            request_id: request.request_id,
+            payload: ort_domain::PortablePdfReplayPayload {
+                archive_id: request.payload.archive_id,
+                manifest_id: request.payload.manifest_id,
+            },
+        },
+        Some(style),
+    )
+    .await
+}
+
+async fn replay_portable_resume_pdf_with_mode(
+    window: WebviewWindow,
+    request: PortablePdfReplayRequest,
+    regeneration_style: Option<ort_domain::DocumentStyle>,
+) -> CommandResponse<PdfReplayResponse> {
     if window.label() != "main" {
         return window_not_authorized();
     }
@@ -643,8 +739,11 @@ pub(crate) async fn replay_portable_resume_pdf(
     }
     match tauri::async_runtime::spawn_blocking(move || {
         let _lease = lease;
-        let artifact = match render_matching_receipt(&entry.saved.document, &entry.manifest.receipt)
-        {
+        let artifact = match render_retained_document(
+            &entry.saved.document,
+            &entry.manifest.receipt,
+            regeneration_style,
+        ) {
             Ok(value) => value,
             Err(ReplayRenderError::Incompatible) => return failure("PDF_REPLAY_INCOMPATIBLE"),
             Err(ReplayRenderError::Render(error)) => {
@@ -882,6 +981,94 @@ mod tests {
     }
 
     #[test]
+    fn styled_replay_keeps_template_identity_and_rejects_tampered_receipts() {
+        use ort_domain::DocumentStyle;
+        let mut document = ort_domain::ResumeDocument::empty("Synthetic styles");
+        document.contact.full_name = "Synthetic Replay".into();
+        for style in [
+            DocumentStyle::Plain,
+            DocumentStyle::Technical,
+            DocumentStyle::Professional,
+            DocumentStyle::Modern,
+        ] {
+            let original = ort_render::render_pdf_with_style(&document, style).unwrap();
+            assert_eq!(
+                render_matching_receipt(&document, &original.receipt)
+                    .unwrap()
+                    .bytes,
+                original.bytes
+            );
+            for field in 0..5 {
+                let mut receipt = original.receipt.clone();
+                match field {
+                    0 => receipt.template_id = "unknown".into(),
+                    1 => receipt.template_sha256 = "unknown".into(),
+                    2 => receipt.renderer_version = "unknown".into(),
+                    3 => receipt.font_bundle_sha256 = "unknown".into(),
+                    _ => receipt.pdf_sha256 = "unknown".into(),
+                }
+                assert_eq!(
+                    render_matching_receipt(&document, &receipt).err(),
+                    Some(ReplayRenderError::Incompatible)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn regeneration_changes_presentation_but_requires_the_exact_source_identity() {
+        let mut document = ort_domain::ResumeDocument::empty("Synthetic retained source");
+        document.contact.full_name = "Synthetic historical person".into();
+        let mut historical = ort_render::render_pdf(&document).unwrap().receipt;
+        historical.renderer_version = "historical-renderer".into();
+        historical.template_id = "historical-template".into();
+        historical.pdf_sha256 = "f".repeat(64);
+        assert_eq!(
+            render_retained_document(&document, &historical, None).err(),
+            Some(ReplayRenderError::Incompatible)
+        );
+        for style in [
+            ort_domain::DocumentStyle::Technical,
+            ort_domain::DocumentStyle::Professional,
+            ort_domain::DocumentStyle::Modern,
+        ] {
+            let regenerated =
+                render_retained_document(&document, &historical, Some(style)).unwrap();
+            assert_eq!(
+                regenerated.receipt.document_sha256,
+                historical.document_sha256
+            );
+            assert_eq!(
+                regenerated.receipt.renderer_version,
+                ort_render::RENDERER_VERSION
+            );
+            assert_ne!(regenerated.receipt.template_id, historical.template_id);
+            assert_ne!(regenerated.receipt.pdf_sha256, historical.pdf_sha256);
+        }
+        let mut changed = document.clone();
+        changed.contact.full_name = "A newer source must not substitute".into();
+        assert_eq!(
+            render_retained_document(
+                &changed,
+                &historical,
+                Some(ort_domain::DocumentStyle::Modern)
+            )
+            .err(),
+            Some(ReplayRenderError::Incompatible)
+        );
+        historical.document_schema_version = 2;
+        assert_eq!(
+            render_retained_document(
+                &document,
+                &historical,
+                Some(ort_domain::DocumentStyle::Modern)
+            )
+            .err(),
+            Some(ReplayRenderError::Incompatible)
+        );
+    }
+
+    #[test]
     fn replay_loads_an_exact_older_publication_but_not_an_old_draft() {
         let temporary = TempDir::new().unwrap();
         let vault = MemoryDatabaseKeyVault::new();
@@ -913,6 +1100,7 @@ mod tests {
         let second_draft = store.save_draft(first_draft.revision, &document).unwrap();
         store.publish_draft(second_draft.revision).unwrap();
         let state = DesktopState {
+            reviews: std::sync::Arc::default(),
             storage: Mutex::new(DesktopStorage::Ready(store)),
         };
 
@@ -920,6 +1108,35 @@ mod tests {
             load_replay_source(&state, published_manifest.manifest_id).unwrap();
         assert_eq!(loaded_manifest, published_manifest);
         assert_eq!(loaded_source, first_published);
+        let regenerated = render_retained_document(
+            &loaded_source.document,
+            &loaded_manifest.receipt,
+            Some(ort_domain::DocumentStyle::Modern),
+        )
+        .unwrap();
+        let new_manifest = state
+            .with_store(|store| {
+                store.record_render_manifest(
+                    loaded_manifest.source,
+                    loaded_source.revision,
+                    2_000,
+                    &regenerated.receipt,
+                )
+            })
+            .unwrap();
+        assert_ne!(new_manifest.manifest_id, loaded_manifest.manifest_id);
+        assert_eq!(new_manifest.receipt, regenerated.receipt);
+        assert_eq!(
+            load_replay_source(&state, published_manifest.manifest_id).unwrap(),
+            (published_manifest.clone(), first_published.clone())
+        );
+        assert_eq!(
+            state
+                .with_store(ort_storage::EncryptedStore::load_draft)
+                .unwrap()
+                .unwrap(),
+            second_draft
+        );
         assert_eq!(
             load_replay_source(&state, draft_manifest.manifest_id),
             Err(StorageError::NotFound)
@@ -978,7 +1195,29 @@ mod tests {
         assert_eq!(archive.total_manifests, 4);
         assert_eq!(archive.unavailable_sources, 1);
         assert_eq!(archive.incompatible_receipts, 1);
-        assert_eq!(archive.entries.len(), 2);
+        assert_eq!(archive.entries.len(), 3);
+        let historical = &archive.entries[2];
+        assert_eq!(
+            render_retained_document(
+                &historical.saved.document,
+                &historical.manifest.receipt,
+                None
+            )
+            .err(),
+            Some(ReplayRenderError::Incompatible)
+        );
+        assert!(
+            render_retained_document(
+                &historical.saved.document,
+                &historical.manifest.receipt,
+                Some(ort_domain::DocumentStyle::Technical)
+            )
+            .is_ok()
+        );
+        assert_eq!(
+            historical.manifest.receipt.renderer_version,
+            "typst-0.14.0/ort-1"
+        );
         assert_eq!(
             archive.entries[0].manifest.manifest_id,
             current_draft.manifest_id

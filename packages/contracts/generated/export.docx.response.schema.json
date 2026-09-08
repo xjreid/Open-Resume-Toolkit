@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ExportTextResponse",
+  "title": "ExportDocxResponse",
   "oneOf": [
     {
       "type": "object",
@@ -45,6 +45,12 @@
         "status": {
           "type": "string",
           "const": "exported"
+        },
+        "templateId": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "additionalProperties": false,

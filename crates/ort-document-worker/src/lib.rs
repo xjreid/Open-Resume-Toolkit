@@ -4,7 +4,9 @@
 //! point remains inert until the platform containment and launch gates pass.
 
 mod docx;
+#[cfg(feature = "native-pdf")]
 mod pdf;
 
 pub use docx::{DocxParseError, extract_docx};
+#[cfg(feature = "native-pdf")]
 pub use pdf::{PdfParseError, extract_pdf};
