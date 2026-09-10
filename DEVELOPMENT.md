@@ -1,7 +1,7 @@
 # Development
 
 Open Resume Toolkit implements the M0 architecture skeleton, the local M1
-encrypted-storage slice, and an M2 offline editor checkpoint. The development
+encrypted-storage slice, and the completed M2 offline resume path for macOS Apple Silicon development. The development
 app can autosave synthetic resume drafts and publish immutable snapshots through
 its OS-vault-backed encrypted database, and export a saved draft or published
 snapshot as unencrypted UTF-8 text, constrained DOCX, or the exact locally
@@ -9,13 +9,20 @@ previewed PDF through a native Save dialog. It can also create a passphrase-
 protected portable backup of saved profile records through a native Save dialog.
 It can authenticate and inspect an existing backup through a native Open dialog,
 or stage it into a fresh encrypted replacement profile that is activated safely
-on restart. PDF/DOCX import, AI, updater, and browser-native messaging remain
-gated or unimplemented.
+on restart. PDF/DOCX import is available through the signed, pinned metered parser
+helper and explicit review. AI, updater, and browser-native messaging remain
+later milestone work.
 
 The active M0-M2 development and native-test environment is macOS Apple Silicon.
 Windows and Intel Mac remain later platform-expansion goals. Their CI jobs may
 continue to catch shared-code regressions, but they are not current support or
 manual-qualification targets.
+
+## Current milestone status
+
+M0, M1 and M2 are complete. See [closure and accepted limitations](evidence/0.0.0-dev/m2-acceptance-closure.md)
+and [next milestones](Implementation%20Plans/Next_Milestones.md). Older checkpoint
+notes below are historical. New changes still need the normal commit/CI workflow.
 
 ## Prerequisites
 
@@ -852,3 +859,27 @@ checks repository-generated fixtures and is not a general user-document CLI.
 See `evidence/0.0.0-dev/m2-implementation-completion.md` for final evidence and
 `evidence/0.0.0-dev/m2-final-native-acceptance.md` for the Step 6 checklist.
 M0/M1 completion remains unchanged.
+
+## M2 round-three acceptance candidate
+
+The final native rounds found stale-review cancellation and quit blocking. The
+current source permits dismissal after native review expiry and distinguishes idle
+review from running parser/save work for quit. Existing mutation/identity gates
+remain in place. See `evidence/0.0.0-dev/m2-round3-preparation.md` for the new signed
+candidate and qualification identities, passing native recovery/APFS checks, and
+unresolved full-app overlay regression. `tools/package-m2-macos.py --output PATH`
+and `tools/stage-m2-acceptance.py --candidate PATH --checklist PATH` preserve prior
+candidates and transfer folders. Do not use an earlier candidate for new acceptance.
+
+Use `evidence/0.0.0-dev/m2-round3-orttest-handoff.md` for the remaining real-account
+session. No further manual host-disk filling or improvised profile crash injection
+is required. The canonical gate passes locally; the new fixes still need the user's
+commit/CI workflow and final native acceptance before M2 signoff.
+
+## M2 final scoped acceptance
+
+M2 is now complete under the user's accepted development scope. Round four passed
+menu Quit with the overlay frontmost, Command-Q and saved-state persistence.
+See `evidence/0.0.0-dev/m2-acceptance-closure.md` for the decision, signing-trust
+limitation and waived/unrun checks. The earlier handoffs above are historical;
+no further M2 acceptance session is requested. Commit/CI integration remains separate.

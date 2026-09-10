@@ -1565,3 +1565,74 @@ it("refreshes saved pages once per identity and pauses while the reading view is
     ),
   ).toBe(false);
 });
+
+it("quits an idle review even after cancellation fails, but waits for actual import work", async () => {
+  const original = native.invoke.getMockImplementation()!;
+  let closeAttempt: string | null = null;
+  let wake!: () => void;
+  let finish!: (value: unknown) => void;
+  const snapshot = {
+    id: createEntityId(),
+    baseRevision: 1,
+    mappingVersion: 1,
+    blocks: [
+      {
+        source: "Projects",
+        page: 1,
+        explanation: "Heading",
+        suggestedTarget: "section",
+        suggestedValue: "Projects",
+        proposedSection: null,
+      },
+    ],
+    sections: [],
+    contacts: { fullName: "", email: "", phone: "", location: "" },
+  };
+  native.listen.mockImplementation(async (_event, callback) => {
+    wake = callback;
+    return () => {};
+  });
+  native.invoke.mockImplementation(async (command, ...args) => {
+    if (command === "document_import_available") return true;
+    if (command === "begin_document_import")
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    if (command === "read_import_review") return { ok: true, value: snapshot };
+    if (command === "cancel_import_review") return unavailable;
+    if (command === "close_status")
+      return { ok: true, value: { pendingAttempt: closeAttempt } };
+    if (command === "resolve_close") {
+      closeAttempt = null;
+      return noCloseAttempt;
+    }
+    return original(command, ...args);
+  });
+  const container = await render(<App surface="main" />);
+  await act(async () =>
+    buttonNamed(container, "Import an existing resume").click(),
+  );
+  closeAttempt = createEntityId();
+  await act(async () => wake());
+  expect(
+    native.invoke.mock.calls.filter(([command]) => command === "resolve_close"),
+  ).toHaveLength(0);
+  expect(
+    buttonNamed(container, "Discard unsaved edits and quit").disabled,
+  ).toBe(true);
+  await act(async () => buttonNamed(container, "Keep editing").click());
+  await act(async () => finish({ ok: true, value: snapshot }));
+  await settle();
+  await act(async () => buttonNamed(container, "Cancel import").click());
+  expect(container.textContent).toContain(
+    "Cancellation could not be confirmed",
+  );
+  closeAttempt = createEntityId();
+  await act(async () => wake());
+  await settle();
+  expect(
+    native.invoke.mock.calls
+      .filter(([command]) => command === "resolve_close")
+      .at(-1)?.[1],
+  ).toMatchObject({ request: { payload: { decision: "quit" } } });
+});

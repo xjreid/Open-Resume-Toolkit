@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Native qualification of the signed, job-only parser helper using synthetic data."""
+import argparse
 import hashlib
 import json
 import io
@@ -34,6 +35,14 @@ def run(data, expected_success):
 
 
 def main():
+    global HELPER, REPORT
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--helper", type=pathlib.Path, default=HELPER)
+    parser.add_argument("--report", type=pathlib.Path, default=REPORT)
+    args = parser.parse_args()
+    HELPER, REPORT = args.helper.resolve(), args.report.resolve()
+    if REPORT.exists():
+        raise SystemExit("Report exists; choose a fresh report path")
     if sys.platform != "darwin":
         raise SystemExit("macOS qualification only")
     subprocess.run(["/usr/bin/codesign", "--verify", "--strict", str(HELPER)], check=True)

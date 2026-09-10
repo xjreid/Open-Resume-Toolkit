@@ -41,95 +41,83 @@ Required coverage includes:
 - Overlay behavior that does not trap focus or obstruct essential browser/OS controls
 - Required Qualification Alerts that are keyboard and screen-reader accessible, do not rely on color alone, expose the requirement and evidence relationship clearly, can be dismissed/ignored/reopened, and never seize focus or block the workflow
 
-## Supported compatibility matrix
+## Testing policy — M2.5 and M3 onward, revised 2026-09-09
 
-The active M0-M2 qualification matrix is macOS Apple Silicon only. Exact minimum macOS versions are chosen before distribution and recorded centrally. During the current phase, test:
+The user replaced the previous exhaustive acceptance approach with focused,
+lightweight verification. This policy supersedes broader test-matrix, soak,
+fuzz-campaign, specialized-harness and evidence-package requirements elsewhere
+in the plans for remaining milestones. M0–M2 stay closed under their recorded
+acceptance scope. Actual product protections above and in the security/data plans
+remain requirements; testing depth and completion procedure are reduced.
 
-- The developer-controlled macOS-arm64 version plus any additional macOS-arm64 versions explicitly added to the matrix
-- Current stable Chrome and Edge plus a documented compatibility window
-- Development and unsigned preview identities; Developer ID/notarized distribution remains a release gate
-- Fresh install, upgrade, repair, uninstall, extension-first installation, and desktop-first installation
-- Multiple browser profiles and distinct Chrome/Edge extension identifiers
+### Default completion check
 
-Windows and Intel-Mac matrices are retained as later qualification work. Shared
-CI compilation and deterministic tests on them may detect portability regressions,
-but they do not replace native vault, sandbox, installer, WebView, accessibility,
-filesystem, lifecycle, and clean-machine testing.
+1. Build/typecheck and run the existing fast checks relevant to changed behavior.
+2. Exercise one representative user journey for the new feature. Aim for a single
+   5–15 minute manual session after setup; use automation when it is simpler.
+3. Check the main failure/cancel path and a small set of critical protections
+   affected by the change (for example credential redaction, rejected unauthenticated
+   messages, spending caps or preservation of saved data).
+4. Record the build/commit, checks and outcomes, plus known limitations. A short
+   note or ordinary test output is sufficient.
 
-## Critical end-to-end journeys
+Do not require real-time expiry waits, overnight runs, repeated full-account
+sessions, disk-filling, forced shutdown/crash campaigns, custom destructive
+harnesses, long fuzzing, statistical AI evaluations, broad performance benchmarks,
+or every combination of provider/model/browser/OS/package. Use controlled clocks,
+mocks and small deterministic fixtures for time, cost, failure and recovery paths.
+These specialized activities are removed from default milestone/release gates;
+use one only when a specific observed defect makes it worthwhile, explaining why.
 
-1. First launch, local-profile creation, backup explanation, and manual resume creation without AI.
-2. Import a text-bearing resume in No AI mode, verify lossless local mapping/custom-section review with no network, correct the proposal, save the draft, and publish; repeat with a configured provider and separate transmission confirmation.
-3. Edit a published draft without those unpublished changes leaking into tailoring.
-4. From overlay Stage 1, capture and review/edit a job description through Chrome and Edge, capture again, and continue, including browser-gesture, desktop-not-running, and repair cases.
-5. In overlay Stage 2, tailor, inspect no more than three verified change points and Required Qualification Alerts, dismiss/ignore/reopen alerts, enlarge preview/edit, and require a correction prompt before resume regeneration.
-6. Generate and preview/edit a cover-letter PDF; capture/review an application question, generate and edit an answer, copy it, then reset and capture another; refuse a prohibited attestation.
-7. Download and drag the current resume and cover-letter PDFs from their overlay cards, verify the browser-rejected-drop fallback, and render/validate PDF, DOCX, and text outputs across representative content lengths and templates.
-8. Finish with selected structured materials, recover safely from a failed save, and reset temporary content.
-9. Open a historical structured snapshot and render it after application and renderer upgrades.
-10. Create an encrypted backup, restore on a clean profile, handle the missing AI credential, and verify integrity.
-11. Delete selected data and all local data without affecting unrelated files.
-12. Configure each OpenAI, Anthropic, and Gemini direct adapter; complete successful, failed, retried, cancelled, ambiguous, and interrupted calls; verify Week/Month/Year/All time token and estimated-cost graphs/totals, aggregate breakdowns, accessible text equivalents, internal attempt accounting, provenance, export, retention, and date-range clearing.
-13. Enable weekly/monthly/yearly/all-time direct spending caps and prove warnings, atomic reservation, boundary reset, fail-closed unknown pricing/usage, crash recovery, credential replacement, and the separation between clearing activity and resetting a cap.
-14. Connect and sign out of Codex through browser and device-code paths; discover tested account models; verify isolated no-tool execution, ORT thread tokens where available, account-wide daily/lifetime tokens, exact quota windows, delayed/rounded updates, quota thresholds, bucket changes, and missing telemetry labels.
-15. Switch between Direct API, Codex subscription, and No AI without leaking credentials, changing an active operation, or silently falling back.
-16. Verify that unsigned macOS previews remain clearly labeled and do not enable
-    an unauthenticated automatic updater; later test Developer ID-signed macOS
-    updates without losing data/native messaging. SignPath and Microsoft Store
-    journeys are deferred with Windows qualification.
+Retain working automated tests and existing quick CI. Do not rerun a passing suite
+without changed code, a failure or another concrete reason. This document does
+not itself remove or reconfigure CI jobs. Fix reproducible critical failures;
+record minor limitations or defer the affected feature rather than expanding the
+whole acceptance matrix. Skipped checks are unrun, never implicit passes.
 
-## Security and privacy verification
+### Platform and account scope
 
-- Static analysis, dependency/license scanning, secret scanning, and malicious import tests run in CI.
-- Release checks verify that `LICENSE` remains the unmodified GPLv3 text; required copyright, canonical-source, Section 7, third-party, and trademark notices ship in source and binary distributions; and About/Legal content agrees with the release channel and signing identity.
-- Native-message fuzzing and malformed IPC tests verify bounded behavior.
-- Logs, crash output, diagnostics, backups, exports, and update requests are inspected for forbidden content and secrets.
-- Threat modeling covers web capture, import parsers, provider calls, local storage, IPC, updates, release CI, and signing.
-- A security review is required before representing a build as stable for broad public use.
+Use the active macOS Apple Silicon development environment for M3–M8 until another
+platform is explicitly activated. Use the developer account by default. A separate
+account or clean installation is needed only when that boundary is itself changing
+or when checking the actual distributed package. Browser work gets one primary
+Chrome journey and an Edge smoke check; no multi-profile/version matrix is required.
+Test one supported runtime/provider configuration live where available, with small
+adapter fixtures for the other implemented providers. Record missing credentials
+or unavailable environments as limits instead of making setup a separate test project.
 
-## AI evaluation
+### Accessibility and output
 
-Use synthetic or explicitly authorized representative resumes and job descriptions to evaluate each supported provider/model configuration for:
+Preserve the accessibility behavior listed above. For changed UI, check keyboard
+access, visible focus, labels and understandable errors; use a short screen-reader
+spot check for a new major interaction. Inspect one representative export or preview
+when its layout changes. Existing automated accessibility/render checks are useful;
+full assistive-technology, template/content and platform combinations are not gates.
 
-- Structured-output reliability
-- Unsupported factual additions
-- Important accidental omissions
-- Prompt-injection resistance
-- Change-summary accuracy
-- Required-versus-preferred qualification classification; supported resume-category mapping; confirmed-mismatch and not-found accuracy; resolvable job/resume evidence; duplicate suppression; and exclusion of ambiguous, personal, protected, and legal-attestation requirements
-- Prohibited-answer refusal
-- Length/page-target adherence
-- Latency, cancellation, and actionable failure behavior
-- Input/output size and user-visible estimated cost
-- Usage normalization and cost calculations across input, output, cached, reasoning, missing, and provider-specific billing categories
-- Separation of logical operations from provider-call attempts and accurate retry aggregation
-- Per-model and per-provider totals with partial-data and cross-currency cases
-- Direct-spend reservation/settlement accuracy at every supported period boundary and under failures
-- Codex requested/effective model behavior, no-tool containment, token telemetry provenance, quota-window display, and threshold enforcement
+### AI and critical boundaries
 
-Provider presets are versioned. A provider/model change requires re-evaluation and release notes.
+Use a small synthetic fixture set covering valid structured output, one unsupported
+claim, one malformed/prohibited response and relevant alert behavior. Verify costs
+with a few known arithmetic examples and representative cap/duplicate-reservation
+rejection. Do not make paid live calls across every preset a completion requirement.
+A changed adapter or prompt gets affected checks, not the full AI system retest.
 
-## Release gates
+Authentication, containment, no-tool runtime restrictions, provider-transmission
+consent, encrypted storage and atomic writes remain implemented protections. Review
+the relevant enforcement code/configuration and run bounded negative checks when
+changing those boundaries. No known critical exposure should ship merely because
+the happy path passed; disable or defer the affected feature if needed.
 
-A stable release requires:
+### Distribution check
 
-- All critical journeys pass on the active macOS-arm64 matrix. Each later platform must pass the full applicable matrix before it is described as supported.
-- Local migrations and backup restoration pass from every supported prior version.
-- Export clipping, link, selectable-text, and font tests pass on representative documents.
-- Store/direct installers register, repair, update, and remove native messaging as documented.
-- Update signature/provenance checks and rollback/recovery exercises pass.
-- No known critical security vulnerability or secret exposure remains.
-- License and distributed-asset review is complete.
-- Privacy, provider-transmission, backup, unsigned-build, and local-only limitations are truthful in the application and its distributed documentation.
-- The internal ledger records every ORT provider attempt without forbidden content and survives interruption; aggregate AI Monitoring graphs/totals export and delete correctly and never represent an estimate as an invoice or ORT-only Codex account statement.
-- Required Qualification Alerts are generated within the existing tailoring call, contain only validated explicit requirement/evidence references, use no fit score or eligibility claim, remain non-blocking and dismissible, and are removed with the workspace rather than retained in the tracker.
-- Direct spending caps cannot be bypassed by retry, concurrency, crash, activity deletion, clock change, or missing data; Codex caps block future operations based on freshly reported stable quota buckets and clearly disclose best-effort limits.
-- Hostile PDF/DOCX inputs cannot escape the disposable parser worker, reach secrets/user files/network, spawn surviving children, or mutate canonical data; No-AI import preserves every extracted block for review.
-- Vault tests demonstrate macOS desktop/native-host access controls, cross-account denial, and identity continuity without plaintext fallback or cross-secret access. The documented Windows same-user boundary is a later Windows qualification gate.
-- Known limitations and deferred features are documented.
+For the channel actually being shipped, check one install/launch/update-or-reinstall/
+uninstall cycle and one supported-version data migration/backup reopen. Check the
+artifact identity, applicable updater signature rejection, shipped notices and
+truthful preview/support limitations. Inspect changed logging/diagnostics for secrets.
+A concise review of known critical issues replaces a blanket specialized audit gate.
+Additional platforms/channels need their own small relevant check when introduced,
+not a pre-emptive all-platform campaign.
 
-## Evidence
-
-Future implementation plans assign stable requirement identifiers, test ownership, objective pass criteria, and evidence locations. A feature is not complete solely because its happy-path interface exists.
-
-A release cannot satisfy a gate with an untested critical requirement, unexplained failure, evidence drawn from unauthorized personal content, or a manual assertion where an objective automated or repeatable check is feasible.
+See the [delivery roadmap](../Implementation%20Plans/System%20Documentation/Delivery_Roadmap.md)
+for each milestone's minimum checks. The detailed feature plans define behavior;
+this policy defines the proportionate verification needed to close the work.

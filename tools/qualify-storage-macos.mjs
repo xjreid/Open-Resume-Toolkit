@@ -96,6 +96,7 @@ try {
   };
   if (!process.argv.includes("--low-disk-only")) {
     test("native_storage_failure_matrix");
+    test("native_m2_recovery_crashes");
   }
   if (process.argv.includes("--installed-key-probe")) {
     test("native_untrusted_process_cannot_load_installed_key");
@@ -108,7 +109,7 @@ try {
     "-size",
     "64m",
     "-fs",
-    "HFS+",
+    process.argv.includes("--apfs") ? "APFS" : "HFS+",
     "-volname",
     "ORT-M1-disposable",
     "-type",

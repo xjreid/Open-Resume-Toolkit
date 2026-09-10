@@ -4,16 +4,16 @@
 
 This repository defines and implements **Open Resume Toolkit**: a free, open-source, local-first desktop application with companion Chrome and Edge extensions.
 
-Implementation has reached milestone M2. The development build has an encrypted
-local resume editor with draft/publish lifecycle, guarded quit, text/DOCX export,
-local PDF preview/export and render history, encrypted backup validation/restore,
-storage management, and crash-resumable deletion of all currently implemented
-local profile data. Production PDF/DOCX import remains disabled pending its
-native macOS containment proof. M0-M2 development and qualification currently
-target macOS Apple Silicon only; Windows and Intel Mac are deferred platform
-expansions, although their shared CI builds remain portability signals. AI,
-browser messaging, updates, final document
-templates, and release hardening are not yet implemented.
+**M0, M1 and M2 are complete for macOS Apple Silicon development.** The build
+supports encrypted resume editing and publication, reviewed PDF/DOCX import,
+guarded quit, three PDF/DOCX styles, text export, render history, encrypted
+backup/recovery and local-data deletion. See the
+[acceptance record and known limitations](evidence/0.0.0-dev/m2-acceptance-closure.md).
+
+**M2.5 — usable desktop and resume designs is next, before M3.** AI, browser messaging, updates and release
+hardening remain later milestone work. Windows and Intel Mac remain deferred
+platform expansions; shared CI builds are portability signals, not native support.
+Start with the [next milestone guide](<Implementation Plans/Next_Milestones.md>).
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) to configure a development machine and run the shell.
 

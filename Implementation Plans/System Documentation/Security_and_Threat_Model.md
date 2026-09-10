@@ -114,7 +114,10 @@ Application-level prompting is not sufficient containment. Before stable Codex s
 5. outbound network access is limited to the required Codex authentication/service endpoints at process level;
 6. app-server tool and approval requests are rejected and treated as a security event;
 7. termination kills the full child process tree and removes temporary state;
-8. bypass attempts pass on the active macOS-arm64 matrix; every later platform repeats the complete proof before the capability is enabled there.
+8. enforcement configuration is reviewed and bounded negative checks confirm
+   rejection of a bypass attempt on the active platform before the capability is
+   enabled there. A later platform needs the same focused review and relevant
+   negative check when it is introduced.
 
 The executable gate is independent of the protocol/version gate. Resolve the canonical file and every parent, reject symlink/reparse redirection and unsafe ownership/write permissions, and verify the expected official distribution provenance using the strongest stable platform evidence available (code-signing/notarization identity, package receipt, and/or release-manifest digest). A manual picker can locate a runtime but cannot waive these checks. Test a counterfeit executable that prints the expected version and protocol handshake; it must never be launched beyond a non-executing identity check, or—when a bounded version probe is unavoidable—must already be inside the external sandbox with no user-data access.
 
@@ -219,7 +222,9 @@ If supported public OS mechanisms cannot enforce these properties without admini
 - Links are parsed as data, allow only approved schemes, and are escaped by the renderer.
 - Backup payload entries use logical IDs rather than paths. Restore never joins an archive-provided path to disk.
 - Backup clear headers are bounded and canonicalized before any allocation or KDF work. Argon2id parameters outside the accepted memory/iteration/lane policy fail before derivation. Authentication succeeds before decompression, manifest parsing, or archive entry allocation.
-- Fuzzing covers parser panics, decompression bombs, malformed UTF-8, integer overflow, and partial files.
+- Parser and archive boundaries reject bounded malformed, oversized, and partial
+  inputs before unsafe allocation or processing. Broader fuzzing is a targeted
+  investigation tool, not a default release requirement.
 
 ## Update and supply-chain controls
 
@@ -241,26 +246,27 @@ Automated tests intercept all process network destinations for critical offline 
 - backups exclude credentials and device-bound secrets;
 - diagnostic bundles contain none of the seeded marker strings from synthetic content/credentials.
 
-## Security test matrix
+## Security verification
 
-| Test class | Examples | Gate |
-|---|---|---|
-| Unit/property | URL sanitizer, cap arithmetic, schema references, HMAC expiry | every PR |
-| Fuzz | PDF/DOCX, backup, IPC, AI JSON, catalog parser | scheduled and release candidate |
-| Integration | vault unavailable, database tamper, replayed capture, invalid update signature | release candidate |
-| Platform | vault access matrix, parser sandbox escape attempts, permissions, process-tree kill, native-host registration, updater rollback | every supported OS/channel |
-| Adversarial AI | page prompt injection, fabricated facts, required/preferred confusion | every prompt/schema release |
-| Manual review | CSP/capabilities, release permissions, Codex sandbox evidence | stable release |
+Follow the proportional verification policy in
+`../../Product Plans/Quality_Accessibility_and_Verification.md`. A change to a
+security boundary needs focused, repeatable checks for the affected control and
+its failure-closed behavior. Examples include bounded invalid IPC rejection,
+cap arithmetic, tamper rejection, vault-unavailable handling, or an intercepted
+offline journey. Containment-dependent features remain disabled until the
+documented containment gate passes.
 
-## Required evidence
+Fuzzing, full platform/channel matrices, forced process termination, and broad
+adversarial campaigns are not default gates. Use them when a security finding,
+defect, or changed high-risk boundary makes the added investigation useful.
 
-- threat-to-test traceability table;
-- dependency and binary review;
-- redacted network capture for offline and AI journeys;
-- Codex containment report per supported platform/version;
-- installer/update signature verification output;
-- restore-fuzz and corrupted-database results;
-- accessibility/security interaction review for warnings and confirmations.
+## Evidence
+
+Record concise evidence for the changed critical control: the test or review,
+its result, and any limitation. Releases retain artifact identity and signing
+evidence. Containment-dependent features retain their containment proof before
+they are enabled. No blanket evidence inventory or recurring campaign is needed
+for unrelated work.
 
 ## Remaining bounded technical questions
 

@@ -207,7 +207,7 @@ impl ReviewSessions {
         Ok(saved)
     }
 
-    /// Cancels only the requesting native owner's exact active review.
+    /// Cancels the exact active review, or confirms the slot is already empty.
     ///
     /// # Errors
     /// Foreign/stale tokens cannot cancel the current review.
@@ -217,8 +217,11 @@ impl ReviewSessions {
         token: ReviewToken,
         now: Instant,
     ) -> Result<(), SessionError> {
-        self.authorized(owner, token, now)?;
-        self.active = None;
+        self.expire(now);
+        if self.active.is_some() {
+            self.authorized(owner, token, now)?;
+            self.active = None;
+        }
         Ok(())
     }
 

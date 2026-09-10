@@ -17,6 +17,7 @@ export function ImportReviewFlow(props: {
   currentRevision: number;
   onSaved: (saved: VersionedResume) => void;
   onCancelled: () => void;
+  onOperationChange?: (busy: boolean) => void;
 }) {
   return <ReviewFlow key={props.reviewId} {...props} />;
 }
@@ -25,6 +26,7 @@ function ReviewFlow({
   currentRevision,
   onSaved,
   onCancelled,
+  onOperationChange,
 }: Parameters<typeof ImportReviewFlow>[0]) {
   const inFlight = useRef(false);
   const mounted = useRef(true);
@@ -51,10 +53,12 @@ function ReviewFlow({
     if (inFlight.current) return;
     inFlight.current = true;
     setBusy(true);
+    onOperationChange?.(true);
     const response = await cancelImportReview(reviewId);
     inFlight.current = false;
     if (!mounted.current) return;
     setBusy(false);
+    onOperationChange?.(false);
     if (response.ok) onCancelled();
     else
       setError(
@@ -71,11 +75,13 @@ function ReviewFlow({
       return;
     inFlight.current = true;
     setBusy(true);
+    onOperationChange?.(true);
     setError(undefined);
     const response = await applyImportReview(reviewId, choices);
     inFlight.current = false;
     if (!mounted.current) return;
     setBusy(false);
+    onOperationChange?.(false);
     if (response.ok) {
       onSaved(response.value);
     } else {

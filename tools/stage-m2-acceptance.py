@@ -4,6 +4,7 @@
 Creates a new directory under /Users/Shared. Does not install or launch an app,
 change an account, modify Keychain items, or touch any existing transfer folder.
 """
+import argparse
 import hashlib
 import json
 import pathlib
@@ -15,7 +16,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 def main():
-    candidate = ROOT / "target/m2-candidate"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--candidate", type=pathlib.Path, default=ROOT / "target/m2-candidate")
+    parser.add_argument("--checklist", type=pathlib.Path, default=ROOT / "evidence/0.0.0-dev/m2-final-native-acceptance.md")
+    args = parser.parse_args()
+    candidate = args.candidate.resolve()
     manifest = json.loads((candidate / "manifest.json").read_text())
     app = candidate / "Open Resume Toolkit Dev.app"
     executable = app / "Contents/MacOS/ort-desktop"
@@ -46,8 +51,8 @@ fi
 /usr/bin/open -n "Open Resume Toolkit Dev.app"
 ''')
     launcher.chmod(0o755)
-    shutil.copyfile(ROOT / "evidence/0.0.0-dev/m2-final-native-acceptance.md", transfer / "Test checklist.md")
-    (ROOT / "target/m2-candidate/transfer.json").write_text(json.dumps({"directory": str(transfer)}, indent=2) + "\n")
+    shutil.copyfile(args.checklist, transfer / "Test checklist.md")
+    (candidate / "transfer.json").write_text(json.dumps({"directory": str(transfer)}, indent=2) + "\n")
     print(transfer)
 
 

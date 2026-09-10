@@ -71,26 +71,27 @@ The current selections and module-level acceptance criteria are documented under
 
 ## Validation and release work
 
-1. **[VALIDATION]** Ensure resume creation remains approachable despite flexible structured sections and entries.
-2. **[VALIDATION]** Prevent layout overflow, clipping, broken links, unreadable fonts, and poor DOCX behavior across templates on the active macOS-arm64 matrix. Later platforms repeat this gate before qualification.
-3. **[VALIDATION]** Demonstrate that draft/publish state is understandable and unpublished changes never enter tailoring silently.
-4. **[VALIDATION]** Confirm Finish Application prevents accidental loss and survives failed tracker writes.
-5. **[VALIDATION]** Test long-lived local tracker performance and historical structured rendering with large representative profiles.
-6. **[VALIDATION]** Test backup creation, corruption detection, passphrase handling, full restore, version migration, and low-disk-space recovery.
-7. **[VALIDATION]** Evaluate every supported direct and Codex model preset for factuality, prompt injection, prohibited answers, structural validity, required-qualification alert precision/recall and evidence validity, requested-versus-effective model behavior, provider cost/quota visibility, and cancellation behavior.
-8. **[VALIDATION]** Reconcile representative successful, failed, retried, cancelled, timed-out, streamed, cached/reasoning-token, missing-usage, rerouted, and ambiguous responses against model/provider totals and verified pricing fixtures; prove that unavailable cost is never displayed as zero or as an invoice.
-9. **[VALIDATION]** Prove direct-API caps under boundaries, concurrent dispatch, retries, crashes, time-zone/clock changes, price changes, missing usage, activity clearing, credential replacement, and all-time reset. No request may dispatch without a committed reservation when a cap is active.
-10. **[VALIDATION]** Prove external Codex-runtime absence, official identity/provenance and counterfeit-runtime rejection, compatible/incompatible version handling, app-managed `stdio` launch and termination, browser/device login, isolated configuration/authentication, model discovery, exact request/event allowlists, experimental-capability disablement, fail-closed command/process/filesystem/tool/approval/permission/elicitation events, token/quota provenance, delayed/rounded quota updates, provider bucket changes, cap blocking, sign-out, protocol mismatch, orphan recovery, and cleanup on every supported OS/package channel.
-11. **[VALIDATION]** Test Chrome/Edge permissions, profiles, native messaging, IPC impersonation resistance, app launch, update skew, repair, and uninstall across the active macOS-arm64 compatibility matrix; repeat for each later platform before support is claimed.
-12. **[VALIDATION]** Verify that provider calls, internal accounting, aggregate AI Monitoring, guardrail state, Codex account snapshots, update checks, diagnostics, and logs match the application's privacy explanations.
-13. **[RELEASE]** Obtain qualified review and finalize the exact `GPL-3.0-only` dependency/asset compatibility, Section 7 attribution term, contributor inbound-license treatment, SPDX approach, Store/signing-program eligibility, and trademark policy; add the remaining repository governance files.
-14. **[RELEASE]** Complete security review of imports, local storage, direct and Codex credential handling, app-server containment, guardrail transactions, extensions, native IPC, updater, release CI, and diagnostic export.
-15. **[RELEASE]** Complete accessibility testing and document-export readability checks.
-16. **[RELEASE]** Confirm current Store policies, signing requirements, API/Codex integration terms, provider model availability and pricing, and platform rules immediately before distribution.
-17. **[RELEASE]** Before accepting nontrivial external code contributions, decide whether hosted-service risk justifies changing future releases from GPLv3 to AGPLv3. The default remains `GPL-3.0-only`; any change requires copyright authority, compatibility review, a documented transition, and updates to every license and public claim.
-18. **[VALIDATION]** Prove the complete overlay journey, resume/cover-letter PDF drag and Download behavior/fallback/cleanup, main-window route exclusion, single light visual scheme, document-brand separation, and aggregate monitoring accessibility on macOS arm64 during the current phase.
-19. **[VALIDATION]** Prove the hostile-document worker denies user/application files, vaults, database, native IPC, network, and child processes; enforces resource ceilings; kills its full process tree; and cannot mutate canonical data after malformed, crashing, timed-out, or adversarial PDF/DOCX input.
-20. **[VALIDATION]** Prove database/provider/IPC vault namespace separation, macOS development-identity and preview desktop/native-host behavior, moved/update/repair flows, cross-account denial, and absence of any plaintext fallback. Windows boundary proof is deferred with Windows qualification.
+The [revised quality policy](Quality_Accessibility_and_Verification.md) replaces
+the earlier exhaustive validation list for M3 onward. Use the roadmap's short
+milestone checks and record known limitations. M0–M2 remain closed.
+
+1. Check the new user journey and its main failure/cancel path with synthetic data.
+2. For AI, check representative factual/structured output, alert behavior, provider
+   errors, redaction, cost arithmetic and cap rejection with small fixtures.
+3. For workspace/browser changes, check capture/review/save/reopen, authentication
+   rejection and that capture does not automatically transmit content to AI.
+4. For optional Codex, inspect isolation enforcement and check one supported
+   runtime plus wrong-identity/version/forbidden-event rejection. Defer it if unsafe.
+5. For changed data handling, check normal save/restore and a representative rejected
+   write/input using mocks rather than a crash or low-disk campaign.
+6. Spot-check keyboard/accessibility and output readability on changed interfaces.
+7. For distribution, check the actual channel's install/lifecycle, artifact identity,
+   notices, current Store/provider terms and truthful limitations. No broad platform
+   matrix or specialist testing campaign is required.
+8. Before accepting nontrivial external code contributions, decide whether hosted-
+   service risk justifies changing future releases from GPLv3 to AGPLv3. The default
+   remains `GPL-3.0-only`; any change requires copyright authority, compatibility
+   review, a documented transition and updates to every license/public claim.
 
 ## Later possibilities
 

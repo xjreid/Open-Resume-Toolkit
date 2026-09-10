@@ -1,13 +1,19 @@
+#[cfg(not(target_os = "macos"))]
+use tauri::menu::MenuItem;
 use tauri::{
     AppHandle,
-    menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
+    menu::{Menu, PredefinedMenuItem, Submenu},
 };
 
 pub(crate) const QUIT_ID: &str = "ort-request-quit";
 
 pub(crate) fn editor_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    // Do not use PredefinedMenuItem::quit: on macOS it invokes terminate:
-    // directly, bypassing Tauri ExitRequested (upstream issue #9198).
+    // On macOS, the native Quit command invokes `applicationShouldTerminate:`.
+    // The AppKit lifecycle bridge in `lib.rs` guards that request and returns
+    // the renderer's final decision through `replyToApplicationShouldTerminate:`.
+    #[cfg(target_os = "macos")]
+    let quit = PredefinedMenuItem::quit(app, Some("Quit Open Resume Toolkit"))?;
+    #[cfg(not(target_os = "macos"))]
     let quit = MenuItem::with_id(
         app,
         QUIT_ID,

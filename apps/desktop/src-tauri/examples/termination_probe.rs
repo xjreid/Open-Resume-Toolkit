@@ -6,6 +6,7 @@ fn main() {
         atomic::{AtomicUsize, Ordering},
     };
     use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
+    let automatic = std::env::args().any(|arg| arg == "--automatic-exit");
     let requests = Arc::new(AtomicUsize::new(0));
     let mut context = tauri::generate_context!();
     context.config_mut().identifier = "com.openresumetoolkit.synthetic-termination-probe".into();
@@ -39,11 +40,26 @@ fn main() {
                 .initialization_script("document.addEventListener('DOMContentLoaded', () => { document.body.textContent = 'Synthetic native quit probe. No profile is open. Use Quit Synthetic Probe twice: first cancels, second exits.'; });")
                 .build()?;
             window.set_focus()?;
+            tauri::WebviewWindowBuilder::new(app, "overlay", tauri::WebviewUrl::External("about:blank".parse().unwrap()))
+                .title("ORT Synthetic Overlay — no profile access").build()?;
+            if automatic {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    let main = handle.clone();
+                    handle.run_on_main_thread(move || {
+                        eprintln!("AUTOMATIC: approved app.exit with two windows");
+                        main.exit(0);
+                    }).unwrap();
+                });
+            }
             eprintln!("READY: use native Quit twice; first cancels and second approves.");
             Ok(())
         })
         .build(context).expect("synthetic app")
-        .run(|_, _| {});
+        .run(|_, event| {
+            if matches!(event, tauri::RunEvent::Exit) { eprintln!("EXIT observed"); }
+        });
 }
 #[cfg(not(target_os = "macos"))]
 fn main() {

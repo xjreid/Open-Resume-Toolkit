@@ -6,21 +6,28 @@ This is the navigation and authority map for the product and technical implement
 
 ## Current planning status
 
-The product direction and core workflows are defined. Implementation is underway
-at M2 on the selected Tauri 2, React/TypeScript, Rust, SQLCipher and Typst
-baseline. The development build supports encrypted structured editing,
+Testing for M3 onward follows the [revised focused policy](<Product Plans/Quality_Accessibility_and_Verification.md>).
+The roadmap now lists minimum checks; older exhaustive testing instructions are superseded.
+
+
+The product direction and core workflows are defined. M0, M1, and M2 are
+complete for the macOS Apple Silicon development scope on the selected Tauri 2,
+React/TypeScript, Rust, SQLCipher and Typst baseline. The development build supports encrypted structured editing,
 publication, local exports/rendering, portable backup/recovery, storage reporting
-and exact crash-resumable local-profile deletion. A common fail-closed
-parser-supervision coordinator is implemented, but hostile document import remains
-disabled pending the native macOS adapter and containment proof; AI, browser messaging,
-updates and release hardening remain later milestones. Quiet Navy/Open Frame is
+and exact crash-resumable local-profile deletion. The signed metered-Wasm import
+path provides explicit review before it changes a master record; AI, browser
+messaging, updates and release hardening remain later milestones. Quiet Navy/Open Frame is
 the approved application direction. M2 completion includes the complete manual
 master-editor behavior in the authoritative resume-editor plan and all three
-qualified PDF/DOCX style categories; the current plain fixtures do not satisfy
-that gate. Historical replay retains immutable structured sources and uses a
+qualified PDF/DOCX style categories. Historical replay retains immutable structured sources and uses a
 truthfully identified current renderer when the original tuple is unavailable,
 without retaining superseded drafts or old executable renderer bundles solely
 for replay.
+
+The [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>)
+is authoritative for milestone scope and order. The completed offline-path
+boundary is recorded in [M2 acceptance closure](evidence/0.0.0-dev/m2-acceptance-closure.md).
+The next implementation milestone is M2.5, usable desktop and resume designs, before M3 Direct AI foundation.
 
 M0-M2 are currently qualified only on macOS Apple Silicon. Windows and Intel
 Mac remain later platform-expansion goals. Their shared builds may remain in CI
@@ -103,6 +110,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 ### Technical implementation and future aesthetic work
 
 - [Implementation plans](<Implementation Plans/README.md>) — selected technical baseline, component plans, delivery order, and implementation gates.
+- [Next milestones](<Implementation Plans/Next_Milestones.md>) — concise M3 starting route and ordered navigation to M4–M8; the delivery roadmap remains authoritative for scope and exit evidence.
 - [Development and deployment outline](<Implementation Plans/System Documentation/Development_and_Deployment_Outline.md>) — shared desktop/extension source ownership, platform and Store artifacts, environments, CI/release sequence, mandatory gates, rollback, and M0 readiness.
 - Component folders under `Implementation Plans/` — implementation-ready plans for architecture/security/build, desktop, extensions/IPC, local data/migration, AI/document processing, and distribution/updates.
 - [Aesthetic planning](Aesthetic/README.md) — approved Quiet Navy/Open Frame direction, surface responsibilities, document independence, and remaining visual deliverables.
@@ -128,6 +136,13 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 5. Read the applicable component implementation plan.
 6. Link code and tests to the product requirement and technical completion criteria.
 7. Record major irreversible refinements as architecture decision records.
+
+### Next milestone handoff
+
+1. Read [Next milestones](<Implementation Plans/Next_Milestones.md>).
+2. Read M2.5 in the [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>) and its linked product authority before opening work.
+3. Use [M2 acceptance closure](evidence/0.0.0-dev/m2-acceptance-closure.md) as the completed offline-path boundary; do not reopen completed M0–M2 scope unless a regression requires it.
+4. Continue through M4–M8 only in roadmap order and after their stated dependencies and gates are satisfied.
 
 ### Security and privacy review
 

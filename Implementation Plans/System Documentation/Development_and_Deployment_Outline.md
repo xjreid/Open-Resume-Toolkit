@@ -95,7 +95,7 @@ or behavior differences.
 
 | Environment | Identity/data | External services | Intended use |
 |---|---|---|---|
-| test | temporary per-test profile and fake vault | mocked; no updater/signing | unit, property, integration, fuzz |
+| test | temporary per-test profile and fake vault | mocked; no updater/signing | focused unit, component, and integration checks |
 | development | dev app ID, dev native-host name, dev extension IDs, isolated data | mocked by default; opt-in synthetic live probes | daily development |
 | preview | separate preview app/data/channel and preview extension IDs | production endpoints only when explicitly tested | release-candidate and public preview |
 | stable direct | stable direct app/data/update identity | signed catalog/update endpoints | trusted GitHub direct release |
@@ -137,9 +137,14 @@ Commands are platform-neutral intents even when their underlying implementation 
 7. verify production Tauri capabilities/CSP contain no broad privilege or remote asset;
 8. publish non-release test evidence only.
 
-### Scheduled security/platform workflow
+### Targeted security/platform workflow
 
-Nightly or scheduled jobs run fuzz corpora, parser-worker sandbox tests, vault access matrices, provider contract probes, Codex compatibility/containment probes, clean-machine native-host registration, and reproducibility comparisons. A scheduled result can block promotion even when an earlier pull request passed.
+Follow the proportional verification policy in
+`../../Product Plans/Quality_Accessibility_and_Verification.md`. There is no
+default nightly or scheduled test gate. Run focused platform, containment,
+provider, registration, reproducibility, or malformed-input checks when a
+changed boundary or concrete defect warrants them. Capabilities remain disabled
+until their documented safety gates pass.
 
 ### Preview workflow
 
@@ -147,7 +152,7 @@ Nightly or scheduled jobs run fuzz corpora, parser-worker sandbox tests, vault a
 
 1. compile the macOS-arm64 preview and Chrome/Edge targets; deferred platform artifacts may be attached as non-qualified CI evidence but are not published as supported previews;
 2. create checksums, SBOMs, license inventory, provenance, compatibility manifest, and preview update metadata where allowed;
-3. run clean-account install/launch/repair/uninstall and extension interoperability tests on the exact macOS-arm64 artifacts;
+3. run a representative install/launch path and any focused checks required by changed installer or extension boundaries on the exact macOS-arm64 artifacts;
 4. label unsigned macOS outputs prominently and prevent stable-channel update ownership;
 5. publish only to a draft/prerelease after required evidence passes.
 
@@ -160,7 +165,7 @@ Nightly or scheduled jobs run fuzz corpora, parser-worker sandbox tests, vault a
 3. sign eligible Windows binaries/installer through the approved SignPath policy or route the fallback package through the Store;
 4. when macOS stable signing exists, sign nested code, apply hardened runtime, notarize, and staple; otherwise retain preview classification;
 5. verify every code signature, updater signature, digest, provenance statement, channel identity, and compatibility field;
-6. install and test the exact signed artifacts without rebuilding;
+6. verify and install the exact signed artifacts without rebuilding;
 7. package Chrome and Edge variants against the released desktop/native-host compatibility range;
 8. create a draft GitHub Release and Store submissions;
 9. require human release approval, then promote the already-tested artifacts;

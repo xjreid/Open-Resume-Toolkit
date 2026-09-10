@@ -7,6 +7,7 @@ This folder owns cross-component technical decisions. Component plans may specia
 - [`Development_and_Deployment_Outline.md`](Development_and_Deployment_Outline.md) — shared platform/browser ownership, build artifacts, environment identities, deployment order, release gates, rollback, and concrete M0 handoff.
 - [`Security_and_Threat_Model.md`](Security_and_Threat_Model.md) — trust boundaries, mitigations, and security evidence.
 - [`Delivery_Roadmap.md`](Delivery_Roadmap.md) — milestones, release gates, and completion evidence.
+- [`../Next_Milestones.md`](../Next_Milestones.md) — concise M3 starting route and ordered M4–M8 navigation; the roadmap remains authoritative.
 - [`Requirement_Traceability.md`](Requirement_Traceability.md) — stable technical requirement IDs mapped to product authority, implementation owner, and evidence.
 - [`Technical_Reference_Baseline.md`](Technical_Reference_Baseline.md) — official upstream documentation used for the initial selections and items that must be reverified.
 

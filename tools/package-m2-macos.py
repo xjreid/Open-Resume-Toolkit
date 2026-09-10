@@ -22,7 +22,11 @@ def run(command, **kwargs):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--identity", required=True)
+    parser.add_argument("--output", type=pathlib.Path, default=ROOT / "target/m2-candidate")
     args = parser.parse_args()
+    destination = args.output.resolve() / "Open Resume Toolkit Dev.app"
+    if destination.parent.exists():
+        raise SystemExit("Output already exists; choose a fresh candidate directory")
     if len(args.identity) != 40 or not all(c in "0123456789abcdefABCDEF" for c in args.identity):
         raise SystemExit("Use the exact fingerprint of an existing local signing identity")
     run(["python3", "tools/package-parser-helper.py"])
@@ -34,7 +38,6 @@ def main():
                                       "macOS": {"signingIdentity": args.identity, "hardenedRuntime": True}}})
     run(["pnpm", "--filter", "@ort/desktop", "tauri", "build", "--config", override, "--bundles", "app"], env=environment)
     original = ROOT / "target/release/bundle/macos/Open Resume Toolkit Dev.app"
-    destination = ROOT / "target/m2-candidate/Open Resume Toolkit Dev.app"
     if destination.exists():
         raise SystemExit("Candidate already exists; preserve it or choose a fresh worktree before rebuilding")
     shutil.copytree(original, destination)

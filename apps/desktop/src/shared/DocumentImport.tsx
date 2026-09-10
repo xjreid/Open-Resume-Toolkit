@@ -11,17 +11,28 @@ export function DocumentImport({
   disabled,
   revision,
   onBusyChange,
+  onOperationChange,
   onSaved,
 }: {
   disabled: boolean;
   revision: number | null;
   onBusyChange: (busy: boolean) => void;
+  onOperationChange?: (busy: boolean) => void;
   onSaved: (saved: VersionedResume) => void;
 }) {
   const [available, setAvailable] = useState(false);
   const [pending, setPending] = useState(false);
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const launch = useRef<HTMLButtonElement>(null);
+  const restoreFocus = useRef(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (reviewId === null && restoreFocus.current) {
+      restoreFocus.current = false;
+      launch.current?.focus();
+    }
+  }, [reviewId]);
   const inFlight = useRef(false);
   const mounted = useRef(true);
   const cancelled = useRef(false);
@@ -40,11 +51,14 @@ export function DocumentImport({
     cancelled.current = false;
     setPending(true);
     setError(null);
+    setNotice(null);
     onBusyChange(true);
+    onOperationChange?.(true);
     const result = await beginDocumentImport(revision);
     inFlight.current = false;
     if (!mounted.current) return;
     setPending(false);
+    onOperationChange?.(false);
     if (result.ok && result.value) {
       // A cancellation may race successful native completion. Retain the
       // native-created session so its explicit Cancel action can retire it.
@@ -66,6 +80,7 @@ export function DocumentImport({
       );
   }
   function finished() {
+    restoreFocus.current = true;
     setReviewId(null);
     onBusyChange(false);
   }
@@ -80,7 +95,13 @@ export function DocumentImport({
         <ImportReviewFlow
           reviewId={reviewId}
           currentRevision={revision ?? 0}
-          onCancelled={finished}
+          onOperationChange={onOperationChange}
+          onCancelled={() => {
+            setNotice(
+              "Import review closed. No changes were applied by cancellation.",
+            );
+            finished();
+          }}
           onSaved={(saved) => {
             finished();
             onSaved(saved);
@@ -90,6 +111,7 @@ export function DocumentImport({
         <>
           <button
             type="button"
+            ref={launch}
             className="button--secondary"
             disabled={disabled || !available || pending}
             onClick={() => void begin()}
@@ -112,6 +134,7 @@ export function DocumentImport({
           ) : null}
         </>
       )}
+      {notice ? <p role="status">{notice}</p> : null}
       {error ? <p role="alert">{error}</p> : null}
     </section>
   );

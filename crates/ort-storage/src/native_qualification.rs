@@ -314,9 +314,21 @@ fn native_child() {
     );
     assert_eq!(fs::read(parent.join("qualification-only")).unwrap(), b"1");
     let root = parent.join("profiles/default");
-    let store =
-        EncryptedStore::open_or_initialize(&root, CHANNEL, &OsDatabaseKeyVault::new()).unwrap();
     let action = std::env::var("ORT_M1_ACTION").unwrap();
+    let vault = OsDatabaseKeyVault::new();
+    if action == "activate" {
+        EncryptedStore::open_or_activate_pending_restore(&root, CHANNEL, &vault).unwrap();
+        return;
+    }
+    if action == "delete-all" {
+        EncryptedStore::delete_all_local_data(&root, CHANNEL, &vault).unwrap();
+        return;
+    }
+    let store = EncryptedStore::open_or_initialize(&root, CHANNEL, &vault).unwrap();
+    if action == "delete-safety" {
+        store.delete_retained_safety_copy(CHANNEL, &vault).unwrap();
+        return;
+    }
     let draft = store.load_draft().unwrap().unwrap();
     assert_eq!(draft.document.title, MARKER);
     if action == "wal-write" {
@@ -509,4 +521,116 @@ fn qualify_portable_key_separation_and_deletion(vault: &OsDatabaseKeyVault) {
     println!(
         "PASS native portable key separation and exact-target deletion with other profile/key preserved"
     );
+}
+
+#[test]
+#[ignore = "real Keychain and owned-child SIGKILL at M2 recovery boundaries"]
+fn native_m2_recovery_crashes() {
+    opt_in();
+    let _no_ui = SecKeychain::disable_user_interaction().unwrap();
+    let vault = OsDatabaseKeyVault::new();
+    for point in [
+        "restore-old-moved",
+        "restore-promoted",
+        "rollback-safety-removed",
+        "safety-delete-renamed",
+        "delete-intent",
+        "delete-keys-removed",
+        "delete-directory-removed",
+    ] {
+        qualify_m2_recovery_crash(point, &vault);
+    }
+}
+
+fn qualify_m2_recovery_crash(point: &str, vault: &OsDatabaseKeyVault) {
+    let mut profile = NativeProfile::new();
+    let store = profile.initialize();
+    let passphrase = BackupPassphrase::new("M2 disposable recovery phrase".into()).unwrap();
+    let backup = store
+        .create_portable_backup(&passphrase, "0.0.0-dev")
+        .unwrap();
+    let external = profile.temporary.path().join("preserved.ort-backup");
+    fs::write(&external, &backup).unwrap();
+    let mut edited = store.load_draft().unwrap().unwrap().document;
+    edited.title = "M2 later synthetic draft".into();
+    store.save_draft(1, &edited).unwrap();
+    store
+        .stage_portable_restore(&backup, &passphrase, CHANNEL, vault)
+        .unwrap();
+    let parent = profile.root().parent().unwrap().to_path_buf();
+    profile.references.push(
+        read_manifest(
+            &parent
+                .join(RESTORE_STAGING_DIRECTORY)
+                .join(MANIFEST_FILENAME),
+            CHANNEL,
+        )
+        .unwrap()
+        .vault_reference()
+        .unwrap(),
+    );
+    drop(store);
+    if point.starts_with("restore-") {
+        profile.crash("activate", point);
+        let (restored, _) =
+            EncryptedStore::open_or_activate_pending_restore(&profile.root(), CHANNEL, vault)
+                .unwrap();
+        assert_eq!(
+            restored.load_draft().unwrap().unwrap().document.title,
+            MARKER
+        );
+        assert_eq!(
+            restored.load_latest_published().unwrap().unwrap().revision,
+            1
+        );
+        restored.verify_integrity().unwrap();
+    } else {
+        let (restored, _) =
+            EncryptedStore::open_or_activate_pending_restore(&profile.root(), CHANNEL, vault)
+                .unwrap();
+        if point == "rollback-safety-removed" {
+            restored.stage_safety_rollback(CHANNEL, vault).unwrap();
+        }
+        drop(restored);
+        let action = if point == "rollback-safety-removed" {
+            "activate"
+        } else if point == "safety-delete-renamed" {
+            "delete-safety"
+        } else {
+            "delete-all"
+        };
+        profile.crash(action, point);
+        let (reopened, _) =
+            EncryptedStore::open_or_activate_pending_restore(&profile.root(), CHANNEL, vault)
+                .unwrap();
+        if action == "delete-all" {
+            assert!(reopened.load_draft().unwrap().is_none());
+            assert!(reopened.load_latest_published().unwrap().is_none());
+            for reference in &profile.references {
+                assert!(matches!(vault.load(reference), Err(VaultError::Missing)));
+            }
+            profile
+                .references
+                .push(reopened.manifest().vault_reference().unwrap());
+        } else {
+            let expected = if action == "activate" {
+                "M2 later synthetic draft"
+            } else {
+                MARKER
+            };
+            assert_eq!(
+                reopened.load_draft().unwrap().unwrap().document.title,
+                expected
+            );
+            assert_eq!(
+                reopened.load_latest_published().unwrap().unwrap().revision,
+                1
+            );
+        }
+        reopened.verify_integrity().unwrap();
+    }
+    assert_eq!(fs::read(external).unwrap(), backup);
+    assert!(!parent.join(RESTORE_MARKER_FILENAME).exists());
+    assert!(!parent.join(DELETE_ALL_MARKER_FILENAME).exists());
+    println!("PASS M2 owned-child SIGKILL recovery: {point}");
 }

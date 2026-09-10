@@ -222,8 +222,9 @@ Errors show a plain-language summary, safe support code, retry eligibility, and 
 - Minimum target size and non-color status indicators are enforced by automated component tests later, independent of the final visual theme.
 
 Current manual coverage includes VoiceOver with WKWebView, keyboard-only use,
-200% text scaling, and reduced motion on macOS arm64. NVDA with Windows WebView2
-must repeat the full matrix when Windows qualification resumes.
+200% text scaling, and reduced motion on macOS arm64. When Windows qualification
+resumes, a focused NVDA/WebView2 spot check covers changed major interactions;
+a full matrix is not a default requirement.
 
 ## Performance and resource behavior
 
@@ -236,13 +237,19 @@ must repeat the full matrix when Windows qualification resumes.
 
 ## Tests
 
-- unit: reducers/view models, validation summaries, focus restoration, formatters;
-- component: forms, conflict handling, alerts, activity provenance, confirmations;
-- contract: every command/event against generated schemas and error envelope;
-- integration: Tauri command to temporary encrypted repositories and mocked adapters;
-- end-to-end: first run, draft/publish, import review, preview/export, capture/tailor/alert/finish, backup/restore, connection changes;
-- failure: vault locked, stale revision, provider timeout, process restart, low disk, renderer failure, incompatible Codex/extension/update;
-- accessibility: axe-style checks plus the manual platform matrix.
+Follow the proportional verification policy in
+`../../Product Plans/Quality_Accessibility_and_Verification.md`. Cover the
+changed user flow with focused component or integration checks and include its
+critical failure protection when applicable: validation/error recovery, retained
+local state, confirmation boundaries, accessibility labels/focus, and atomic
+Finish Application or export behavior. Contract checks cover commands or events
+that change; a representative keyboard and screen-reader path covers material UI
+changes.
+
+Long end-to-end suites, exhaustive device/accessibility matrices, forced crashes,
+low-disk simulation, and real-time waits are not required by default. They are
+appropriate only for a reported defect, a changed high-risk boundary, or a
+specific release concern.
 
 ## Rollout and completion
 

@@ -342,6 +342,8 @@ impl EncryptedStore {
             // the ordinary promotion path; the key remains required by staging.
             cleanup_profile_directory(&safety)?;
             sync_directory(parent)?;
+            #[cfg(all(test, target_os = "macos"))]
+            native_qualification::crash_checkpoint("rollback-safety-removed");
         }
 
         let active = root.is_dir();
@@ -351,6 +353,8 @@ impl EncryptedStore {
             (true, true, false) => {
                 fs::rename(root, &safety).map_err(|_| StorageError::Unavailable)?;
                 sync_directory(parent)?;
+                #[cfg(all(test, target_os = "macos"))]
+                native_qualification::crash_checkpoint("restore-old-moved");
                 if fs::rename(&staging, root).is_err() {
                     let _ = fs::rename(&safety, root);
                     let _ = sync_directory(parent);
@@ -373,6 +377,8 @@ impl EncryptedStore {
             _ => return Err(StorageError::IncompleteInitialization),
         }
 
+        #[cfg(all(test, target_os = "macos"))]
+        native_qualification::crash_checkpoint("restore-promoted");
         match Self::open_or_initialize(root, channel, vault) {
             Ok(store) => {
                 remove_exact_optional_file(&marker)?;
@@ -1553,6 +1559,8 @@ impl EncryptedStore {
         drop(safety_store);
         fs::rename(&safety, &deleting).map_err(|_| StorageError::Unavailable)?;
         sync_directory(parent)?;
+        #[cfg(all(test, target_os = "macos"))]
+        native_qualification::crash_checkpoint("safety-delete-renamed");
         recover_pending_safety_deletion(parent, channel, vault)?;
         Ok(true)
     }
@@ -1587,6 +1595,8 @@ impl EncryptedStore {
         } else {
             validate_all_data_deletion_targets(root, channel, true)?;
             write_delete_all_marker(&marker, parent)?;
+            #[cfg(all(test, target_os = "macos"))]
+            native_qualification::crash_checkpoint("delete-intent");
         }
         Ok(
             match recover_pending_all_data_deletion(root, channel, vault) {
@@ -2344,10 +2354,14 @@ fn recover_pending_all_data_deletion(
             .delete(&reference)
             .map_err(|_| StorageError::VaultKeyUnavailable)?;
     }
+    #[cfg(all(test, target_os = "macos"))]
+    native_qualification::crash_checkpoint("delete-keys-removed");
     for candidate in all_data_profile_roots(root)? {
         if known_optional_directory(&candidate)? {
             cleanup_profile_directory(&candidate)?;
             sync_directory(parent)?;
+            #[cfg(all(test, target_os = "macos"))]
+            native_qualification::crash_checkpoint("delete-directory-removed");
         }
     }
     remove_exact_optional_file(&parent.join(RESTORE_MARKER_FILENAME))?;

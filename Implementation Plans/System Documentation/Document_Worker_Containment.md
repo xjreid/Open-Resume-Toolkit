@@ -1,3 +1,8 @@
+> **Testing scope update (2026-09-09):** M2 is closed. Historical probe matrices
+> below do not create new milestone gates. Future changes use the
+> [focused testing policy](../../Product%20Plans/Quality_Accessibility_and_Verification.md).
+> Runtime containment requirements remain in force.
+
 > **2026-09-07 implementation update:** The signed metered-Wasm helper and desktop
 > integration are implemented and locally qualified for macOS arm64. The new
 > packaged path requires both executable and running-code identity pins; the

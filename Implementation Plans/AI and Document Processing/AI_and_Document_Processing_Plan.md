@@ -200,10 +200,10 @@ Requests contain only the minimized prompt data through app-server messages. Par
 Account/rate-limit information from app-server is normalized into timestamped snapshots with source method, runtime version, bucket identity, reset time, and freshness. Local token totals are never presented as provider account quota.
 
 Codex remains runtime-disabled until the process-level network/filesystem
-containment proof in the threat model passes on macOS arm64. Windows and
-Intel-Mac builds must keep it disabled until each later platform repeats the
-complete proof. Compatibility loss disables new Codex operations but preserves
-local activity and documents.
+enforcement review and bounded negative checks in the threat model pass on the
+active platform. Later platforms keep it disabled until the same focused check
+is completed when they are introduced. Compatibility loss disables new Codex
+operations but preserves local activity and documents.
 
 ## Import pipeline
 
@@ -436,39 +436,41 @@ Plain text is generated from the same canonical ordering with deterministic whit
 
 ## Evaluation program
 
-Synthetic corpus dimensions include career level, section mixes, sparse/dense resumes, Unicode, date formats, long job descriptions, technical/nontechnical roles, and adversarial page instructions.
+For an affected provider, prompt, model, or preset, use a small synthetic fixture
+set covering valid structured output, one unsupported claim, one malformed or
+prohibited response, and relevant alert behavior. Check a few known cost/cap
+arithmetic cases when accounting changes. Review the local validators and
+failure-closed behavior; unsupported or unsafe configurations remain disabled.
 
-Per provider/model/preset, measure:
-
-- schema validity and retry rate;
-- unsupported/fabricated claim rate (release threshold: zero in gate corpus);
-- source-reference accuracy;
-- required/preferred classification precision/recall;
-- confirmed-mismatch and not-found precision, with special sensitive-category cases;
-- change-summary completeness;
-- document constraint pass rate;
-- token/cost estimate error distribution;
-- cancellation/timeouts and latency budgets.
-
-A catalog/prompt/model change cannot promote to stable merely because it “looks better”; it must meet recorded thresholds and not regress safety.
+This is not a statistical evaluation gate: per-provider/model/preset rates,
+thresholds, large corpora, latency budgets, and paid live-call campaigns are not
+default completion requirements. Expand the fixtures only for an observed defect
+or a concrete release concern.
 
 ## Tests and evidence
 
-- unit/property: minimizers, pricing math, model resolution, alert validator, fact references;
-- adapter contract: fixture responses, streaming splits, usage variants, auth/rate-limit/retired-model errors;
-- integration: mocked HTTPS, vault, coordinator/database transactions, retries/cancellation/crash;
-- live probes: minimal synthetic calls under project-owned restricted credentials;
-- document: deterministic No-AI mapping, unknown-section preservation, import corpus, golden semantic output, links, pagination, Unicode, scanned detection;
-- adversarial: prompt injection, schema bombs, fabricated qualifications, sensitive inference, unsupported Codex events;
-- resource: maximum request/response/import/render limits;
-- platform: parser-worker sandbox/kill/access-denial matrix and Codex identity/version discovery/auth/kill/containment matrix.
+Follow the proportional verification policy in
+`../../Product Plans/Quality_Accessibility_and_Verification.md`. For each change,
+run focused checks for the affected workflow and its critical protections: local
+validation and factual boundaries, request/response caps, operation persistence
+and guardrails, deterministic No-AI review, and atomic export behavior. Use small
+synthetic fixtures and bounded malformed-input cases where a parser or protocol
+boundary changes. Exercise a supported direct-provider fixture path when its
+adapter changes. Codex and document import remain disabled unless their existing
+containment gates pass; their safety controls are not relaxed by this policy.
+
+Fuzz campaigns, large corpus sweeps, exhaustive platform matrices, forced crash
+or disk-exhaustion exercises, and real-time wait tests are not default milestone
+requirements. Run a targeted investigation when a defect, security finding, or
+specific release risk warrants it, and retain only concise evidence of the check
+that resolved the risk.
 
 ## Completion criteria
 
 - No backend can bypass operation persistence, validation, accounting, and applicable guardrails.
 - Tailoring produces a structured proposal, change summary, and validated alert set in one logical result.
-- Alerts achieve the recorded false-positive gate and never manufacture sensitive-status conclusions.
+- Alerts never manufacture sensitive-status conclusions; focused fixtures cover changed classification or evidence rules.
 - Preview/PDF use the same renderer tuple and DOCX/text preserve required semantics.
 - No-AI PDF/DOCX import produces a complete reviewable local proposal, preserves unfamiliar extracted content, and never runs the parser in the desktop process or performs network I/O.
-- All three direct providers pass common contract tests.
-- Codex support is either backed by complete platform containment evidence or disabled in stable builds.
+- Changed direct adapters pass their affected contract checks.
+- Codex support is either backed by the focused active-platform enforcement review and bounded negative checks or disabled in stable builds.

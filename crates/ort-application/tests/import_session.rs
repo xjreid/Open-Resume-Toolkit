@@ -341,3 +341,28 @@ fn empty_profile_review_defers_creation_until_explicit_commit() {
     assert_eq!(saved.revision, 1);
     assert_eq!(saved.document.sections[0].heading, "Projects");
 }
+
+#[test]
+fn expired_or_already_retired_review_can_be_dismissed_without_cancelling_a_new_review() {
+    let now = Instant::now();
+    let owner = ReviewOwner::default();
+    let mut sessions = ReviewSessions::default();
+    let token = sessions.begin(owner, base(), proposal(), now).unwrap();
+    let expired = now + REVIEW_LIFETIME;
+    sessions.cancel(owner, token, expired).unwrap();
+    sessions.cancel(owner, token, expired).unwrap();
+    assert!(!sessions.is_active(expired));
+    let next = sessions.begin(owner, base(), proposal(), expired).unwrap();
+    assert_eq!(
+        sessions.cancel(owner, token, expired),
+        Err(SessionError::Unavailable)
+    );
+    assert!(sessions.read(owner, next, expired).is_ok());
+    assert!(
+        sessions
+            .commit::<()>(owner, token, expired, &base(), |_| panic!(
+                "retired review reached storage"
+            ))
+            .is_err()
+    );
+}

@@ -153,27 +153,29 @@ Emergency desktop disablement is local capability-based; the extension itself st
 
 ## Security tests
 
-- malicious page mutates DOM/selection during capture;
-- page tries to impersonate extension messages;
-- HTML/script/control characters and deceptive Unicode;
-- credentials/fragments/tracking values in URLs;
-- oversized/truncated/negative-length/deep JSON frames;
-- unapproved extension origin and development/production ID mix-up;
-- forged HMAC, replay, expired request, wrong install ID, local cross-user connection;
-- unrelated same-user process and native-host attempts to read database/provider vault entries; other-user attempts to read the IPC entry;
-- symlink/reparse/registry path substitution;
-- desktop absent, slow start, crash mid-request, two simultaneous captures;
-- host/stdout contamination and seeded-data log scan;
-- install/repair/update/uninstall on both browsers and every release channel.
+Follow the proportional verification policy in
+`../../Product Plans/Quality_Accessibility_and_Verification.md`. For a changed
+capture or IPC boundary, use bounded synthetic checks that confirm explicit-action
+capture, origin/install identity and HMAC/replay rejection, frame-size limits,
+and no content persistence or log leakage. Check registration or repair on the
+actively supported browser/channel when that code changes. Keep the desktop
+disabled on an identity, authentication, or protocol failure.
+
+No default fuzz campaign, timing-dependent desktop-start test, forced crash, or
+all-browser/all-channel installation matrix is required. Investigate those cases
+when a defect or release-specific risk justifies it.
 
 ## Accessibility and privacy tests
 
-Extension action/status and errors are keyboard/screen-reader operable at 200% scaling. The overlay review owns the labeled edit/accept controls and announces receipt without trapping focus. Privacy tests inspect browser storage after success/failure/restart and verify no captured content remains.
+Extension action/status and errors are keyboard/screen-reader operable at 200%
+scaling. The overlay review owns the labeled edit/accept controls and announces
+receipt without trapping focus. A focused success/failure storage check verifies
+that captured content does not remain.
 
 ## Completion criteria
 
 - A deliberate selection can reach desktop review on Chrome and Edge/Windows and macOS.
 - No tested passive navigation/selection event creates storage or native traffic.
 - Unauthenticated, replayed, expired, malformed, oversized, or wrong-origin messages cannot create a workspace.
-- Installation, repair, update, version skew, and uninstall have clean-machine evidence per supported channel.
+- Changed installation, repair, update, version-skew, or uninstall behavior has concise evidence on its active supported path.
 - The extension contains no provider credentials, AI logic, telemetry, or persistent job content.

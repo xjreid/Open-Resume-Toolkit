@@ -22,6 +22,7 @@ it("does not launch unavailable import or mutate an empty profile on picker canc
   const root = createRoot(host);
   const saved = vi.fn();
   const busy = vi.fn();
+  const operation = vi.fn();
   try {
     await act(async () =>
       root.render(
@@ -30,6 +31,7 @@ it("does not launch unavailable import or mutate an empty profile on picker canc
           revision={null}
           onSaved={saved}
           onBusyChange={busy}
+          onOperationChange={operation}
         />,
       ),
     );
@@ -50,6 +52,7 @@ it("does not launch unavailable import or mutate an empty profile on picker canc
           revision={null}
           onSaved={saved}
           onBusyChange={busy}
+          onOperationChange={operation}
         />,
       ),
     );
@@ -76,6 +79,7 @@ it("owns one pending request and retains a review if cancellation races completi
   const root = createRoot(host);
   const saved = vi.fn();
   const busy = vi.fn();
+  const operation = vi.fn();
   try {
     await act(async () =>
       root.render(
@@ -84,6 +88,7 @@ it("owns one pending request and retains a review if cancellation races completi
           revision={3}
           onSaved={saved}
           onBusyChange={busy}
+          onOperationChange={operation}
         />,
       ),
     );
@@ -99,6 +104,8 @@ it("owns one pending request and retains a review if cancellation races completi
     });
     await act(async () => finish({ ok: true, value: { id: "native-review" } }));
     expect(host.textContent).toContain("Cancel review");
+    expect(busy).toHaveBeenLastCalledWith(true);
+    expect(operation).toHaveBeenLastCalledWith(false);
     expect(saved).not.toHaveBeenCalled();
     await act(async () => host.querySelector("button")!.click());
     expect(busy).toHaveBeenLastCalledWith(false);

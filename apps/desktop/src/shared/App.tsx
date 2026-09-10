@@ -95,8 +95,9 @@ function ResumeEditor() {
   const [health, setHealth] = useState<HealthState>({ kind: "checking" });
   const [editor, dispatch] = useReducer(editorReducer, initialEditorState);
   const [importActive, setImportActive] = useState(false);
+  const [importWorking, setImportWorking] = useState(false);
   const close = useCloseGuard(
-    importActive ? { ...editor, status: "exporting" } : editor,
+    importWorking ? { ...editor, status: "exporting" } : editor,
   );
   const [confirmReload, setConfirmReload] = useState(false);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("txt");
@@ -322,7 +323,7 @@ function ResumeEditor() {
     <main className="shell shell--editor">
       <CloseDialog
         open={close.pending}
-        busy={busy}
+        busy={editor.status !== "idle" || importWorking}
         resolving={close.resolving}
         canSave={!!document && dirty && !mustReload && issues.length === 0}
         error={close.error}
@@ -381,6 +382,7 @@ function ResumeEditor() {
               }
               revision={revision}
               onBusyChange={setImportActive}
+              onOperationChange={setImportWorking}
               onSaved={(saved) => {
                 dispatch({
                   type: "loaded",
@@ -416,6 +418,7 @@ function ResumeEditor() {
           }
           revision={revision}
           onBusyChange={setImportActive}
+          onOperationChange={setImportWorking}
           onSaved={(saved) => {
             dispatch({
               type: "loaded",

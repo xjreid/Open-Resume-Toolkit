@@ -147,13 +147,14 @@ Document import is runtime-disabled on a platform/package whose parser-worker sa
 - accessibility automated checks for reachable UI routes;
 - builds on the macOS-arm64 qualification target and retained Windows/Intel-Mac portability targets.
 
-### Nightly or scheduled
+### Optional targeted checks
 
-- fuzz corpora for backup, IPC, PDF, DOCX, URL, and AI-output parsers;
-- current provider contract probes using project-owned low-limit test credentials;
-- Codex supported-version matrix;
-- update/install/repair virtual-machine matrix;
-- deterministic/reproducibility comparison where toolchains permit.
+The default CI is the pull-request and protected-release work needed for the
+change. Follow the proportional verification policy in
+`../../Product Plans/Quality_Accessibility_and_Verification.md`; it does not
+require a standing nightly schedule. Fuzzing, live provider probes, broad
+compatibility/install matrices, and reproducibility comparisons are targeted
+tools for a specific defect, security finding, or release risk.
 
 ### Protected release
 
@@ -172,7 +173,8 @@ Provider adapters use recorded contract fixtures with secrets and identifying te
 
 ## Evidence layout
 
-CI attaches a machine-readable evidence bundle:
+When a release or changed high-risk boundary needs evidence, attach the concise,
+relevant results rather than a fixed universal bundle:
 
 ```text
 evidence/<version>/
@@ -182,7 +184,7 @@ evidence/<version>/
   licenses/
   sbom/
   provenance/
-  install-matrix/
+  installation/
   renderer/
   compatibility.json
 ```

@@ -262,13 +262,18 @@ Normal uninstall removes application binaries and native-host registration but p
 
 ## Tests
 
-- unit/property: IDs, revisions, dates, cap period math, reservation settlement, retention;
-- integration: encrypted open/reopen, WAL recovery, concurrent writes, low disk, vault loss/lock;
-- migration: every historical schema to current, interruption at each phase, newer schema refusal;
-- backup: deterministic fixtures, wrong passphrase, corruption, truncation, hostile sizes/counts, cross-platform restore;
-- deletion: exact-target resolution, symlink/reparse protection, preserved exports, vault cleanup;
-- fuzz: SQL-boundary values, JSON payloads, archive header/payload and search queries;
-- privacy: seeded sensitive markers absent from clear files, logs, backups, and process arguments.
+Follow the proportional verification policy in
+`../../Product Plans/Quality_Accessibility_and_Verification.md`. Each storage,
+migration, backup, or deletion change gets focused synthetic checks for its
+normal flow and the relevant critical protection: encryption/key separation,
+schema/version validation, atomic write or migration recovery, exact-target
+deletion, or bounded archive/input rejection. Verify that seeded sensitive data
+does not appear in the affected clear-text output or log boundary.
+
+Do not require fuzz campaigns, every historical-schema upgrade, phase-by-phase
+interruption, forced crashes, disk-fill tests, or cross-platform matrices by
+default. Use a bounded negative case and expand to a targeted investigation only
+when a defect, migration risk, or platform-specific issue warrants it.
 
 ## Rollout and rollback
 

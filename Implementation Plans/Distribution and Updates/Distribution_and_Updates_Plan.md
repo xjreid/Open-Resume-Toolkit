@@ -176,14 +176,18 @@ Desktop exposes this data in diagnostics. Website/support pages render it rather
 
 ## Test matrix
 
-- clean install, upgrade from every supported predecessor, interrupted download/install, app running, low disk;
-- tampered package, updater metadata, signature, checksum, provenance, and catalog;
-- preview/stable/direct/Store crossover attempts;
-- Windows per-user permissions, WebView2 variants, Unicode paths, native host repair/uninstall;
-- macOS Intel/Apple Silicon, quarantine/Gatekeeper, drag-install, moved app, unsigned update guidance;
-- schema migration failure and recovery copy;
-- offline update check and GitHub rate/availability failures;
-- external Codex absent/old/new/incompatible without affecting base install.
+Follow the proportional verification policy in
+`../../Product Plans/Quality_Accessibility_and_Verification.md`. For a changed
+release or updater path, verify one representative install or upgrade path and
+the critical protections: signed/digest-verified artifact identity, channel
+separation, tamper rejection, and recoverable migration/update failure. Confirm
+that an absent or incompatible external Codex runtime does not affect the base
+install when that integration changes.
+
+Exhaustive predecessor, OS, WebView, browser, channel, and failure matrices;
+forced interruption or low-disk tests; and scheduled availability probes are not
+default requirements. Use a targeted check for a known defect, a changed
+platform-specific installer boundary, or a release risk.
 
 ## Completion criteria
 
