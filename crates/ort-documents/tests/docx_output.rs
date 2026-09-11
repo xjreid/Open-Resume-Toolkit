@@ -83,7 +83,7 @@ fn fixed_parts_well_formed_xml_and_deterministic_bytes_for_whole_corpus() {
 }
 
 #[test]
-fn semantic_headings_lists_line_breaks_and_safe_visible_links() {
+fn semantic_headings_lists_line_breaks_and_safe_link_labels() {
     let values = parts(&render_docx(&support::fixture("standard")).unwrap());
     let body = &values["word/document.xml"];
     for required in [
@@ -92,8 +92,8 @@ fn semantic_headings_lists_line_breaks_and_safe_visible_links() {
         "<w:numPr>",
         "<w:br/>",
         "<w:tab/>",
-        "Portfolio: https://example.org/work?a=1&amp;b=2",
-        "Tools: Rust, TypeScript &amp; SQL",
+        "Portfolio",
+        "Rust, TypeScript &amp; SQL",
     ] {
         assert!(body.contains(required), "{required}");
     }
@@ -101,6 +101,7 @@ fn semantic_headings_lists_line_breaks_and_safe_visible_links() {
         values["word/_rels/document.xml.rels"]
             .contains("Target=\"https://example.org/work?a=1&amp;b=2\"")
     );
+    assert!(!body.contains("Portfolio: https://example.org"));
     let hostile = parts(&render_docx(&support::fixture("hostile")).unwrap());
     assert!(!hostile["word/document.xml"].contains("<w:object>"));
     assert!(hostile["word/document.xml"].contains("&lt;w:object&gt;"));
@@ -204,7 +205,28 @@ fn bundled_styles_preserve_all_content_relationships_and_package_constraints() {
             );
             let styled_parts = parts(&bytes);
             for (name, content) in &original_parts {
-                if name != "word/styles.xml" {
+                if name == "word/document.xml" {
+                    // Contact rows and date alignment may change presentation;
+                    // no factual text may disappear or be duplicated.
+                    fn words(xml: &str) -> Vec<String> {
+                        let mut words = xml
+                            .split("<w:t xml:space=\"preserve\">")
+                            .skip(1)
+                            .flat_map(|part| {
+                                part.split("</w:t>").next().unwrap().split_whitespace()
+                            })
+                            .filter(|word| *word != "|")
+                            .map(str::to_owned)
+                            .collect::<Vec<_>>();
+                        words.sort();
+                        words
+                    }
+                    assert_eq!(
+                        words(&styled_parts[name]),
+                        words(content),
+                        "{kind}: content"
+                    );
+                } else if name != "word/styles.xml" {
                     assert_eq!(&styled_parts[name], content, "{kind}: {name}");
                 }
             }

@@ -11,7 +11,8 @@ import {
 describe("published snapshot review", () => {
   it("escapes content and displays links without creating navigation authority", () => {
     const document = createResumeDocument();
-    document.title = "<script>alert('synthetic')</script>";
+    document.title = "This internal document title must not appear";
+    document.contact.fullName = "<script>alert('synthetic')</script>";
     document.contact.links = [{ label: "Website", url: "https://example.com" }];
     const section = createSection(0);
     const entry = createEntry(0);
@@ -28,6 +29,7 @@ describe("published snapshot review", () => {
     const html = renderToStaticMarkup(<PublishedResume document={document} />);
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>");
+    expect(html).not.toContain("This internal document title must not appear");
     expect(html).not.toContain("href=");
     expect(html).toContain("https://example.com");
     expect(html).toContain("Language (skill)");

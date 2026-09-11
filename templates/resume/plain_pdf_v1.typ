@@ -12,20 +12,39 @@
     text(part.replace("\t", "    "))
   }
 }
+#let rich(runs) = {
+  for run in runs {
+    let content = text(
+      weight: if run.bold { "bold" } else { "regular" },
+      style: if run.italic { "italic" } else { "normal" },
+      literal(run.text),
+    )
+    if run.url == none { content } else { link(run.url, content) }
+  }
+}
 #let paragraphs = json(bytes(sys.inputs.resume))
 #for p in paragraphs {
   if p.kind == "name" {
-    block(above: 0pt, below: 8pt, text(size: 18pt, weight: "bold", literal(p.text)))
+    block(above: 0pt, below: 8pt, text(size: 18pt, weight: "bold", rich(p.runs)))
   } else if p.kind == "section" {
-    heading(level: 1, literal(p.text))
+    heading(level: 1, rich(p.runs))
   } else if p.kind == "entry" {
-    heading(level: 2, literal(p.text))
+    block(sticky: true, above: 5pt, below: 1pt,
+      grid(columns: (1fr, 30%), align: (left, right), column-gutter: 12pt,
+        rich(p.runs), rich(p.right_runs),
+      )
+    )
+  } else if p.kind == "subrow" or p.kind == "meta" {
+    block(above: 0pt, below: 1pt,
+      grid(columns: (1fr, 30%), align: (left, right), column-gutter: 12pt,
+        rich(p.runs), rich(p.right_runs),
+      )
+    )
   } else if p.kind == "bullet" {
-    list(tight: true, indent: 0pt, body-indent: 12pt, literal(p.text))
+    block(above: 0pt, below: 1pt, list(tight: true, indent: 0pt, body-indent: 12pt, rich(p.runs)))
   } else if p.kind == "link" {
-    block(above: 0pt, below: 4pt, link(p.url, literal(p.text)))
+    block(above: 1pt, below: 1pt, rich(p.runs))
   } else {
-    block(above: 0pt, below: 4pt, literal(p.text))
+    block(above: 0pt, below: 2pt, rich(p.runs))
   }
-  v(6pt, weak: false)
 }

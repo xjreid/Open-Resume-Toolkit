@@ -22,6 +22,7 @@ pub const FONT_BUNDLE_ID: &str = "libertinus-serif/typst-assets-0.15.1";
 const TEMPLATE: &str = include_str!("../../../templates/resume/plain_pdf_v1.typ");
 const MAX_LAYOUT_BLOCKS: usize = 800;
 const MAX_HARD_BREAKS: usize = 200;
+const PARAGRAPH_FIELD_LABEL: &str = "__ort_body_paragraph__";
 static RENDER_LOCK: Mutex<()> = Mutex::new(());
 static SOURCE: LazyLock<Source> = LazyLock::new(|| Source::detached(TEMPLATE));
 static TECHNICAL_SOURCE: LazyLock<Source> =
@@ -73,10 +74,20 @@ pub struct PdfArtifact {
 }
 
 #[derive(Serialize)]
+struct InlineRun {
+    text: String,
+    bold: bool,
+    italic: bool,
+    url: Option<String>,
+}
+
+#[derive(Serialize)]
 struct Paragraph {
     kind: &'static str,
     text: String,
-    url: Option<String>,
+    right: Option<String>,
+    runs: Vec<InlineRun>,
+    right_runs: Vec<InlineRun>,
 }
 
 fn normalized(value: &str) -> String {
@@ -87,15 +98,44 @@ fn normalized(value: &str) -> String {
         .to_owned()
 }
 
-fn add(paragraphs: &mut Vec<Paragraph>, kind: &'static str, value: &str) {
-    let text = normalized(value);
-    if !text.is_empty() {
-        paragraphs.push(Paragraph {
-            kind,
-            text,
-            url: None,
-        });
+fn inline_runs(value: &str, force_bold: bool, force_italic: bool) -> Vec<InlineRun> {
+    ort_documents::parse_inline_text(&normalized(value))
+        .into_iter()
+        .map(|span| InlineRun {
+            text: span.text,
+            bold: force_bold || span.bold,
+            italic: force_italic || span.italic,
+            url: span.url,
+        })
+        .collect()
+}
+
+fn plain_runs(runs: &[InlineRun]) -> String {
+    runs.iter().map(|run| run.text.as_str()).collect()
+}
+
+fn push_paragraph(
+    paragraphs: &mut Vec<Paragraph>,
+    kind: &'static str,
+    runs: Vec<InlineRun>,
+    right_runs: Vec<InlineRun>,
+) {
+    let text = plain_runs(&runs);
+    let right = plain_runs(&right_runs);
+    if text.is_empty() && right.is_empty() {
+        return;
     }
+    paragraphs.push(Paragraph {
+        kind,
+        text,
+        right: (!right.is_empty()).then_some(right),
+        runs,
+        right_runs,
+    });
+}
+
+fn add(paragraphs: &mut Vec<Paragraph>, kind: &'static str, value: &str) {
+    push_paragraph(paragraphs, kind, inline_runs(value, false, false), vec![]);
 }
 
 fn link(paragraphs: &mut Vec<Paragraph>, value: &Link) -> Result<(), PdfRenderError> {
@@ -104,74 +144,137 @@ fn link(paragraphs: &mut Vec<Paragraph>, value: &Link) -> Result<(), PdfRenderEr
     }
     let label = normalized(&value.label);
     let url = normalized(&value.url);
-    let text = if label.is_empty() || label == url {
-        url.clone()
-    } else {
-        format!("{label}: {url}")
-    };
-    paragraphs.push(Paragraph {
-        kind: "link",
-        text,
+    let text = if label.is_empty() { url.clone() } else { label };
+    push_paragraph(
+        paragraphs,
+        "link",
+        vec![InlineRun {
+            text,
+            bold: false,
+            italic: false,
+            url: Some(url),
+        }],
+        vec![],
+    );
+    Ok(())
+}
+
+fn append_runs(target: &mut Vec<InlineRun>, value: &str, bold: bool, italic: bool) {
+    target.extend(inline_runs(value, bold, italic));
+}
+
+fn append_separator(target: &mut Vec<InlineRun>, separator: &str) {
+    if !target.is_empty() {
+        target.push(InlineRun {
+            text: separator.to_owned(),
+            bold: false,
+            italic: false,
+            url: None,
+        });
+    }
+}
+
+fn append_link(target: &mut Vec<InlineRun>, value: &Link) -> Result<(), PdfRenderError> {
+    if value.url.chars().any(char::is_whitespace) {
+        return Err(PdfRenderError::InvalidContent);
+    }
+    let url = normalized(&value.url);
+    let label = normalized(&value.label);
+    target.push(InlineRun {
+        text: if label.is_empty() { url.clone() } else { label },
+        bold: false,
+        italic: false,
         url: Some(url),
     });
     Ok(())
 }
 
-fn paragraphs(document: &ResumeDocument) -> Result<Vec<Paragraph>, PdfRenderError> {
+fn paragraphs(
+    document: &ResumeDocument,
+    style: DocumentStyle,
+) -> Result<Vec<Paragraph>, PdfRenderError> {
     ort_documents::render_plain_text(document).map_err(|_| PdfRenderError::InvalidContent)?;
     let mut out = Vec::new();
-    add(&mut out, "name", &document.contact.full_name);
-    for value in [
-        &document.contact.email,
-        &document.contact.phone,
-        &document.contact.location,
-    ] {
-        add(&mut out, "text", value);
+    push_paragraph(
+        &mut out,
+        "name",
+        inline_runs(&document.contact.full_name, true, false),
+        vec![],
+    );
+    if style == DocumentStyle::Plain {
+        for value in [
+            &document.contact.email,
+            &document.contact.phone,
+            &document.contact.location,
+        ] {
+            add(&mut out, "text", value);
+        }
+    } else {
+        let mut contact = Vec::new();
+        for value in [
+            &document.contact.email,
+            &document.contact.phone,
+            &document.contact.location,
+        ] {
+            if !normalized(value).is_empty() {
+                append_separator(&mut contact, "  •  ");
+                append_runs(&mut contact, value, false, false);
+            }
+        }
+        for value in &document.contact.links {
+            append_separator(&mut contact, "  •  ");
+            append_link(&mut contact, value)?;
+        }
+        push_paragraph(&mut out, "contact", contact, vec![]);
     }
-    for value in &document.contact.links {
-        link(&mut out, value)?;
+    if style == DocumentStyle::Plain {
+        for value in &document.contact.links {
+            link(&mut out, value)?;
+        }
     }
     for section in &document.sections {
         let mut entries = Vec::new();
         for entry in &section.entries {
-            add(&mut entries, "entry", &entry.heading);
-            for value in [&entry.subheading, &entry.date_range, &entry.location] {
-                add(&mut entries, "text", value);
-            }
-            for date in entry.dates.iter().flatten() {
-                add(&mut entries, "text", &date.display_text());
-            }
-            for field in &entry.fields {
-                let value = normalized(&field.value);
-                if !value.is_empty() {
-                    let label = normalized(&field.label);
-                    add(
-                        &mut entries,
-                        "text",
-                        &if label.is_empty() {
-                            value
-                        } else {
-                            format!("{label}: {value}")
-                        },
-                    );
+            entry_header(&mut entries, entry);
+            if let Some(body) = entry
+                .fields
+                .iter()
+                .find(|field| field.label == PARAGRAPH_FIELD_LABEL)
+                .map(|field| field.value.as_str())
+                .filter(|value| !value.trim().is_empty())
+            {
+                add(&mut entries, "text", body);
+            } else {
+                for bullet in &entry.bullets {
+                    add(&mut entries, "bullet", &bullet.text);
                 }
-            }
-            for bullet in &entry.bullets {
-                add(&mut entries, "bullet", &bullet.text);
             }
             for value in &entry.links {
                 link(&mut entries, value)?;
             }
         }
         if !entries.is_empty() {
-            add(&mut out, "section", &section.heading);
+            push_paragraph(
+                &mut out,
+                "section",
+                inline_runs(&section.heading, true, false),
+                vec![],
+            );
             out.extend(entries);
         }
     }
+    validate_paragraphs(&out)?;
+    Ok(out)
+}
+
+fn validate_paragraphs(out: &[Paragraph]) -> Result<(), PdfRenderError> {
     if out.len() > MAX_LAYOUT_BLOCKS
         || out
             .iter()
-            .map(|p| p.text.matches('\n').count())
+            .map(|p| {
+                p.text.matches('\n').count()
+                    + p.right.as_deref().unwrap_or("").matches('\n').count()
+            })
             .sum::<usize>()
             > MAX_HARD_BREAKS
     {
@@ -181,7 +284,11 @@ fn paragraphs(document: &ResumeDocument) -> Result<Vec<Paragraph>, PdfRenderErro
     // headings and ordinary text must both have coverage. No system fallback.
     for c in out
         .iter()
-        .flat_map(|p| p.text.chars())
+        .flat_map(|p| {
+            p.text
+                .chars()
+                .chain(p.right.as_deref().unwrap_or("").chars())
+        })
         .filter(|c| !c.is_whitespace())
     {
         if FONTS
@@ -191,7 +298,54 @@ fn paragraphs(document: &ResumeDocument) -> Result<Vec<Paragraph>, PdfRenderErro
             return Err(PdfRenderError::UnsupportedGlyph);
         }
     }
-    Ok(out)
+    Ok(())
+}
+
+fn entry_header(entries: &mut Vec<Paragraph>, entry: &ort_domain::ResumeEntry) {
+    let mut title = inline_runs(&entry.heading, true, false);
+    if let Some(details) = entry.fields.iter().find(|field| {
+        field.label != PARAGRAPH_FIELD_LABEL
+            && !field.label.trim().eq_ignore_ascii_case("extra")
+            && !field.value.trim().is_empty()
+    }) {
+        append_separator(&mut title, " | ");
+        append_runs(&mut title, &details.value, false, false);
+    }
+    push_paragraph(
+        entries,
+        "entry",
+        title,
+        inline_runs(&entry.location, false, false),
+    );
+
+    let dates = if entry.date_range.trim().is_empty() {
+        entry
+            .dates
+            .iter()
+            .flatten()
+            .map(ort_domain::ResumeDate::display_text)
+            .collect::<Vec<_>>()
+            .join("\n")
+    } else {
+        entry.date_range.clone()
+    };
+    push_paragraph(
+        entries,
+        "subrow",
+        inline_runs(&entry.subheading, false, false),
+        inline_runs(&dates, false, false),
+    );
+
+    let extras = entry
+        .fields
+        .iter()
+        .filter(|field| {
+            field.label.trim().eq_ignore_ascii_case("extra") && !field.value.trim().is_empty()
+        })
+        .map(|field| field.value.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    push_paragraph(entries, "meta", vec![], inline_runs(&extras, false, false));
 }
 
 struct MemoryWorld {
@@ -291,7 +445,25 @@ fn visible_frame(frame: &Frame, origin: Point, depth: usize) -> bool {
                     })
             }
             FrameItem::Link(..) | FrameItem::Tag(..) => true,
-            FrameItem::Image(..) | FrameItem::Shape(..) => false,
+            FrameItem::Shape(shape, _) => {
+                // Only thin, horizontal section rules from bundled templates.
+                // Images, fills, curves, clipping and transformed drawing stay denied.
+                if let typst::visualize::Geometry::Line(end) = &shape.geometry {
+                    shape.fill.is_none()
+                        && shape.stroke.as_ref().is_some_and(|stroke| {
+                            stroke.thickness.to_pt() > 0.0 && stroke.thickness.to_pt() <= 1.0
+                        })
+                        && end.y.to_pt() == 0.0
+                        && end.x.to_pt() >= 0.0
+                        && [point, point + *end].iter().all(|p| {
+                            (56.0..=556.0).contains(&p.x.to_pt())
+                                && (56.0..=736.0).contains(&p.y.to_pt())
+                        })
+                } else {
+                    false
+                }
+            }
+            FrameItem::Image(..) => false,
         }
     })
 }
@@ -316,7 +488,7 @@ pub fn render_pdf_with_style(
         .lock()
         .map_err(|_| PdfRenderError::Unavailable)?;
     let _eviction = EvictMemoizedContent;
-    let content = paragraphs(document)?;
+    let content = paragraphs(document, style)?;
     let world = MemoryWorld::new(&content, style)?;
     let compiled = typst::compile::<typst_layout::PagedDocument>(&world);
     if !compiled.warnings.is_empty() {
@@ -373,18 +545,67 @@ mod tests {
     #[test]
     fn bundled_template_compiles_without_warnings() {
         let _guard = RENDER_LOCK.lock().unwrap();
-        let world = MemoryWorld::new(
-            &[Paragraph {
-                kind: "name",
-                text: "Synthetic".into(),
-                url: None,
-            }],
+        for style in [
             DocumentStyle::Plain,
-        )
-        .unwrap();
-        let result = typst::compile::<typst_layout::PagedDocument>(&world);
-        assert!(result.warnings.is_empty(), "{:?}", result.warnings);
-        assert!(result.output.is_ok(), "{:?}", result.output.err());
+            DocumentStyle::Technical,
+            DocumentStyle::Professional,
+            DocumentStyle::Modern,
+        ] {
+            let world = MemoryWorld::new(
+                &[
+                    Paragraph {
+                        kind: "name",
+                        text: "Synthetic".into(),
+                        right: None,
+                        runs: vec![InlineRun {
+                            text: "Synthetic".into(),
+                            bold: true,
+                            italic: false,
+                            url: None,
+                        }],
+                        right_runs: vec![],
+                    },
+                    Paragraph {
+                        kind: "entry",
+                        text: "Software Engineer".into(),
+                        right: Some("2023-2026".into()),
+                        runs: vec![InlineRun {
+                            text: "Software Engineer".into(),
+                            bold: true,
+                            italic: false,
+                            url: None,
+                        }],
+                        right_runs: vec![InlineRun {
+                            text: "2023-2026".into(),
+                            bold: false,
+                            italic: false,
+                            url: None,
+                        }],
+                    },
+                ],
+                style,
+            )
+            .unwrap();
+            let result = typst::compile::<typst_layout::PagedDocument>(&world);
+            assert!(
+                result.warnings.is_empty(),
+                "{style:?}: {:?}",
+                result.warnings
+            );
+            assert!(
+                result.output.is_ok(),
+                "{style:?}: {:?}",
+                result.output.err()
+            );
+            let output = result.output.unwrap();
+            assert!(
+                output
+                    .pages()
+                    .iter()
+                    .all(|page| visible_frame(&page.frame, Point::zero(), 0)),
+                "{style:?}: frame rejected"
+            );
+        }
     }
 
     #[test]

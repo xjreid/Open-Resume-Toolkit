@@ -220,6 +220,41 @@ afterEach(async () => {
 });
 
 describe("M2 live editor accessibility", () => {
+  it("preserves edits across workspace destinations and restores the section navigator", async () => {
+    const container = await render(<App surface="main" />);
+    await act(async () =>
+      inputValue(inputInLabel(container, "Full name"), "Updated locally"),
+    );
+    await act(async () => buttonNamed(container, "Settings").click());
+    expect(container.querySelector<HTMLElement>(".resume-page")?.hidden).toBe(
+      true,
+    );
+    expect(container.querySelector<HTMLElement>(".settings-page")?.hidden).toBe(
+      false,
+    );
+    await act(async () =>
+      buttonNamed(container, "Storage and deletion").click(),
+    );
+    await expectSurfaceAccessible(container);
+    await act(async () => buttonNamed(container, "Master resume").click());
+    expect(inputInLabel(container, "Full name").value).toBe("Updated locally");
+    await act(async () => buttonNamed(container, "Collapse sections").click());
+    expect(
+      buttonNamed(container, "Show sections").getAttribute("aria-expanded"),
+    ).toBe("false");
+    await act(async () => buttonNamed(container, "Show sections").click());
+    expect(
+      buttonNamed(container, "Collapse sections").getAttribute("aria-expanded"),
+    ).toBe("true");
+    await act(async () => buttonNamed(container, "2. Review & style").click());
+    expect(container.querySelector(".focused-editor")).toBeNull();
+    await act(async () => buttonNamed(container, "Edit contact").click());
+    expect(inputInLabel(container, "Full name").value).toBe("Updated locally");
+    expect(
+      buttonNamed(container, "1. Write").getAttribute("aria-current"),
+    ).toBe("step");
+  });
+
   it("starts one manual draft with suggested sections and focuses contact information", async () => {
     const original = native.invoke.getMockImplementation()!;
     native.invoke.mockImplementation(
@@ -335,8 +370,8 @@ describe("M2 live editor accessibility", () => {
     );
     await settle();
     expect(container.textContent).toContain("Restart ORT to activate it");
-    expect(container.textContent).toContain("Not saved");
-    expect(container.textContent).toContain("No snapshot");
+    expect(container.textContent).toContain("Getting started");
+    expect(container.textContent).toContain("Not published yet");
     expect(
       container.querySelector('[aria-labelledby="identity-heading"]'),
     ).toBeNull();
@@ -404,7 +439,7 @@ describe("M2 live editor accessibility", () => {
 
   it("audits the loaded editor rather than only its loading shell", async () => {
     const container = await render(<App surface="main" />);
-    expect(container.textContent).toContain("Identity and contact");
+    expect(container.textContent).toContain("Contact information");
     const fullName = Array.from(container.querySelectorAll("input")).find(
       (input) => input.value === "Synthetic Person",
     );

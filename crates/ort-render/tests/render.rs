@@ -117,10 +117,11 @@ fn every_style_rejects_overflow_missing_glyphs_and_external_links() {
     ] {
         let mut document = support::fixture("standard");
         document.contact.full_name = "W".repeat(1900);
-        assert!(matches!(
-            ort_render::render_pdf_with_style(&document, style),
-            Err(PdfRenderError::LayoutLimit)
-        ));
+        let error = ort_render::render_pdf_with_style(&document, style).err();
+        assert!(
+            matches!(error, Some(PdfRenderError::LayoutLimit)),
+            "{style:?}: {error:?}"
+        );
         document.contact.full_name = "示例".into();
         assert!(matches!(
             ort_render::render_pdf_with_style(&document, style),
@@ -132,5 +133,21 @@ fn every_style_rejects_overflow_missing_glyphs_and_external_links() {
             ort_render::render_pdf_with_style(&document, style),
             Err(PdfRenderError::InvalidContent)
         ));
+    }
+}
+
+#[test]
+fn aligned_dates_still_reject_unsupported_glyphs() {
+    for style in [
+        ort_domain::DocumentStyle::Technical,
+        ort_domain::DocumentStyle::Professional,
+        ort_domain::DocumentStyle::Modern,
+    ] {
+        let mut document = support::fixture("standard");
+        document.sections[0].entries[0].date_range = "示例".into();
+        assert_eq!(
+            ort_render::render_pdf_with_style(&document, style).err(),
+            Some(PdfRenderError::UnsupportedGlyph)
+        );
     }
 }

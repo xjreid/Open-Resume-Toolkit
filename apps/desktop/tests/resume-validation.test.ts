@@ -22,6 +22,12 @@ describe("editor validation and ordering", () => {
     );
   });
 
+  it("keeps recommended contact positions free-form", () => {
+    const document = createResumeDocument();
+    document.contact.email = "New York · available to relocate";
+    expect(validateEditorDocument(document)).toEqual([]);
+  });
+
   it("accepts safe links and counts Unicode characters like Rust", () => {
     const document = createResumeDocument();
     document.title = "😀".repeat(DOCUMENT_LIMITS.fieldCharacters);

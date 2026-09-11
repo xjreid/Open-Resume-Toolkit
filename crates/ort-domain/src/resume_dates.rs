@@ -23,7 +23,8 @@ impl CalendarDate {
     #[must_use]
     pub fn display_text(&self) -> String {
         const MONTHS: [&str; 12] = [
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+            "Jan.", "Feb.", "Mar.", "Apr.", "May.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.",
+            "Dec.",
         ];
         let value = self
             .month

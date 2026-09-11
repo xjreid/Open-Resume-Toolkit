@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "documentId": "01a08cf7-402d-7af2-a5ce-e313cc01a127",
+  "title": "Synthetic design review",
+  "contact": {
+    "fullName": "Alex Morgan",
+    "email": "alex.morgan@example.org",
+    "phone": "+1 (202) 555-0142",
+    "location": "Portland, OR",
+    "links": []
+  },
+  "sections": [
+    {
+      "id": "01a08cf7-402d-7af2-a5ce-e395e7020b4d",
+      "order": 0,
+      "heading": "Experience",
+      "entries": [
+        {
+          "id": "01a08cf7-402d-7af2-a5ce-e3267ad3e0ab",
+          "order": 0,
+          "heading": "Senior Software Engineer",
+          "subheading": "Example Studio",
+          "dateRange": "2022–Present",
+          "location": "",
+          "fields": [],
+          "bullets": [
+            {
+              "id": "01a08cf7-402d-7af2-a5ce-e3381332ef24",
+              "order": 0,
+              "text": "Led the development of accessible planning tools for cross-functional teams."
+            },
+            {
+              "id": "01a08cf7-402d-7af2-a5ce-e34276d35136",
+              "order": 1,
+              "text": "Reduced report preparation time by 35% through a reusable data validation workflow."
+            },
+            {
+              "id": "01a08cf7-402d-7af2-a5ce-e3564e87f016",
+              "order": 2,
+              "text": "Partnered with design and customer teams to simplify onboarding and document editing."
+            }
+          ],
+          "links": []
+        },
+        {
+          "id": "01a08cf7-402d-7af2-a5ce-e3619223a632",
+          "order": 1,
+          "heading": "Software Engineer",
+          "subheading": "Northstar Example Cooperative",
+          "dateRange": "2019–2022",
+          "location": "",
+          "fields": [],
+          "bullets": [
+            {
+              "id": "01a08cf7-402d-7af2-a5ce-e37e89b94e24",
+              "order": 0,
+              "text": "Built reliable services in TypeScript and SQL with clear operational documentation."
+            },
+            {
+              "id": "01a08cf7-402d-7af2-a5ce-e38ff699bbc2",
+              "order": 1,
+              "text": "Introduced automated checks for data quality and keyboard accessibility."
+            }
+          ],
+          "links": []
+        }
+      ]
+    },
+    {
+      "id": "01a08cf7-402d-7af2-a5ce-e3d628b34b00",
+      "order": 1,
+      "heading": "Projects",
+      "entries": [
+        {
+          "id": "01a08cf7-402d-7af2-a5ce-e3ac3ac431c7",
+          "order": 0,
+          "heading": "Community Resource Directory",
+          "subheading": "Independent project",
+          "dateRange": "2024",
+          "location": "",
+          "fields": [],
+          "bullets": [
+            {
+              "id": "01a08cf7-402d-7af2-a5ce-e3b461754830",
+              "order": 0,
+              "text": "Designed a searchable directory that helps residents find local support services."
+            },
+            {
+              "id": "01a08cf7-402d-7af2-a5ce-e3c36510f60c",
+              "order": 1,
+              "text": "Implemented a responsive interface, clear content hierarchy, and accessible navigation."
+            }
+          ],
+          "links": []
+        }
+      ]
+    },
+    {
+      "id": "01a08cf7-402d-7af2-a5ce-e407fc7d350d",
+      "order": 2,
+      "heading": "Education",
+      "entries": [
+        {
+          "id": "01a08cf7-402d-7af2-a5ce-e3e27925f18f",
+          "order": 0,
+          "heading": "Example State University",
+          "subheading": "B.S. in Computer Science",
+          "dateRange": "2015–2019",
+          "location": "",
+          "fields": [],
+          "bullets": [
+            {
+              "id": "01a08cf7-402d-7af2-a5ce-e3f217a2f31b",
+              "order": 0,
+              "text": "Coursework: software engineering, data structures, human-computer interaction."
+            }
+          ],
+          "links": []
+        }
+      ]
+    },
+    {
+      "id": "01a08cf7-402d-7af2-a5ce-e4334bc41723",
+      "order": 3,
+      "heading": "Skills",
+      "entries": [
+        {
+          "id": "01a08cf7-402d-7af2-a5ce-e411843b299f",
+          "order": 0,
+          "heading": "Languages and tools",
+          "subheading": "TypeScript, Rust, Python, SQL, Git, Figma",
+          "dateRange": "",
+          "location": "",
+          "fields": [],
+          "bullets": [
+            {
+              "id": "01a08cf7-402d-7af2-a5ce-e424fbf64b3e",
+              "order": 0,
+              "text": "Accessibility, user research, technical writing, and cross-functional collaboration."
+            }
+          ],
+          "links": []
+        }
+      ]
+    }
+  ]
+}

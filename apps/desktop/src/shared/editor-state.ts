@@ -137,9 +137,10 @@ export function editorReducer(
         document: newerEdits ? state.document : action.value.document,
         errorCode: null,
         autosavePaused: false,
-        notice: newerEdits
-          ? "Earlier changes saved; newer edits are still pending."
-          : `Draft revision ${action.value.revision} saved securely.`,
+        // Saving is routine and already has a stable status indicator in the
+        // workspace toolbar. Do not insert a notice into the document flow on
+        // every autosave: it interrupts reading and makes the layout jump.
+        notice: null,
       };
     }
     case "publishing":

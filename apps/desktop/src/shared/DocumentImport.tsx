@@ -118,9 +118,7 @@ export function DocumentImport({
           >
             Import an existing resume
           </button>
-          {!available ? (
-            <p>Import is unavailable in this development build.</p>
-          ) : null}
+          {!available ? <p>Import is not available in this version of the app.</p> : null}
           {pending ? (
             <div role="status">
               <p>

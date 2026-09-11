@@ -1,17 +1,17 @@
 import type { CalendarDate, ResumeDate } from "@ort/contracts/resume";
 const months = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
+  "Jan.",
+  "Feb.",
+  "Mar.",
+  "Apr.",
+  "May.",
+  "Jun.",
+  "Jul.",
+  "Aug.",
+  "Sep.",
+  "Oct.",
+  "Nov.",
+  "Dec.",
 ];
 function calendarText(value: CalendarDate): string {
   const date =

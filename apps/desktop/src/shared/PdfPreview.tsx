@@ -130,7 +130,7 @@ export function PdfPreviewPanel({
     portablePassphrase,
   ).byteLength;
   const [message, setMessage] = useState(
-    "Generate a preview from a saved revision. Unsaved edits are not included.",
+    "Choose a saved draft or published resume to load its PDF preview.",
   );
   const mounted = useRef(false);
   const currentSelection = useRef({ saved, published, dirty, style });
@@ -453,14 +453,12 @@ export function PdfPreviewPanel({
     preview && !snapshot?.retained
       ? previewIsStale(preview, current?.revision ?? null, dirty)
       : false;
-  const content = (
+  const legacyContent = (
     <section className="editor-panel pdf-panel" aria-labelledby="pdf-title">
       <h2 id="pdf-title">PDF preview &amp; export</h2>
       <p>
-        New preview style: {DOCUMENT_STYLE_LABELS[style]}. US Letter ·
-        Libertinus Serif · English layout · five pages maximum. Unsupported
-        characters are reported, not substituted. Export creates an unencrypted
-        file; choose a private local folder and a new filename.
+        {DOCUMENT_STYLE_LABELS[style]} · US Letter · up to five pages. Review
+        these exact pages before exporting. Exported files are unencrypted.
       </p>
       <div className="move-controls">
         <button
@@ -505,9 +503,8 @@ export function PdfPreviewPanel({
         Automatically refresh saved-draft pages
       </label>
       <p>
-        Refresh waits for a valid saved draft and runs only while exact pages
-        are selected. A failed attempt waits for a new save or your retry.
-        Published and historical previews turn automatic refresh off.
+        Refresh follows saved changes while these pages are open. Published and
+        historical previews stay fixed.
       </p>
       {dirty ? (
         <p role="status">
@@ -830,6 +827,123 @@ export function PdfPreviewPanel({
         ) : null}
       </details>
       <PdfNotices />
+    </section>
+  );
+  void legacyContent;
+  const content = (
+    <section className="pdf-quick-panel" aria-labelledby="pdf-title">
+      <div className="pdf-quick-panel__heading">
+        <div>
+          <h3 id="pdf-title">PDF export</h3>
+          <p>
+            Load the version you want, review it, then export that exact PDF.
+          </p>
+        </div>
+        <label className="pdf-auto-refresh">
+          <input
+            type="checkbox"
+            checked={autoRefresh}
+            disabled={blocked}
+            onChange={(event) => {
+              lastAutomaticAttempt.current = null;
+              setAutoRefresh(event.target.checked);
+            }}
+          />
+          Refresh preview automatically after edits are saved
+        </label>
+      </div>
+      <div className="pdf-quick-panel__actions">
+        <button
+          type="button"
+          disabled={blocked || !saved || dirty}
+          onClick={() => void generate("saved_draft")}
+        >
+          Load saved draft
+        </button>
+        <button
+          type="button"
+          className="button--secondary"
+          disabled={blocked || !published}
+          onClick={() => void generate("published_snapshot")}
+        >
+          Load published resume
+        </button>
+        {snapshot ? (
+          <button
+            type="button"
+            className="button--quiet"
+            disabled={blocked}
+            onClick={() => {
+              setSnapshot(null);
+              setReady(false);
+              setMessage("Choose a version to load its PDF preview.");
+            }}
+          >
+            Clear preview
+          </button>
+        ) : null}
+      </div>
+      {dirty ? (
+        <p className="pdf-quick-panel__notice" role="status">
+          Saving your latest edits before the draft PDF can refresh.
+        </p>
+      ) : null}
+      <p className="pdf-quick-panel__status" role="status">
+        {message}
+      </p>
+      {renderPending ? (
+        <button
+          type="button"
+          className="button--secondary"
+          onClick={() => {
+            if (pendingRender.current) pendingRender.current.discarded = true;
+            setMessage("Discarding the pending preview…");
+          }}
+        >
+          Cancel loading preview
+        </button>
+      ) : null}
+      {snapshot && preview ? (
+        <div className="pdf-quick-panel__preview">
+          <div className="pdf-quick-panel__preview-header">
+            <p>
+              <strong>
+                {preview.source === "saved_draft"
+                  ? "Saved draft"
+                  : "Published resume"}
+              </strong>{" "}
+              · revision {preview.revision} · {preview.receipt.pageCount}{" "}
+              page(s)
+            </p>
+            <button
+              type="button"
+              disabled={blocked || stale || !ready}
+              onClick={() => void download()}
+            >
+              Export as PDF
+            </button>
+          </div>
+          {stale ? (
+            <p className="pdf-quick-panel__notice" role="status">
+              This preview is out of date. Reload it after the latest changes
+              finish saving.
+            </p>
+          ) : null}
+          <PdfCanvas
+            key={preview.renderId}
+            preview={preview}
+            onPending={() => setReady(false)}
+            onReady={() => {
+              setReady(true);
+              setMessage("PDF ready to export.");
+            }}
+            onError={() => {
+              setReady(false);
+              setMessage("The PDF could not be displayed. Reload the preview.");
+            }}
+          />
+        </div>
+      ) : null}
     </section>
   );
   return previewTarget ? createPortal(content, previewTarget) : content;

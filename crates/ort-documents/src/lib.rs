@@ -1,6 +1,7 @@
 //! Deterministic document output. Hostile-file parsing remains disabled.
 
 use ort_domain::{DocumentLimits, Link, ResumeDocument};
+use url::Url;
 
 mod docx;
 pub mod import;
@@ -18,6 +19,120 @@ pub use docx::{
 pub const IMPORT_ENABLED: bool = false;
 pub const TEXT_FORMAT_VERSION: u16 = 1;
 pub const MAX_TEXT_BYTES: usize = 256 * 1024;
+const PARAGRAPH_FIELD_LABEL: &str = "__ort_body_paragraph__";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InlineSpan {
+    pub text: String,
+    pub bold: bool,
+    pub italic: bool,
+    pub url: Option<String>,
+}
+
+/// Parses the small, literal inline-formatting language used by the editor.
+/// Unsupported or incomplete markers remain visible text, matching the preview.
+#[must_use]
+pub fn parse_inline_text(value: &str) -> Vec<InlineSpan> {
+    let mut spans = Vec::new();
+    let mut at = 0;
+    let mut literal_at = 0;
+    while at < value.len() {
+        if let Some((consumed, span)) = inline_token(&value[at..]) {
+            push_inline_span(
+                &mut spans,
+                InlineSpan {
+                    text: value[literal_at..at].to_owned(),
+                    bold: false,
+                    italic: false,
+                    url: None,
+                },
+            );
+            push_inline_span(&mut spans, span);
+            at += consumed;
+            literal_at = at;
+        } else {
+            at += value[at..].chars().next().map_or(1, char::len_utf8);
+        }
+    }
+    push_inline_span(
+        &mut spans,
+        InlineSpan {
+            text: value[literal_at..].to_owned(),
+            bold: false,
+            italic: false,
+            url: None,
+        },
+    );
+    spans
+}
+
+fn inline_token(value: &str) -> Option<(usize, InlineSpan)> {
+    if let Some(rest) = value.strip_prefix("**") {
+        if let Some(end) = rest.find("**") {
+            let text = &rest[..end];
+            if !text.is_empty() && !text.contains('*') {
+                return Some((end + 4, formatted_span(text, true, false, None)));
+            }
+        }
+    }
+    if let Some(rest) = value.strip_prefix('*') {
+        if !rest.starts_with('*') {
+            if let Some(end) = rest.find('*') {
+                let text = &rest[..end];
+                if !text.is_empty() && !text.contains('*') {
+                    return Some((end + 2, formatted_span(text, false, true, None)));
+                }
+            }
+        }
+    }
+    if let Some(rest) = value.strip_prefix('[') {
+        if let Some(label_end) = rest.find("](") {
+            let label = &rest[..label_end];
+            let url_and_end = &rest[label_end + 2..];
+            if let Some(url_end) = url_and_end.find(')') {
+                let address = &url_and_end[..url_end];
+                if !label.is_empty()
+                    && !address.is_empty()
+                    && !address.chars().any(char::is_whitespace)
+                    && safe_inline_url(address)
+                {
+                    return Some((
+                        1 + label_end + 2 + url_end + 1,
+                        formatted_span(label, false, false, Some(address.to_owned())),
+                    ));
+                }
+            }
+        }
+    }
+    None
+}
+
+fn formatted_span(text: &str, bold: bool, italic: bool, url: Option<String>) -> InlineSpan {
+    InlineSpan {
+        text: text.to_owned(),
+        bold,
+        italic,
+        url,
+    }
+}
+
+fn push_inline_span(spans: &mut Vec<InlineSpan>, span: InlineSpan) {
+    if span.text.is_empty() {
+        return;
+    }
+    if let Some(previous) = spans.last_mut() {
+        if previous.bold == span.bold && previous.italic == span.italic && previous.url == span.url
+        {
+            previous.text.push_str(&span.text);
+            return;
+        }
+    }
+    spans.push(span);
+}
+
+fn safe_inline_url(value: &str) -> bool {
+    Url::parse(value).is_ok_and(|parsed| matches!(parsed.scheme(), "http" | "https" | "mailto"))
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextExportError {
@@ -70,6 +185,10 @@ pub fn render_plain_text(document: &ResumeDocument) -> Result<String, TextExport
             for field in &entry.fields {
                 let value = normalized(&field.value)?;
                 if value.is_empty() {
+                    continue;
+                }
+                if field.label == PARAGRAPH_FIELD_LABEL {
+                    lines.push(value);
                     continue;
                 }
                 let label = normalized(&field.label)?;

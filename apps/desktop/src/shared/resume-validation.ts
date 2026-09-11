@@ -68,6 +68,8 @@ export function validateEditorDocument(
   field("title", document.title);
   for (const key of ["fullName", "email", "phone", "location"] as const)
     field(`contact.${key}`, document.contact[key]);
+  // Contact canvas areas are intentionally free-form recommendations. The
+  // legacy storage keys must not constrain what a person displays there.
   links("contact.links", document.contact.links);
   for (const section of document.sections) {
     const path = `section.${section.id}`;
