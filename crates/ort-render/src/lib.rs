@@ -50,12 +50,29 @@ const MODERN_FONT_BYTES: [&[u8]; 4] = [
     include_bytes!("../fonts/LiberationSans-Italic.ttf"),
     include_bytes!("../fonts/LiberationSans-BoldItalic.ttf"),
 ];
+const TECHNICAL_FONT_BUNDLE_ID: &str = "liberation-serif/2.1.5";
+const TECHNICAL_FONT_BYTES: [&[u8]; 4] = [
+    include_bytes!("../fonts/LiberationSerif-Regular.ttf"),
+    include_bytes!("../fonts/LiberationSerif-Bold.ttf"),
+    include_bytes!("../fonts/LiberationSerif-Italic.ttf"),
+    include_bytes!("../fonts/LiberationSerif-BoldItalic.ttf"),
+];
+const PROFESSIONAL_FONT_BUNDLE_ID: &str = "gelasio/7ab20e7e5c42+liberation-serif/2.1.5";
+const PROFESSIONAL_FONT_BYTES: [&[u8]; 4] = [
+    include_bytes!("../fonts/Gelasio-Regular.ttf"),
+    include_bytes!("../fonts/Gelasio-Bold.ttf"),
+    include_bytes!("../fonts/Gelasio-Italic.ttf"),
+    include_bytes!("../fonts/Gelasio-BoldItalic.ttf"),
+];
 // Fixed, compiled-in faces only: the original six serif faces followed by
-// four sans-serif faces used by Modern. Historical serif indices stay fixed.
+// four faces each for Modern, Technical and Professional. Historical
+// serif indices stay fixed.
 static FONTS: LazyLock<Vec<Font>> = LazyLock::new(|| {
     typst_assets::fonts()
         .take(6)
         .chain(MODERN_FONT_BYTES)
+        .chain(TECHNICAL_FONT_BYTES)
+        .chain(PROFESSIONAL_FONT_BYTES)
         .map(|bytes| Font::new(Bytes::new(bytes), 0).expect("reviewed bundled font"))
         .collect()
 });
@@ -97,6 +114,9 @@ struct Paragraph {
     right: Option<String>,
     runs: Vec<InlineRun>,
     right_runs: Vec<InlineRun>,
+    subtitle_runs: Vec<InlineRun>,
+    title_runs: Vec<InlineRun>,
+    detail_runs: Vec<InlineRun>,
     sticky: bool,
     entry_end: bool,
     body_start: bool,
@@ -143,6 +163,9 @@ fn push_paragraph(
         right: (!right.is_empty()).then_some(right),
         runs,
         right_runs,
+        subtitle_runs: vec![],
+        title_runs: vec![],
+        detail_runs: vec![],
         sticky: false,
         entry_end: false,
         body_start: false,
@@ -255,7 +278,7 @@ fn paragraphs(
         let mut entries = Vec::new();
         for entry in &section.entries {
             let entry_start = entries.len();
-            entry_header(&mut entries, entry);
+            entry_header(&mut entries, entry, style);
             let body_start = entries.len();
             if let Some(body) = entry
                 .fields
@@ -309,6 +332,10 @@ fn validate_paragraphs(out: &[Paragraph], style: DocumentStyle) -> Result<(), Pd
             .map(|p| {
                 p.text.matches('\n').count()
                     + p.right.as_deref().unwrap_or("").matches('\n').count()
+                    + p.subtitle_runs
+                        .iter()
+                        .map(|r| r.text.matches('\n').count())
+                        .sum::<usize>()
             })
             .sum::<usize>()
             > MAX_HARD_BREAKS
@@ -323,43 +350,59 @@ fn validate_paragraphs(out: &[Paragraph], style: DocumentStyle) -> Result<(), Pd
             p.text
                 .chars()
                 .chain(p.right.as_deref().unwrap_or("").chars())
+                .chain(p.subtitle_runs.iter().flat_map(|r| r.text.chars()))
         })
         .filter(|c| !c.is_whitespace())
     {
-        if (if style == DocumentStyle::Modern {
-            &FONTS[6..]
-        } else {
-            &FONTS[..6]
-        })
-        .iter()
-        .any(|font| !font.info().coverage.contains(u32::from(c)))
-        {
+        let covers = |fonts: &[Font]| {
+            fonts
+                .iter()
+                .all(|font| font.info().coverage.contains(u32::from(c)))
+        };
+        let supported = match style {
+            DocumentStyle::Modern => covers(&FONTS[6..10]),
+            DocumentStyle::Technical => covers(&FONTS[10..14]),
+            // Fixed fallback retains Greek/Cyrillic coverage without host fonts.
+            DocumentStyle::Professional => covers(&FONTS[14..18]) || covers(&FONTS[10..14]),
+            DocumentStyle::Plain => covers(&FONTS[..6]),
+        };
+        if !supported {
             return Err(PdfRenderError::UnsupportedGlyph);
         }
     }
     Ok(())
 }
 
-fn entry_header(entries: &mut Vec<Paragraph>, entry: &ort_domain::ResumeEntry) {
+fn entry_header(
+    entries: &mut Vec<Paragraph>,
+    entry: &ort_domain::ResumeEntry,
+    style: DocumentStyle,
+) {
     let mut title = inline_runs(&entry.heading, true, false);
+    let mut details_runs = vec![];
     if let Some(details) = entry.fields.iter().find(|field| {
         field.label != PARAGRAPH_FIELD_LABEL
             && !field.label.trim().eq_ignore_ascii_case("extra")
             && !field.value.trim().is_empty()
     }) {
+        details_runs = inline_runs(&details.value, false, false);
         append_separator(&mut title, " | ");
         append_runs(&mut title, &details.value, false, false);
     }
-    let dates = if entry.date_range.trim().is_empty() {
-        entry
-            .dates
-            .iter()
-            .flatten()
-            .map(ort_domain::ResumeDate::display_text)
+    let dates = if style == DocumentStyle::Plain && !entry.date_range.trim().is_empty() {
+        entry.date_range.clone()
+    } else {
+        std::iter::once(entry.date_range.clone())
+            .chain(
+                entry
+                    .dates
+                    .iter()
+                    .flatten()
+                    .map(ort_domain::ResumeDate::display_text),
+            )
+            .filter(|value| !value.trim().is_empty())
             .collect::<Vec<_>>()
             .join("\n")
-    } else {
-        entry.date_range.clone()
     };
     let extras = entry
         .fields
@@ -370,6 +413,28 @@ fn entry_header(entries: &mut Vec<Paragraph>, entry: &ort_domain::ResumeEntry) {
         .map(|field| field.value.as_str())
         .collect::<Vec<_>>()
         .join("\n");
+    if style != DocumentStyle::Plain {
+        let right = [entry.location.as_str(), dates.as_str(), extras.as_str()]
+            .into_iter()
+            .filter(|value| !value.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let subtitle = inline_runs(&entry.subheading, false, false);
+        if !title.is_empty() || !subtitle.is_empty() || !right.is_empty() {
+            let index = entries.len();
+            // One pair of independent stacks: a wrapped title must not move
+            // the location/dates down. The body still follows both stacks.
+            if title.is_empty() && right.is_empty() {
+                push_paragraph(entries, "entry", subtitle, vec![]);
+            } else {
+                push_paragraph(entries, "entry", title, inline_runs(&right, false, false));
+                entries[index].subtitle_runs = subtitle;
+                entries[index].title_runs = inline_runs(&entry.heading, true, false);
+                entries[index].detail_runs = details_runs;
+            }
+        }
+        return;
+    }
     let mut right_rows = [entry.location.as_str(), dates.as_str(), extras.as_str()]
         .into_iter()
         .map(|value| inline_runs(value, false, false))
@@ -567,6 +632,17 @@ pub fn render_pdf_with_style(
         for font in MODERN_FONT_BYTES {
             font_hash.update(font);
         }
+    } else if style == DocumentStyle::Technical {
+        for font in TECHNICAL_FONT_BYTES {
+            font_hash.update(font);
+        }
+    } else if style == DocumentStyle::Professional {
+        for font in PROFESSIONAL_FONT_BYTES
+            .into_iter()
+            .chain(TECHNICAL_FONT_BYTES)
+        {
+            font_hash.update(font);
+        }
     } else {
         for font in typst_assets::fonts().take(6) {
             font_hash.update(font);
@@ -583,6 +659,10 @@ pub fn render_pdf_with_style(
         template_sha256: sha256(template(style).as_bytes()),
         font_bundle_id: if style == DocumentStyle::Modern {
             MODERN_FONT_BUNDLE_ID
+        } else if style == DocumentStyle::Technical {
+            TECHNICAL_FONT_BUNDLE_ID
+        } else if style == DocumentStyle::Professional {
+            PROFESSIONAL_FONT_BUNDLE_ID
         } else {
             FONT_BUNDLE_ID
         }
@@ -619,6 +699,9 @@ mod tests {
                             url: None,
                         }],
                         right_runs: vec![],
+                        subtitle_runs: vec![],
+                        title_runs: vec![],
+                        detail_runs: vec![],
                         sticky: false,
                         entry_end: false,
                         body_start: false,
@@ -639,6 +722,9 @@ mod tests {
                             italic: false,
                             url: None,
                         }],
+                        subtitle_runs: vec![],
+                        title_runs: vec![],
+                        detail_runs: vec![],
                         sticky: false,
                         entry_end: false,
                         body_start: false,
@@ -680,18 +766,24 @@ mod tests {
         .intern();
         assert!(matches!(world.source(other), Err(FileError::AccessDenied)));
         assert!(matches!(world.file(other), Err(FileError::AccessDenied)));
-        assert_eq!(FONTS.len(), 10);
+        assert_eq!(FONTS.len(), 18);
         assert!(
             FONTS[..6]
                 .iter()
                 .all(|font| font.info().family == "Libertinus Serif")
         );
         assert!(
-            FONTS[6..]
+            FONTS[6..10]
                 .iter()
                 .all(|font| font.info().family == "Liberation Sans")
         );
-        assert!(world.font(10).is_none());
+        assert!(
+            FONTS[10..14]
+                .iter()
+                .all(|f| f.info().family == "Liberation Serif")
+        );
+        assert!(FONTS[14..18].iter().all(|f| f.info().family == "Gelasio"));
+        assert!(world.font(18).is_none());
         assert!(world.today(None).is_none());
         for code in [
             r#"#read("/private/secret")"#,

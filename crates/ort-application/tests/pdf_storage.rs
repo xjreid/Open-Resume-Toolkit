@@ -145,7 +145,7 @@ fn schema_upgrade_retains_publications_and_round_trips_mixed_versions_through_ba
         "a v1 client cannot discard v2 data"
     );
     let text = ort_documents::render_plain_text(&upgraded).unwrap();
-    assert!(text.contains("Graduation: Expected Jun 2027"));
+    assert!(text.contains("Graduation: Expected Jun. 2027"));
     for style in [
         ort_domain::DocumentStyle::Plain,
         ort_domain::DocumentStyle::Technical,

@@ -33,7 +33,7 @@
   } else if p.kind == "entry" {
     block(sticky: p.sticky, above: 4pt, below: 1pt,
       pad(left: content-inset, grid(columns: (1fr, 23%), align: (left, right), column-gutter: 10.5pt,
-        rich(p.runs), rich(p.right_runs),
+        heading(level: 2, outlined: false, rich(p.runs)), rich(p.right_runs),
       ))
     )
   } else if p.kind == "subrow" or p.kind == "meta" {

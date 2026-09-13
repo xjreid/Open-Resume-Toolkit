@@ -67,40 +67,39 @@ pub fn parse_inline_text(value: &str) -> Vec<InlineSpan> {
 }
 
 fn inline_token(value: &str) -> Option<(usize, InlineSpan)> {
-    if let Some(rest) = value.strip_prefix("**") {
-        if let Some(end) = rest.find("**") {
-            let text = &rest[..end];
-            if !text.is_empty() && !text.contains('*') {
-                return Some((end + 4, formatted_span(text, true, false, None)));
-            }
+    if let Some(rest) = value.strip_prefix("**")
+        && let Some(end) = rest.find("**")
+    {
+        let text = &rest[..end];
+        if !text.is_empty() && !text.contains('*') {
+            return Some((end + 4, formatted_span(text, true, false, None)));
         }
     }
-    if let Some(rest) = value.strip_prefix('*') {
-        if !rest.starts_with('*') {
-            if let Some(end) = rest.find('*') {
-                let text = &rest[..end];
-                if !text.is_empty() && !text.contains('*') {
-                    return Some((end + 2, formatted_span(text, false, true, None)));
-                }
-            }
+    if let Some(rest) = value.strip_prefix('*')
+        && !rest.starts_with('*')
+        && let Some(end) = rest.find('*')
+    {
+        let text = &rest[..end];
+        if !text.is_empty() && !text.contains('*') {
+            return Some((end + 2, formatted_span(text, false, true, None)));
         }
     }
-    if let Some(rest) = value.strip_prefix('[') {
-        if let Some(label_end) = rest.find("](") {
-            let label = &rest[..label_end];
-            let url_and_end = &rest[label_end + 2..];
-            if let Some(url_end) = url_and_end.find(')') {
-                let address = &url_and_end[..url_end];
-                if !label.is_empty()
-                    && !address.is_empty()
-                    && !address.chars().any(char::is_whitespace)
-                    && safe_inline_url(address)
-                {
-                    return Some((
-                        1 + label_end + 2 + url_end + 1,
-                        formatted_span(label, false, false, Some(address.to_owned())),
-                    ));
-                }
+    if let Some(rest) = value.strip_prefix('[')
+        && let Some(label_end) = rest.find("](")
+    {
+        let label = &rest[..label_end];
+        let url_and_end = &rest[label_end + 2..];
+        if let Some(url_end) = url_and_end.find(')') {
+            let address = &url_and_end[..url_end];
+            if !label.is_empty()
+                && !address.is_empty()
+                && !address.chars().any(char::is_whitespace)
+                && safe_inline_url(address)
+            {
+                return Some((
+                    1 + label_end + 2 + url_end + 1,
+                    formatted_span(label, false, false, Some(address.to_owned())),
+                ));
             }
         }
     }
@@ -120,12 +119,13 @@ fn push_inline_span(spans: &mut Vec<InlineSpan>, span: InlineSpan) {
     if span.text.is_empty() {
         return;
     }
-    if let Some(previous) = spans.last_mut() {
-        if previous.bold == span.bold && previous.italic == span.italic && previous.url == span.url
-        {
-            previous.text.push_str(&span.text);
-            return;
-        }
+    if let Some(previous) = spans.last_mut()
+        && previous.bold == span.bold
+        && previous.italic == span.italic
+        && previous.url == span.url
+    {
+        previous.text.push_str(&span.text);
+        return;
     }
     spans.push(span);
 }

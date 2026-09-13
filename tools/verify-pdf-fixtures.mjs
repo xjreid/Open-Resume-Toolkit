@@ -50,11 +50,18 @@ const expectedPageCounts = {
   sparse: 1,
   unicode: 1,
   hostile: 1,
-  dense: 4,
+  dense: 3,
   optional: 1,
   structured: 1,
-  paginated: 2,
+  paginated: 1,
 };
+const safeArea = {
+  plain: { left: 55, right: 557, bottom: 55, top: 737 },
+  // Allow up to 3pt of font-glyph overhang beyond the configured margins.
+  technical: { left: 35.25, right: 576.75, bottom: 30.75, top: 761.25 },
+  professional: { left: 41.25, right: 570.75, bottom: 30.75, top: 761.25 },
+  modern: { left: 39.75, right: 572.25, bottom: 30.75, top: 761.25 },
+}[style];
 assert.deepEqual(Object.keys(goldens).sort(), [...kinds].sort());
 assert.deepEqual(Object.keys(textGoldens).sort(), [...kinds].sort());
 const normalized = (value) =>
@@ -62,13 +69,102 @@ const normalized = (value) =>
     .replace(/^\s*- /gm, "")
     .replaceAll("•", "")
     .replace(/\s+/g, "");
+const visibleLink = (link) => link.label.trim() || link.url.trim();
+const visibleDate = (date) => {
+  const months = [
+    "Jan.",
+    "Feb.",
+    "Mar.",
+    "Apr.",
+    "May.",
+    "Jun.",
+    "Jul.",
+    "Aug.",
+    "Sep.",
+    "Oct.",
+    "Nov.",
+    "Dec.",
+  ];
+  const calendar = (value) => {
+    if (!value) return "";
+    const text =
+      value.month === null
+        ? `${value.year}`
+        : `${months[value.month - 1]} ${value.year}`;
+    return value.expected ? `Expected ${text}` : text;
+  };
+  const start = calendar(date.start);
+  const end =
+    date.end?.kind === "present" ? "Present" : calendar(date.end?.value);
+  const value = [start, end].filter(Boolean).join("–");
+  return value && date.label.trim() ? `${date.label.trim()}: ${value}` : value;
+};
+const expectedVisibleText = (source, documentStyle) => {
+  const parts = [];
+  const add = (value) => {
+    if (value?.trim()) parts.push(value.trim());
+  };
+  add(source.contact.fullName);
+  add(source.contact.email);
+  add(source.contact.phone);
+  add(source.contact.location);
+  source.contact.links.forEach((link) => add(visibleLink(link)));
+  for (const section of source.sections) {
+    if (!section.entries.length) continue;
+    add(
+      documentStyle === "modern"
+        ? section.heading.toUpperCase()
+        : section.heading,
+    );
+    for (const entry of section.entries) {
+      const details = entry.fields.find(
+        (field) =>
+          field.label !== "__ort_body_paragraph__" &&
+          field.label.trim().toLowerCase() !== "extra" &&
+          field.value.trim(),
+      );
+      add(
+        [entry.heading, details?.value]
+          .filter((value) => value?.trim())
+          .join(" | "),
+      );
+      const dates = [entry.dateRange, ...(entry.dates ?? []).map(visibleDate)]
+        .filter((value) => value?.trim())
+        .join("\n");
+      const extras = entry.fields
+        .filter((field) => field.label.trim().toLowerCase() === "extra")
+        .map((field) => field.value)
+        .filter((value) => value.trim())
+        .join("\n");
+      const rightRows = [entry.location, dates, extras].filter((value) =>
+        value.trim(),
+      );
+      if (documentStyle === "plain") {
+        add(rightRows.shift());
+        add(entry.subheading);
+        rightRows.forEach(add);
+      } else {
+        add(entry.subheading);
+        rightRows.forEach(add);
+      }
+      const body = entry.fields.find(
+        (field) =>
+          field.label === "__ort_body_paragraph__" && field.value.trim(),
+      );
+      if (body) add(body.value);
+      else entry.bullets.forEach((bullet) => add(bullet.text));
+      entry.links.forEach((link) => add(visibleLink(link)));
+    }
+  }
+  return parts.join("\n");
+};
 const expectedManifest = {
   documentSchemaVersion: schemaV2 ? 2 : 1,
   rendererVersion: "typst-0.15.1/ort-1",
   templateId: `${style}_pdf_v1`,
   templateSha256:
     style === "plain"
-      ? "8074983903239c57a2373fbd542b10c7bef70a890a7ef9bb6e98a1b9be799bc3"
+      ? "ebffeff9632a3aa59f9b4667de003506e91413c24124d551b928beafb66ee3a5"
       : createHash("sha256")
           .update(
             readFileSync(
@@ -79,9 +175,20 @@ const expectedManifest = {
             ),
           )
           .digest("hex"),
-  fontBundleId: "libertinus-serif/typst-assets-0.15.1",
-  fontBundleSha256:
-    "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+  fontBundleId: {
+    plain: "libertinus-serif/typst-assets-0.15.1",
+    technical: "liberation-serif/2.1.5",
+    professional: "gelasio/7ab20e7e5c42+liberation-serif/2.1.5",
+    modern: "liberation-sans/pdfjs-6.3.289",
+  }[style],
+  fontBundleSha256: {
+    plain: "98b4ba1306ed79918244fb630cbc653c70671c9299ee98177addc6f560e3fdcf",
+    technical:
+      "31ced13201af120eda0affb7fa96197044221d11bf6f05c832bfba01f22b1416",
+    professional:
+      "4182a6a5e2f5ef08dee0ae208d0db4a95b25304324dda8af37a78d10328180b6",
+    modern: "1117d564dbe2e60bd59e80fb38b4b3a84223c2a7beaa4dd7af0d1b4ee2ef9f57",
+  }[style],
 };
 for (const kind of kinds) {
   const bytes = readFileSync(join(directory, `${kind}.pdf`));
@@ -158,12 +265,14 @@ for (const kind of kinds) {
         if (!("str" in item)) continue;
         text += item.str + (item.hasEOL ? "\n" : " ");
         assert(
-          item.transform[4] >= 55 && item.transform[4] + item.width <= 557,
-          `${kind}: text outside horizontal safe area`,
+          item.transform[4] >= safeArea.left &&
+            item.transform[4] + item.width <= safeArea.right,
+          `${kind}: text outside horizontal safe area (${item.transform[4]}..${item.transform[4] + item.width}; expected ${safeArea.left}..${safeArea.right})`,
         );
         assert(
-          item.transform[5] >= 55 && item.transform[5] <= 737,
-          `${kind}: text outside vertical safe area`,
+          item.transform[5] >= safeArea.bottom &&
+            item.transform[5] <= safeArea.top,
+          `${kind}: text outside vertical safe area (${item.transform[5]}; expected ${safeArea.bottom}..${safeArea.top})`,
         );
       }
       assert.equal(await page.getJSActions(), null);
@@ -178,7 +287,7 @@ for (const kind of kinds) {
     }
     assert.equal(
       normalized(text),
-      normalized(expected),
+      normalized(expectedVisibleText(source, style)),
       `${kind}: visible text/order parity`,
     );
     const expectedUrls = [

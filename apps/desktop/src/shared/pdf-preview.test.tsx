@@ -236,7 +236,7 @@ it("rendering blocks quit and failures do not discard edits or pause autosave", 
   expect(finished.autosavePaused).toBe(false);
   expect(closeDisposition(finished)).toBe("confirm");
 });
-it("offers explicit saved-source controls, privacy warning and local license notices", () => {
+it("offers the focused saved-source preview controls", () => {
   const html = renderToStaticMarkup(
     <PdfPreviewPanel
       saved={null}
@@ -248,24 +248,29 @@ it("offers explicit saved-source controls, privacy warning and local license not
       semantic={() => null}
     />,
   );
-  expect(html).toContain("Preview saved draft");
-  expect(html).toContain("Preview published snapshot");
-  expect(html).toContain("Stored render history");
-  expect(html).toContain("Replay from an encrypted portable backup");
-  expect(html).toContain("does not restore or change the active profile");
-  expect(html).toContain("encrypted profile retains at most 100");
-  expect(html).toContain("unencrypted");
-  expect(html).toContain("SIL OPEN FONT LICENSE");
+  expect(html).toContain("Load saved draft");
+  expect(html).toContain("Load published resume");
+  expect(html).toContain("Refresh preview automatically after edits are saved");
+  expect(html).toContain("Choose a saved draft or published resume");
   expect(html).not.toContain("<iframe");
 });
 
 it("binds each styled preview to the requested template without accepting a substitute", async () => {
+  const fontBundleIds = {
+    technical: "liberation-serif/2.1.5",
+    professional: "gelasio/7ab20e7e5c42+liberation-serif/2.1.5",
+    modern: "liberation-sans/pdfjs-6.3.289",
+  } as const;
   for (const style of ["technical", "professional", "modern"] as const) {
     vi.mocked(invoke).mockResolvedValue({
       ok: true,
       value: {
         ...preview,
-        receipt: { ...preview.receipt, templateId: `${style}_pdf_v1` },
+        receipt: {
+          ...preview.receipt,
+          templateId: `${style}_pdf_v1`,
+          fontBundleId: fontBundleIds[style],
+        },
       },
     });
     expect((await renderResumePdf("saved_draft", 1, style)).ok).toBe(true);
@@ -292,7 +297,11 @@ it("binds regenerated responses to the historical source and explicitly requeste
   };
   const regenerated = {
     ...preview,
-    receipt: { ...preview.receipt, templateId: "modern_pdf_v1" },
+    receipt: {
+      ...preview.receipt,
+      templateId: "modern_pdf_v1",
+      fontBundleId: "liberation-sans/pdfjs-6.3.289",
+    },
   };
   for (const archiveId of [undefined, "019a0000-0000-7000-8000-000000000003"]) {
     vi.mocked(invoke).mockResolvedValueOnce({

@@ -215,7 +215,9 @@ fn bundled_styles_preserve_all_content_relationships_and_package_constraints() {
                             .flat_map(|part| {
                                 part.split("</w:t>").next().unwrap().split_whitespace()
                             })
-                            .filter(|word| *word != "|")
+                            // Styled contact rows use visual separators that
+                            // are not resume content.
+                            .filter(|word| *word != "|" && *word != "•")
                             .map(str::to_owned)
                             .collect::<Vec<_>>();
                         words.sort();
@@ -225,6 +227,14 @@ fn bundled_styles_preserve_all_content_relationships_and_package_constraints() {
                         words(&styled_parts[name]),
                         words(content),
                         "{kind}: content"
+                    );
+                } else if name == "word/numbering.xml" && style != DocumentStyle::Plain {
+                    // Only bullet geometry changes; numbering remains semantic.
+                    assert_eq!(
+                        styled_parts[name],
+                        content
+                            .replace("\"540\"", "\"750\"")
+                            .replace("\"180\"", "\"270\"")
                     );
                 } else if name != "word/styles.xml" {
                     assert_eq!(&styled_parts[name], content, "{kind}: {name}");
@@ -241,5 +251,28 @@ fn bundled_styles_preserve_all_content_relationships_and_package_constraints() {
                 assert_eq!(bytes, original);
             }
         }
+    }
+}
+
+#[test]
+fn styled_exports_keep_dates_and_match_preview_page_geometry() {
+    use ort_domain::DocumentStyle;
+
+    let mut document = support::fixture("standard");
+    document.sections[0].entries[0].date_range = "2022–Present".into();
+    for (style, tab, margin) in [
+        (DocumentStyle::Technical, "10710", "765"),
+        (DocumentStyle::Professional, "10470", "885"),
+        (DocumentStyle::Modern, "10530", "855"),
+    ] {
+        let values = parts(&ort_documents::render_docx_with_style(&document, style).unwrap());
+        assert!(values["word/document.xml"].contains("2022–Present"));
+        assert!(
+            values["word/document.xml"]
+                .contains(&format!("<w:tab w:val=\"right\" w:pos=\"{tab}\"/>"))
+        );
+        assert!(values["word/document.xml"].contains(&format!(
+            "w:top=\"675\" w:right=\"{margin}\" w:bottom=\"675\" w:left=\"{margin}\""
+        )));
     }
 }

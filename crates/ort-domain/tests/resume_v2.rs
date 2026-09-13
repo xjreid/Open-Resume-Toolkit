@@ -137,7 +137,7 @@ fn date_precision_empty_fields_expected_and_present_are_not_invented() {
         month: Some(9),
         expected: false,
     });
-    assert_eq!(date.display_text(), "Sep 2020–Present");
+    assert_eq!(date.display_text(), "Sep. 2020–Present");
     date.end = Some(DateEnd::Date {
         value: CalendarDate {
             year: 2020,

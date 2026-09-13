@@ -175,6 +175,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         e.order = u16::try_from(i).expect("bounded synthetic fixture");
     }
     let artifact = ort_render::render_pdf_with_style(&doc, DocumentStyle::Technical)?;
+    fs::write(
+        root.join("technical-long.source.json"),
+        serde_json::to_vec_pretty(&doc)?,
+    )?;
     fs::write(root.join("technical-long.pdf"), artifact.bytes)?;
     fs::write(
         root.join("technical-long.docx"),

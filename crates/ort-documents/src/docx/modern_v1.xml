@@ -3,16 +3,16 @@
   <w:docDefaults>
     <w:rPrDefault>
       <w:rPr>
-        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="SimSun" w:cs="Times New Roman" />
+        <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="SimSun" w:cs="Arial" />
         <w:color w:val="000000" />
-        <w:sz w:val="22" />
-        <w:szCs w:val="22" />
+        <w:sz w:val="19" />
+        <w:szCs w:val="19" />
       </w:rPr>
     </w:rPrDefault>
     <w:pPrDefault>
       <w:pPr>
         <w:widowControl />
-        <w:spacing w:after="60" w:line="250" w:lineRule="auto" />
+        <w:spacing w:after="20" w:line="276" w:lineRule="auto" />
       </w:pPr>
     </w:pPrDefault>
   </w:docDefaults>
@@ -32,7 +32,7 @@
     </w:pPr>
     <w:rPr>
       <w:b />
-      <w:color w:val="164E63" />
+      <w:color w:val="133C49" />
       <w:sz w:val="46" />
       <w:szCs w:val="46" />
     </w:rPr>
@@ -47,14 +47,16 @@
       <w:spacing w:before="160" w:after="40" />
       <w:outlineLvl w:val="0" />
       <w:pBdr>
-        <w:bottom w:val="single" w:sz="4" w:space="3" w:color="0F5C66" />
+        <w:bottom w:val="single" w:sz="12" w:space="3" w:color="276A78" />
       </w:pBdr>
     </w:pPr>
     <w:rPr>
       <w:b />
-      <w:color w:val="164E63" />
-      <w:sz w:val="24" />
-      <w:szCs w:val="24" />
+      <w:caps />
+      <w:spacing w:val="17" />
+      <w:color w:val="1B5C69" />
+      <w:sz w:val="21" />
+      <w:szCs w:val="21" />
     </w:rPr>
   </w:style>
   <w:style w:type="paragraph" w:styleId="Heading2">

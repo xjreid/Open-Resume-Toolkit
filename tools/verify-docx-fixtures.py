@@ -32,7 +32,7 @@ def normalized(value):
     return value.replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
-def expected_paragraphs(source):
+def expected_paragraphs(source, style):
     paragraphs, links = [], []
 
     def add(value, style="Normal", bullet=False):
@@ -42,31 +42,57 @@ def expected_paragraphs(source):
 
     def link(value):
         label, url = normalized(value["label"]), normalized(value["url"])
-        add(url if not label or label == url else f"{label}: {url}")
         links.append(url)
+        return label or url
 
     contact = source["contact"]
     add(contact["fullName"], "Title")
-    for key in ("email", "phone", "location"):
-        add(contact[key])
-    for value in contact["links"]:
-        link(value)
+    if style == "plain":
+        for key in ("email", "phone", "location"):
+            add(contact[key])
+        for value in contact["links"]:
+            add(link(value))
+    else:
+        values = [normalized(contact[key]) for key in ("email", "phone", "location")]
+        values.extend(link(value) for value in contact["links"])
+        add("  •  ".join(value for value in values if value), "Contact")
     for section in source["sections"]:
         begin = len(paragraphs)
         for entry in section["entries"]:
-            add(entry["heading"], "Heading2")
-            for key in ("subheading", "dateRange", "location"):
-                add(entry[key])
-            for date in entry.get("dates", []):
-                add(date_text(date))
-            for field in entry["fields"]:
-                if normalized(field["value"]):
-                    label, value = normalized(field["label"]), normalized(field["value"])
-                    add(f"{label}: {value}" if label else value)
-            for value in entry["bullets"]:
-                add(value["text"], "ListParagraph", True)
+            fields = [field for field in entry["fields"] if normalized(field["value"])]
+            details = next((field for field in fields
+                            if field["label"] != "__ort_body_paragraph__"
+                            and normalized(field["label"]).lower() != "extra"), None)
+            title = normalized(entry["heading"])
+            if details:
+                title += (" | " if title else "") + normalized(details["value"])
+            date_values = []
+            if normalized(entry["dateRange"]):
+                date_values.append(normalized(entry["dateRange"]))
+            date_values.extend(date_text(date) for date in entry.get("dates", []) if date_text(date))
+            extras = "\n".join(normalized(field["value"]) for field in fields
+                               if normalized(field["label"]).lower() == "extra")
+            right_rows = [normalized(entry["location"]), "\n".join(date_values), extras]
+            right_rows = [value for value in right_rows if value]
+
+            def paired(left, right, paragraph_style):
+                if not left and not right:
+                    return
+                spacer = " " if style != "plain" and not left and right else ""
+                add(spacer + left + ("\t" + right if right else ""), paragraph_style)
+
+            paired(title, right_rows.pop(0) if right_rows else "", "Heading2")
+            paired(normalized(entry["subheading"]), right_rows.pop(0) if right_rows else "", "Normal")
+            for right in right_rows:
+                paired("", right, "Normal")
+            body = next((field for field in fields if field["label"] == "__ort_body_paragraph__"), None)
+            if body:
+                add(body["value"])
+            else:
+                for value in entry["bullets"]:
+                    add(value["text"], "ListParagraph", True)
             for value in entry["links"]:
-                link(value)
+                add(link(value))
         if len(paragraphs) > begin:
             paragraphs.insert(begin, (normalized(section["heading"]), "Heading1", False))
     return paragraphs, links
@@ -121,7 +147,7 @@ def verify_text(data, source):
     assert source["title"] not in text and source["documentId"] not in text
 
 
-def verify(data, source):
+def verify(data, source, style="plain"):
     assert 0 < len(data) <= 2097152, "archive bound"
     with ZipFile(io.BytesIO(data)) as archive:
         infos = archive.infolist()
@@ -139,22 +165,26 @@ def verify(data, source):
     xml = {name: ET.fromstring(body) for name, body in contents.items()}
     document = xml["word/document.xml"]
     assert document.tag == W + "document"
-    allowed = {W + tag for tag in ("document", "body", "p", "pPr", "pStyle", "r", "t",
-               "br", "tab", "numPr", "ilvl", "numId", "hyperlink", "sectPr", "pgSz", "pgMar")}
+    allowed = {W + tag for tag in ("document", "body", "p", "pPr", "pStyle", "r", "rPr", "t",
+               "br", "tab", "tabs", "numPr", "ilvl", "numId", "hyperlink", "sectPr", "pgSz", "pgMar",
+               "spacing", "ind", "keepNext", "b", "i", "u", "color")}
     assert all(node.tag in allowed for node in document.iter()), "no fields, media or active content"
     body = document.find(W + "body")
     assert body is not None
     actual = []
     for p in body.findall(W + "p"):
+        # Paragraph-property tabs describe layout; only tabs in content runs
+        # are semantic text separators.
+        content_nodes = (n for child in p if child.tag != W + "pPr" for n in child.iter())
         text = "".join((n.text or "") if n.tag == W + "t" else
                        "\n" if n.tag == W + "br" else "\t" if n.tag == W + "tab" else ""
-                       for n in p.iter())
-        style = p.find(f"{W}pPr/{W}pStyle")
+                       for n in content_nodes)
+        paragraph_style = p.find(f"{W}pPr/{W}pStyle")
         bullet = p.find(f"{W}pPr/{W}numPr/{W}numId")
         if bullet is not None:
             assert bullet.get(W + "val") == "1"
-        actual.append((text, style.get(W + "val") if style is not None else "Normal", bullet is not None))
-    expected, links = expected_paragraphs(source)
+        actual.append((text, paragraph_style.get(W + "val") if paragraph_style is not None else "Normal", bullet is not None))
+    expected, links = expected_paragraphs(source, style)
     assert actual == expected, "semantic text, heading, list and ordering parity"
     rels = xml["word/_rels/document.xml.rels"]
     assert rels.tag == REL + "Relationships" and len(rels) == len(links) + 2
@@ -178,9 +208,12 @@ def verify(data, source):
     assert all("macroEnabled" not in value for node in types for value in node.attrib.values())
     styles = xml["word/styles.xml"]
     ids = {node.get(W + "styleId") for node in styles.findall(W + "style")}
-    assert ids == {"Normal", "Title", "Heading1", "Heading2", "ListParagraph"}
-    for style, level in (("Heading1", "0"), ("Heading2", "1")):
-        node = next(n for n in styles if n.get(W + "styleId") == style)
+    expected_ids = {"Normal", "Title", "Heading1", "Heading2", "ListParagraph"}
+    if style != "plain":
+        expected_ids |= {"Contact", "Subtitle"}
+    assert ids == expected_ids
+    for heading_style, level in (("Heading1", "0"), ("Heading2", "1")):
+        node = next(n for n in styles if n.get(W + "styleId") == heading_style)
         assert node.find(f"{W}pPr/{W}outlineLvl").get(W + "val") == level
         assert node.find(f"{W}pPr/{W}keepNext") is not None
     numbering = xml["word/numbering.xml"]
@@ -188,12 +221,19 @@ def verify(data, source):
     assert numbering.find(f"{W}num/{W}abstractNumId").get(W + "val") == "0"
     section = body.find(W + "sectPr")
     assert section.find(W + "pgSz").attrib == {W + "w": "12240", W + "h": "15840"}
-    assert all(section.find(W + "pgMar").get(W + key) == "1440" for key in ("top", "right", "bottom", "left"))
+    margins = {
+        "plain": ("1440", "1440", "1440", "1440"),
+        "technical": ("675", "765", "675", "765"),
+        "professional": ("675", "885", "675", "885"),
+        "modern": ("675", "855", "675", "855"),
+    }[style]
+    assert tuple(section.find(W + "pgMar").get(W + key)
+                 for key in ("top", "right", "bottom", "left")) == margins
     return contents
 
 
-def rejection_checks(data, source):
-    original = verify(data, source)
+def rejection_checks(data, source, style="plain"):
+    original = verify(data, source, style)
     changes = [
         {"word/vbaProject.bin": b"unexpected"},
         {"word/document.xml": original["word/document.xml"].replace(b"<w:body>", b"<w:body><w:object/>")},
@@ -213,7 +253,7 @@ def rejection_checks(data, source):
             for name, body in (original | change).items():
                 archive.writestr(ZipInfo(name), body)
         try:
-            verify(mutated.getvalue(), source)
+            verify(mutated.getvalue(), source, style)
         except AssertionError:
             continue
         raise AssertionError("mutated package was incorrectly accepted")
@@ -238,7 +278,7 @@ def main():
         source = json.loads((root / (name + ".json")).read_text(encoding="utf-8"))
         text = (root / (name + ".txt")).read_bytes()
         assert source["schemaVersion"] == (2 if schema_v2 else 1)
-        verify(data, source)
+        verify(data, source, style)
         verify_text(text, source)
         digest = hashlib.sha256(data).hexdigest()
         if style == "plain" and not schema_v2:
@@ -247,7 +287,7 @@ def main():
             assert archive.read("word/styles.xml") == styles_path.read_bytes(), "exact bundled style XML"
         text_digest = hashlib.sha256(text).hexdigest()
         assert schema_v2 or text_digest == text_goldens[name], f"{name}: reviewed plain-text golden changed"
-    rejection_checks((root / "standard.docx").read_bytes(), json.loads((root / "standard.json").read_text(encoding="utf-8")))
+    rejection_checks((root / "standard.docx").read_bytes(), json.loads((root / "standard.json").read_text(encoding="utf-8")), style)
     print(f"{style}: Eight DOCX/text fixtures: {'golden SHA-256' if style == 'plain' and not schema_v2 else 'bundled style audit (golden/native qualification pending)'}, exact text, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; {8 if schema_v2 else 7} negative controls rejected.")
 
 

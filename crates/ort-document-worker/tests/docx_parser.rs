@@ -36,11 +36,11 @@ fn constrained_parser_reads_the_shipping_docx_export_shape() {
     let wire = extract_docx(&mut Cursor::new(docx)).unwrap();
     let extraction = ValidatedExtraction::decode(&wire, InputFormat::Docx).unwrap();
     let blocks = extraction.blocks();
-    assert_eq!(blocks.len(), 8);
+    assert_eq!(blocks.len(), 6);
     assert_eq!(blocks[0].text, "Zoë Example");
     assert_eq!(blocks[2].text, "Experience");
     assert_eq!(
-        blocks[7].text,
+        blocks[5].text,
         "Preserved Unicode, structure, and review boundaries."
     );
 
@@ -51,7 +51,7 @@ fn constrained_parser_reads_the_shipping_docx_export_shape() {
     ));
     assert!(matches!(
         &proposal.items()[3].content,
-        ProposedContent::Text { text, .. } if text == "Engineer"
+        ProposedContent::Text { text, .. } if text == "Engineer\tRemote"
     ));
     assert_eq!(proposal.items()[3].section_index, Some(2));
 }

@@ -14,8 +14,8 @@ fn fixed_output_is_repeatable_and_receipt_describes_exact_bytes() {
         assert_eq!(first.receipt.pdf_sha256, sha256(&first.bytes));
         assert_eq!(first.receipt.byte_count, first.bytes.len());
         let expected_pages = match kind {
-            "dense" => 4,
-            "paginated" => 2,
+            // Matches the existing Plain template (also checked against HEAD).
+            "dense" => 3,
             _ => 1,
         };
         assert_eq!(first.receipt.page_count, expected_pages, "{kind}");
@@ -106,6 +106,21 @@ fn styles_are_deterministic_distinct_and_do_not_change_source_identity() {
                     output.receipt.font_bundle_sha256,
                     original.receipt.font_bundle_sha256
                 );
+            } else if style == DocumentStyle::Technical {
+                assert_eq!(output.receipt.font_bundle_id, "liberation-serif/2.1.5");
+                assert_ne!(
+                    output.receipt.font_bundle_sha256,
+                    original.receipt.font_bundle_sha256
+                );
+            } else if style == DocumentStyle::Professional {
+                assert_eq!(
+                    output.receipt.font_bundle_id,
+                    "gelasio/7ab20e7e5c42+liberation-serif/2.1.5"
+                );
+                assert_ne!(
+                    output.receipt.font_bundle_sha256,
+                    original.receipt.font_bundle_sha256
+                );
             } else {
                 assert_eq!(
                     output.receipt.font_bundle_sha256,
@@ -160,6 +175,12 @@ fn aligned_dates_still_reject_unsupported_glyphs() {
     ] {
         let mut document = support::fixture("standard");
         document.sections[0].entries[0].date_range = "示例".into();
+        assert_eq!(
+            ort_render::render_pdf_with_style(&document, style).err(),
+            Some(PdfRenderError::UnsupportedGlyph)
+        );
+        document.sections[0].entries[0].date_range.clear();
+        document.sections[0].entries[0].subheading = "示例".into();
         assert_eq!(
             ort_render::render_pdf_with_style(&document, style).err(),
             Some(PdfRenderError::UnsupportedGlyph)

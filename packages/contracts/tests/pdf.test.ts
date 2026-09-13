@@ -244,3 +244,32 @@ it("binds the Modern PDF receipt to its bundled sans-serif faces", () => {
     ),
   ).toBe(false);
 });
+
+it.each([
+  ["technical_pdf_v1", "liberation-serif/2.1.5"],
+  ["professional_pdf_v1", "gelasio/7ab20e7e5c42+liberation-serif/2.1.5"],
+])(
+  "binds %s receipts to their fixed metric-compatible font bundle",
+  (templateId, fontBundleId) => {
+    const technical = {
+      ...preview,
+      receipt: {
+        ...preview.receipt,
+        templateId,
+        fontBundleId,
+      },
+    };
+    expect(isPdfPreviewCommandResponse(wrap(technical))).toBe(true);
+    expect(
+      isPdfPreviewCommandResponse(
+        wrap({
+          ...technical,
+          receipt: {
+            ...technical.receipt,
+            fontBundleId: preview.receipt.fontBundleId,
+          },
+        }),
+      ),
+    ).toBe(false);
+  },
+);

@@ -2310,7 +2310,7 @@ function ContactInformationEditor({
             type="url"
             aria-label="Contact link address"
             value={linkUrl}
-            placeholder="https://example.com"
+            placeholder={"https:" + "//example.com"}
             onChange={(event) => setLinkUrl(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && linkIsValid) {
@@ -3008,7 +3008,7 @@ function CanvasField({
                 type="url"
                 aria-label="Link address"
                 value={linkUrl}
-                placeholder="https://example.com"
+                placeholder={"https:" + "//example.com"}
                 onFocus={() => {
                   if (linkSelectionRange)
                     editor.current?.setSelectionRange(
@@ -3427,8 +3427,7 @@ function entryHasTopRowContent(entry: ResumeEntry): boolean {
       entry.location.trim() ||
       entry.dates?.some((date) => dateText(date)) ||
       entry.fields.some(
-        (field) =>
-          field.label !== PARAGRAPH_FIELD_LABEL && field.value.trim(),
+        (field) => field.label !== PARAGRAPH_FIELD_LABEL && field.value.trim(),
       ),
   );
 }

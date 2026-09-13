@@ -3,16 +3,16 @@
   <w:docDefaults>
     <w:rPrDefault>
       <w:rPr>
-        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="SimSun" w:cs="Times New Roman" />
+        <w:rFonts w:ascii="Georgia" w:hAnsi="Georgia" w:eastAsia="SimSun" w:cs="Georgia" />
         <w:color w:val="000000" />
-        <w:sz w:val="22" />
-        <w:szCs w:val="22" />
+        <w:sz w:val="20" />
+        <w:szCs w:val="20" />
       </w:rPr>
     </w:rPrDefault>
     <w:pPrDefault>
       <w:pPr>
         <w:widowControl />
-        <w:spacing w:after="100" w:line="260" w:lineRule="auto" />
+        <w:spacing w:after="20" w:line="284" w:lineRule="auto" />
       </w:pPr>
     </w:pPrDefault>
   </w:docDefaults>
@@ -27,14 +27,13 @@
     <w:qFormat />
     <w:pPr>
       <w:keepNext />
-      <w:spacing w:after="120" />
+      <w:spacing w:after="120" w:line="240" w:lineRule="auto" />
       <w:jc w:val="center" />
     </w:pPr>
     <w:rPr>
-      <w:b />
       <w:color w:val="243C5A" />
-      <w:sz w:val="40" />
-      <w:szCs w:val="40" />
+      <w:sz w:val="45" />
+      <w:szCs w:val="45" />
     </w:rPr>
   </w:style>
   <w:style w:type="paragraph" w:styleId="Heading1">
@@ -47,14 +46,14 @@
       <w:spacing w:before="180" w:after="40" />
       <w:outlineLvl w:val="0" />
       <w:pBdr>
-        <w:bottom w:val="single" w:sz="4" w:space="3" w:color="8A795F" />
+        <w:bottom w:val="single" w:sz="6" w:space="3" w:color="8A795F" />
       </w:pBdr>
     </w:pPr>
     <w:rPr>
       <w:b />
       <w:color w:val="243C5A" />
-      <w:sz w:val="24" />
-      <w:szCs w:val="24" />
+      <w:sz w:val="21" />
+      <w:szCs w:val="21" />
     </w:rPr>
   </w:style>
   <w:style w:type="paragraph" w:styleId="Heading2">

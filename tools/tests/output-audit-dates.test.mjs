@@ -23,7 +23,7 @@ test("output audit preserves partial, expected, present and reversed dates", () 
         start: null,
         end: { kind: "date", value: calendar(2027, 6, true) },
       },
-      "Graduation: Expected Jun 2027",
+      "Graduation: Expected Jun. 2027",
     ],
     [
       {
@@ -39,7 +39,7 @@ test("output audit preserves partial, expected, present and reversed dates", () 
         start: calendar(1, 1),
         end: { kind: "date", value: calendar(9999, 12) },
       },
-      "Term: Jan 1–Dec 9999",
+      "Term: Jan. 1–Dec. 9999",
     ],
     [
       { label: "", start: calendar(2027, null, true), end: null },

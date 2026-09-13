@@ -27,7 +27,7 @@ it("preserves date precision, expected dates, open ranges and nonblocking revers
     start: { year: 2020, month: 9, expected: false },
     end: { kind: "present" },
   };
-  expect(dateText(range)).toBe("Sep 2020–Present");
+  expect(dateText(range)).toBe("Sep. 2020–Present");
   range.end = {
     kind: "date",
     value: { year: 2020, month: null, expected: false },

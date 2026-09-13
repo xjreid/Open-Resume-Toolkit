@@ -9,7 +9,10 @@ pub const DOCX_TEMPLATE_ID: &str = "plain_docx_v1";
 pub const MAX_DOCX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_XML_BYTES: usize = 1024 * 1024;
 const PARAGRAPH_FIELD_LABEL: &str = "__ort_body_paragraph__";
-const CONTENT_INDENT_TWIPS: u16 = 180;
+const CONTENT_INDENT_TWIPS: u16 = 210;
+const TECHNICAL_TAB_TWIPS: u16 = 10_710;
+const PROFESSIONAL_TAB_TWIPS: u16 = 10_470;
+const MODERN_TAB_TWIPS: u16 = 10_530;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocxExportError {
@@ -46,6 +49,7 @@ pub fn render_docx(document: &ResumeDocument) -> Result<Vec<u8>, DocxExportError
 ///
 /// # Errors
 /// Applies the same validation and expansion bounds as plain DOCX output.
+#[allow(clippy::too_many_lines)]
 pub fn render_docx_with_style(
     document: &ResumeDocument,
     style: DocumentStyle,
@@ -65,7 +69,7 @@ pub fn render_docx_with_style(
         "Title",
         &document.contact.full_name,
         false,
-        true,
+        style != DocumentStyle::Professional,
         false,
         false,
     )?;
@@ -84,11 +88,7 @@ pub fn render_docx_with_style(
                 &mut relationships,
                 &mut next_link,
                 entry,
-                if style == DocumentStyle::Plain {
-                    9360
-                } else {
-                    9792
-                },
+                tab_position(style),
             )?;
             if let Some(body_text) = entry
                 .fields
@@ -142,11 +142,7 @@ pub fn render_docx_with_style(
             body.push(&entries.0)?;
         }
     }
-    if style == DocumentStyle::Plain {
-        body.push(DOCUMENT_END)?;
-    } else {
-        body.push(&DOCUMENT_END.replace("1440", "1224"))?;
-    }
+    body.push(document_end(style))?;
     relationships.push("</Relationships>")?;
     opc::package(&[
         (
@@ -165,8 +161,33 @@ pub fn render_docx_with_style(
                 DocumentStyle::Modern => include_str!("docx/modern_v1.xml"),
             },
         ),
-        ("word/numbering.xml", include_str!("docx/numbering.xml")),
+        (
+            "word/numbering.xml",
+            if style == DocumentStyle::Plain {
+                include_str!("docx/numbering.xml")
+            } else {
+                include_str!("docx/numbering_styled.xml")
+            },
+        ),
     ])
+}
+
+const fn tab_position(style: DocumentStyle) -> u16 {
+    match style {
+        DocumentStyle::Plain => 9360,
+        DocumentStyle::Technical => TECHNICAL_TAB_TWIPS,
+        DocumentStyle::Professional => PROFESSIONAL_TAB_TWIPS,
+        DocumentStyle::Modern => MODERN_TAB_TWIPS,
+    }
+}
+
+const fn document_end(style: DocumentStyle) -> &'static str {
+    match style {
+        DocumentStyle::Plain => DOCUMENT_END,
+        DocumentStyle::Technical => TECHNICAL_DOCUMENT_END,
+        DocumentStyle::Professional => PROFESSIONAL_DOCUMENT_END,
+        DocumentStyle::Modern => MODERN_DOCUMENT_END,
+    }
 }
 
 #[derive(Default)]
@@ -304,17 +325,18 @@ fn entry_rows(
         append_separator(&mut title, " | ");
         title.extend(spans(&details.value, false, false)?);
     }
-    let dates = if entry.date_range.trim().is_empty() {
+    let mut date_lines = Vec::new();
+    if !entry.date_range.trim().is_empty() {
+        date_lines.push(entry.date_range.clone());
+    }
+    date_lines.extend(
         entry
             .dates
             .iter()
             .flatten()
-            .map(ort_domain::ResumeDate::display_text)
-            .collect::<Vec<_>>()
-            .join("\n")
-    } else {
-        entry.date_range.clone()
-    };
+            .map(ort_domain::ResumeDate::display_text),
+    );
+    let dates = date_lines.join("\n");
     let extras = entry
         .fields
         .iter()
@@ -369,6 +391,7 @@ fn entry_rows(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 fn rich_paragraph(
     body: &mut Xml,
     relationships: &mut Xml,
@@ -427,6 +450,7 @@ fn paragraph_with_spans(
     body.push("</w:p>")
 }
 
+#[allow(clippy::too_many_arguments)]
 fn paired_paragraph(
     body: &mut Xml,
     relationships: &mut Xml,
@@ -446,7 +470,20 @@ fn paired_paragraph(
     if style == "Heading2" {
         body.push("<w:keepNext/><w:spacing w:before=\"40\" w:after=\"20\"/>")?;
     } else if compact {
-        body.push("<w:keepNext/><w:spacing w:after=\"0\"/>")?;
+        // Reserve a real line box for right-only rows in Word and LibreOffice.
+        // This prevents baseline collisions without adding empty lines.
+        body.push(match tab_position {
+            TECHNICAL_TAB_TWIPS => {
+                "<w:keepNext/><w:spacing w:after=\"40\" w:line=\"247\" w:lineRule=\"atLeast\"/>"
+            }
+            PROFESSIONAL_TAB_TWIPS => {
+                "<w:keepNext/><w:spacing w:after=\"40\" w:line=\"277\" w:lineRule=\"atLeast\"/>"
+            }
+            MODERN_TAB_TWIPS => {
+                "<w:keepNext/><w:spacing w:after=\"40\" w:line=\"272\" w:lineRule=\"atLeast\"/>"
+            }
+            _ => "<w:keepNext/><w:spacing w:after=\"0\"/>",
+        })?;
     }
     body.push("<w:ind w:left=\"")?;
     body.push(&CONTENT_INDENT_TWIPS.to_string())?;
@@ -454,7 +491,13 @@ fn paired_paragraph(
     body.push("<w:tabs><w:tab w:val=\"right\" w:pos=\"")?;
     body.push(&tab_position.to_string())?;
     body.push("\"/></w:tabs></w:pPr>")?;
-    write_spans(body, relationships, next_link, left)?;
+    if left.is_empty() && !right.is_empty() {
+        // A non-empty left run gives LibreOffice a line box for metadata-only
+        // rows, preventing the following bullet from sharing its baseline.
+        body.text_run(" ", false, false, false)?;
+    } else {
+        write_spans(body, relationships, next_link, left)?;
+    }
     if !right.is_empty() {
         body.push("<w:r><w:tab/></w:r>")?;
         write_spans(body, relationships, next_link, right)?;
@@ -560,6 +603,9 @@ fn hyperlink(
 
 const DOCUMENT_START: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><w:body>";
 const DOCUMENT_END: &str = "<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/><w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/></w:sectPr></w:body></w:document>";
+const TECHNICAL_DOCUMENT_END: &str = "<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/><w:pgMar w:top=\"675\" w:right=\"765\" w:bottom=\"675\" w:left=\"765\" w:header=\"432\" w:footer=\"432\" w:gutter=\"0\"/></w:sectPr></w:body></w:document>";
+const PROFESSIONAL_DOCUMENT_END: &str = "<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/><w:pgMar w:top=\"675\" w:right=\"885\" w:bottom=\"675\" w:left=\"885\" w:header=\"432\" w:footer=\"432\" w:gutter=\"0\"/></w:sectPr></w:body></w:document>";
+const MODERN_DOCUMENT_END: &str = "<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/><w:pgMar w:top=\"675\" w:right=\"855\" w:bottom=\"675\" w:left=\"855\" w:header=\"432\" w:footer=\"432\" w:gutter=\"0\"/></w:sectPr></w:body></w:document>";
 const RELS_START: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"styles\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/><Relationship Id=\"numbering\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering\" Target=\"numbering.xml\"/>";
 
 #[cfg(test)]

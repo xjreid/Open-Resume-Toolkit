@@ -85,7 +85,7 @@ export function DocumentImport({
     onBusyChange(false);
   }
   return (
-    <section aria-label="Import a resume">
+    <section aria-label="Resume file importer">
       <h2>Import an existing resume</h2>
       <p>
         Choose a PDF or DOCX, compare the extracted text, and accept or reject
@@ -118,7 +118,9 @@ export function DocumentImport({
           >
             Import an existing resume
           </button>
-          {!available ? <p>Import is not available in this version of the app.</p> : null}
+          {!available ? (
+            <p>Import is not available in this version of the app.</p>
+          ) : null}
           {pending ? (
             <div role="status">
               <p>

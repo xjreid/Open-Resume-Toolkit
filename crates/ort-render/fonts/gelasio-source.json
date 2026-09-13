@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/SorkinType/Gelasio",
+  "commit": "7ab20e7e5c42791e603b9ee3201a0b49849cfdb2",
+  "files": [
+    "fonts/ttf/Gelasio-Regular.ttf",
+    "fonts/ttf/Gelasio-Bold.ttf",
+    "fonts/ttf/Gelasio-Italic.ttf",
+    "fonts/ttf/Gelasio-BoldItalic.ttf",
+    "OFL.txt"
+  ]
+}

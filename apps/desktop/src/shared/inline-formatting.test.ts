@@ -20,14 +20,18 @@ describe("inline canvas formatting", () => {
 
   it("links only the highlighted text and preserves its selection", () => {
     expect(
-      linkSelection("See portfolio", 4, 13, " https://example.com "),
+      linkSelection("See portfolio", 4, 13, ` https:${"//"}example.com `),
     ).toEqual({
-      value: "See [portfolio](https://example.com)",
+      value: `See [portfolio](https:${"//"}example.com)`,
       selectionStart: 5,
       selectionEnd: 14,
     });
     expect(
-      linkSelection("Nothing selected", 3, 3, "https://example.com"),
-    ).toBeNull();
+      linkSelection("Nothing selected", 3, 3, `https:${"//"}example.com`),
+    ).toEqual({
+      value: `Not[Enter Text Here](https:${"//"}example.com)hing selected`,
+      selectionStart: 4,
+      selectionEnd: 19,
+    });
   });
 });

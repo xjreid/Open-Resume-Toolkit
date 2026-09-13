@@ -172,7 +172,11 @@ function isReceipt(
       : value.fontBundleId ===
         (value.templateId === "modern_pdf_v1"
           ? "liberation-sans/pdfjs-6.3.289"
-          : "libertinus-serif/typst-assets-0.15.1")) &&
+          : value.templateId === "technical_pdf_v1"
+            ? "liberation-serif/2.1.5"
+            : value.templateId === "professional_pdf_v1"
+              ? "gelasio/7ab20e7e5c42+liberation-serif/2.1.5"
+              : "libertinus-serif/typst-assets-0.15.1")) &&
     hash(value.fontBundleSha256) &&
     positive(value.pageCount, MAX_PDF_PAGES) &&
     positive(value.byteCount, MAX_PDF_BYTES)

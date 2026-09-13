@@ -1,6 +1,6 @@
 """Independent formatting oracle for synthetic output audits, never an importer."""
 
-MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+MONTHS = ("Jan.", "Feb.", "Mar.", "Apr.", "May.", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec.")
 
 
 def date_text(record):

@@ -9,7 +9,7 @@ import {
 } from "../src/shared/resume-editor";
 
 describe("published snapshot review", () => {
-  it("escapes content and displays links without creating navigation authority", () => {
+  it("escapes content and gives safe links explicit browser navigation semantics", () => {
     const document = createResumeDocument();
     document.title = "This internal document title must not appear";
     document.contact.fullName = "<script>alert('synthetic')</script>";
@@ -30,9 +30,10 @@ describe("published snapshot review", () => {
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("This internal document title must not appear");
-    expect(html).not.toContain("href=");
-    expect(html).toContain("https://example.com");
-    expect(html).toContain("Language (skill)");
+    expect(html).toContain('href="https://example.com"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noreferrer"');
+    expect(html).toContain("Website");
     expect(html).toContain("Rust");
   });
 });
