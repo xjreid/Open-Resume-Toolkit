@@ -1,6 +1,6 @@
 //! Small, synthetic visual-review set; never reads a profile or credentials.
 use ort_domain::{
-    Bullet, DocumentStyle, EntityId, NamedField, ResumeDocument, ResumeEntry, ResumeSection,
+    Bullet, DocumentStyle, EntityId, Link, NamedField, ResumeDocument, ResumeEntry, ResumeSection,
 };
 use std::{fs, path::PathBuf};
 
@@ -18,7 +18,7 @@ fn entry(title: &str, subtitle: &str, dates: &str, bullets: &[&str]) -> ResumeEn
                 id: EntityId::new(),
                 order: 0,
                 label: "Skills / details".into(),
-                value: "**Rust**, *Typst*, SQL".into(),
+                value: "**Rust**, *Typst*, SQL, Spring Boot, FastAPI, PostgreSQL".into(),
                 is_skill: true,
             },
             NamedField {
@@ -58,6 +58,20 @@ fn representative() -> ResumeDocument {
     doc.contact.email = "[alex.morgan@example.org](mailto:alex.morgan@example.org)".into();
     doc.contact.phone = "+1 (202) 555-0142".into();
     doc.contact.location = "Portland, OR".into();
+    doc.contact.links = vec![
+        Link {
+            id: None,
+            order: None,
+            label: "Portfolio".into(),
+            url: "https://example.org".into(),
+        },
+        Link {
+            id: None,
+            order: None,
+            label: "LinkedIn".into(),
+            url: "https://www.linkedin.com/in/example".into(),
+        },
+    ];
     doc.sections = vec![
         section(
             0,
@@ -120,6 +134,7 @@ fn representative() -> ResumeDocument {
             )],
         ),
     ];
+    doc.sections[0].entries[1].location.clear();
     doc
 }
 

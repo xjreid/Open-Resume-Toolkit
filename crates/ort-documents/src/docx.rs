@@ -9,6 +9,7 @@ pub const DOCX_TEMPLATE_ID: &str = "plain_docx_v1";
 pub const MAX_DOCX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_XML_BYTES: usize = 1024 * 1024;
 const PARAGRAPH_FIELD_LABEL: &str = "__ort_body_paragraph__";
+const CONTENT_INDENT_TWIPS: u16 = 180;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocxExportError {
@@ -66,6 +67,7 @@ pub fn render_docx_with_style(
         false,
         true,
         false,
+        false,
     )?;
     contact_paragraphs(
         &mut body,
@@ -104,6 +106,7 @@ pub fn render_docx_with_style(
                     false,
                     false,
                     false,
+                    true,
                 )?;
             } else {
                 for bullet in &entry.bullets {
@@ -116,11 +119,12 @@ pub fn render_docx_with_style(
                         true,
                         false,
                         false,
+                        true,
                     )?;
                 }
             }
             for link in &entry.links {
-                hyperlink(&mut entries, &mut relationships, &mut next_link, link)?;
+                hyperlink(&mut entries, &mut relationships, &mut next_link, link, true)?;
             }
         }
         if !entries.0.is_empty() {
@@ -132,6 +136,7 @@ pub fn render_docx_with_style(
                 &section.heading,
                 false,
                 true,
+                false,
                 false,
             )?;
             body.push(&entries.0)?;
@@ -246,10 +251,11 @@ fn contact_paragraphs(
                 false,
                 false,
                 false,
+                false,
             )?;
         }
         for link in &document.contact.links {
-            hyperlink(body, relationships, next_link, link)?;
+            hyperlink(body, relationships, next_link, link, false)?;
         }
     } else {
         let mut content = Vec::new();
@@ -269,7 +275,15 @@ fn contact_paragraphs(
             append_separator(&mut content, "  •  ");
             content.push(link_span(link)?);
         }
-        paragraph_with_spans(body, relationships, next_link, "Contact", false, &content)?;
+        paragraph_with_spans(
+            body,
+            relationships,
+            next_link,
+            "Contact",
+            false,
+            &content,
+            false,
+        )?;
     }
     Ok(())
 }
@@ -290,17 +304,6 @@ fn entry_rows(
         append_separator(&mut title, " | ");
         title.extend(spans(&details.value, false, false)?);
     }
-    paired_paragraph(
-        body,
-        relationships,
-        next_link,
-        "Heading2",
-        &title,
-        &spans(&entry.location, true, false)?,
-        tab_position,
-        false,
-    )?;
-
     let dates = if entry.date_range.trim().is_empty() {
         entry
             .dates
@@ -312,17 +315,6 @@ fn entry_rows(
     } else {
         entry.date_range.clone()
     };
-    paired_paragraph(
-        body,
-        relationships,
-        next_link,
-        "Normal",
-        &spans(&entry.subheading, false, false)?,
-        &spans(&dates, false, false)?,
-        tab_position,
-        true,
-    )?;
-
     let extras = entry
         .fields
         .iter()
@@ -332,16 +324,49 @@ fn entry_rows(
         .map(|field| field.value.as_str())
         .collect::<Vec<_>>()
         .join("\n");
+    let mut right_rows = [entry.location.as_str(), dates.as_str(), extras.as_str()]
+        .into_iter()
+        .map(|value| spans(value, false, false))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|runs| !runs.is_empty());
+
+    let first_right = right_rows.next().unwrap_or_default();
+    paired_paragraph(
+        body,
+        relationships,
+        next_link,
+        "Heading2",
+        &title,
+        &first_right,
+        tab_position,
+        false,
+    )?;
+
+    let second_right = right_rows.next().unwrap_or_default();
     paired_paragraph(
         body,
         relationships,
         next_link,
         "Normal",
-        &[],
-        &spans(&extras, false, false)?,
+        &spans(&entry.subheading, false, false)?,
+        &second_right,
         tab_position,
         true,
-    )
+    )?;
+    for right in right_rows {
+        paired_paragraph(
+            body,
+            relationships,
+            next_link,
+            "Normal",
+            &[],
+            &right,
+            tab_position,
+            true,
+        )?;
+    }
+    Ok(())
 }
 
 fn rich_paragraph(
@@ -353,13 +378,22 @@ fn rich_paragraph(
     bullet: bool,
     force_bold: bool,
     force_italic: bool,
+    content_indent: bool,
 ) -> Result<(), DocxExportError> {
     let text = normalized(text)?;
     if text.is_empty() {
         return Ok(());
     }
     let content = spans(&text, force_bold, force_italic)?;
-    paragraph_with_spans(body, relationships, next_link, style, bullet, &content)
+    paragraph_with_spans(
+        body,
+        relationships,
+        next_link,
+        style,
+        bullet,
+        &content,
+        content_indent,
+    )
 }
 
 fn paragraph_with_spans(
@@ -369,6 +403,7 @@ fn paragraph_with_spans(
     style: &str,
     bullet: bool,
     content: &[InlineSpan],
+    content_indent: bool,
 ) -> Result<(), DocxExportError> {
     if content.is_empty() {
         return Ok(());
@@ -378,6 +413,14 @@ fn paragraph_with_spans(
     body.push("\"/>")?;
     if bullet {
         body.push("<w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"1\"/></w:numPr>")?;
+    }
+    if content_indent {
+        body.push("<w:spacing w:after=\"20\"/>")?;
+        if !bullet {
+            body.push("<w:ind w:left=\"")?;
+            body.push(&CONTENT_INDENT_TWIPS.to_string())?;
+            body.push("\"/>")?;
+        }
     }
     body.push("</w:pPr>")?;
     write_spans(body, relationships, next_link, content)?;
@@ -400,9 +443,14 @@ fn paired_paragraph(
     body.push("<w:p><w:pPr><w:pStyle w:val=\"")?;
     body.push(style)?;
     body.push("\"/>")?;
-    if compact {
-        body.push("<w:keepNext/><w:spacing w:after=\"20\"/>")?;
+    if style == "Heading2" {
+        body.push("<w:keepNext/><w:spacing w:before=\"40\" w:after=\"20\"/>")?;
+    } else if compact {
+        body.push("<w:keepNext/><w:spacing w:after=\"0\"/>")?;
     }
+    body.push("<w:ind w:left=\"")?;
+    body.push(&CONTENT_INDENT_TWIPS.to_string())?;
+    body.push("\"/>")?;
     body.push("<w:tabs><w:tab w:val=\"right\" w:pos=\"")?;
     body.push(&tab_position.to_string())?;
     body.push("\"/></w:tabs></w:pPr>")?;
@@ -499,6 +547,7 @@ fn hyperlink(
     rels: &mut Xml,
     next: &mut usize,
     link: &Link,
+    content_indent: bool,
 ) -> Result<(), DocxExportError> {
     // The domain has already allowed only http/https/mailto. Refuse controls
     // and whitespace instead of allowing URI parsers/XML to silently remove it.
@@ -506,7 +555,7 @@ fn hyperlink(
         return Err(DocxExportError::InvalidDocument);
     }
     let content = [link_span(link)?];
-    paragraph_with_spans(body, rels, next, "Normal", false, &content)
+    paragraph_with_spans(body, rels, next, "Normal", false, &content, content_indent)
 }
 
 const DOCUMENT_START: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><w:body>";

@@ -43,10 +43,19 @@ fn template(style: DocumentStyle) -> &'static str {
     }
 }
 
-// Only the six Libertinus Serif faces, in the pinned asset package's fixed order.
+const MODERN_FONT_BUNDLE_ID: &str = "liberation-sans/pdfjs-6.3.289";
+const MODERN_FONT_BYTES: [&[u8]; 4] = [
+    include_bytes!("../fonts/LiberationSans-Regular.ttf"),
+    include_bytes!("../fonts/LiberationSans-Bold.ttf"),
+    include_bytes!("../fonts/LiberationSans-Italic.ttf"),
+    include_bytes!("../fonts/LiberationSans-BoldItalic.ttf"),
+];
+// Fixed, compiled-in faces only: the original six serif faces followed by
+// four sans-serif faces used by Modern. Historical serif indices stay fixed.
 static FONTS: LazyLock<Vec<Font>> = LazyLock::new(|| {
     typst_assets::fonts()
         .take(6)
+        .chain(MODERN_FONT_BYTES)
         .map(|bytes| Font::new(Bytes::new(bytes), 0).expect("reviewed bundled font"))
         .collect()
 });
@@ -88,6 +97,9 @@ struct Paragraph {
     right: Option<String>,
     runs: Vec<InlineRun>,
     right_runs: Vec<InlineRun>,
+    sticky: bool,
+    entry_end: bool,
+    body_start: bool,
 }
 
 fn normalized(value: &str) -> String {
@@ -131,6 +143,9 @@ fn push_paragraph(
         right: (!right.is_empty()).then_some(right),
         runs,
         right_runs,
+        sticky: false,
+        entry_end: false,
+        body_start: false,
     });
 }
 
@@ -198,7 +213,11 @@ fn paragraphs(
     push_paragraph(
         &mut out,
         "name",
-        inline_runs(&document.contact.full_name, true, false),
+        inline_runs(
+            &document.contact.full_name,
+            style != DocumentStyle::Professional,
+            false,
+        ),
         vec![],
     );
     if style == DocumentStyle::Plain {
@@ -235,7 +254,9 @@ fn paragraphs(
     for section in &document.sections {
         let mut entries = Vec::new();
         for entry in &section.entries {
+            let entry_start = entries.len();
             entry_header(&mut entries, entry);
+            let body_start = entries.len();
             if let Some(body) = entry
                 .fields
                 .iter()
@@ -252,6 +273,20 @@ fn paragraphs(
             for value in &entry.links {
                 link(&mut entries, value)?;
             }
+            let entry_end = entries.len();
+            if entry_end > entry_start {
+                entries[entry_end - 1].entry_end = true;
+                if body_start > entry_start && body_start < entry_end {
+                    entries[body_start].body_start = true;
+                }
+            }
+            // Keep ordinary entries intact at page boundaries. Exceptionally
+            // large entries remain breakable so they can span pages safely.
+            if entry_end > entry_start && entry_end - entry_start <= 10 {
+                for paragraph in &mut entries[entry_start..entry_end - 1] {
+                    paragraph.sticky = true;
+                }
+            }
         }
         if !entries.is_empty() {
             push_paragraph(
@@ -263,11 +298,11 @@ fn paragraphs(
             out.extend(entries);
         }
     }
-    validate_paragraphs(&out)?;
+    validate_paragraphs(&out, style)?;
     Ok(out)
 }
 
-fn validate_paragraphs(out: &[Paragraph]) -> Result<(), PdfRenderError> {
+fn validate_paragraphs(out: &[Paragraph], style: DocumentStyle) -> Result<(), PdfRenderError> {
     if out.len() > MAX_LAYOUT_BLOCKS
         || out
             .iter()
@@ -291,9 +326,13 @@ fn validate_paragraphs(out: &[Paragraph]) -> Result<(), PdfRenderError> {
         })
         .filter(|c| !c.is_whitespace())
     {
-        if FONTS
-            .iter()
-            .any(|font| !font.info().coverage.contains(u32::from(c)))
+        if (if style == DocumentStyle::Modern {
+            &FONTS[6..]
+        } else {
+            &FONTS[..6]
+        })
+        .iter()
+        .any(|font| !font.info().coverage.contains(u32::from(c)))
         {
             return Err(PdfRenderError::UnsupportedGlyph);
         }
@@ -311,13 +350,6 @@ fn entry_header(entries: &mut Vec<Paragraph>, entry: &ort_domain::ResumeEntry) {
         append_separator(&mut title, " | ");
         append_runs(&mut title, &details.value, false, false);
     }
-    push_paragraph(
-        entries,
-        "entry",
-        title,
-        inline_runs(&entry.location, false, false),
-    );
-
     let dates = if entry.date_range.trim().is_empty() {
         entry
             .dates
@@ -329,13 +361,6 @@ fn entry_header(entries: &mut Vec<Paragraph>, entry: &ort_domain::ResumeEntry) {
     } else {
         entry.date_range.clone()
     };
-    push_paragraph(
-        entries,
-        "subrow",
-        inline_runs(&entry.subheading, false, false),
-        inline_runs(&dates, false, false),
-    );
-
     let extras = entry
         .fields
         .iter()
@@ -345,7 +370,26 @@ fn entry_header(entries: &mut Vec<Paragraph>, entry: &ort_domain::ResumeEntry) {
         .map(|field| field.value.as_str())
         .collect::<Vec<_>>()
         .join("\n");
-    push_paragraph(entries, "meta", vec![], inline_runs(&extras, false, false));
+    let mut right_rows = [entry.location.as_str(), dates.as_str(), extras.as_str()]
+        .into_iter()
+        .map(|value| inline_runs(value, false, false))
+        .filter(|runs| !runs.is_empty());
+
+    push_paragraph(
+        entries,
+        "entry",
+        title,
+        right_rows.next().unwrap_or_default(),
+    );
+    push_paragraph(
+        entries,
+        "subrow",
+        inline_runs(&entry.subheading, false, false),
+        right_rows.next().unwrap_or_default(),
+    );
+    for right in right_rows {
+        push_paragraph(entries, "meta", vec![], right);
+    }
 }
 
 struct MemoryWorld {
@@ -440,8 +484,8 @@ fn visible_frame(frame: &Frame, origin: Point, depth: usize) -> bool {
                 [point + bounds.min, point + bounds.max]
                     .iter()
                     .all(|point| {
-                        (55.0..=557.0).contains(&point.x.to_pt())
-                            && (55.0..=737.0).contains(&point.y.to_pt())
+                        (32.0..=580.0).contains(&point.x.to_pt())
+                            && (28.0..=764.0).contains(&point.y.to_pt())
                     })
             }
             FrameItem::Link(..) | FrameItem::Tag(..) => true,
@@ -451,13 +495,13 @@ fn visible_frame(frame: &Frame, origin: Point, depth: usize) -> bool {
                 if let typst::visualize::Geometry::Line(end) = &shape.geometry {
                     shape.fill.is_none()
                         && shape.stroke.as_ref().is_some_and(|stroke| {
-                            stroke.thickness.to_pt() > 0.0 && stroke.thickness.to_pt() <= 1.0
+                            stroke.thickness.to_pt() > 0.0 && stroke.thickness.to_pt() <= 1.5
                         })
                         && end.y.to_pt() == 0.0
                         && end.x.to_pt() >= 0.0
                         && [point, point + *end].iter().all(|p| {
-                            (56.0..=556.0).contains(&p.x.to_pt())
-                                && (56.0..=736.0).contains(&p.y.to_pt())
+                            (33.0..=579.0).contains(&p.x.to_pt())
+                                && (29.0..=763.0).contains(&p.y.to_pt())
                         })
                 } else {
                     false
@@ -519,8 +563,14 @@ pub fn render_pdf_with_style(
         return Err(PdfRenderError::OutputTooLarge);
     }
     let mut font_hash = Sha256::new();
-    for font in typst_assets::fonts().take(6) {
-        font_hash.update(font);
+    if style == DocumentStyle::Modern {
+        for font in MODERN_FONT_BYTES {
+            font_hash.update(font);
+        }
+    } else {
+        for font in typst_assets::fonts().take(6) {
+            font_hash.update(font);
+        }
     }
     let receipt = PdfRenderReceipt {
         document_sha256: sha256(
@@ -531,7 +581,12 @@ pub fn render_pdf_with_style(
         renderer_version: RENDERER_VERSION.into(),
         template_id: style.pdf_template_id().into(),
         template_sha256: sha256(template(style).as_bytes()),
-        font_bundle_id: FONT_BUNDLE_ID.into(),
+        font_bundle_id: if style == DocumentStyle::Modern {
+            MODERN_FONT_BUNDLE_ID
+        } else {
+            FONT_BUNDLE_ID
+        }
+        .into(),
         font_bundle_sha256: hex::encode(font_hash.finalize()),
         page_count: output.pages().len(),
         byte_count: bytes.len(),
@@ -564,6 +619,9 @@ mod tests {
                             url: None,
                         }],
                         right_runs: vec![],
+                        sticky: false,
+                        entry_end: false,
+                        body_start: false,
                     },
                     Paragraph {
                         kind: "entry",
@@ -581,6 +639,9 @@ mod tests {
                             italic: false,
                             url: None,
                         }],
+                        sticky: false,
+                        entry_end: false,
+                        body_start: false,
                     },
                 ],
                 style,
@@ -619,13 +680,18 @@ mod tests {
         .intern();
         assert!(matches!(world.source(other), Err(FileError::AccessDenied)));
         assert!(matches!(world.file(other), Err(FileError::AccessDenied)));
-        assert_eq!(FONTS.len(), 6);
+        assert_eq!(FONTS.len(), 10);
         assert!(
-            FONTS
+            FONTS[..6]
                 .iter()
                 .all(|font| font.info().family == "Libertinus Serif")
         );
-        assert!(world.font(6).is_none());
+        assert!(
+            FONTS[6..]
+                .iter()
+                .all(|font| font.info().family == "Liberation Sans")
+        );
+        assert!(world.font(10).is_none());
         assert!(world.today(None).is_none());
         for code in [
             r#"#read("/private/secret")"#,

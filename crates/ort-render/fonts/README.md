@@ -1,0 +1,1 @@
+These unmodified Liberation Sans faces come from the pinned pdfjs-dist 6.3.289 standard_fonts directory. They are compiled into the PDF renderer for the Modern layout; no system font discovery or network access is used. See LICENSE_LIBERATION for the license and document-embedding exception.

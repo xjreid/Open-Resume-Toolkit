@@ -1,9 +1,13 @@
-// Original ORT professional layout. Structured content is data, never code.
+// PDF dimensions follow the fixed 816px View page at 72/96 pt per CSS px.
+// Structured content is data, never code; all fonts remain bundled.
 #set document(title: "Resume", author: (), date: none)
-#set page(paper: "us-letter", margin: .85in)
-#set text(font: "Libertinus Serif", size: 10.5pt, lang: "en", fallback: false, ligatures: false)
-#set par(spacing: 0pt, justify: false, leading: 2.2pt)
-#let accent = rgb("0F5C66")
+#set page(paper: "us-letter", margin: (x: 42.75pt, y: 33.75pt))
+#set text(font: "Liberation Sans", size: 9.375pt, top-edge: .8em, bottom-edge: .2em, fill: rgb("171717"), lang: "en", fallback: false, ligatures: false)
+#set par(spacing: 0pt, justify: false, leading: 4.21875pt)
+#let accent = rgb("1B5C69")
+#show link: set text(fill: rgb("0A4F9E"))
+#let content-inset = 10.5pt
+#let row-inset = 3pt
 #let literal(value) = {
   for (i, part) in value.split("\n").enumerate() {
     if i > 0 { linebreak() }
@@ -17,34 +21,34 @@
       style: if run.italic { "italic" } else { "normal" },
       literal(run.text),
     )
-    if run.url == none { content } else { link(run.url, content) }
+    if run.url == none { content } else { link(run.url, underline(content)) }
   }
 }
 #for p in json(bytes(sys.inputs.resume)) {
   if p.kind == "name" {
-    align(center, block(above: 0pt, below: 4pt, text(size: 25pt, weight: "bold", fill: accent, rich(p.runs))))
+    align(center, block(above: 0pt, below: 4pt, text(size: 23.25pt, tracking: .015em, weight: "bold", fill: rgb("133C49"), rich(p.runs))))
   } else if p.kind == "contact" {
-    align(center, block(above: 0pt, below: 3pt, text(size: 9.5pt, rich(p.runs))))
+    align(center, block(inset: (top: 3pt, bottom: 3pt), above: 0pt, below: 9pt, rich(p.runs)))
   } else if p.kind == "section" {
-    block(sticky: true, above: 11pt, below: 4pt, { text(size: 11pt, weight: "bold", fill: accent, rich(p.runs)); v(2pt); line(length: 100%, stroke: .5pt + accent) })
+    block(sticky: true, above: 18pt, below: 3.75pt, { text(size: 10.5pt, tracking: .08em, weight: "bold", fill: accent, upper(rich(p.runs))); v(1.5pt); line(length: 100%, stroke: 1.5pt + rgb("276A78")) })
   } else if p.kind == "entry" {
-    block(sticky: true, above: 5pt, below: 1pt,
-      grid(columns: (1fr, 30%), align: (left, right), column-gutter: 12pt,
+    block(sticky: p.sticky, inset: (top: row-inset, bottom: row-inset), above: 3pt, below: if p.entry_end { 10.5pt } else { 0pt },
+      pad(left: content-inset, grid(columns: (1fr, .28fr), align: (left, right), column-gutter: 10.5pt,
         rich(p.runs),
-        text(size: 10pt, rich(p.right_runs)),
-      )
+        rich(p.right_runs),
+      ))
     )
   } else if p.kind == "subrow" or p.kind == "meta" {
-    block(above: 0pt, below: 1pt,
-      grid(columns: (1fr, 30%), align: (left, right), column-gutter: 12pt,
-        rich(p.runs), text(size: 10pt, rich(p.right_runs)),
-      )
+    block(sticky: p.sticky, inset: (top: row-inset, bottom: row-inset), above: 0pt, below: if p.entry_end { 10.5pt } else { 0pt },
+      pad(left: content-inset, grid(columns: (1fr, .28fr), align: (left, right), column-gutter: 10.5pt,
+        rich(p.runs), rich(p.right_runs),
+      ))
     )
   } else if p.kind == "bullet" {
-    block(above: 0pt, below: 1pt, list(tight: true, indent: 0pt, body-indent: 12pt, rich(p.runs)))
+    block(sticky: p.sticky, inset: (top: row-inset, bottom: row-inset), above: if p.body_start { 6pt } else { 0pt }, below: if p.entry_end { 10.5pt } else { .75pt }, pad(left: content-inset, list(tight: true, indent: 18pt, body-indent: 9pt, rich(p.runs))))
   } else if p.kind == "link" {
-    block(above: 1pt, below: 1pt, text(size: 9.5pt, rich(p.runs)))
+    block(sticky: p.sticky, inset: (top: row-inset, bottom: row-inset), above: 1pt, below: 2pt, pad(left: content-inset, rich(p.runs)))
   } else {
-    block(above: 2pt, below: 1pt, rich(p.runs))
+    block(sticky: p.sticky, inset: (top: row-inset, bottom: row-inset), above: 2pt, below: 2pt, pad(left: content-inset, rich(p.runs)))
   }
 }

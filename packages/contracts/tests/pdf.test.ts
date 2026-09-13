@@ -210,3 +210,37 @@ it("accepts bounded historical bundle identifiers only as history metadata", () 
     }
   }
 });
+
+it("binds the Modern PDF receipt to its bundled sans-serif faces", () => {
+  const modern = {
+    ...preview,
+    receipt: {
+      ...preview.receipt,
+      templateId: "modern_pdf_v1",
+      fontBundleId: "liberation-sans/pdfjs-6.3.289",
+    },
+  };
+  expect(isPdfPreviewCommandResponse(wrap(modern))).toBe(true);
+  expect(
+    isPdfPreviewCommandResponse(
+      wrap({
+        ...modern,
+        receipt: {
+          ...modern.receipt,
+          fontBundleId: preview.receipt.fontBundleId,
+        },
+      }),
+    ),
+  ).toBe(false);
+  expect(
+    isPdfPreviewCommandResponse(
+      wrap({
+        ...preview,
+        receipt: {
+          ...preview.receipt,
+          fontBundleId: modern.receipt.fontBundleId,
+        },
+      }),
+    ),
+  ).toBe(false);
+});

@@ -3249,7 +3249,14 @@ export function PublishedResume({
           </h3>
           {section.entries.map((entry, entryIndex) =>
             entryHasVisibleContent(entry) || onSelectEntry ? (
-              <div className="resume-document__entry" key={entry.id}>
+              <div
+                className={`resume-document__entry${
+                  entryHasTopRowContent(entry)
+                    ? ""
+                    : " resume-document__entry--without-top-row"
+                }`}
+                key={entry.id}
+              >
                 <div className="resume-document__primary">
                   <div className="resume-document__title-line">
                     {entry.heading.trim() ? (
@@ -3409,6 +3416,20 @@ function entryHasVisibleContent(entry: ResumeEntry): boolean {
       entry.fields.some((field) => field.value.trim()) ||
       entry.bullets.some((bullet) => bullet.text.trim()) ||
       entry.links.some((link) => link.label.trim() || link.url.trim()),
+  );
+}
+
+function entryHasTopRowContent(entry: ResumeEntry): boolean {
+  return Boolean(
+    entry.heading.trim() ||
+      entry.subheading.trim() ||
+      entry.dateRange.trim() ||
+      entry.location.trim() ||
+      entry.dates?.some((date) => dateText(date)) ||
+      entry.fields.some(
+        (field) =>
+          field.label !== PARAGRAPH_FIELD_LABEL && field.value.trim(),
+      ),
   );
 }
 

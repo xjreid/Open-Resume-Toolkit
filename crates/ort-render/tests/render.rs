@@ -97,6 +97,21 @@ fn styles_are_deterministic_distinct_and_do_not_change_source_identity() {
                 original.receipt.document_sha256
             );
             assert_eq!(output.receipt.template_id, style.pdf_template_id());
+            if style == DocumentStyle::Modern {
+                assert_eq!(
+                    output.receipt.font_bundle_id,
+                    "liberation-sans/pdfjs-6.3.289"
+                );
+                assert_ne!(
+                    output.receipt.font_bundle_sha256,
+                    original.receipt.font_bundle_sha256
+                );
+            } else {
+                assert_eq!(
+                    output.receipt.font_bundle_sha256,
+                    original.receipt.font_bundle_sha256
+                );
+            }
             assert_eq!(output.receipt.pdf_sha256, sha256(&output.bytes));
             assert!(hashes.insert(output.receipt.pdf_sha256.clone()));
             if style == DocumentStyle::Plain {

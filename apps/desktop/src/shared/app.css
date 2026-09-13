@@ -2475,6 +2475,7 @@ body.is-section-sorting * {
 
 .resume-canvas,
 .resume-document {
+  --resume-content-inset: 14px;
   width: min(100%, 816px);
   min-height: 1056px;
   margin: 14px auto 0;
@@ -2488,8 +2489,8 @@ body.is-section-sorting * {
 .resume-canvas--technical,
 .resume-document--technical {
   font-family: "Times New Roman", Times, serif;
-  font-size: 13px;
-  line-height: 1.25;
+  font-size: 13.5px;
+  line-height: 1.22;
 }
 .resume-canvas--professional,
 .resume-document--professional {
@@ -2513,7 +2514,7 @@ body.is-section-sorting * {
 }
 .resume-canvas__contact {
   gap: 3px;
-  margin-bottom: 25px;
+  margin-bottom: 12px;
 }
 .resume-canvas__contact .canvas-field:first-child .canvas-field__button {
   font-size: 27px;
@@ -2615,8 +2616,8 @@ body.is-section-sorting * {
 }
 .resume-canvas__section > h3,
 .resume-document__section > h3 {
-  margin: 22px 0 10px;
-  padding-bottom: 3px;
+  margin: 16px 0 5px;
+  padding-bottom: 2px;
   border-bottom: 1px solid currentColor;
   color: inherit;
   font-size: 14px;
@@ -2624,6 +2625,17 @@ body.is-section-sorting * {
   letter-spacing: 0.055em;
   line-height: 1.2;
   text-transform: uppercase;
+}
+.resume-canvas__section {
+  margin-top: 0;
+}
+.resume-canvas--technical .resume-canvas__section > h3,
+.resume-document--technical .resume-document__section > h3 {
+  font-size: 15px;
+  font-variant: small-caps;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  text-transform: none;
 }
 .resume-canvas--modern .resume-canvas__section > h3,
 .resume-document--modern .resume-document__section > h3 {
@@ -2644,9 +2656,10 @@ body.is-section-sorting * {
   grid-template-areas:
     "primary meta"
     "body body";
-  gap: 5px 16px;
-  margin: 10px 0 15px;
-  padding: 10px 9px 12px;
+  width: calc(100% - var(--resume-content-inset));
+  gap: 3px 14px;
+  margin: 4px 0 8px var(--resume-content-inset);
+  padding: 7px 7px 8px;
 }
 .canvas-entry__primary {
   grid-area: primary;
@@ -2678,7 +2691,7 @@ body.is-section-sorting * {
   grid-area: body;
   width: 100%;
   margin-left: 0;
-  margin-top: 5px;
+  margin-top: 2px;
 }
 .canvas-entry > .canvas-field--bullets:last-child {
   width: calc(100% - 18px);
@@ -2990,13 +3003,13 @@ body.is-section-sorting * {
   gap: 2px 9px;
   align-items: baseline;
   justify-content: center;
-  margin-bottom: 23px;
+  margin-bottom: 12px;
   text-align: center;
 }
 .resume-document__contact h2 {
   flex-basis: 100%;
   margin: 0 0 3px;
-  font-size: 29px;
+  font-size: 30px;
   line-height: 1.05;
   letter-spacing: 0.015em;
 }
@@ -3018,8 +3031,23 @@ body.is-section-sorting * {
     "primary meta"
     "body body"
     "links links";
-  gap: 3px 16px;
-  margin: 10px 0 15px;
+  width: calc(100% - var(--resume-content-inset));
+  gap: 1px 14px;
+  margin: 4px 0 8px var(--resume-content-inset);
+}
+.resume-document__entry--without-top-row {
+  grid-template-areas:
+    "body body"
+    "links links";
+  margin-top: 2px;
+}
+.resume-document__entry--without-top-row .resume-document__primary,
+.resume-document__entry--without-top-row .resume-document__meta {
+  display: none;
+}
+.resume-document__entry--without-top-row .resume-document__body,
+.resume-document__entry--without-top-row .resume-document__links {
+  margin-top: 0;
 }
 .resume-document__primary {
   grid-area: primary;
@@ -3041,7 +3069,7 @@ body.is-section-sorting * {
 }
 .resume-document__primary p,
 .resume-document__meta p {
-  margin: 1px 0;
+  margin: 0;
 }
 .resume-document__primary p {
   white-space: pre-wrap;
@@ -3051,12 +3079,9 @@ body.is-section-sorting * {
   align-self: start;
   text-align: right;
 }
-.resume-document__meta p:first-child {
-  font-weight: 600;
-}
 .resume-document__body {
   grid-area: body;
-  margin: 5px 0 0;
+  margin: 3px 0 0;
   padding-left: 0;
 }
 ul.resume-document__body {
@@ -3065,7 +3090,7 @@ ul.resume-document__body {
   list-style-position: outside;
 }
 .resume-document__body li {
-  margin: 2px 0;
+  margin: 1px 0;
   padding-left: 2px;
 }
 .resume-document__body--paragraph {
@@ -3077,7 +3102,12 @@ ul.resume-document__body {
   display: flex;
   grid-area: links;
   gap: 10px;
-  margin: 3px 0 0;
+  margin: 1px 0 0;
+}
+.canvas-add-entry,
+.resume-document__section > .reading-entry-action {
+  width: calc(100% - var(--resume-content-inset));
+  margin-left: var(--resume-content-inset);
 }
 .resume-document--modern .resume-document__contact h2 {
   color: #133c49;
