@@ -12,6 +12,8 @@ use tauri::{
     AppHandle, Emitter, EventTarget, Manager, RunEvent, State, WebviewWindow, WindowEvent,
 };
 
+mod ai_request;
+mod ai_settings;
 mod backup_export;
 mod close_guard;
 mod data_deletion;
@@ -359,7 +361,17 @@ fn initialize_storage(app: &tauri::App) -> DesktopStorage {
     let profile_root = app_data.join("profiles").join("default");
     let vault = OsDatabaseKeyVault::new();
     match EncryptedStore::open_or_activate_pending_restore(&profile_root, "dev", &vault) {
-        Ok((store, _activated_restore)) => DesktopStorage::Ready(store),
+        Ok((store, _activated_restore)) => {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .ok()
+                .and_then(|duration| i64::try_from(duration.as_millis()).ok());
+            if now.is_some_and(|now| store.recover_ai_attempts(now).is_ok()) {
+                DesktopStorage::Ready(store)
+            } else {
+                DesktopStorage::Unavailable
+            }
+        }
         Err(_) => DesktopStorage::Unavailable,
     }
 }
@@ -374,12 +386,14 @@ fn development_identity_allowed(identifier: &str) -> bool {
 /// # Panics
 /// Panics when Tauri cannot initialize the application runtime. Storage
 /// initialization itself fails closed and leaves the UI available for recovery.
+#[allow(clippy::too_many_lines)]
 pub fn run() {
     tauri::Builder::default()
         .manage(CloseGuard::default())
         .manage(text_export::ExportState::default())
         .manage(pdf_preview::PdfState::default())
         .manage(pdf_preview::PortablePdfState::default())
+        .manage(ai_request::AiRequestGate::default())
         .plugin(tauri_plugin_dialog::init())
         .menu(menu::editor_menu)
         .on_menu_event(|app, event| {
@@ -405,6 +419,24 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            ai_settings::load_ai_connection,
+            ai_settings::load_ai_catalog,
+            ai_request::test_ai_connection,
+            ai_request::preview_ai_test,
+            ai_request::cancel_ai_test,
+            ai_settings::load_ai_monitoring,
+            ai_settings::load_ai_retention,
+            ai_settings::save_ai_retention,
+            ai_settings::load_ai_caps,
+            ai_settings::save_ai_cap,
+            ai_settings::disable_ai_cap,
+            ai_settings::reset_ai_cap,
+            ai_settings::clear_ai_monitoring,
+            ai_settings::export_ai_monitoring,
+            ai_settings::save_ai_connection,
+            ai_settings::disable_ai,
+            ai_settings::activate_saved_ai,
+            ai_settings::remove_ai_credential,
             import_review::begin::begin_document_import,
             import_review::begin::cancel_document_import,
             import_review::begin::document_import_available,

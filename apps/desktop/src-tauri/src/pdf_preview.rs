@@ -1189,6 +1189,8 @@ mod tests {
                 old_renderer,
                 old_draft,
             ],
+            ai_operations: Vec::new(),
+            ai_attempts: Vec::new(),
         };
         let created = Instant::now();
         let archive = build_portable_archive(&profile, created, 10_000).unwrap();
@@ -1269,6 +1271,8 @@ mod tests {
             published_resumes: Vec::new(),
             settings: std::collections::BTreeMap::new(),
             render_manifests: vec![manifest.clone()],
+            ai_operations: Vec::new(),
+            ai_attempts: Vec::new(),
         };
         let passphrase = BackupPassphrase::new("synthetic archive phrase".into()).unwrap();
         let bytes = ort_backup::create_backup(
@@ -1332,6 +1336,8 @@ mod tests {
                 published_resumes,
                 settings: std::collections::BTreeMap::new(),
                 render_manifests,
+                ai_operations: Vec::new(),
+                ai_attempts: Vec::new(),
             },
             Instant::now(),
             10_000,

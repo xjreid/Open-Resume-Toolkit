@@ -60,4 +60,6 @@ renderer outputs were separately generated and visually verified. Screenshots
 may precede the last small frontend refinements. No final native rebuild or
 signed installation was performed, to avoid another heavy compile cycle.
 
-Full workspace Rust/CI gates and final user visual acceptance remain unrun.
+Full workspace Rust/CI gates remain unrun. On September 13, 2026, the user
+explicitly accepted M2.5 as complete with the limitations above; see
+[closure](closure.md).

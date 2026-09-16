@@ -122,6 +122,8 @@ pub enum ValidateBackupResponse {
         published_resumes: u16,
         settings: u16,
         render_manifests: u16,
+        ai_operations: u16,
+        ai_attempts: u16,
     },
 }
 

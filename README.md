@@ -10,7 +10,7 @@ guarded quit, three PDF/DOCX styles, text export, render history, encrypted
 backup/recovery and local-data deletion. See the
 [acceptance record and known limitations](evidence/0.0.0-dev/m2-acceptance-closure.md).
 
-**M2.5 — usable desktop and resume designs is next, before M3.** AI, browser messaging, updates and release
+**M2.5 — usable desktop and resume designs and M3 Direct AI are complete for macOS Apple Silicon development.** See the [M3 evidence](evidence/0.0.0-dev/m3/README.md). Browser messaging, updates and release
 hardening remain later milestone work. Windows and Intel Mac remain deferred
 platform expansions; shared CI builds are portability signals, not native support.
 Start with the [next milestone guide](<Implementation Plans/Next_Milestones.md>).

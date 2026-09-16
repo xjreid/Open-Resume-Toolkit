@@ -1,4 +1,5 @@
 import { SettingsWorkspace } from "./SettingsWorkspace";
+import { AiWorkspace } from "./AiWorkspace";
 import { AppShell, Brand, type WorkspaceDestination } from "./AppShell";
 import { duplicateEntryGroups } from "./duplicate-hints";
 import { entryGuidance } from "./entry-guidance";
@@ -1305,6 +1306,11 @@ function ResumeEditor() {
               }}
             />
           }
+        />
+      </div>
+      <div className="settings-page" hidden={destination !== "ai"}>
+        <AiWorkspace
+          blocked={!storageReady || busy || confirmReload || close.pending}
         />
       </div>
     </AppShell>

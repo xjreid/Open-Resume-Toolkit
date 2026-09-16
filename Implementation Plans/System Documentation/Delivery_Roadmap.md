@@ -7,8 +7,8 @@
 | M0 | Complete | Architecture skeleton and contracts |
 | M1 | Complete | Encrypted local core and structured resume |
 | M2 | Complete | Offline editing, reviewed import, publication and export |
-| M2.5 | Next | Usable desktop layout, approved aesthetic and professional resume designs |
-| M3 | Planned | Direct AI foundation |
+| M2.5 | Complete | Usable desktop layout, approved aesthetic and professional resume designs |
+| M3 | Complete | Direct AI foundation |
 | M4 | Planned | Tailoring, alerts and application materials |
 | M5 | Planned | Workspace, tracker and browser bridge |
 | M6 | Optional | External Codex integration |
@@ -23,6 +23,13 @@ claim. The test-account signing-trust issue remains a packaging/setup follow-up.
 Start with the [next milestone guide](../Next_Milestones.md). Detailed technical
 behavior belongs in the component and product plans, not this status document.
 [Earlier checkpoint history](Delivery_Roadmap_History_2026-09-09.md) is archived.
+
+M2.5 was accepted complete on September 13, 2026. Its implementation evidence,
+accepted limitations, and the user's closure decision are recorded in the
+[M2.5 closure](../../evidence/0.0.0-dev/m2.5/closure.md). M3 began the same day;
+M3 completed on September 16 for macOS Apple Silicon development. The
+[M3 implementation record](../../evidence/0.0.0-dev/m3/README.md) includes its
+automated audit, signed native walkthrough, and documented no-credential exception.
 
 ## Testing approach
 

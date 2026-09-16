@@ -2,7 +2,7 @@
 
 ## Status
 
-These plans select the architecture, module boundaries, durable records, protocols, security controls, test strategy, and release workflow. M0–M2 are complete for the macOS Apple Silicon development scope; see the [M2 acceptance closure](../evidence/0.0.0-dev/m2-acceptance-closure.md). The next milestone is M2.5: usable desktop layout, approved aesthetic and professional resume designs, before M3. The approved visual direction remains owned by `../Aesthetic/`; exact component polish and the two non-default document-template layouts may be tested and refined during development without weakening their release gates.
+These plans select the architecture, module boundaries, durable records, protocols, security controls, test strategy, and release workflow. M0–M3 are complete for the macOS Apple Silicon development scope; see the [M2 acceptance closure](../evidence/0.0.0-dev/m2-acceptance-closure.md), [M2.5 closure](../evidence/0.0.0-dev/m2.5/closure.md), and [M3 evidence](../evidence/0.0.0-dev/m3/README.md). M4 is next. The approved visual direction remains owned by `../Aesthetic/`.
 
 Implementation may refine library versions and internal names without changing product behavior. Any change to privacy promises, supported AI modes, data ownership, release channels, or the user-visible lifecycle must first be approved in `../Product Plans/`.
 
@@ -45,7 +45,7 @@ Exact dependency versions are chosen and locked when the workspace is bootstrapp
 - [`System Documentation/Development_and_Deployment_Outline.md`](System%20Documentation/Development_and_Deployment_Outline.md) — shared-code ownership, build targets, environments, artifact matrix, CI/deployment flow, gates, rollback, and M0 readiness checklist.
 - [`System Documentation/Security_and_Threat_Model.md`](System%20Documentation/Security_and_Threat_Model.md) — trust boundaries, controls, abuse cases, and release-blocking security gates.
 - [`System Documentation/Delivery_Roadmap.md`](System%20Documentation/Delivery_Roadmap.md) — vertical milestones, dependencies, evidence, and explicit deferrals.
-- [`Next_Milestones.md`](Next_Milestones.md) — M3 starting route and ordered navigation for M4–M8; it summarizes and does not supersede the delivery roadmap.
+- [`Next_Milestones.md`](Next_Milestones.md) — completed M3 review route and ordered navigation for M4–M8; it summarizes and does not supersede the delivery roadmap.
 - [`System Documentation/Requirement_Traceability.md`](System%20Documentation/Requirement_Traceability.md) — stable requirement IDs for issues, tests, and release evidence.
 
 ### Component plans

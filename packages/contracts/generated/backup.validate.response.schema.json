@@ -18,6 +18,18 @@
     {
       "type": "object",
       "properties": {
+        "aiAttempts": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "aiOperations": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
         "appVersion": {
           "type": "string"
         },
@@ -95,7 +107,9 @@
         "masterDrafts",
         "publishedResumes",
         "settings",
-        "renderManifests"
+        "renderManifests",
+        "aiOperations",
+        "aiAttempts"
       ]
     }
   ]

@@ -54,5 +54,13 @@
       "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="
     }
   ],
-  "packageExceptions": []
+  "packageExceptions": [
+    {
+      "ecosystem": "rust",
+      "package": "webpki-root-certs@1.0.9",
+      "license": "CDLA-Permissive-2.0",
+      "reason": "Exact CA-certificate data dependency of rustls-platform-verifier for M3 HTTPS. CDLA-Permissive-2.0 permits sharing if its agreement text accompanies the data; include that text in distribution notices and reassess before signed release.",
+      "expiresOn": "2027-03-15"
+    }
+  ]
 }

@@ -60,6 +60,9 @@ probe-document-lifecycle-macos:
 test-platform-vault:
 	ORT_RUN_OS_VAULT_TESTS=1 cargo test -p ort-vault --test os_vault native_database_key_round_trip_and_overwrite_denial -- --ignored --exact --nocapture
 
+test-platform-provider-vault:
+	ORT_RUN_OS_VAULT_TESTS=1 cargo test -p ort-vault --test os_vault native_provider_credential_round_trip_and_removal -- --ignored --exact --nocapture
+
 # Native synthetic Keychain checks; each process disables interactive prompts.
 test-platform-vault-concurrency:
 	ORT_RUN_OS_VAULT_TESTS=1 cargo test --locked -p ort-vault --test os_vault native_upsert_negative_control_can_replace_a_competing_key -- --ignored --exact --nocapture

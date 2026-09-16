@@ -185,7 +185,30 @@ test("canonical local and CI gates execute license and contract drift checks", a
   assert.match(workflow, /run: pnpm check:licenses/);
   const parsedPolicy = JSON.parse(policy);
   assert.equal(parsedPolicy.schemaVersion, 1);
-  assert.deepEqual(parsedPolicy.packageExceptions, []);
+  assert.equal(parsedPolicy.packageExceptions.length, 1);
+  assert.deepEqual(
+    parsedPolicy.packageExceptions.map(
+      ({ ecosystem, package: name, license }) => ({
+        ecosystem,
+        package: name,
+        license,
+      }),
+    ),
+    [
+      {
+        ecosystem: "rust",
+        package: "webpki-root-certs@1.0.9",
+        license: "CDLA-Permissive-2.0",
+      },
+    ],
+  );
+  assert(
+    licenseExceptionAllowed(
+      parsedPolicy.packageExceptions[0],
+      "CDLA-Permissive-2.0",
+      "2026-09-15",
+    ),
+  );
   assert(
     !parsedPolicy.allowedLicenses.some((license) => license.includes("AGPL")),
   );

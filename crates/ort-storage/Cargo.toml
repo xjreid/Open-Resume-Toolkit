@@ -10,6 +10,7 @@ repository.workspace = true
 hex.workspace = true
 jiff.workspace = true
 ort-backup = { path = "../ort-backup" }
+ort-ai = { path = "../ort-ai" }
 ort-domain = { path = "../ort-domain" }
 ort-vault = { path = "../ort-vault" }
 rusqlite.workspace = true

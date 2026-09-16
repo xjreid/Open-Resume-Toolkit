@@ -1,11 +1,13 @@
 use ort_domain::{CommandResponse, DeleteAllLocalDataRequest, DeleteAllLocalDataResponse};
 use ort_storage::{AllLocalDataDeletion, EncryptedStore, StorageError};
-use ort_vault::{DatabaseKeyVault, OsDatabaseKeyVault};
+use ort_vault::{
+    DatabaseKeyVault, OsDatabaseKeyVault, OsProviderCredentialVault, ProviderCredentialVault,
+};
 use tauri::{Manager, WebviewWindow};
 
 use super::{
-    DesktopState, DesktopStorage, pdf_preview::PdfState, text_export::ExportState,
-    window_not_authorized,
+    DesktopState, DesktopStorage, ai_request::AiRequestGate, ai_settings, pdf_preview::PdfState,
+    text_export::ExportState, window_not_authorized,
 };
 
 #[tauri::command]
@@ -25,9 +27,18 @@ pub(crate) async fn delete_all_local_data(
     };
     match tauri::async_runtime::spawn_blocking(move || {
         let _lease = lease;
+        let gate = app.state::<AiRequestGate>();
+        let Some(_ai_lease) = gate.begin(uuid::Uuid::now_v7()) else {
+            return failure("LOCAL_DATA_OPERATION_BUSY", true);
+        };
         let state = app.state::<DesktopState>();
         let previews = app.state::<PdfState>();
-        delete_and_reinitialize(&state, &previews, &OsDatabaseKeyVault::new())
+        delete_and_reinitialize(
+            &state,
+            &previews,
+            &OsDatabaseKeyVault::new(),
+            &OsProviderCredentialVault::new(),
+        )
     })
     .await
     {
@@ -36,14 +47,33 @@ pub(crate) async fn delete_all_local_data(
     }
 }
 
-fn delete_and_reinitialize(
+fn delete_and_reinitialize<P: ProviderCredentialVault>(
     state: &DesktopState,
     previews: &PdfState,
     vault: &dyn DatabaseKeyVault,
+    provider_vault: &P,
 ) -> CommandResponse<DeleteAllLocalDataResponse> {
     let Ok(store) = state.take_store() else {
         return failure("STORAGE_UNAVAILABLE", true);
     };
+    if let Err(error) = store.validate_all_data_deletion_boundary() {
+        let _ = state.replace_storage(DesktopStorage::Ready(store));
+        return deletion_failure(&error);
+    }
+    let credential = match ai_settings::saved_credential_reference(&store) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = state.replace_storage(DesktopStorage::Ready(store));
+            return deletion_failure(&error);
+        }
+    };
+    if credential
+        .as_ref()
+        .is_some_and(|reference| provider_vault.delete(reference).is_err())
+    {
+        let _ = state.replace_storage(DesktopStorage::Ready(store));
+        return failure("LOCAL_DATA_CREDENTIAL_DELETE_UNAVAILABLE", true);
+    }
     let Some(root) = store.database_path().parent().map(ToOwned::to_owned) else {
         let _ = state.replace_storage(DesktopStorage::Unavailable);
         return failure("LOCAL_DATA_DELETE_UNSAFE", false);
@@ -100,12 +130,61 @@ fn failure(code: &str, retryable: bool) -> CommandResponse<DeleteAllLocalDataRes
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     use ort_domain::ResumeDocument;
     use ort_vault::testing::MemoryDatabaseKeyVault;
+    use ort_vault::{ProviderCredentialReference, ProviderSecret, VaultError};
     use tempfile::TempDir;
 
     use super::*;
+
+    struct NoopProviderVault;
+    impl ProviderCredentialVault for NoopProviderVault {
+        fn use_secret<T>(
+            &self,
+            _reference: &ProviderCredentialReference,
+            _operation: impl FnOnce(&ProviderSecret) -> T,
+        ) -> Result<T, VaultError> {
+            Err(VaultError::Missing)
+        }
+
+        fn store_new(
+            &self,
+            _reference: &ProviderCredentialReference,
+            _secret: &ProviderSecret,
+        ) -> Result<(), VaultError> {
+            Ok(())
+        }
+
+        fn delete(&self, _reference: &ProviderCredentialReference) -> Result<(), VaultError> {
+            Ok(())
+        }
+    }
+
+    struct RecordingProviderVault(AtomicBool);
+    impl ProviderCredentialVault for RecordingProviderVault {
+        fn use_secret<T>(
+            &self,
+            _reference: &ProviderCredentialReference,
+            _operation: impl FnOnce(&ProviderSecret) -> T,
+        ) -> Result<T, VaultError> {
+            Err(VaultError::Missing)
+        }
+
+        fn store_new(
+            &self,
+            _reference: &ProviderCredentialReference,
+            _secret: &ProviderSecret,
+        ) -> Result<(), VaultError> {
+            Ok(())
+        }
+
+        fn delete(&self, _reference: &ProviderCredentialReference) -> Result<(), VaultError> {
+            self.0.store(true, Ordering::SeqCst);
+            Ok(())
+        }
+    }
 
     #[test]
     fn deletion_replaces_the_active_store_with_a_new_empty_identity() {
@@ -123,7 +202,7 @@ mod tests {
         };
         let previews = PdfState::default();
 
-        let response = delete_and_reinitialize(&state, &previews, &vault);
+        let response = delete_and_reinitialize(&state, &previews, &vault, &NoopProviderVault);
         assert!(matches!(
             response,
             CommandResponse::Success {
@@ -143,13 +222,46 @@ mod tests {
     }
 
     #[test]
+    fn deletion_removes_the_active_provider_vault_item() {
+        let temporary = TempDir::new().unwrap();
+        let root = temporary.path().join("default");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(&root, "test", &vault).unwrap();
+        store
+            .save_setting(
+                "ai.connection.v1",
+                None,
+                &serde_json::json!({
+                    "mode": "direct_api",
+                    "provider": "openai",
+                    "preset": "balanced",
+                    "credentialId": uuid::Uuid::now_v7(),
+                }),
+            )
+            .unwrap();
+        let state = DesktopState {
+            reviews: std::sync::Arc::default(),
+            storage: Mutex::new(DesktopStorage::Ready(store)),
+        };
+        let provider_vault = RecordingProviderVault(AtomicBool::new(false));
+        let response =
+            delete_and_reinitialize(&state, &PdfState::default(), &vault, &provider_vault);
+        assert!(matches!(response, CommandResponse::Success { .. }));
+        assert!(provider_vault.0.load(Ordering::SeqCst));
+    }
+
+    #[test]
     fn unavailable_storage_cannot_be_misreported_as_deleted() {
         let state = DesktopState {
             reviews: std::sync::Arc::default(),
             storage: Mutex::new(DesktopStorage::Unavailable),
         };
-        let response =
-            delete_and_reinitialize(&state, &PdfState::default(), &MemoryDatabaseKeyVault::new());
+        let response = delete_and_reinitialize(
+            &state,
+            &PdfState::default(),
+            &MemoryDatabaseKeyVault::new(),
+            &NoopProviderVault,
+        );
         let CommandResponse::Failure { error, .. } = response else {
             panic!("unavailable storage must fail");
         };
@@ -175,7 +287,8 @@ mod tests {
             storage: Mutex::new(DesktopStorage::Ready(store)),
         };
 
-        let response = delete_and_reinitialize(&state, &PdfState::default(), &vault);
+        let response =
+            delete_and_reinitialize(&state, &PdfState::default(), &vault, &NoopProviderVault);
         let CommandResponse::Failure { error, .. } = response else {
             panic!("unsafe deletion must fail");
         };

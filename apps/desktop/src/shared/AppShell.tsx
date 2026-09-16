@@ -6,6 +6,7 @@ import logo from "../assets/open-frame-icon.svg";
 export const WORKSPACE_DESTINATIONS = [
   { id: "resume", label: "Master resume" },
   { id: "import", label: "Import resume" },
+  { id: "ai", label: "AI & monitoring" },
   { id: "settings", label: "Settings" },
 ] as const;
 export type WorkspaceDestination =
@@ -45,7 +46,9 @@ export function AppShell({
               ? "Resume workspace"
               : destination === "import"
                 ? "Import resume"
-                : "Settings"
+                : destination === "ai"
+                  ? "AI & monitoring"
+                  : "Settings"
           }
         />
         {status}

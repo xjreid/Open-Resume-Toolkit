@@ -266,6 +266,8 @@ fn validate_backup_bytes(
         published_resumes: backup.manifest.inventory.published_resumes,
         settings: backup.manifest.inventory.settings,
         render_manifests: backup.manifest.inventory.render_manifests,
+        ai_operations: backup.manifest.inventory.ai_operations,
+        ai_attempts: backup.manifest.inventory.ai_attempts,
     })
 }
 

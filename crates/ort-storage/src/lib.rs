@@ -13,9 +13,10 @@ use std::time::Duration;
 
 use jiff::Timestamp;
 use ort_backup::{
-    BackupError, BackupExportRequestV1, BackupPassphrase, PortableProfileV1,
-    PortablePublishedResumeV1, PortableRenderManifestV1, PortableResumeRevisionV1,
-    PortableSettingV1, create_backup, restore_backup,
+    BackupError, BackupExportRequestV1, BackupPassphrase, PortableAiAttemptV1,
+    PortableAiOperationV1, PortableAiPriceV1, PortableProfileV1, PortablePublishedResumeV1,
+    PortableRenderManifestV1, PortableResumeRevisionV1, PortableSettingV1, create_backup,
+    restore_backup,
 };
 use ort_domain::{
     DocumentLimits, ExportSource, MAX_PDF_BYTES, MAX_PDF_PAGES, PdfRenderReceipt, ResumeDocument,
@@ -30,6 +31,8 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 use zeroize::Zeroize;
 
+pub mod ai_activity;
+
 const DATABASE_FILENAME: &str = "profile.db";
 const MANIFEST_FILENAME: &str = "profile.json";
 const PREVIOUS_MANIFEST_FILENAME: &str = "profile.json.previous";
@@ -40,11 +43,12 @@ const RESTORE_SAFETY_DIRECTORY: &str = ".ort-restore-safety";
 const SAFETY_DELETE_DIRECTORY: &str = ".ort-safety-delete-pending";
 const DELETE_ALL_MARKER_FILENAME: &str = ".ort-delete-all-pending.json";
 const DATABASE_FORMAT_VERSION: u16 = 1;
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 4;
 const MAX_RENDER_MANIFESTS: i64 = 100;
 const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 const MAX_MANIFEST_BYTES: u64 = 16 * 1_024;
 const MAX_SETTING_BYTES: usize = 64 * 1_024;
+const AI_CONNECTION_SETTING_KEY: &str = "ai.connection.v1";
 const MIGRATION_V1_SQL: &str = "CREATE TABLE schema_migrations (
          version INTEGER PRIMARY KEY,
          checksum_sha256 TEXT NOT NULL,
@@ -118,6 +122,61 @@ const MIGRATION_V2_SQL: &str = "CREATE TABLE render_manifests (
      ) STRICT;
      CREATE INDEX render_manifests_recent
          ON render_manifests (profile_id, last_generated_at_unix_ms DESC, manifest_id DESC);";
+const MIGRATION_V3_SQL: &str = "CREATE TABLE ai_operations (
+         operation_id TEXT PRIMARY KEY,
+         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+         operation_type TEXT NOT NULL CHECK (operation_type IN ('tailor_resume', 'refine_resume', 'cover_letter', 'answer_question', 'import_mapping', 'credential_test')),
+         started_at_unix_ms INTEGER NOT NULL CHECK (started_at_unix_ms >= 1),
+         ended_at_unix_ms INTEGER CHECK (ended_at_unix_ms IS NULL OR ended_at_unix_ms >= started_at_unix_ms),
+         status TEXT NOT NULL CHECK (status IN ('active', 'succeeded', 'failed', 'cancelled', 'outcome_unknown')),
+         cancelled INTEGER NOT NULL CHECK (cancelled IN (0, 1))
+     ) STRICT;
+     CREATE UNIQUE INDEX ai_one_active_operation
+         ON ai_operations (profile_id) WHERE status = 'active';
+     CREATE TABLE ai_attempts (
+         attempt_id TEXT PRIMARY KEY,
+         operation_id TEXT NOT NULL REFERENCES ai_operations(operation_id) ON DELETE CASCADE,
+         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+         provider TEXT NOT NULL CHECK (provider IN ('openai', 'anthropic', 'gemini')),
+         credential_id TEXT NOT NULL,
+         requested_model TEXT NOT NULL,
+         effective_model TEXT,
+         preset_version TEXT NOT NULL,
+         catalog_id TEXT NOT NULL,
+         started_at_unix_ms INTEGER NOT NULL CHECK (started_at_unix_ms >= 1),
+         ended_at_unix_ms INTEGER CHECK (ended_at_unix_ms IS NULL OR ended_at_unix_ms >= started_at_unix_ms),
+         status TEXT NOT NULL CHECK (status IN ('reserved', 'dispatching', 'streaming', 'succeeded', 'failed', 'cancelled', 'outcome_unknown')),
+         retry_of TEXT REFERENCES ai_attempts(attempt_id),
+         usage_json BLOB,
+         usage_complete INTEGER NOT NULL CHECK (usage_complete IN (0, 1)),
+         estimated_input_tokens INTEGER NOT NULL CHECK (estimated_input_tokens >= 0),
+         reserved_cost_micros INTEGER NOT NULL CHECK (reserved_cost_micros >= 0),
+         settled_cost_micros INTEGER CHECK (settled_cost_micros IS NULL OR settled_cost_micros >= 0),
+         currency TEXT NOT NULL CHECK (length(currency) = 3),
+         estimate_completeness TEXT NOT NULL CHECK (estimate_completeness IN ('complete', 'partial', 'unavailable')),
+         error_category TEXT CHECK (error_category IS NULL OR error_category IN ('authentication', 'rate_limit', 'transient', 'safety', 'invalid_output', 'timeout', 'cancelled', 'provider'))
+     ) STRICT;
+     CREATE INDEX ai_attempts_monitoring
+         ON ai_attempts (profile_id, started_at_unix_ms, provider, status);
+     CREATE TABLE ai_guardrail_policies (
+         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+         credential_id TEXT NOT NULL,
+         period TEXT NOT NULL CHECK (period IN ('week', 'month', 'year', 'all_time')),
+         currency TEXT NOT NULL CHECK (length(currency) = 3),
+         time_zone TEXT NOT NULL,
+         limit_micros INTEGER NOT NULL CHECK (limit_micros > 0),
+         activated_at_unix_ms INTEGER NOT NULL CHECK (activated_at_unix_ms >= 1),
+         period_start_unix_ms INTEGER NOT NULL CHECK (period_start_unix_ms >= 1),
+         period_end_unix_ms INTEGER CHECK (period_end_unix_ms IS NULL OR period_end_unix_ms > period_start_unix_ms),
+         counted_micros INTEGER NOT NULL CHECK (counted_micros >= 0),
+         reserved_micros INTEGER NOT NULL CHECK (reserved_micros >= 0),
+         unresolved_micros INTEGER NOT NULL CHECK (unresolved_micros >= 0),
+         revision INTEGER NOT NULL CHECK (revision >= 1),
+         PRIMARY KEY (profile_id, credential_id, period)
+     ) STRICT;";
+const MIGRATION_V4_SQL: &str =
+    "ALTER TABLE ai_attempts ADD COLUMN catalog_effective_from TEXT NOT NULL DEFAULT 'unavailable';
+     ALTER TABLE ai_attempts ADD COLUMN pricing_components_json BLOB NOT NULL DEFAULT X'5B5D';";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum StorageError {
@@ -292,6 +351,15 @@ pub struct EncryptedStore {
 }
 
 impl EncryptedStore {
+    /// Returns non-secret identifiers needed to derive a namespaced vault address.
+    #[must_use]
+    pub fn vault_identity(&self) -> (&str, Uuid, Uuid) {
+        (
+            &self.manifest.channel,
+            self.manifest.install_id,
+            self.manifest.profile_id,
+        )
+    }
     /// Opens the active profile, first completing a fully staged portable
     /// replacement when a valid recovery marker is present.
     ///
@@ -1296,6 +1364,7 @@ impl EncryptedStore {
     /// # Errors
     /// Returns `RevisionConflict` if the destination already contains portable
     /// records, or `InvalidData` for every untrusted backup failure.
+    #[allow(clippy::too_many_lines)]
     pub fn restore_portable_backup(
         &self,
         bytes: &[u8],
@@ -1316,7 +1385,9 @@ impl EncryptedStore {
                  (SELECT COUNT(*) FROM resume_drafts WHERE profile_id = ?1) + \
                  (SELECT COUNT(*) FROM published_resumes WHERE profile_id = ?1) + \
                  (SELECT COUNT(*) FROM settings WHERE profile_id = ?1) + \
-                 (SELECT COUNT(*) FROM render_manifests WHERE profile_id = ?1)",
+                 (SELECT COUNT(*) FROM render_manifests WHERE profile_id = ?1) + \
+                 (SELECT COUNT(*) FROM ai_operations WHERE profile_id = ?1) + \
+                 (SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1)",
                 [self.manifest.profile_id.to_string()],
                 |row| row.get(0),
             )
@@ -1362,6 +1433,10 @@ impl EncryptedStore {
                 .map_err(|_| StorageError::Unavailable)?;
         }
         for (key, setting) in &backup.profile.settings {
+            // A portable backup never rebinds an OS-vault-only credential ID.
+            if key == AI_CONNECTION_SETTING_KEY {
+                continue;
+            }
             validate_setting_key(key)?;
             let value_json =
                 serde_json::to_vec(&setting.value).map_err(|_| StorageError::InvalidData)?;
@@ -1387,6 +1462,12 @@ impl EncryptedStore {
             &transaction,
             &self.manifest.profile_id.to_string(),
             &backup.profile.render_manifests,
+        )?;
+        restore_ai_activity(
+            &transaction,
+            &self.manifest.profile_id.to_string(),
+            &backup.profile.ai_operations,
+            &backup.profile.ai_attempts,
         )?;
         transaction
             .commit()
@@ -1565,19 +1646,28 @@ impl EncryptedStore {
         Ok(true)
     }
 
+    /// Validates the fixed local deletion boundary before a caller removes
+    /// related OS-vault credentials.
+    /// # Errors
+    /// Fails closed when the fixed profile/recovery boundary is unsafe.
+    pub fn validate_all_data_deletion_boundary(&self) -> Result<(), StorageError> {
+        let root = self
+            .database_path
+            .parent()
+            .ok_or(StorageError::UnsafeLocation)?;
+        validate_all_data_deletion_targets(root, &self.manifest.channel, true).map(drop)
+    }
+
     /// Permanently deletes every currently implemented ORT profile/recovery
     /// record and associated database-vault key under the active profile's
     /// fixed parent. A durable marker makes the destructive intent resumable
-    /// before a fresh profile can be opened.
-    ///
-    /// The caller must drop the active `EncryptedStore` first so SQLite has
-    /// closed its database, WAL and shared-memory handles. User-selected
-    /// exports and backups are outside this exact-name boundary.
+    /// before a fresh profile can be opened. The caller must first drop the
+    /// active store so SQLite closes its handles. External exports/backups are
+    /// outside the boundary.
     ///
     /// # Errors
-    /// Returns an error only before destructive intent is durably committed.
-    /// After the marker is durable, an incomplete cleanup is reported as
-    /// `CleanupPending` and startup must resume it.
+    /// Returns an error only before destructive intent is durably committed;
+    /// later incomplete cleanup is returned as `CleanupPending`.
     pub fn delete_all_local_data(
         root: &Path,
         channel: &str,
@@ -1606,6 +1696,7 @@ impl EncryptedStore {
         )
     }
 
+    #[allow(clippy::too_many_lines)]
     fn read_portable_profile(&self) -> Result<PortableProfileV1, StorageError> {
         let mut connection = self
             .connection
@@ -1684,8 +1775,50 @@ impl EncryptedStore {
                 })
                 .collect::<Result<BTreeMap<_, _>, StorageError>>()?
         };
+        let mut settings = settings;
+        settings.remove(AI_CONNECTION_SETTING_KEY);
         let render_manifests =
             read_portable_render_manifests(&transaction, &self.manifest.profile_id.to_string())?;
+        let ai_operations = {
+            let mut statement = transaction
+                .prepare(
+                    "SELECT operation_id, operation_type, started_at_unix_ms, ended_at_unix_ms,
+                    status, cancelled FROM ai_operations WHERE profile_id = ?1
+                    ORDER BY started_at_unix_ms, operation_id",
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+            statement
+                .query_map([self.manifest.profile_id.to_string()], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, Option<i64>>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, i64>(5)?,
+                    ))
+                })
+                .map_err(|_| StorageError::Unavailable)?
+                .map(|row| {
+                    let (operation_id, operation_type, started, ended, status, cancelled) =
+                        row.map_err(|_| StorageError::Unavailable)?;
+                    Ok(PortableAiOperationV1 {
+                        operation_id,
+                        operation_type,
+                        started_at_unix_ms: u64::try_from(started)
+                            .map_err(|_| StorageError::InvalidData)?,
+                        ended_at_unix_ms: ended
+                            .map(u64::try_from)
+                            .transpose()
+                            .map_err(|_| StorageError::InvalidData)?,
+                        status,
+                        cancelled: cancelled == 1,
+                    })
+                })
+                .collect::<Result<Vec<_>, StorageError>>()?
+        };
+        let ai_attempts =
+            read_portable_ai_attempts(&transaction, &self.manifest.profile_id.to_string())?;
         transaction
             .commit()
             .map_err(|_| StorageError::Unavailable)?;
@@ -1694,6 +1827,8 @@ impl EncryptedStore {
             published_resumes,
             settings,
             render_manifests,
+            ai_operations,
+            ai_attempts,
         })
     }
 
@@ -1776,6 +1911,248 @@ fn known_file_bytes(path: &Path, required: bool) -> Result<u64, StorageError> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound && !required => Ok(0),
         Err(_) => Err(StorageError::Unavailable),
     }
+}
+
+#[allow(clippy::type_complexity, clippy::too_many_lines)]
+fn read_portable_ai_attempts(
+    transaction: &Transaction<'_>,
+    profile_id: &str,
+) -> Result<Vec<PortableAiAttemptV1>, StorageError> {
+    let mut statement = transaction
+        .prepare(
+            "SELECT attempt_id, operation_id, provider, credential_id, requested_model,
+            effective_model, preset_version, catalog_id, catalog_effective_from,
+            pricing_components_json, started_at_unix_ms, ended_at_unix_ms,
+            status, retry_of, usage_json, usage_complete, estimated_input_tokens,
+            reserved_cost_micros, settled_cost_micros, currency, estimate_completeness,
+            error_category FROM ai_attempts WHERE profile_id = ?1
+            ORDER BY started_at_unix_ms, attempt_id",
+        )
+        .map_err(|_| StorageError::Unavailable)?;
+    statement
+        .query_map([profile_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
+                row.get::<_, Vec<u8>>(9)?,
+                row.get::<_, i64>(10)?,
+                row.get::<_, Option<i64>>(11)?,
+                row.get::<_, String>(12)?,
+                row.get::<_, Option<String>>(13)?,
+                row.get::<_, Option<Vec<u8>>>(14)?,
+                row.get::<_, i64>(15)?,
+                row.get::<_, i64>(16)?,
+                row.get::<_, i64>(17)?,
+                row.get::<_, Option<i64>>(18)?,
+                row.get::<_, String>(19)?,
+                row.get::<_, String>(20)?,
+                row.get::<_, Option<String>>(21)?,
+            ))
+        })
+        .map_err(|_| StorageError::Unavailable)?
+        .map(|row| {
+            let (
+                attempt_id,
+                operation_id,
+                provider,
+                credential_id,
+                requested_model,
+                effective_model,
+                preset_version,
+                catalog_id,
+                catalog_effective_from,
+                pricing_components,
+                started,
+                ended,
+                status,
+                retry_of,
+                usage,
+                usage_complete,
+                estimated_input_tokens,
+                reserved_cost_micros,
+                settled_cost_micros,
+                currency,
+                estimate_completeness,
+                error_category,
+            ) = row.map_err(|_| StorageError::Unavailable)?;
+            let pricing_components =
+                serde_json::from_slice::<Vec<ort_ai::Price>>(&pricing_components)
+                    .map_err(|_| StorageError::InvalidData)?
+                    .into_iter()
+                    .map(|price| PortableAiPriceV1 {
+                        category: match price.category {
+                            ort_ai::PriceCategory::Input => "input",
+                            ort_ai::PriceCategory::CachedInput => "cached_input",
+                            ort_ai::PriceCategory::CacheWrite => "cache_write",
+                            ort_ai::PriceCategory::Output => "output",
+                            ort_ai::PriceCategory::Reasoning => "reasoning",
+                        }
+                        .into(),
+                        micros_per_million: price.micros_per_million,
+                    })
+                    .collect();
+            Ok(PortableAiAttemptV1 {
+                attempt_id,
+                operation_id,
+                provider,
+                credential_id,
+                requested_model,
+                effective_model,
+                preset_version,
+                catalog_id,
+                catalog_effective_from,
+                pricing_components,
+                started_at_unix_ms: u64::try_from(started)
+                    .map_err(|_| StorageError::InvalidData)?,
+                ended_at_unix_ms: ended
+                    .map(u64::try_from)
+                    .transpose()
+                    .map_err(|_| StorageError::InvalidData)?,
+                status,
+                retry_of,
+                usage: usage
+                    .map(|bytes| serde_json::from_slice(&bytes))
+                    .transpose()
+                    .map_err(|_| StorageError::InvalidData)?,
+                usage_complete: usage_complete == 1,
+                estimated_input_tokens: u64::try_from(estimated_input_tokens)
+                    .map_err(|_| StorageError::InvalidData)?,
+                reserved_cost_micros: u64::try_from(reserved_cost_micros)
+                    .map_err(|_| StorageError::InvalidData)?,
+                settled_cost_micros: settled_cost_micros
+                    .map(u64::try_from)
+                    .transpose()
+                    .map_err(|_| StorageError::InvalidData)?,
+                currency,
+                estimate_completeness,
+                error_category,
+            })
+        })
+        .collect()
+}
+
+fn restore_ai_activity(
+    transaction: &Transaction<'_>,
+    profile_id: &str,
+    operations: &[PortableAiOperationV1],
+    attempts: &[PortableAiAttemptV1],
+) -> Result<(), StorageError> {
+    for operation in operations {
+        let started =
+            i64::try_from(operation.started_at_unix_ms).map_err(|_| StorageError::InvalidData)?;
+        let ended = operation
+            .ended_at_unix_ms
+            .map(i64::try_from)
+            .transpose()
+            .map_err(|_| StorageError::InvalidData)?;
+        transaction
+            .execute(
+                "INSERT INTO ai_operations (operation_id, profile_id, operation_type,
+                started_at_unix_ms, ended_at_unix_ms, status, cancelled)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    operation.operation_id,
+                    profile_id,
+                    operation.operation_type,
+                    started,
+                    ended,
+                    operation.status,
+                    i64::from(operation.cancelled),
+                ],
+            )
+            .map_err(|_| StorageError::Unavailable)?;
+    }
+    for attempt in attempts {
+        let usage_json = attempt
+            .usage
+            .as_ref()
+            .map(serde_json::to_vec)
+            .transpose()
+            .map_err(|_| StorageError::InvalidData)?;
+        let pricing_components_json = encode_portable_prices(&attempt.pricing_components)?;
+        let catalog_effective_from = if attempt.catalog_effective_from.is_empty() {
+            "unavailable"
+        } else {
+            attempt.catalog_effective_from.as_str()
+        };
+        transaction
+            .execute(
+                "INSERT INTO ai_attempts (attempt_id, operation_id, profile_id, provider,
+                credential_id, requested_model, effective_model, preset_version, catalog_id,
+                catalog_effective_from, pricing_components_json,
+                started_at_unix_ms, ended_at_unix_ms, status, retry_of, usage_json,
+                usage_complete, estimated_input_tokens, reserved_cost_micros,
+                settled_cost_micros, currency, estimate_completeness, error_category)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+                ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
+                params![
+                    attempt.attempt_id,
+                    attempt.operation_id,
+                    profile_id,
+                    attempt.provider,
+                    attempt.credential_id,
+                    attempt.requested_model,
+                    attempt.effective_model,
+                    attempt.preset_version,
+                    attempt.catalog_id,
+                    catalog_effective_from,
+                    pricing_components_json,
+                    i64::try_from(attempt.started_at_unix_ms)
+                        .map_err(|_| StorageError::InvalidData)?,
+                    attempt
+                        .ended_at_unix_ms
+                        .map(i64::try_from)
+                        .transpose()
+                        .map_err(|_| StorageError::InvalidData)?,
+                    attempt.status,
+                    attempt.retry_of,
+                    usage_json,
+                    i64::from(attempt.usage_complete),
+                    i64::try_from(attempt.estimated_input_tokens)
+                        .map_err(|_| StorageError::InvalidData)?,
+                    i64::try_from(attempt.reserved_cost_micros)
+                        .map_err(|_| StorageError::InvalidData)?,
+                    attempt
+                        .settled_cost_micros
+                        .map(i64::try_from)
+                        .transpose()
+                        .map_err(|_| StorageError::InvalidData)?,
+                    attempt.currency,
+                    attempt.estimate_completeness,
+                    attempt.error_category,
+                ],
+            )
+            .map_err(|_| StorageError::Unavailable)?;
+    }
+    Ok(())
+}
+
+fn encode_portable_prices(prices: &[PortableAiPriceV1]) -> Result<Vec<u8>, StorageError> {
+    let prices = prices
+        .iter()
+        .map(|price| {
+            let category = match price.category.as_str() {
+                "input" => ort_ai::PriceCategory::Input,
+                "cached_input" => ort_ai::PriceCategory::CachedInput,
+                "cache_write" => ort_ai::PriceCategory::CacheWrite,
+                "output" => ort_ai::PriceCategory::Output,
+                "reasoning" => ort_ai::PriceCategory::Reasoning,
+                _ => return Err(StorageError::InvalidData),
+            };
+            Ok(ort_ai::Price {
+                category,
+                micros_per_million: price.micros_per_million,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    serde_json::to_vec(&prices).map_err(|_| StorageError::InvalidData)
 }
 
 fn restore_render_manifests(
@@ -2755,7 +3132,7 @@ fn initialize_schema(
 
 fn migrate_schema(connection: &Connection) -> Result<(), StorageError> {
     let migrations = load_migration_receipts(connection)?;
-    let latest = migrations
+    let mut latest = migrations
         .last()
         .map(|(version, _)| *version)
         .ok_or(StorageError::IntegrityFailure)?;
@@ -2763,36 +3140,53 @@ fn migrate_schema(connection: &Connection) -> Result<(), StorageError> {
         return Err(StorageError::NewerSchema);
     }
     verify_migration_receipts(&migrations)?;
+    if latest == 1 {
+        apply_migration(connection, 2, MIGRATION_V2_SQL, &migration_v2_checksum())?;
+        latest = 2;
+    }
+    if latest == 2 {
+        apply_migration(connection, 3, MIGRATION_V3_SQL, &migration_v3_checksum())?;
+        latest = 3;
+    }
+    if latest == 3 {
+        apply_migration(connection, 4, MIGRATION_V4_SQL, &migration_v4_checksum())?;
+        latest = 4;
+    }
     if latest == SCHEMA_VERSION {
-        return Ok(());
+        Ok(())
+    } else {
+        Err(StorageError::IntegrityFailure)
     }
-    if latest != 1 {
-        return Err(StorageError::IntegrityFailure);
-    }
+}
 
+fn apply_migration(
+    connection: &Connection,
+    version: i64,
+    sql: &str,
+    checksum: &str,
+) -> Result<(), StorageError> {
     connection
         .execute_batch("BEGIN IMMEDIATE")
         .map_err(|_| StorageError::Unavailable)?;
     let result = (|| {
         connection
-            .execute_batch(MIGRATION_V2_SQL)
+            .execute_batch(sql)
             .map_err(|_| StorageError::Unavailable)?;
-        connection
-            .execute(
-                "INSERT INTO schema_migrations \
-                 (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
-                  requires_safety_copy, applied_at) \
-                 VALUES (2, ?1, ?2, 0, 0, ?3)",
-                params![migration_v2_checksum(), "0.0.0-dev", now_string()],
-            )
-            .map_err(|_| StorageError::Unavailable)?;
+        connection.execute(
+            "INSERT INTO schema_migrations (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, requires_safety_copy, applied_at) VALUES (?1, ?2, ?3, 0, 0, ?4)",
+            params![version, checksum, "0.0.0-dev", now_string()],
+        ).map_err(|_| StorageError::Unavailable)?;
         #[cfg(all(test, target_os = "macos"))]
-        native_qualification::crash_checkpoint("migration-before-commit");
+        if version == 2 {
+            native_qualification::crash_checkpoint("migration-before-commit");
+        }
         connection
             .execute_batch("COMMIT")
             .map_err(|_| StorageError::Unavailable)?;
         #[cfg(all(test, target_os = "macos"))]
-        native_qualification::crash_checkpoint("migration-after-commit");
+        if version == 2 {
+            native_qualification::crash_checkpoint("migration-after-commit");
+        }
         Ok(())
     })();
     if result.is_err() {
@@ -2829,7 +3223,12 @@ fn load_migration_receipts(connection: &Connection) -> Result<Vec<(i64, String)>
 }
 
 fn verify_migration_receipts(migrations: &[(i64, String)]) -> Result<(), StorageError> {
-    let expected = [(1, migration_v1_checksum()), (2, migration_v2_checksum())];
+    let expected = [
+        (1, migration_v1_checksum()),
+        (2, migration_v2_checksum()),
+        (3, migration_v3_checksum()),
+        (4, migration_v4_checksum()),
+    ];
     if migrations.len() > expected.len()
         || migrations.iter().zip(expected).any(
             |((version, checksum), (expected_version, expected_checksum))| {
@@ -2848,6 +3247,14 @@ fn migration_v1_checksum() -> String {
 
 fn migration_v2_checksum() -> String {
     hex::encode(Sha256::digest(MIGRATION_V2_SQL.as_bytes()))
+}
+
+fn migration_v3_checksum() -> String {
+    hex::encode(Sha256::digest(MIGRATION_V3_SQL.as_bytes()))
+}
+
+fn migration_v4_checksum() -> String {
+    hex::encode(Sha256::digest(MIGRATION_V4_SQL.as_bytes()))
 }
 
 fn verify_integrity(connection: &Connection) -> Result<(), StorageError> {
@@ -2971,6 +3378,7 @@ mod tests {
     use std::fs;
     use std::sync::atomic::{AtomicBool, Ordering};
 
+    use ort_ai::{OperationType, Provider, Usage};
     use ort_backup::BackupPassphrase;
     use ort_domain::{ExportSource, PdfRenderReceipt, ResumeDocument};
     use ort_vault::testing::MemoryDatabaseKeyVault;
@@ -3143,7 +3551,7 @@ mod tests {
         let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("initialize encrypted store");
         let empty = store.storage_usage().expect("empty usage");
-        assert_eq!(empty.database_schema, 2);
+        assert_eq!(empty.database_schema, 4);
         assert_eq!(empty.drafts, 0);
         assert_eq!(empty.published_snapshots, 0);
         assert_eq!(empty.settings, 0);
@@ -3346,7 +3754,7 @@ mod tests {
                     "INSERT INTO schema_migrations \
                      (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
                       requires_safety_copy, applied_at) \
-                     VALUES (3, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
+                     VALUES (5, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
                     [super::now_string()],
                 )
                 .expect("seed newer schema marker");
@@ -3404,7 +3812,11 @@ mod tests {
             let connection = store.connection.lock().expect("lock test connection");
             connection
                 .execute_batch(
-                    "DROP TABLE render_manifests; DELETE FROM schema_migrations WHERE version = 2;",
+                    "DROP TABLE ai_guardrail_policies;
+                     DROP TABLE ai_attempts;
+                     DROP TABLE ai_operations;
+                     DROP TABLE render_manifests;
+                     DELETE FROM schema_migrations WHERE version >= 2;",
                 )
                 .expect("simulate schema v1 database");
         }
@@ -3423,7 +3835,7 @@ mod tests {
 
         let upgraded = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("upgrade schema v1 profile");
-        assert_eq!(upgraded.manifest().schema_version, 2);
+        assert_eq!(upgraded.manifest().schema_version, 4);
         assert_eq!(
             upgraded
                 .load_draft()
@@ -3441,7 +3853,31 @@ mod tests {
             .expect("query migration versions")
             .collect::<Result<_, _>>()
             .expect("collect migration versions");
-        assert_eq!(versions, vec![1, 2]);
+        assert_eq!(versions, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn ai_schema_is_content_free_and_rejects_untrusted_accounting_categories() {
+        let temporary = TempDir::new().expect("temporary directory");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
+            .expect("initialize encrypted store");
+        let connection = store.connection.lock().expect("lock database");
+        let columns: Vec<String> = connection
+            .prepare("SELECT name FROM pragma_table_info('ai_attempts') ORDER BY cid")
+            .expect("prepare columns")
+            .query_map([], |row| row.get(0))
+            .expect("query columns")
+            .collect::<Result<_, _>>()
+            .expect("collect columns");
+        for prohibited in [
+            "prompt", "response", "resume", "job", "url", "api_key", "secret",
+        ] {
+            assert!(!columns.iter().any(|column| column.contains(prohibited)));
+        }
+        let profile = store.manifest.profile_id.to_string();
+        connection.execute("INSERT INTO ai_operations (operation_id, profile_id, operation_type, started_at_unix_ms, status, cancelled) VALUES ('operation', ?1, 'credential_test', 1, 'active', 0)", [&profile]).expect("operation");
+        assert!(connection.execute("INSERT INTO ai_attempts (attempt_id, operation_id, profile_id, provider, credential_id, requested_model, preset_version, catalog_id, started_at_unix_ms, status, usage_complete, estimated_input_tokens, reserved_cost_micros, currency, estimate_completeness) VALUES ('attempt', 'operation', ?1, 'other', 'credential', 'model', 'preset', 'catalog', 1, 'reserved', 0, 0, 1, 'USD', 'complete')", [&profile]).is_err());
     }
 
     #[test]
@@ -3757,6 +4193,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn portable_backup_restores_into_a_fresh_keyed_profile() {
         let temporary = TempDir::new().expect("temporary directory");
         let source_root = temporary.path().join("source");
@@ -3778,6 +4215,16 @@ mod tests {
                 &Value::String("system".to_owned()),
             )
             .expect("save setting");
+        source.save_setting(AI_CONNECTION_SETTING_KEY, None,
+            &serde_json::json!({"mode":"direct_api","provider":"openai","preset":"balanced","credentialId":"synthetic-vault-only-id"}))
+            .expect("save vault reference setting");
+        assert!(
+            !source
+                .read_portable_profile()
+                .unwrap()
+                .settings
+                .contains_key(AI_CONNECTION_SETTING_KEY)
+        );
         let render_manifest = source
             .record_render_manifest(
                 ExportSource::PublishedSnapshot,
@@ -3786,6 +4233,62 @@ mod tests {
                 &synthetic_render_receipt("e".repeat(64)),
             )
             .expect("record render manifest");
+        let ai_operation_id = Uuid::now_v7();
+        let ai_attempt_id = Uuid::now_v7();
+        source
+            .reserve_ai_attempt(&crate::ai_activity::AiAttemptPreflight {
+                operation_id: ai_operation_id,
+                attempt_id: ai_attempt_id,
+                operation_type: OperationType::CredentialTest,
+                provider: Provider::OpenAi,
+                credential_id: Uuid::now_v7(),
+                requested_model: "synthetic-model".into(),
+                preset_version: "balanced@direct-v1".into(),
+                catalog_id: "synthetic-catalog".into(),
+                catalog_effective_from: "2026-09-13T00:00:00Z".into(),
+                pricing_components: vec![ort_ai::Price {
+                    category: ort_ai::PriceCategory::Input,
+                    micros_per_million: 1,
+                }],
+                started_at_unix_ms: 1_725_192_002_000,
+                estimated_input_tokens: 8,
+                maximum_cost_micros: 50,
+                currency: "USD".into(),
+                retry_of: None,
+            })
+            .expect("reserve AI activity");
+        source
+            .mark_ai_dispatching(ai_attempt_id)
+            .expect("dispatch AI activity");
+        source
+            .settle_ai_attempt(&crate::ai_activity::AiAttemptSettlement {
+                attempt_id: ai_attempt_id,
+                status: crate::ai_activity::AiTerminalStatus::Succeeded,
+                effective_model: Some("synthetic-model".into()),
+                usage: Some(Usage {
+                    input_tokens: 8,
+                    output_tokens: 2,
+                    ..Usage::default()
+                }),
+                settled_cost_micros: Some(10),
+                usage_complete: true,
+                error_category: None,
+                ended_at_unix_ms: 1_725_192_003_000,
+                keep_operation_active: false,
+            })
+            .expect("settle AI activity");
+        let portable = source.read_portable_profile().expect("portable profile");
+        assert_eq!(portable.ai_operations.len(), 1);
+        assert_eq!(portable.ai_attempts.len(), 1);
+        assert_eq!(
+            portable.ai_attempts[0].catalog_effective_from,
+            "2026-09-13T00:00:00Z"
+        );
+        assert_eq!(portable.ai_attempts[0].pricing_components.len(), 1);
+        assert_eq!(
+            portable.ai_attempts[0].pricing_components[0].micros_per_million,
+            1
+        );
         let passphrase = BackupPassphrase::new("synthetic portable backup passphrase".to_owned())
             .expect("valid passphrase");
         let backup = source
@@ -3821,6 +4324,12 @@ mod tests {
         destination
             .restore_portable_backup(&backup, &passphrase)
             .expect("restore portable backup");
+        assert!(
+            destination
+                .load_setting(AI_CONNECTION_SETTING_KEY)
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(
             destination
                 .load_draft()
@@ -3852,6 +4361,28 @@ mod tests {
                 .load_recent_render_manifests(20)
                 .expect("load restored render history"),
             vec![render_manifest]
+        );
+        let restored_ai = destination
+            .ai_monitoring_summary(
+                1_725_192_000_000,
+                1_725_193_000_000,
+                "UTC",
+                crate::ai_activity::AiBucketSize::Day,
+            )
+            .expect("load restored AI activity");
+        assert_eq!(restored_ai.logical_operations, 1);
+        assert_eq!(restored_ai.attempts, 1);
+        assert_eq!(restored_ai.estimated_cost_micros, 10);
+        let restored_portable = destination
+            .read_portable_profile()
+            .expect("read restored portable profile");
+        assert_eq!(
+            restored_portable.ai_attempts[0].catalog_effective_from,
+            "2026-09-13T00:00:00Z"
+        );
+        assert_eq!(
+            restored_portable.ai_attempts[0].pricing_components,
+            portable.ai_attempts[0].pricing_components
         );
         destination.verify_integrity().expect("restored integrity");
     }

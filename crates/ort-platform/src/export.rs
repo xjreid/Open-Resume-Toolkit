@@ -21,6 +21,7 @@ pub enum ExportFileType {
     Text,
     Docx,
     Pdf,
+    Json,
 }
 
 impl ExportFileType {
@@ -30,12 +31,13 @@ impl ExportFileType {
             Self::Text => ".txt",
             Self::Docx => ".docx",
             Self::Pdf => ".pdf",
+            Self::Json => ".json",
         }
     }
     const fn max_bytes(self) -> usize {
         match self {
             Self::Backup => ort_domain::MAX_BACKUP_BYTES,
-            Self::Text => MAX_BYTES,
+            Self::Text | Self::Json => MAX_BYTES,
             Self::Docx => 2 * 1024 * 1024,
             Self::Pdf => ort_domain::MAX_PDF_BYTES,
         }
@@ -668,4 +670,29 @@ fn pdf_uses_exact_bytes_a_fixed_extension_and_no_overwrite() {
         Err(ExportWriteError::InvalidContent)
     ));
     assert!(!large.exists());
+}
+
+#[test]
+fn monitoring_json_requires_a_new_fixed_extension_destination() {
+    use std::fs;
+    use tempfile::TempDir;
+    let directory = TempDir::new().unwrap();
+    let path = directory.path().join("ort-ai-monitoring.json");
+    let bytes = br#"{"attempts":1,"partial":true}"#;
+    ExportDestination::for_native_dialog(&path, ExportFileType::Json)
+        .unwrap()
+        .write(bytes)
+        .unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    assert!(matches!(
+        ExportDestination::for_native_dialog(&path, ExportFileType::Json),
+        Err(ExportWriteError::AlreadyExists)
+    ));
+    assert!(
+        ExportDestination::for_native_dialog(
+            &directory.path().join("wrong.txt"),
+            ExportFileType::Json
+        )
+        .is_err()
+    );
 }

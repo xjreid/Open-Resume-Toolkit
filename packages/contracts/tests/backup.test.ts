@@ -70,6 +70,8 @@ describe("portable backup contract", () => {
       publishedResumes: 2,
       settings: 3,
       renderManifests: 4,
+      aiOperations: 0,
+      aiAttempts: 0,
     };
     expect(isValidateBackupCommandResponse({ ok: true, value: current })).toBe(
       true,
@@ -78,6 +80,18 @@ describe("portable backup contract", () => {
       isValidateBackupCommandResponse({
         ok: true,
         value: { ...current, formatMinor: 2, documentSchema: 2 },
+      }),
+    ).toBe(true);
+    expect(
+      isValidateBackupCommandResponse({
+        ok: true,
+        value: {
+          ...current,
+          formatMinor: 4,
+          databaseSchema: 4,
+          aiOperations: 2,
+          aiAttempts: 3,
+        },
       }),
     ).toBe(true);
     expect(
@@ -92,6 +106,18 @@ describe("portable backup contract", () => {
         value: { ...current, documentSchema: 2 },
       }),
     ).toBe(false);
+    expect(
+      isValidateBackupCommandResponse({
+        ok: true,
+        value: {
+          ...current,
+          formatMinor: 3,
+          databaseSchema: 3,
+          aiOperations: 2,
+          aiAttempts: 3,
+        },
+      }),
+    ).toBe(true);
 
     expect(
       isValidateBackupCommandResponse({
@@ -207,12 +233,12 @@ describe("portable backup contract", () => {
   });
 });
 
-it("accepts explicit v1.2 exports but refuses future backup formats", () => {
+it("accepts explicit current exports but refuses future backup formats", () => {
   const receipt = {
     status: "exported",
     byteCount: 1000,
     formatMajor: 1,
-    formatMinor: 2,
+    formatMinor: 4,
     cleanupPending: false,
     durabilityUnconfirmed: false,
   };
@@ -222,7 +248,7 @@ it("accepts explicit v1.2 exports but refuses future backup formats", () => {
   expect(
     isExportBackupCommandResponse({
       ok: true,
-      value: { ...receipt, formatMinor: 3 },
+      value: { ...receipt, formatMinor: 5 },
     }),
   ).toBe(false);
 });

@@ -164,7 +164,7 @@ fn export_with_dialog(
             "docx",
             DOCX_FORMAT_VERSION,
         ),
-        ExportFileType::Backup | ExportFileType::Pdf => {
+        ExportFileType::Backup | ExportFileType::Pdf | ExportFileType::Json => {
             return export_failure("EXPORT_INVALID_CONTENT");
         }
     };
@@ -213,7 +213,7 @@ fn render_saved(
             .map(String::into_bytes)
             .map_err(|_| ()),
         ExportFileType::Docx => render_docx_with_style(&saved.document, style).map_err(|_| ()),
-        ExportFileType::Backup | ExportFileType::Pdf => Err(()),
+        ExportFileType::Backup | ExportFileType::Pdf | ExportFileType::Json => Err(()),
         // Backup owns a separate encrypted-profile command; PDF consumes a preview ticket.
     }
 }

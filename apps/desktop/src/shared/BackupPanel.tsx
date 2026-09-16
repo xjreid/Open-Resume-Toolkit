@@ -225,8 +225,9 @@ export function BackupPanel({
         </div>
       </div>
       <p className="description" id="backup-description">
-        This packages saved resume data, settings, published snapshots, and PDF
-        render history. Device keys and future provider credentials are
+        This packages saved resume data, settings, published snapshots, PDF
+        render history, and content-free AI activity with pricing provenance.
+        Device keys, provider credentials, and active spending-cap authority are
         excluded. The passphrase cannot be recovered by ORT. A synced
         destination receives the encrypted archive, and existing files are never
         replaced.
@@ -440,10 +441,11 @@ export function BackupPanel({
       >
         <h3 id="backup-restore-heading">Replace saved profile from backup</h3>
         <p className="description" id="backup-restore-description">
-          This replaces the draft, published snapshots, settings, and render
-          history after restart. Save current edits first. ORT authenticates the
-          selected archive and imports it into a separately keyed encrypted
-          staging profile before scheduling any replacement.
+          This replaces the draft, published snapshots, settings, render
+          history, and content-free AI activity after restart. Save current
+          edits first. ORT authenticates the selected archive and imports it
+          into a separately keyed encrypted staging profile before scheduling
+          any replacement.
         </p>
         <form
           className="backup-form"
@@ -548,6 +550,9 @@ function ValidatedBackupSummary({ backup }: { backup: ValidatedBackup }) {
           <dd>
             {backup.masterDrafts} draft · {backup.publishedResumes} published ·{" "}
             {backup.settings} settings · {backup.renderManifests} render records
+            {" · "}
+            {backup.aiOperations} AI operations · {backup.aiAttempts} AI
+            attempts
           </dd>
         </div>
       </dl>

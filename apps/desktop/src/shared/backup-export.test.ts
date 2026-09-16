@@ -44,7 +44,10 @@ describe("portable backup export", () => {
     expect(html.match(/type="password"/g)).toHaveLength(4);
     expect(html).toContain("Encrypted portable backup");
     expect(html).toContain("passphrase cannot be recovered");
-    expect(html).toContain("credentials are excluded");
+    expect(html).toContain("content-free AI activity with pricing provenance");
+    expect(html).toContain(
+      "Device keys, provider credentials, and active spending-cap authority are excluded",
+    );
     expect(html).toContain("activated only after restart");
     expect(html).toContain("Check an existing backup");
     expect(html).toContain("does not replace or write to the active profile");
@@ -111,6 +114,8 @@ describe("portable backup export", () => {
       publishedResumes: 2,
       settings: 3,
       renderManifests: 4,
+      aiOperations: 0,
+      aiAttempts: 0,
     };
     vi.mocked(invoke).mockResolvedValue({ ok: true, value: validated });
     const result = await validatePortableBackup("synthetic backup phrase");

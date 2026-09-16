@@ -27,6 +27,170 @@ pub enum VaultError {
     CorruptSecret,
 }
 
+/// Opaque address for one direct-provider credential. The random credential ID
+/// is safe to persist in accounting records; no key prefix or fingerprint is used.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ProviderCredentialReference {
+    service: String,
+    account: String,
+}
+
+impl ProviderCredentialReference {
+    /// # Errors
+    /// Rejects namespace components that are empty, oversized, or contain separators.
+    pub fn new(
+        channel: &str,
+        install_id: &str,
+        profile_id: &str,
+        provider: &str,
+        credential_id: &str,
+    ) -> Result<Self, VaultError> {
+        for value in [channel, install_id, profile_id, provider, credential_id] {
+            validate_component(value)?;
+        }
+        Ok(Self {
+            service: format!("com.openresumetoolkit.{channel}.provider.{provider}"),
+            account: format!(
+                "install-{install_id}.profile-{profile_id}.credential-{credential_id}"
+            ),
+        })
+    }
+
+    #[must_use]
+    pub fn service(&self) -> &str {
+        &self.service
+    }
+    #[must_use]
+    pub fn account(&self) -> &str {
+        &self.account
+    }
+}
+
+/// Provider key bytes that cannot be cloned or serialized and clear on drop.
+pub struct ProviderSecret(Vec<u8>);
+
+impl ProviderSecret {
+    /// # Errors
+    /// Rejects empty, oversized, non-UTF-8, or control-containing keys.
+    pub fn from_bytes(mut bytes: Vec<u8>) -> Result<Self, VaultError> {
+        if bytes.is_empty()
+            || bytes.len() > 8_192
+            || std::str::from_utf8(&bytes).is_err()
+            || bytes.iter().any(u8::is_ascii_control)
+        {
+            bytes.zeroize();
+            return Err(VaultError::CorruptSecret);
+        }
+        Ok(Self(bytes))
+    }
+
+    pub fn expose_for<T>(&self, operation: impl FnOnce(&[u8]) -> T) -> T {
+        operation(&self.0)
+    }
+}
+
+impl fmt::Debug for ProviderSecret {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderSecret([REDACTED])")
+    }
+}
+
+impl Drop for ProviderSecret {
+    fn drop(&mut self) {
+        self.0.zeroize();
+    }
+}
+
+pub trait ProviderCredentialVault: Send + Sync {
+    /// # Errors
+    /// Returns a safe error when the item is absent or inaccessible.
+    fn use_secret<T>(
+        &self,
+        reference: &ProviderCredentialReference,
+        operation: impl FnOnce(&ProviderSecret) -> T,
+    ) -> Result<T, VaultError>;
+    /// # Errors
+    /// Never overwrites an existing credential identity.
+    fn store_new(
+        &self,
+        reference: &ProviderCredentialReference,
+        secret: &ProviderSecret,
+    ) -> Result<(), VaultError>;
+    /// # Errors
+    /// Missing credentials are treated as already removed.
+    fn delete(&self, reference: &ProviderCredentialReference) -> Result<(), VaultError>;
+}
+
+/// OS Keychain/Credential Manager provider-key implementation.
+pub struct OsProviderCredentialVault {
+    operations: Mutex<()>,
+}
+impl Default for OsProviderCredentialVault {
+    fn default() -> Self {
+        Self {
+            operations: Mutex::new(()),
+        }
+    }
+}
+impl OsProviderCredentialVault {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+    fn entry(reference: &ProviderCredentialReference) -> Result<keyring::Entry, VaultError> {
+        keyring::Entry::new(reference.service(), reference.account())
+            .map_err(|_| VaultError::Unavailable)
+    }
+}
+impl ProviderCredentialVault for OsProviderCredentialVault {
+    fn use_secret<T>(
+        &self,
+        reference: &ProviderCredentialReference,
+        operation: impl FnOnce(&ProviderSecret) -> T,
+    ) -> Result<T, VaultError> {
+        let _guard = self
+            .operations
+            .lock()
+            .map_err(|_| VaultError::Unavailable)?;
+        let bytes = Self::entry(reference)?
+            .get_secret()
+            .map_err(|error| map_read_error(&error))?;
+        Ok(operation(&ProviderSecret::from_bytes(bytes)?))
+    }
+    fn store_new(
+        &self,
+        reference: &ProviderCredentialReference,
+        secret: &ProviderSecret,
+    ) -> Result<(), VaultError> {
+        let _guard = self
+            .operations
+            .lock()
+            .map_err(|_| VaultError::Unavailable)?;
+        let entry = Self::entry(reference)?;
+        match entry.get_secret() {
+            Ok(mut existing) => {
+                existing.zeroize();
+                return Err(VaultError::AlreadyExists);
+            }
+            Err(keyring::Error::NoEntry) => {}
+            Err(_) => return Err(VaultError::Unavailable),
+        }
+        secret
+            .expose_for(|bytes| entry.set_secret(bytes))
+            .map_err(|_| VaultError::Unavailable)
+    }
+    fn delete(&self, reference: &ProviderCredentialReference) -> Result<(), VaultError> {
+        let _guard = self
+            .operations
+            .lock()
+            .map_err(|_| VaultError::Unavailable)?;
+        match Self::entry(reference)?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(_) => Err(VaultError::Unavailable),
+        }
+    }
+}
+
 /// Stable, non-secret address for one profile's database key.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct VaultReference {
@@ -312,7 +476,9 @@ pub mod testing {
 
 #[cfg(test)]
 mod tests {
-    use super::{DatabaseKey, VaultError, VaultReference};
+    use super::{
+        DatabaseKey, ProviderCredentialReference, ProviderSecret, VaultError, VaultReference,
+    };
 
     #[test]
     fn database_key_debug_is_redacted() {
@@ -337,5 +503,26 @@ mod tests {
         let reference = VaultReference::new("dev", "one", "two").expect("valid reference");
         assert_eq!(reference.service(), "com.openresumetoolkit.dev.database");
         assert_eq!(reference.account(), "install-one.profile-two");
+    }
+
+    #[test]
+    fn provider_secrets_are_redacted_and_opaque_ids_namespace_the_address() {
+        let secret = ProviderSecret::from_bytes(b"SYNTHETIC_PROVIDER_SECRET".to_vec())
+            .expect("provider secret");
+        assert_eq!(format!("{secret:?}"), "ProviderSecret([REDACTED])");
+        let reference = ProviderCredentialReference::new(
+            "dev",
+            "install",
+            "profile",
+            "openai",
+            "0199-credential",
+        )
+        .expect("provider reference");
+        assert_eq!(
+            reference.service(),
+            "com.openresumetoolkit.dev.provider.openai"
+        );
+        assert!(reference.account().ends_with("credential-0199-credential"));
+        assert!(!reference.account().contains("SYNTHETIC_PROVIDER_SECRET"));
     }
 }

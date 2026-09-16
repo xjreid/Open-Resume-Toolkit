@@ -4,27 +4,28 @@
 
 The [delivery roadmap](System%20Documentation/Delivery_Roadmap.md) is the
 authoritative source for milestone scope, dependencies, exit evidence, and
-deferrals. M0–M2 are complete for the macOS Apple Silicon development scope;
-their final boundary is recorded in the
-[M2 acceptance closure](../evidence/0.0.0-dev/m2-acceptance-closure.md).
+deferrals. M0–M3 are complete for the macOS Apple Silicon development scope;
+their boundaries are recorded in the
+[M2 acceptance closure](../evidence/0.0.0-dev/m2-acceptance-closure.md) and
+[M2.5 closure](../evidence/0.0.0-dev/m2.5/closure.md).
 
 Testing follows the [focused quality policy](../Product%20Plans/Quality_Accessibility_and_Verification.md):
 small automated checks and one short walkthrough, not a repeated full matrix.
 
-Start with M2.5 before new AI feature work. Do not treat this guide as a replacement for the
-roadmap or the applicable product plans.
+M3 Direct AI foundation is complete; M4 is next. Do not treat this guide as a
+replacement for the roadmap or the applicable product plans.
 
-## M2.5 starting route — usable desktop and resume designs
+## M2.5 closure — usable desktop and resume designs
 
 Read the [M2.5 plan](Desktop%20Application/M2_5_Usable_Desktop_and_Resume_Designs.md),
 the [approved aesthetic](../Aesthetic/Precision_Workbench_Visual_Direction.md)
 and the [resume editor specification](../Product%20Plans/Resume_Editor_and_Schema.md).
-Implement the actual layout and workflow, then the three professional templates.
-Finish with a short practical walkthrough and visual review before starting M3.
+The implementation and accepted limitations are recorded in the
+[M2.5 closure](../evidence/0.0.0-dev/m2.5/closure.md).
 
-## M3 starting route — after M2.5
+## M3 completed route
 
-Read these in order before opening M3 work:
+Use these in order when reviewing or maintaining M3 work:
 
 1. [M3 in the delivery roadmap](System%20Documentation/Delivery_Roadmap.md#m3--direct-ai-foundation) for the complete deliverables and exit evidence.
 2. [AI and import product plan](../Product%20Plans/AI_and_Import.md) for connection modes, credentials, provider behavior, accounting, and guardrails.

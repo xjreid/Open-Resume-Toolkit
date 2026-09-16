@@ -1,4 +1,8 @@
-use ort_vault::{DatabaseKey, DatabaseKeyVault, OsDatabaseKeyVault, VaultError, VaultReference};
+use ort_vault::{
+    DatabaseKey, DatabaseKeyVault, OsDatabaseKeyVault, OsProviderCredentialVault,
+    ProviderCredentialReference, ProviderCredentialVault, ProviderSecret, VaultError,
+    VaultReference,
+};
 
 const OPT_IN_ENVIRONMENT: &str = "ORT_RUN_OS_VAULT_TESTS";
 
@@ -52,6 +56,62 @@ fn native_database_key_round_trip_and_overwrite_denial() {
 struct CredentialCleanup<'a> {
     vault: &'a OsDatabaseKeyVault,
     reference: &'a VaultReference,
+}
+
+#[test]
+#[ignore = "creates and deletes a synthetic provider Keychain item; explicit native opt-in required"]
+fn native_provider_credential_round_trip_and_removal() {
+    assert_eq!(std::env::var(OPT_IN_ENVIRONMENT).as_deref(), Ok("1"));
+    let mut random_id = [0_u8; 16];
+    getrandom::fill(&mut random_id).expect("random test identity");
+    let credential = hex::encode(random_id);
+    let reference = ProviderCredentialReference::new(
+        "platform-test",
+        &credential,
+        "synthetic",
+        "openai",
+        &credential,
+    )
+    .expect("provider test namespace");
+    let vault = OsProviderCredentialVault::new();
+    let _cleanup = ProviderCredentialCleanup {
+        vault: &vault,
+        reference: &reference,
+    };
+    vault
+        .delete(&reference)
+        .expect("clear exact synthetic test item");
+    let secret = ProviderSecret::from_bytes(b"SYNTHETIC-NOT-A-REAL-API-KEY".to_vec()).unwrap();
+    vault
+        .store_new(&reference, &secret)
+        .expect("store provider test secret");
+    assert_eq!(
+        vault.use_secret(&reference, |loaded| loaded
+            .expose_for(|bytes| bytes == b"SYNTHETIC-NOT-A-REAL-API-KEY")),
+        Ok(true),
+    );
+    assert_eq!(
+        vault.store_new(&reference, &secret),
+        Err(VaultError::AlreadyExists)
+    );
+    vault
+        .delete(&reference)
+        .expect("remove synthetic provider item");
+    assert!(matches!(
+        vault.use_secret(&reference, |_| ()),
+        Err(VaultError::Missing)
+    ));
+}
+
+struct ProviderCredentialCleanup<'a> {
+    vault: &'a OsProviderCredentialVault,
+    reference: &'a ProviderCredentialReference,
+}
+
+impl Drop for ProviderCredentialCleanup<'_> {
+    fn drop(&mut self) {
+        let _ = self.vault.delete(self.reference);
+    }
 }
 
 #[cfg(target_os = "macos")]

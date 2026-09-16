@@ -21,9 +21,11 @@ use zeroize::{Zeroize, Zeroizing};
 
 const MAGIC: &[u8; 4] = b"ORTB";
 const FORMAT_MAJOR: u16 = 1;
-const FORMAT_MINOR: u16 = 2;
+const FORMAT_MINOR: u16 = 4;
 const DATABASE_SCHEMA_V1_0: u16 = 1;
 const DATABASE_SCHEMA_V1_1: u16 = 2;
+const DATABASE_SCHEMA_V1_2: u16 = 3;
+const DATABASE_SCHEMA_V1_3: u16 = 4;
 const KDF_ARGON2ID: u8 = 1;
 const HEADER_LEN: usize = 76;
 const SALT_LEN: usize = 16;
@@ -40,6 +42,8 @@ const MAX_ITERATIONS: u32 = 10;
 const MAX_PAYLOAD_BYTES: usize = 64 * 1_024 * 1_024;
 const MAX_PUBLISHED_RESUMES: usize = 100;
 const MAX_RENDER_MANIFESTS: usize = 100;
+const MAX_AI_OPERATIONS: usize = 10_000;
+const MAX_AI_ATTEMPTS: usize = 20_000;
 const MAX_SETTINGS: usize = 128;
 const MAX_SETTING_BYTES: usize = 64 * 1_024;
 const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
@@ -123,6 +127,53 @@ pub struct PortableRenderManifestV1 {
     pub receipt: PdfRenderReceipt,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortableAiOperationV1 {
+    pub operation_id: String,
+    pub operation_type: String,
+    pub started_at_unix_ms: u64,
+    pub ended_at_unix_ms: Option<u64>,
+    pub status: String,
+    pub cancelled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortableAiAttemptV1 {
+    pub attempt_id: String,
+    pub operation_id: String,
+    pub provider: String,
+    pub credential_id: String,
+    pub requested_model: String,
+    pub effective_model: Option<String>,
+    pub preset_version: String,
+    pub catalog_id: String,
+    #[serde(default)]
+    pub catalog_effective_from: String,
+    #[serde(default)]
+    pub pricing_components: Vec<PortableAiPriceV1>,
+    pub started_at_unix_ms: u64,
+    pub ended_at_unix_ms: Option<u64>,
+    pub status: String,
+    pub retry_of: Option<String>,
+    pub usage: Option<Value>,
+    pub usage_complete: bool,
+    pub estimated_input_tokens: u64,
+    pub reserved_cost_micros: u64,
+    pub settled_cost_micros: Option<u64>,
+    pub currency: String,
+    pub estimate_completeness: String,
+    pub error_category: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortableAiPriceV1 {
+    pub category: String,
+    pub micros_per_million: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PortableProfileV1 {
@@ -131,6 +182,10 @@ pub struct PortableProfileV1 {
     pub settings: BTreeMap<String, PortableSettingV1>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub render_manifests: Vec<PortableRenderManifestV1>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ai_operations: Vec<PortableAiOperationV1>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ai_attempts: Vec<PortableAiAttemptV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -141,6 +196,10 @@ pub struct BackupInventoryV1 {
     pub settings: u16,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub render_manifests: u16,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub ai_operations: u16,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub ai_attempts: u16,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -224,18 +283,14 @@ fn create_backup_with_entropy(
     salt: [u8; SALT_LEN],
     nonce: [u8; NONCE_LEN],
 ) -> Result<Vec<u8>, BackupError> {
-    let format_minor = if profile_document_schema(&request.profile) == 2 {
-        2
-    } else {
-        1
-    };
+    let format_minor = FORMAT_MINOR;
     create_backup_with_entropy_for_format(
         passphrase,
         request,
         salt,
         nonce,
         format_minor,
-        DATABASE_SCHEMA_V1_1,
+        DATABASE_SCHEMA_V1_3,
     )
 }
 
@@ -253,11 +308,21 @@ fn create_backup_with_entropy_for_format(
     let supported_writer = (format_minor == 0
         && database_schema == DATABASE_SCHEMA_V1_0
         && request.profile.render_manifests.is_empty())
-        || (matches!(format_minor, 1 | 2) && database_schema == DATABASE_SCHEMA_V1_1);
+        || (matches!(format_minor, 1 | 2) && database_schema == DATABASE_SCHEMA_V1_1)
+        || (format_minor == 3 && database_schema == DATABASE_SCHEMA_V1_2)
+        || (format_minor == 4 && database_schema == DATABASE_SCHEMA_V1_3);
     let supported_writer = supported_writer
         && ((format_minor <= 1 && document_schema == 1)
-            || (format_minor == 2 && document_schema == 2));
+            || (format_minor == 2 && document_schema == 2)
+            || (format_minor >= 3 && matches!(document_schema, 1 | 2)));
     if !supported_writer {
+        return Err(BackupError::InvalidContent);
+    }
+    if format_minor >= 4
+        && request.profile.ai_attempts.iter().any(|attempt| {
+            attempt.catalog_effective_from.is_empty() || attempt.pricing_components.is_empty()
+        })
+    {
         return Err(BackupError::InvalidContent);
     }
     let profile_json =
@@ -499,6 +564,8 @@ fn validate_payload(
     let expected_database_schema = match header.format_minor {
         0 => DATABASE_SCHEMA_V1_0,
         1 | 2 => DATABASE_SCHEMA_V1_1,
+        3 => DATABASE_SCHEMA_V1_2,
+        4 => DATABASE_SCHEMA_V1_3,
         _ => return Err(BackupError::InvalidBackup),
     };
     if payload.manifest.format_major != FORMAT_MAJOR
@@ -506,7 +573,15 @@ fn validate_payload(
         || payload.manifest.format_minor != header.format_minor
         || payload.manifest.database_schema != expected_database_schema
         || payload.manifest.document_schema != profile_document_schema(&payload.profile)
-        || payload.manifest.document_schema != if header.format_minor == 2 { 2 } else { 1 }
+        || (header.format_minor <= 1 && payload.manifest.document_schema != 1)
+        || (header.format_minor == 2 && payload.manifest.document_schema != 2)
+        || (header.format_minor < 3
+            && (!payload.profile.ai_operations.is_empty()
+                || !payload.profile.ai_attempts.is_empty()))
+        || (header.format_minor >= 4
+            && payload.profile.ai_attempts.iter().any(|attempt| {
+                attempt.catalog_effective_from.is_empty() || attempt.pricing_components.is_empty()
+            }))
         || (header.format_minor == 0 && !payload.profile.render_manifests.is_empty())
     {
         return Err(BackupError::InvalidBackup);
@@ -559,6 +634,8 @@ fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
     if profile.published_resumes.len() > MAX_PUBLISHED_RESUMES
         || profile.render_manifests.len() > MAX_RENDER_MANIFESTS
         || profile.settings.len() > MAX_SETTINGS
+        || profile.ai_operations.len() > MAX_AI_OPERATIONS
+        || profile.ai_attempts.len() > MAX_AI_ATTEMPTS
     {
         return Err(BackupError::InvalidContent);
     }
@@ -586,8 +663,147 @@ fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
         validate_setting(key, &setting.value)?;
     }
     validate_render_manifests(&profile.render_manifests)?;
+    validate_ai_activity(&profile.ai_operations, &profile.ai_attempts)?;
     let serialized = serde_json::to_vec(profile).map_err(|_| BackupError::InvalidContent)?;
     if serialized.len() > MAX_PAYLOAD_BYTES {
+        return Err(BackupError::InvalidContent);
+    }
+    Ok(())
+}
+
+fn valid_bounded_label(value: &str, maximum: usize) -> bool {
+    !value.is_empty() && value.len() <= maximum && !value.chars().any(char::is_control)
+}
+
+#[allow(clippy::too_many_lines)]
+fn validate_ai_activity(
+    operations: &[PortableAiOperationV1],
+    attempts: &[PortableAiAttemptV1],
+) -> Result<(), BackupError> {
+    let mut operation_ids = BTreeSet::new();
+    for operation in operations {
+        let id =
+            EntityId::parse(&operation.operation_id).map_err(|_| BackupError::InvalidContent)?;
+        if id.to_string() != operation.operation_id
+            || !operation_ids.insert(operation.operation_id.as_str())
+            || !matches!(
+                operation.operation_type.as_str(),
+                "tailor_resume"
+                    | "refine_resume"
+                    | "cover_letter"
+                    | "answer_question"
+                    | "import_mapping"
+                    | "credential_test"
+            )
+            || !matches!(
+                operation.status.as_str(),
+                "active" | "succeeded" | "failed" | "cancelled" | "outcome_unknown"
+            )
+            || operation.started_at_unix_ms == 0
+            || operation.started_at_unix_ms > MAX_JAVASCRIPT_DATE_MS
+            || operation.ended_at_unix_ms.is_some_and(|ended| {
+                ended < operation.started_at_unix_ms || ended > MAX_JAVASCRIPT_DATE_MS
+            })
+            || (operation.status == "active") != operation.ended_at_unix_ms.is_none()
+            || operation.cancelled != (operation.status == "cancelled")
+        {
+            return Err(BackupError::InvalidContent);
+        }
+    }
+    let mut attempt_ids = BTreeSet::new();
+    for attempt in attempts {
+        let attempt_id =
+            EntityId::parse(&attempt.attempt_id).map_err(|_| BackupError::InvalidContent)?;
+        let credential_id =
+            EntityId::parse(&attempt.credential_id).map_err(|_| BackupError::InvalidContent)?;
+        let usage_valid = attempt.usage.as_ref().is_none_or(|usage| {
+            let Some(fields) = usage.as_object() else {
+                return false;
+            };
+            fields.len() <= 5
+                && fields.iter().all(|(key, value)| {
+                    matches!(
+                        key.as_str(),
+                        "inputTokens"
+                            | "cachedInputTokens"
+                            | "cacheWriteTokens"
+                            | "outputTokens"
+                            | "reasoningTokens"
+                    ) && value.as_u64().is_some()
+                })
+        });
+        let mut price_categories = BTreeSet::new();
+        if attempt_id.to_string() != attempt.attempt_id
+            || credential_id.to_string() != attempt.credential_id
+            || !attempt_ids.insert(attempt.attempt_id.as_str())
+            || !operation_ids.contains(attempt.operation_id.as_str())
+            || !matches!(attempt.provider.as_str(), "openai" | "anthropic" | "gemini")
+            || !matches!(
+                attempt.status.as_str(),
+                "reserved"
+                    | "dispatching"
+                    | "streaming"
+                    | "succeeded"
+                    | "failed"
+                    | "cancelled"
+                    | "outcome_unknown"
+            )
+            || !matches!(
+                attempt.estimate_completeness.as_str(),
+                "complete" | "partial" | "unavailable"
+            )
+            || !valid_bounded_label(&attempt.requested_model, 128)
+            || attempt
+                .effective_model
+                .as_deref()
+                .is_some_and(|value| !valid_bounded_label(value, 128))
+            || !valid_bounded_label(&attempt.preset_version, 128)
+            || !valid_bounded_label(&attempt.catalog_id, 128)
+            || (!attempt.catalog_effective_from.is_empty()
+                && !valid_bounded_label(&attempt.catalog_effective_from, 64))
+            || attempt.pricing_components.len() > 5
+            || attempt.pricing_components.iter().any(|price| {
+                price.micros_per_million == 0
+                    || !matches!(
+                        price.category.as_str(),
+                        "input" | "cached_input" | "cache_write" | "output" | "reasoning"
+                    )
+                    || !price_categories.insert(price.category.as_str())
+            })
+            || attempt.currency.len() != 3
+            || !attempt
+                .currency
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase())
+            || attempt.started_at_unix_ms == 0
+            || attempt.started_at_unix_ms > MAX_JAVASCRIPT_DATE_MS
+            || attempt.ended_at_unix_ms.is_some_and(|ended| {
+                ended < attempt.started_at_unix_ms || ended > MAX_JAVASCRIPT_DATE_MS
+            })
+            || !usage_valid
+            || attempt.error_category.as_deref().is_some_and(|value| {
+                !matches!(
+                    value,
+                    "authentication"
+                        | "rate_limit"
+                        | "transient"
+                        | "safety"
+                        | "invalid_output"
+                        | "timeout"
+                        | "cancelled"
+                        | "provider"
+                )
+            })
+        {
+            return Err(BackupError::InvalidContent);
+        }
+    }
+    if attempts.iter().any(|attempt| {
+        attempt
+            .retry_of
+            .as_deref()
+            .is_some_and(|id| id == attempt.attempt_id || !attempt_ids.contains(id))
+    }) {
         return Err(BackupError::InvalidContent);
     }
     Ok(())
@@ -698,6 +914,10 @@ fn inventory_for(profile: &PortableProfileV1) -> Result<BackupInventoryV1, Backu
             .map_err(|_| BackupError::InvalidContent)?,
         settings: u16::try_from(profile.settings.len()).map_err(|_| BackupError::InvalidContent)?,
         render_manifests: u16::try_from(profile.render_manifests.len())
+            .map_err(|_| BackupError::InvalidContent)?,
+        ai_operations: u16::try_from(profile.ai_operations.len())
+            .map_err(|_| BackupError::InvalidContent)?,
+        ai_attempts: u16::try_from(profile.ai_attempts.len())
             .map_err(|_| BackupError::InvalidContent)?,
     })
 }
@@ -852,7 +1072,7 @@ mod tests {
     }
 
     #[test]
-    fn version_two_content_cannot_be_written_or_labeled_as_a_legacy_archive() {
+    fn current_content_cannot_be_written_or_labeled_as_a_legacy_archive() {
         let passphrase = BackupPassphrase::new("synthetic v2 format".into()).unwrap();
         let mut request = sample_request();
         let draft = request.profile.master_draft.as_mut().unwrap();
@@ -872,7 +1092,8 @@ mod tests {
             create_backup_with_entropy(&passphrase, request, [0x11; 16], [0x22; 24]).unwrap();
         let header = inspect_backup(&bytes).unwrap();
         let mut payload = restore_backup(&bytes, &passphrase).unwrap();
-        assert_eq!(header.format_minor, 2);
+        assert_eq!(header.format_minor, 4);
+        assert_eq!(payload.manifest.database_schema, 4);
         assert_eq!(payload.manifest.document_schema, 2);
         payload.manifest.document_schema = 1;
         assert_eq!(
@@ -890,7 +1111,7 @@ mod tests {
         let digest = hex::encode(Sha256::digest(&backup));
         assert_eq!(
             digest,
-            "91ae6005a2879efed5cd379eb0804b5eed4f09fa689c442bddc8497a84ccf409"
+            "e8f30a5393d77308c4dcbc28d56761a0e14b88c3d83e9dba27f4aa2ef56ac9f6"
         );
         let restored = restore_backup(&backup, &passphrase).expect("restore vector");
         assert_eq!(
@@ -972,6 +1193,8 @@ mod tests {
                         byte_count: 1_024,
                     },
                 }],
+                ai_operations: Vec::new(),
+                ai_attempts: Vec::new(),
             },
         }
     }

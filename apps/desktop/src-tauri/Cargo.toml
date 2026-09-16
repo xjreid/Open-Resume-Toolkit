@@ -26,8 +26,13 @@ ort-domain = { path = "../../../crates/ort-domain" }
 ort-storage = { path = "../../../crates/ort-storage" }
 ort-vault = { path = "../../../crates/ort-vault" }
 serde.workspace = true
+serde_json.workspace = true
 tauri.workspace = true
 tauri-plugin-dialog.workspace = true
+ort-ai = { path = "../../../crates/ort-ai" }
+reqwest.workspace = true
+tokio.workspace = true
+jiff.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 ort-macos-lifecycle = { path = "../../../crates/ort-macos-lifecycle" }

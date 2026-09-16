@@ -1,0 +1,87 @@
+{
+  "formatVersion": 1,
+  "catalogId": "2026-09-15.1",
+  "issuedAt": "2026-09-15T00:00:00Z",
+  "expiresAt": "2026-12-31T23:59:59Z",
+  "minimumAppVersion": "0.0.0-dev",
+  "entries": [
+    {
+      "provider": "open_ai",
+      "model": "gpt-5.6-terra",
+      "preset": "balanced",
+      "operations": [
+        "tailor_resume",
+        "refine_resume",
+        "cover_letter",
+        "answer_question",
+        "import_mapping",
+        "credential_test"
+      ],
+      "maxInputTokens": 64000,
+      "maxOutputTokens": 6000,
+      "currency": "USD",
+      "prices": [
+        { "microsPerMillion": 2000000, "category": "input" },
+        { "microsPerMillion": 200000, "category": "cached_input" },
+        { "microsPerMillion": 12000000, "category": "output" }
+      ],
+      "source": "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+      "verifiedAt": "2026-09-15T00:00:00Z",
+      "effectiveFrom": "2026-09-15T00:00:00Z",
+      "effectiveTo": null,
+      "disabled": false
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "preset": "balanced",
+      "operations": [
+        "tailor_resume",
+        "refine_resume",
+        "cover_letter",
+        "answer_question",
+        "import_mapping",
+        "credential_test"
+      ],
+      "maxInputTokens": 64000,
+      "maxOutputTokens": 6000,
+      "currency": "USD",
+      "prices": [
+        { "microsPerMillion": 2000000, "category": "input" },
+        { "microsPerMillion": 10000000, "category": "output" }
+      ],
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "verifiedAt": "2026-09-15T00:00:00Z",
+      "effectiveFrom": "2026-09-15T00:00:00Z",
+      "effectiveTo": null,
+      "disabled": false
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "preset": "balanced",
+      "operations": [
+        "tailor_resume",
+        "refine_resume",
+        "cover_letter",
+        "answer_question",
+        "import_mapping",
+        "credential_test"
+      ],
+      "maxInputTokens": 64000,
+      "maxOutputTokens": 6000,
+      "currency": "USD",
+      "prices": [
+        { "microsPerMillion": 750000, "category": "input" },
+        { "microsPerMillion": 75000, "category": "cached_input" },
+        { "microsPerMillion": 3750000, "category": "output" },
+        { "microsPerMillion": 3750000, "category": "reasoning" }
+      ],
+      "source": "https://ai.google.dev/gemini-api/docs/pricing",
+      "verifiedAt": "2026-09-15T00:00:00Z",
+      "effectiveFrom": "2026-09-15T00:00:00Z",
+      "effectiveTo": "2027-01-01T00:00:00Z",
+      "disabled": false
+    }
+  ]
+}
