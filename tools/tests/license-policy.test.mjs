@@ -9,10 +9,36 @@ import {
   platformPackageLicense,
   pnpmPackageKeys,
   splitPackageKey,
+  unusedLicenseExceptions,
 } from "../lib/license-policy.mjs";
 
 const allowed = new Set(["Apache-2.0", "GPL-3.0-only", "MIT", "Unicode-3.0"]);
 const exceptions = new Set(["LLVM-exception"]);
+
+test("unused exceptions are enforced only for checked ecosystems", () => {
+  const records = new Map([
+    ["rust:webpki-root-certs@1.0.9", {}],
+    ["javascript:synthetic@1.0.0", {}],
+    ["javascript-workspace:@ort/synthetic@1.0.0", {}],
+  ]);
+  const javascript = new Set(["javascript", "javascript-workspace"]);
+  const rust = new Set(["rust"]);
+  assert.deepEqual(unusedLicenseExceptions(records, new Set(), javascript), [
+    "javascript:synthetic@1.0.0",
+    "javascript-workspace:@ort/synthetic@1.0.0",
+  ]);
+  assert.deepEqual(unusedLicenseExceptions(records, new Set(), rust), [
+    "rust:webpki-root-certs@1.0.9",
+  ]);
+  const all = new Set([...javascript, ...rust]);
+  assert.deepEqual(unusedLicenseExceptions(records, new Set(), all), [
+    ...records.keys(),
+  ]);
+  assert.deepEqual(
+    unusedLicenseExceptions(records, new Set(records.keys()), all),
+    [],
+  );
+});
 
 test("single-OS optional fsevents is verified on macOS and exactly accounted for on Linux/Windows", async () => {
   const policy = JSON.parse(

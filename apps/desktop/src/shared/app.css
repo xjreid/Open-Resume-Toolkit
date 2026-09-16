@@ -2572,10 +2572,18 @@ body.is-section-sorting * {
   color: #914545;
   font-size: 17px;
 }
+.canvas-add-entry,
+.canvas-entry > .removal-control > button,
 .contact-information-editor__add {
-  justify-self: stretch;
+  font-family: Inter, ui-sans-serif, sans-serif;
+}
+.canvas-add-entry,
+.contact-information-editor__add {
   color: #2b4d72;
   background: #fff;
+}
+.contact-information-editor__add {
+  justify-self: stretch;
 }
 .contact-information-editor__link {
   display: grid;

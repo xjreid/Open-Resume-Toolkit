@@ -1,5 +1,11 @@
 const operators = new Set(["AND", "OR", "WITH"]);
 
+export function unusedLicenseExceptions(exceptions, used, ecosystems) {
+  return [...exceptions.keys()].filter(
+    (key) => ecosystems.has(key.split(":", 1)[0]) && !used.has(key),
+  );
+}
+
 function tokenize(expression) {
   const normalized = expression.replaceAll(/\s*\/\s*/g, " OR ").trim();
   const tokens = normalized.match(/\(|\)|[A-Za-z0-9.+-]+/g) ?? [];

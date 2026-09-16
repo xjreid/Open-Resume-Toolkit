@@ -16,6 +16,7 @@ import {
   platformPackageLicense,
   pnpmPackageKeys,
   splitPackageKey,
+  unusedLicenseExceptions,
 } from "./lib/license-policy.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -250,9 +251,16 @@ function verifyRust() {
 if (!rustOnly) verifyJavascript();
 if (!javascriptOnly) verifyRust();
 
-for (const key of exceptions.keys()) {
-  if (!usedExceptions.has(key))
-    failures.push(`${key}: unused license exception`);
+const checkedEcosystems = new Set([
+  ...(!rustOnly ? ["javascript", "javascript-workspace"] : []),
+  ...(!javascriptOnly ? ["rust"] : []),
+]);
+for (const key of unusedLicenseExceptions(
+  exceptions,
+  usedExceptions,
+  checkedEcosystems,
+)) {
+  failures.push(`${key}: unused license exception`);
 }
 
 inventory.sort((left, right) =>

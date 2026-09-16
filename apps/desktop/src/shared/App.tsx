@@ -2112,7 +2112,7 @@ function ResumeCanvas({
           ))}
           <button
             type="button"
-            className="canvas-add-entry"
+            className="canvas-add-entry button--secondary button--compact"
             disabled={disabled || !canAddEntry}
             onClick={() =>
               onChange((current) => ({
