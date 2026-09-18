@@ -20,7 +20,7 @@ use ort_storage::{
 };
 use ort_vault::{OsProviderCredentialVault, ProviderCredentialReference, ProviderCredentialVault};
 use reqwest::{Client, Method, Url, redirect::Policy};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{Value, json};
 use tauri::{Manager, State, WebviewWindow, ipc::Channel};
 use tokio::sync::Notify;
@@ -28,7 +28,6 @@ use uuid::Uuid;
 
 use crate::{DesktopState, storage_unavailable, window_not_authorized};
 
-const SETTING: &str = "ai.connection.v1";
 const OUTPUT_LIMIT: u32 = 64;
 const TEST_INPUT_ESTIMATE: u32 = 512;
 const TEST_INPUT_RESERVATION_BOUND: u32 = 4_096;
@@ -97,15 +96,6 @@ impl AiRequestGate {
     }
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct SavedConnection {
-    mode: String,
-    provider: Option<String>,
-    preset: Option<String>,
-    credential_id: Option<Uuid>,
-}
-
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTestResult {
@@ -120,6 +110,7 @@ pub struct AiTestResult {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTestPreview {
+    pub credential_id: Uuid,
     pub provider: String,
     pub model: String,
     pub currency: String,
@@ -305,14 +296,14 @@ fn fail_after_settlement(
 pub fn preview_ai_test(
     window: WebviewWindow,
     state: State<'_, DesktopState>,
+    credential_id: Uuid,
 ) -> CommandResponse<AiTestPreview> {
     if window.label() != "main" {
         return window_not_authorized();
     }
-    let Ok(Some(saved)) = state.with_store(|store| store.load_setting(SETTING)) else {
-        return storage_unavailable();
-    };
-    let Ok(connection) = serde_json::from_value::<SavedConnection>(saved.value) else {
+    let Ok(connection) =
+        state.with_store(|store| crate::ai_keys::test_connection(store, credential_id))
+    else {
         return CommandResponse::failure(
             "AI_CONFIGURATION_INVALID",
             "errors.aiConfigurationInvalid",
@@ -358,6 +349,7 @@ pub fn preview_ai_test(
         );
     };
     CommandResponse::success(AiTestPreview {
+        credential_id,
         provider: provider.as_str().into(),
         model: entry.model.clone(),
         currency: entry.currency.clone(),
@@ -383,6 +375,7 @@ pub fn cancel_ai_test(
 pub async fn test_ai_connection(
     window: WebviewWindow,
     on_progress: Channel<AiProgress>,
+    credential_id: Uuid,
     expected_model: String,
     expected_maximum_cost_micros: u64,
 ) -> CommandResponse<AiTestResult> {
@@ -398,9 +391,7 @@ pub async fn test_ai_connection(
         return CommandResponse::failure("AI_BUSY", "errors.aiBusy", true);
     };
     let prepared = state.with_store(|store| {
-        let saved = store.load_setting(SETTING)?.ok_or(StorageError::NotFound)?;
-        let connection: SavedConnection =
-            serde_json::from_value(saved.value).map_err(|_| StorageError::InvalidData)?;
+        let connection = crate::ai_keys::test_connection(store, credential_id)?;
         let (channel, install, profile) = store.vault_identity();
         Ok((connection, channel.to_owned(), install, profile))
     });

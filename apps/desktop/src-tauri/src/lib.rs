@@ -12,6 +12,7 @@ use tauri::{
     AppHandle, Emitter, EventTarget, Manager, RunEvent, State, WebviewWindow, WindowEvent,
 };
 
+mod ai_keys;
 mod ai_request;
 mod ai_settings;
 mod backup_export;
@@ -419,7 +420,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            ai_settings::load_ai_connection,
+            ai_keys::load_ai_connection,
+            ai_keys::add_ai_key,
+            ai_keys::change_ai_key,
+            ai_keys::rename_ai_key,
+            ai_keys::set_ai_key_preset,
             ai_settings::load_ai_catalog,
             ai_request::test_ai_connection,
             ai_request::preview_ai_test,
@@ -428,15 +433,12 @@ pub fn run() {
             ai_settings::load_ai_retention,
             ai_settings::save_ai_retention,
             ai_settings::load_ai_caps,
+            ai_settings::load_ai_key_settings,
             ai_settings::save_ai_cap,
             ai_settings::disable_ai_cap,
             ai_settings::reset_ai_cap,
             ai_settings::clear_ai_monitoring,
             ai_settings::export_ai_monitoring,
-            ai_settings::save_ai_connection,
-            ai_settings::disable_ai,
-            ai_settings::activate_saved_ai,
-            ai_settings::remove_ai_credential,
             import_review::begin::begin_document_import,
             import_review::begin::cancel_document_import,
             import_review::begin::document_import_available,

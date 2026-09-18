@@ -6,7 +6,7 @@ use ort_vault::{
 use tauri::{Manager, WebviewWindow};
 
 use super::{
-    DesktopState, DesktopStorage, ai_request::AiRequestGate, ai_settings, pdf_preview::PdfState,
+    DesktopState, DesktopStorage, ai_keys, ai_request::AiRequestGate, pdf_preview::PdfState,
     text_export::ExportState, window_not_authorized,
 };
 
@@ -60,16 +60,21 @@ fn delete_and_reinitialize<P: ProviderCredentialVault>(
         let _ = state.replace_storage(DesktopStorage::Ready(store));
         return deletion_failure(&error);
     }
-    let credential = match ai_settings::saved_credential_reference(&store) {
+    let credentials = match ai_keys::saved_credential_references(&store) {
         Ok(value) => value,
         Err(error) => {
             let _ = state.replace_storage(DesktopStorage::Ready(store));
             return deletion_failure(&error);
         }
     };
-    if credential
-        .as_ref()
-        .is_some_and(|reference| provider_vault.delete(reference).is_err())
+    // A partial multi-key cleanup must never leave a missing key selected for requests.
+    if !credentials.is_empty() && ai_keys::suspend_for_deletion(&store).is_err() {
+        let _ = state.replace_storage(DesktopStorage::Ready(store));
+        return failure("LOCAL_DATA_CREDENTIAL_DELETE_UNAVAILABLE", true);
+    }
+    if credentials
+        .iter()
+        .any(|reference| provider_vault.delete(reference).is_err())
     {
         let _ = state.replace_storage(DesktopStorage::Ready(store));
         return failure("LOCAL_DATA_CREDENTIAL_DELETE_UNAVAILABLE", true);
@@ -130,7 +135,7 @@ fn failure(code: &str, retryable: bool) -> CommandResponse<DeleteAllLocalDataRes
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use ort_domain::ResumeDocument;
     use ort_vault::testing::MemoryDatabaseKeyVault;
@@ -162,7 +167,7 @@ mod tests {
         }
     }
 
-    struct RecordingProviderVault(AtomicBool);
+    struct RecordingProviderVault(AtomicUsize);
     impl ProviderCredentialVault for RecordingProviderVault {
         fn use_secret<T>(
             &self,
@@ -181,7 +186,7 @@ mod tests {
         }
 
         fn delete(&self, _reference: &ProviderCredentialReference) -> Result<(), VaultError> {
-            self.0.store(true, Ordering::SeqCst);
+            self.0.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
     }
@@ -243,11 +248,44 @@ mod tests {
             reviews: std::sync::Arc::default(),
             storage: Mutex::new(DesktopStorage::Ready(store)),
         };
-        let provider_vault = RecordingProviderVault(AtomicBool::new(false));
+        let provider_vault = RecordingProviderVault(AtomicUsize::new(0));
         let response =
             delete_and_reinitialize(&state, &PdfState::default(), &vault, &provider_vault);
         assert!(matches!(response, CommandResponse::Success { .. }));
-        assert!(provider_vault.0.load(Ordering::SeqCst));
+        assert_eq!(provider_vault.0.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn deletion_removes_all_saved_keys_including_paused_and_pending_keys() {
+        let temporary = TempDir::new().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store =
+            EncryptedStore::open_or_initialize(&temporary.path().join("default"), "test", &vault)
+                .unwrap();
+        let keys: Vec<_> = ["openai", "anthropic", "gemini"]
+            .into_iter()
+            .enumerate()
+            .map(|(index, provider)| {
+                serde_json::json!({
+                    "credentialId": uuid::Uuid::now_v7(), "identificationNumber": index + 1,
+                    "provider": provider, "preset": "balanced", "paused": index != 0,
+                    "removed": false, "cleanupRequired": index == 2,
+                })
+            })
+            .collect();
+        store.save_setting("ai.connection.v1", None, &serde_json::json!({
+            "primaryCredentialId": keys[0]["credentialId"], "keys": keys, "nextIdentificationNumber": 4,
+        })).unwrap();
+        let state = DesktopState {
+            reviews: std::sync::Arc::default(),
+            storage: Mutex::new(DesktopStorage::Ready(store)),
+        };
+        let provider_vault = RecordingProviderVault(AtomicUsize::new(0));
+        assert!(matches!(
+            delete_and_reinitialize(&state, &PdfState::default(), &vault, &provider_vault),
+            CommandResponse::Success { .. }
+        ));
+        assert_eq!(provider_vault.0.load(Ordering::SeqCst), 3);
     }
 
     #[test]

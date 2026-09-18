@@ -1,26 +1,47 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { useEffect, useState, type FormEvent } from "react";
+import { AiKeyName } from "./AiKeyName";
+import { AiKeyMenu } from "./AiKeyMenu";
+import { AiKeyCustomization } from "./AiKeyCustomization";
+import { AiUsageChart, totalTokens, type Usage } from "./AiUsageChart";
 
-type Connection = {
-  mode: "no_ai" | "direct_api";
-  provider: "openai" | "anthropic" | "gemini" | null;
-  preset: "economy" | "balanced" | "quality" | null;
-  credentialId: string | null;
+export type SavedKey = {
+  credentialId: string;
+  identificationNumber: number;
+  name?: string | null;
+  provider: "openai" | "anthropic" | "gemini";
+  preset: "economy" | "balanced" | "quality";
+  paused: boolean;
+  removed: boolean;
+  cleanupRequired: boolean;
+};
+export type KeyRegistry = {
+  keys: SavedKey[];
+  primaryCredentialId: string | null;
+  nextIdentificationNumber: number;
 };
 type Response =
-  | { ok: true; value: Connection }
+  | { ok: true; value: KeyRegistry }
   | { ok: false; error: { code: string } };
-
+const providerName = (provider: SavedKey["provider"]) =>
+  provider === "openai"
+    ? "OpenAI"
+    : provider === "anthropic"
+      ? "Anthropic"
+      : "Gemini";
+const keyName = (key: SavedKey) =>
+  key.name || `Key #${key.identificationNumber}`;
 type Monitoring = {
   logicalOperations: number;
   attempts: number;
-  usage: { inputTokens: number; outputTokens: number };
+  usage: Usage;
   estimatedCostMicros: number;
   unresolvedReservedMicros: number;
   currency: string | null;
   partial: boolean;
   unknownCount: number;
   byProvider: Record<string, number>;
+  byCredentialId?: Record<string, number>;
   byStatus: Record<string, number>;
   byModel: Record<string, number>;
   byPreset: Record<string, number>;
@@ -45,6 +66,7 @@ type MonitoringResponse =
   | { ok: true; value: Monitoring }
   | { ok: false; error: { code: string } };
 type TestPreview = {
+  credentialId: string;
   provider: string;
   model: string;
   currency: string;
@@ -63,21 +85,6 @@ type TestResult = {
     outputTokens: number;
     reasoningTokens: number;
   };
-};
-type CapPeriod = "week" | "month" | "year" | "all_time";
-type Cap = {
-  credentialId: string;
-  period: CapPeriod;
-  currency: string;
-  timeZone: string;
-  limitMicros: number;
-  activatedAtUnixMs: number;
-  periodStartUnixMs: number;
-  periodEndUnixMs: number | null;
-  countedMicros: number;
-  reservedMicros: number;
-  unresolvedMicros: number;
-  revision: number;
 };
 type RetentionPolicy =
   | "30_days"
@@ -99,34 +106,11 @@ type CatalogEntry = {
   effectiveTo: string | null;
   disabled: boolean;
 };
-type Catalog = {
+export type Catalog = {
   catalogId: string;
   expiresAt: string;
   entries: CatalogEntry[];
 };
-const priceDimensions = [
-  ["input", "Input"],
-  ["cached_input", "Cached input"],
-  ["cache_write", "Cache write"],
-  ["output", "Output"],
-  ["reasoning", "Reasoning"],
-] as const;
-
-function selectedCatalogEntry(
-  catalog: Catalog | null,
-  provider: Connection["provider"],
-  preset: Connection["preset"],
-) {
-  return (
-    catalog?.entries.find(
-      (entry) =>
-        entry.provider === (provider === "openai" ? "open_ai" : provider) &&
-        entry.preset === preset &&
-        !entry.disabled,
-    ) ?? null
-  );
-}
-
 function periodBounds(period: "Week" | "Month" | "Year" | "All time") {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -178,18 +162,28 @@ function testFailureMessage(code: string) {
 }
 
 export function AiWorkspace({ blocked }: { blocked: boolean }) {
-  const [connection, setConnection] = useState<Connection | null>(null);
-  const [provider, setProvider] = useState<"openai" | "anthropic" | "gemini">(
-    "openai",
-  );
-  const [preset, setPreset] = useState<"economy" | "balanced" | "quality">(
-    "balanced",
-  );
+  const [page, setPage] = useState<"general" | "data">("general");
+  const [registry, setRegistry] = useState<KeyRegistry | null>(null);
+  const [keysUnavailable, setKeysUnavailable] = useState(false);
+  const primaryKey =
+    registry?.keys.find(
+      (key) =>
+        key.credentialId === registry.primaryCredentialId &&
+        !key.paused &&
+        !key.removed &&
+        !key.cleanupRequired,
+    ) ?? null;
+  const [addOpen, setAddOpen] = useState(false);
+  const [keyFilter, setKeyFilter] = useState("");
+  const [clearKey, setClearKey] = useState("");
+  const [testTarget, setTestTarget] = useState<SavedKey | null>(null);
+  const [provider, setProvider] = useState<
+    "" | "openai" | "anthropic" | "gemini"
+  >("");
   const [key, setKey] = useState("");
-  const [copyGuardrails, setCopyGuardrails] = useState(false);
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState("");
-  const [removeConfirm, setRemoveConfirm] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
   const [period, setPeriod] = useState<"Week" | "Month" | "Year" | "All time">(
     "Month",
   );
@@ -197,50 +191,64 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   const [monitoringError, setMonitoringError] = useState(false);
   const [monitoringRevision, setMonitoringRevision] = useState(0);
   const [clearConfirm, setClearConfirm] = useState(false);
+  const [clearPeriod, setClearPeriod] = useState(period);
+  const [metric, setMetric] = useState<"cost" | "tokens">("cost");
+  const [currency, setCurrency] = useState("USD");
   const [testPreview, setTestPreview] = useState<TestPreview | null>(null);
   const [testOutput, setTestOutput] = useState("");
   const [testActive, setTestActive] = useState(false);
-  const [caps, setCaps] = useState<Cap[]>([]);
-  const [capPeriod, setCapPeriod] = useState<CapPeriod>("month");
-  const [capAmount, setCapAmount] = useState("");
-  const [capConfirm, setCapConfirm] = useState<"disable" | "reset" | null>(
-    null,
-  );
   const [retention, setRetention] = useState<RetentionPolicy>(
     "retain_until_cleared",
   );
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [catalogUnavailable, setCatalogUnavailable] = useState(false);
+  const [selectingPrimary, setSelectingPrimary] = useState(false);
+  const [primaryCandidate, setPrimaryCandidate] = useState<string | null>(null);
 
   useEffect(() => {
     void invoke<{ ok: true; value: Catalog } | { ok: false }>("load_ai_catalog")
       .then((response) => {
         if (response.ok) setCatalog(response.value);
-        else setCatalogUnavailable(true);
+        else setCatalog(null);
       })
-      .catch(() => setCatalogUnavailable(true));
+      .catch(() => setCatalog(null));
   }, []);
 
+  function applyRegistry(value: KeyRegistry) {
+    setRegistry(value);
+    setKeysUnavailable(false);
+    setTestPreview(null);
+    setTestTarget(null);
+    setTestOutput("");
+  }
+  async function refreshKeys() {
+    try {
+      const response = await invoke<Response>("load_ai_connection");
+      if (response.ok) applyRegistry(response.value);
+      else {
+        setRegistry(null);
+        setKeysUnavailable(true);
+        setNotice(
+          "Saved keys are unavailable. Reload before sending a request.",
+        );
+      }
+    } catch {
+      setRegistry(null);
+      setKeysUnavailable(true);
+      setNotice("Saved keys are unavailable. Reload before sending a request.");
+    }
+  }
   useEffect(() => {
-    void invoke<Response>("load_ai_connection")
-      .then((response) => {
-        if (response.ok) {
-          setConnection(response.value);
-          if (response.value.provider) setProvider(response.value.provider);
-          if (response.value.preset) setPreset(response.value.preset);
-        } else setNotice("AI connection state is unavailable.");
-      })
-      .catch(() => setNotice("AI connection state is unavailable."));
+    void refreshKeys();
   }, []);
 
   useEffect(() => {
     let current = true;
     setMonitoring(null);
     setMonitoringError(false);
-    void invoke<MonitoringResponse>(
-      "load_ai_monitoring",
-      monitoringArgs(period),
-    )
+    void invoke<MonitoringResponse>("load_ai_monitoring", {
+      ...monitoringArgs(period),
+      credentialId: keyFilter || null,
+    })
       .then((response) => {
         if (!current) return;
         if (response.ok) setMonitoring(response.value);
@@ -252,21 +260,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     return () => {
       current = false;
     };
-  }, [period, monitoringRevision]);
-
-  useEffect(() => {
-    let current = true;
-    void invoke<
-      { ok: true; value: Cap[] } | { ok: false; error: { code: string } }
-    >("load_ai_caps")
-      .then((response) => {
-        if (current && response.ok) setCaps(response.value);
-      })
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, [connection?.credentialId]);
+  }, [period, keyFilter, monitoringRevision]);
 
   useEffect(() => {
     void invoke<
@@ -286,105 +280,17 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    const existing = caps.find((cap) => cap.period === capPeriod);
-    setCapAmount(existing ? (existing.limitMicros / 1_000_000).toString() : "");
-  }, [capPeriod, caps]);
-
-  async function saveCap(event: FormEvent) {
-    event.preventDefault();
-    const dollars = Number(capAmount);
-    const limitMicros = Math.round(dollars * 1_000_000);
-    if (!Number.isSafeInteger(limitMicros) || limitMicros <= 0 || working) {
-      setNotice(
-        "Enter a positive spending cap with no more than six decimal places.",
-      );
-      return;
-    }
-    const existing = caps.find((cap) => cap.period === capPeriod);
-    const timeZone =
-      existing?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-    setWorking(true);
-    try {
-      const response = await invoke<
-        { ok: true; value: Cap } | { ok: false; error: { code: string } }
-      >("save_ai_cap", {
-        request: {
-          period: capPeriod,
-          limitMicros,
-          timeZone,
-          expectedRevision: existing?.revision ?? null,
-        },
-      });
-      if (response.ok) {
-        setCaps((current) => [
-          ...current.filter((cap) => cap.period !== response.value.period),
-          response.value,
-        ]);
-        setNotice(
-          `${capPeriod.replace("_", " ")} cap saved. Its activation baseline and recorded time zone remain fixed.`,
-        );
-      } else
-        setNotice(
-          response.error.code === "AI_CAP_CHANGED"
-            ? "The cap changed; reload and review before saving again."
-            : "The spending cap could not be saved.",
-        );
-    } catch {
-      setNotice("The spending cap command is unavailable.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  async function capAction(action: "disable" | "reset") {
-    setCapConfirm(null);
-    setWorking(true);
-    try {
-      const command = action === "disable" ? "disable_ai_cap" : "reset_ai_cap";
-      const response = await invoke<
-        { ok: true; value: boolean } | { ok: false; error: { code: string } }
-      >(command, { request: { period: capPeriod } });
-      if (response.ok) {
-        try {
-          const latest = await invoke<
-            { ok: true; value: Cap[] } | { ok: false }
-          >("load_ai_caps");
-          if (latest.ok) {
-            setCaps(latest.value);
-            setNotice(
-              action === "disable"
-                ? "Cap disabled. Activity history and provider billing are unchanged."
-                : "All-time cap baseline reset to zero at the new activation time. Activity history and provider billing are unchanged.",
-            );
-          } else
-            setNotice(
-              "The cap action completed, but the displayed state could not be refreshed. Reload before another request.",
-            );
-        } catch {
-          setNotice(
-            "The cap action completed, but the displayed state could not be refreshed. Reload before another request.",
-          );
-        }
-      } else
-        setNotice(
-          response.error.code === "AI_BUSY"
-            ? "Finish or cancel the active AI request first."
-            : "The cap action could not be completed.",
-        );
-    } catch {
-      setNotice("The cap action command is unavailable.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
   async function clearMonitoring() {
+    if (blocked || working) return;
+    setWorking(true);
     setClearConfirm(false);
     try {
       const response = await invoke<
         { ok: true; value: number } | { ok: false; error: { code: string } }
-      >("clear_ai_monitoring", periodBounds(period));
+      >("clear_ai_monitoring", {
+        ...periodBounds(clearPeriod),
+        credentialId: clearKey || null,
+      });
       if (response.ok) {
         setNotice(
           `${response.value} completed AI operations cleared. Spending cap counters were not reset.`,
@@ -398,6 +304,8 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
         );
     } catch {
       setNotice("AI activity could not be cleared.");
+    } finally {
+      setWorking(false);
     }
   }
 
@@ -427,8 +335,10 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     }
   }
 
-  async function reviewTest() {
-    if (blocked || working || connection?.mode !== "direct_api") return;
+  async function reviewTest(target: SavedKey) {
+    if (blocked || working || target.cleanupRequired) return;
+    setTestTarget(target);
+    setTestOutput("");
     setWorking(true);
     setNotice("");
     setTestPreview(null);
@@ -436,7 +346,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
       const response = await invoke<
         | { ok: true; value: TestPreview }
         | { ok: false; error: { code: string } }
-      >("preview_ai_test");
+      >("preview_ai_test", { credentialId: target.credentialId });
       if (response.ok) setTestPreview(response.value);
       else
         setNotice(
@@ -473,6 +383,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
         { ok: true; value: TestResult } | { ok: false; error: { code: string } }
       >("test_ai_connection", {
         onProgress: progress,
+        credentialId: preview.credentialId,
         expectedModel: preview.model,
         expectedMaximumCostMicros: preview.maximumCostMicros,
       });
@@ -507,11 +418,15 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   }
 
   async function exportMonitoring() {
-    if (!monitoring) return;
+    if (!monitoring || blocked || working) return;
+    setWorking(true);
     try {
       const response = await invoke<
         { ok: true; value: string } | { ok: false; error: { code: string } }
-      >("export_ai_monitoring", monitoringArgs(period));
+      >("export_ai_monitoring", {
+        ...monitoringArgs(period),
+        credentialId: keyFilter || null,
+      });
       if (response.ok && response.value === "exported")
         setNotice(
           "AI aggregate JSON exported. The file is unencrypted; keep it in a private location.",
@@ -522,790 +437,793 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
         );
     } catch {
       setNotice("AI aggregate JSON could not be exported.");
+    } finally {
+      setWorking(false);
     }
   }
 
-  async function save(event: FormEvent) {
+  async function addKey(event: FormEvent) {
     event.preventDefault();
-    if (!key || working) return;
+    if (blocked || working || !registry || !key.trim() || !provider) return;
     setWorking(true);
     setNotice("");
     try {
-      const response = await invoke<Response>("save_ai_connection", {
-        request: { provider, preset, apiKey: key, copyGuardrails },
+      const response = await invoke<Response>("add_ai_key", {
+        request: { provider, apiKey: key },
       });
       setKey("");
       if (response.ok) {
-        setConnection(response.value);
-        setTestPreview(null);
-        setNotice(
-          "Credential saved to the operating-system vault. It will be used only for a confirmed AI request.",
-        );
+        applyRegistry(response.value);
+        setAddOpen(false);
+        setProvider("");
+        setNotice("Key saved securely. Use Set primary key to select it.");
       } else {
-        if (
-          response.error.code === "AI_CREDENTIAL_CLEANUP_REQUIRED" ||
-          response.error.code === "AI_OLD_CREDENTIAL_CLEANUP_REQUIRED"
-        ) {
-          void invoke<Response>("load_ai_connection")
-            .then((latest) => {
-              if (latest.ok) setConnection(latest.value);
-            })
-            .catch(() => {});
-        }
-        setNotice(
-          response.error.code === "AI_OLD_CREDENTIAL_CLEANUP_REQUIRED"
-            ? "The replacement was saved, but the previous vault item could not be verified as removed. Reload this view and remove the old item through the operating-system credential manager."
-            : response.error.code === "AI_CREDENTIAL_CLEANUP_REQUIRED"
-              ? "The credential transition could not be verified. AI may be paused; reload the connection state and inspect the operating-system credential manager before retrying."
-              : response.error.code === "AI_VAULT_UNAVAILABLE"
-                ? "The operating-system credential vault is unavailable."
-                : "The AI connection could not be saved.",
-        );
-      }
-    } catch {
-      setNotice("The AI connection command is unavailable.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  async function disable() {
-    setWorking(true);
-    setNotice("");
-    try {
-      const response = await invoke<Response>("disable_ai");
-      if (response.ok) {
-        setConnection(response.value);
-        setTestPreview(null);
-        setNotice(
-          "No AI is active. Manual and local features remain available.",
-        );
-      } else setNotice("No AI mode could not be saved.");
-    } catch {
-      setNotice("The AI connection command is unavailable.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  async function activate() {
-    setWorking(true);
-    setNotice("");
-    try {
-      const response = await invoke<Response>("activate_saved_ai");
-      if (response.ok) {
-        setConnection(response.value);
-        setTestPreview(null);
-        setNotice(
-          "The saved Direct API connection is active for future confirmed requests.",
-        );
-      } else setNotice("The saved AI connection could not be activated.");
-    } catch {
-      setNotice("The AI connection command is unavailable.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  async function removeCredential() {
-    setWorking(true);
-    setNotice("");
-    try {
-      const response = await invoke<Response>("remove_ai_credential");
-      if (response.ok) {
-        setConnection(response.value);
-        setTestPreview(null);
-        setNotice(
-          "The provider credential was removed from the operating-system vault. Existing content-free activity is unchanged.",
-        );
-      } else {
-        if (response.error.code === "AI_CREDENTIAL_CLEANUP_REQUIRED") {
-          void invoke<Response>("load_ai_connection")
-            .then((latest) => {
-              if (latest.ok) setConnection(latest.value);
-            })
-            .catch(() => {});
-        }
+        await refreshKeys();
         setNotice(
           response.error.code === "AI_CREDENTIAL_CLEANUP_REQUIRED"
-            ? "Credential removal could not be verified. AI may be paused; reload the connection state and inspect the operating-system credential manager before retrying."
-            : "The credential could not be removed from the operating-system vault.",
+            ? "Key setup is incomplete. Remove the key marked Cleanup required, then try again."
+            : "The key could not be saved. Check your provider and vault.",
         );
       }
     } catch {
-      setNotice("The AI connection command is unavailable.");
+      setKey("");
+      await refreshKeys();
+      setNotice("The key could not be saved.");
     } finally {
       setWorking(false);
     }
   }
 
-  const catalogEntry = selectedCatalogEntry(catalog, provider, preset);
+  async function changeKey(
+    target: SavedKey,
+    action: "select_primary" | "pause" | "unpause" | "remove",
+  ) {
+    if (blocked || working) return;
+    setWorking(true);
+    setRemoveConfirm(null);
+    setNotice("");
+    try {
+      const response = await invoke<Response>("change_ai_key", {
+        request: { credentialId: target.credentialId, action },
+      });
+      if (response.ok) {
+        applyRegistry(response.value);
+        setNotice(
+          action === "select_primary"
+            ? `Key #${target.identificationNumber} is now primary.`
+            : action === "remove"
+              ? `Key #${target.identificationNumber} removed. Its activity history remains.`
+              : action === "pause"
+                ? `Key #${target.identificationNumber} paused.`
+                : `Key #${target.identificationNumber} unpaused. Use Set primary key to select it.`,
+        );
+        setMonitoringRevision((value) => value + 1);
+        return true;
+      } else {
+        await refreshKeys();
+        setNotice(
+          response.error.code === "AI_BUSY"
+            ? "Finish or cancel the active test first."
+            : response.error.code === "AI_CREDENTIAL_CLEANUP_REQUIRED"
+              ? "Key cleanup could not finish. The key is paused and cannot be primary. Retry removal."
+              : "The key could not be updated. Check the credential vault and try again.",
+        );
+      }
+    } catch {
+      await refreshKeys();
+      setNotice("The key could not be updated. Reload before retrying.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  useEffect(() => {
+    if (
+      primaryCandidate &&
+      !registry?.keys.some(
+        (key) =>
+          key.credentialId === primaryCandidate &&
+          !key.paused &&
+          !key.removed &&
+          !key.cleanupRequired,
+      )
+    )
+      setPrimaryCandidate(null);
+  }, [registry, primaryCandidate]);
+  async function confirmPrimary() {
+    const target = registry?.keys.find(
+      (key) =>
+        key.credentialId === primaryCandidate &&
+        !key.paused &&
+        !key.removed &&
+        !key.cleanupRequired,
+    );
+    if (!target || blocked || working) return;
+    if (await changeKey(target, "select_primary")) {
+      setSelectingPrimary(false);
+      setPrimaryCandidate(null);
+    }
+  }
+  function savedName(id: string, name: string | null) {
+    setRegistry((current) =>
+      current
+        ? {
+            ...current,
+            keys: current.keys.map((key) =>
+              key.credentialId === id ? { ...key, name } : key,
+            ),
+          }
+        : current,
+    );
+  }
+
+  const visibleKeys = registry?.keys.filter((key) => !key.removed) ?? [];
+  const activityKeys = [...(registry?.keys ?? [])];
+  for (const id of Object.keys(monitoring?.byCredentialId ?? {})) {
+    if (!activityKeys.some((key) => key.credentialId === id))
+      activityKeys.push({
+        credentialId: id,
+        identificationNumber: 0,
+        provider: "openai",
+        preset: "balanced",
+        paused: true,
+        removed: true,
+        cleanupRequired: false,
+      });
+  }
+  const keyLabel = (id: string) => {
+    const key = activityKeys.find((key) => key.credentialId === id);
+    return key?.identificationNumber
+      ? `${keyName(key)} · ${providerName(key.provider)}${key.removed ? " · Removed" : ""}`
+      : `Archived key · ${id.slice(0, 8)}`;
+  };
+  const currencies = Object.keys(monitoring?.costByCurrencyMicros ?? {});
+  const chartCurrency = currencies.includes(currency)
+    ? currency
+    : (currencies[0] ?? "USD");
 
   return (
-    <section className="workspace-data" aria-labelledby="ai-title">
-      <h2 id="ai-title">AI connection and monitoring</h2>
-      <p>
-        AI is optional. Direct requests go from this app to the provider you
-        select; Open Resume Toolkit has no shared key or relay.
-      </p>
-      <div className="data-card">
-        <p className="eyebrow">Connection</p>
-        <h3>
-          {connection?.mode === "direct_api"
-            ? `${connection.provider} · ${connection.preset}`
-            : "No AI"}
-        </h3>
-        <p>
-          Keys stay in the operating-system credential vault and are never shown
-          again, included in backups, or written to activity history.
-        </p>
-        {connection?.mode === "no_ai" && connection.credentialId ? (
-          <p>A saved credential is retained but inactive.</p>
-        ) : null}
-        <form onSubmit={(event) => void save(event)}>
-          <label>
-            Provider
-            <select
-              value={provider}
-              disabled={blocked || working}
-              onChange={(event) =>
-                setProvider(event.target.value as typeof provider)
-              }
-            >
-              <option value="openai">OpenAI API</option>
-              <option value="anthropic">Anthropic API</option>
-              <option value="gemini">Google Gemini API</option>
-            </select>
-          </label>
-          <label>
-            Preset
-            <select
-              value={preset}
-              disabled={blocked || working}
-              onChange={(event) =>
-                setPreset(event.target.value as typeof preset)
-              }
-            >
-              <option value="economy" disabled>
-                Economy (not yet verified)
-              </option>
-              <option value="balanced">Balanced</option>
-              <option value="quality" disabled>
-                Quality (not yet verified)
-              </option>
-            </select>
-          </label>
-          <p className="description">
-            The signed development catalog currently enables Balanced for each
-            provider. Other presets become selectable only after their verified
-            catalog entries are bundled.
-          </p>
-          <div
-            className="data-card"
-            aria-label="Selected signed model catalog entry"
+    <section className="ai-workspace" aria-label="AI settings">
+      <nav className="workflow-steps" aria-label="AI section">
+        {(["general", "data"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            className="button--secondary"
+            aria-current={page === tab ? "page" : undefined}
+            onClick={() => setPage(tab)}
           >
-            <h4>Selected model and verified pricing</h4>
-            {catalogUnavailable ? (
-              <p>
-                Signed model and pricing information is unavailable. No request
-                can be confirmed without it.
-              </p>
-            ) : null}
-            {!catalog && !catalogUnavailable ? (
-              <p>Loading signed model catalog…</p>
-            ) : null}
-            {catalog && !catalogEntry ? (
-              <p>
-                This provider and preset are unavailable in the signed catalog.
-              </p>
-            ) : null}
-            {catalogEntry ? (
+            {tab === "general" ? "My Keys" : "Data"}
+          </button>
+        ))}
+      </nav>
+      <div className="workspace-data ai-page-content">
+        {notice && (
+          <p className="notice ai-notice" role="status">
+            {notice}
+          </p>
+        )}
+        <div
+          className="ai-page-panels"
+          hidden={page !== "general"}
+          aria-label="My Keys settings"
+        >
+          <section className="ai-panel" aria-labelledby="ai-connection-title">
+            <div className="ai-panel-heading">
               <div>
-                <p>
-                  <strong>{catalogEntry.model}</strong> · Balanced preset for
-                  supported text operations
-                </p>
-                <p>
-                  Catalog {catalog!.catalogId} · expires {catalog!.expiresAt} ·
-                  verified {catalogEntry.verifiedAt}
-                </p>
-                <p>
-                  ORT-tested input limit:{" "}
-                  {catalogEntry.maxInputTokens.toLocaleString()} tokens ·
-                  ORT-tested output limit:{" "}
-                  {catalogEntry.maxOutputTokens.toLocaleString()} tokens.
-                  Provider model limits may be larger. The synthetic connection
-                  test uses a 64-token output limit.
-                </p>
-                <p>
-                  Catalog-listed operation types:{" "}
-                  {catalogEntry.operations.join(", ")}. Only the synthetic
-                  credential test is implemented in M3; later workflows require
-                  their own validation. Reasoning setting: provider default; no
-                  catalog-confirmed setting is available.
-                </p>
-                <p>
-                  Estimated rates per one million tokens (
-                  {catalogEntry.currency}); unavailable does not mean zero:
-                </p>
-                <ul>
-                  {priceDimensions.map(([category, label]) => {
-                    const price = catalogEntry.prices.find(
-                      (item) => item.category === category,
-                    );
-                    return (
-                      <li key={category}>
-                        {label}:{" "}
-                        {price
-                          ? `${(price.microsPerMillion / 1_000_000).toFixed(4)} ${catalogEntry.currency}`
-                          : "unavailable"}
-                      </li>
-                    );
-                  })}
-                </ul>
-                <p>
-                  Effective from {catalogEntry.effectiveFrom}
-                  {catalogEntry.effectiveTo
-                    ? ` through ${catalogEntry.effectiveTo}`
-                    : " · no published end date"}
-                  . Official source: {catalogEntry.source}
-                </p>
-                <p>
-                  Provider account tiers, credits, taxes, tool fees,
-                  service-tier conditions, and later adjustments are not
-                  represented by this entry; local costs remain estimates. Check
-                  the provider billing dashboard for actual charges.
+                <h3 id="ai-connection-title">API keys</h3>
+                <p className="ai-help">
+                  Keys stay in your operating-system vault. Only the primary key
+                  is used for AI.
                 </p>
               </div>
-            ) : null}
-          </div>
-          <label>
-            API key
-            <input
-              type="password"
-              autoComplete="off"
-              value={key}
-              disabled={blocked || working}
-              onChange={(event) => setKey(event.target.value)}
-            />
-          </label>
-          {connection?.credentialId ? (
-            <label>
-              <input
-                type="checkbox"
-                checked={copyGuardrails}
-                disabled={blocked || working}
-                onChange={(event) => setCopyGuardrails(event.target.checked)}
-              />
-              Copy enabled cap amounts to the replacement key with new zero
-              baselines. Existing counters never transfer.
-            </label>
-          ) : null}
-          <div className="button-row">
-            <button type="submit" disabled={blocked || working || !key}>
-              Save credential
-            </button>
-            <button
-              type="button"
-              className="button--secondary"
-              disabled={blocked || working || connection?.mode !== "direct_api"}
-              onClick={() => void disable()}
-            >
-              Pause AI
-            </button>
-            <button
-              type="button"
-              className="button--secondary"
-              disabled={
-                blocked ||
-                working ||
-                connection?.mode !== "no_ai" ||
-                !connection.credentialId
+              <button
+                type="button"
+                disabled={blocked || working || !registry}
+                aria-expanded={addOpen}
+                onClick={() => setAddOpen(true)}
+              >
+                Add key
+              </button>
+            </div>
+            <div
+              className={
+                primaryKey ? "ai-primary ai-primary--selected" : "ai-primary"
               }
-              onClick={() => void activate()}
+              role="status"
             >
-              Resume saved connection
-            </button>
-            <button
-              type="button"
-              className="button--secondary"
-              disabled={blocked || working || !connection?.credentialId}
-              aria-expanded={removeConfirm}
-              onClick={() => setRemoveConfirm(true)}
-            >
-              Remove saved credential
-            </button>
-          </div>
-          {removeConfirm ? (
-            <div role="group" aria-label="Confirm provider credential removal">
-              <p>
-                This permanently removes the key from the operating-system
-                vault. Activity history remains; using this provider again
-                requires entering a key.
+              <span
+                className={
+                  primaryKey ? "ai-badge ai-badge--active" : "ai-badge"
+                }
+              >
+                {keysUnavailable
+                  ? "Primary key unavailable"
+                  : !registry
+                    ? "Loading keys…"
+                    : primaryKey
+                      ? "Primary key"
+                      : "No primary key selected"}
+              </span>
+              <span>
+                {keysUnavailable
+                  ? "Reload to check your keys before using AI."
+                  : !registry
+                    ? ""
+                    : primaryKey
+                      ? `${keyName(primaryKey)} · ${providerName(primaryKey.provider)}`
+                      : "Select an unpaused key to enable AI."}
+              </span>
+              <div className="button-row ai-primary-controls">
+                {selectingPrimary ? (
+                  <>
+                    <span className="ai-help ai-primary-prompt">
+                      Choose a key below
+                    </span>
+                    <button
+                      type="button"
+                      className="button--quiet button--compact"
+                      onClick={() => {
+                        setSelectingPrimary(false);
+                        setPrimaryCandidate(null);
+                      }}
+                    >
+                      Cancel selection
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Confirm primary key"
+                      disabled={blocked || working || !primaryCandidate}
+                      onClick={() => void confirmPrimary()}
+                    >
+                      Confirm
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="button--secondary button--compact"
+                    disabled={
+                      blocked ||
+                      working ||
+                      !visibleKeys.some(
+                        (key) => !key.paused && !key.cleanupRequired,
+                      )
+                    }
+                    onClick={() => {
+                      setSelectingPrimary(true);
+                      setPrimaryCandidate(null);
+                    }}
+                  >
+                    Set primary key
+                  </button>
+                )}
+              </div>
+            </div>
+            {addOpen && (
+              <form
+                className="ai-add-key"
+                aria-label="Add new API key"
+                onSubmit={(event) => void addKey(event)}
+              >
+                <div className="ai-field-row">
+                  <label className="field">
+                    API key
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      placeholder="Paste your API key"
+                      value={key}
+                      disabled={blocked || working}
+                      onChange={(event) => setKey(event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    Provider
+                    <select
+                      value={provider}
+                      disabled={blocked || working}
+                      onChange={(event) =>
+                        setProvider(event.target.value as typeof provider)
+                      }
+                    >
+                      <option value="" disabled>
+                        Select a provider
+                      </option>
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Anthropic</option>
+                      <option value="gemini">Gemini</option>
+                    </select>
+                  </label>
+                </div>
+                <p className="ai-help">
+                  Each key’s provider is fixed. Saving a new key won’t change
+                  your primary key.
+                </p>
+                <div className="button-row">
+                  <button
+                    type="submit"
+                    disabled={blocked || working || !key.trim() || !provider}
+                  >
+                    Save key
+                  </button>
+                  <button
+                    type="button"
+                    className="button--secondary"
+                    disabled={working}
+                    onClick={() => {
+                      setAddOpen(false);
+                      setKey("");
+                      setProvider("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+            {keysUnavailable ? (
+              <p role="alert">
+                Saved keys are unavailable. Reload before sending a request.
               </p>
+            ) : (
+              !registry && <p className="ai-help">Loading saved keys…</p>
+            )}
+            {registry && !visibleKeys.length && (
+              <div className="ai-keys-empty">
+                No saved keys. Add one to get started.
+              </div>
+            )}
+            <div className="ai-key-list">
+              {visibleKeys.map((saved) => {
+                const isPrimary =
+                  saved.credentialId === primaryKey?.credentialId;
+                return (
+                  <div
+                    className={`ai-key-row${saved.paused ? " ai-key-row--paused" : ""}${isPrimary ? " ai-key-row--primary" : ""}${selectingPrimary && primaryCandidate === saved.credentialId ? " ai-key-row--candidate" : ""}${selectingPrimary && !saved.paused && !saved.cleanupRequired ? " ai-key-row--selectable" : ""}`}
+                    key={saved.credentialId}
+                    onClick={(event) => {
+                      if (
+                        selectingPrimary &&
+                        !blocked &&
+                        !working &&
+                        !saved.paused &&
+                        !saved.cleanupRequired &&
+                        !(event.target as HTMLElement).closest(
+                          "button, input, select, form",
+                        )
+                      )
+                        setPrimaryCandidate(saved.credentialId);
+                    }}
+                    aria-label={`${keyName(saved)} · ${providerName(saved.provider)}`}
+                  >
+                    <AiKeyCustomization
+                      saved={saved}
+                      catalog={catalog}
+                      blocked={
+                        blocked || working || selectingPrimary || saved.paused
+                      }
+                      refreshRevision={monitoringRevision}
+                      setWorking={setWorking}
+                      onRegistry={applyRegistry}
+                      onChanged={() =>
+                        setMonitoringRevision((value) => value + 1)
+                      }
+                      status={
+                        <>
+                          {selectingPrimary && (
+                            <input
+                              type="radio"
+                              name="primary-key-selection"
+                              aria-label={`Select key #${saved.identificationNumber} as primary`}
+                              checked={primaryCandidate === saved.credentialId}
+                              disabled={
+                                blocked ||
+                                working ||
+                                saved.paused ||
+                                saved.cleanupRequired
+                              }
+                              onChange={() =>
+                                setPrimaryCandidate(saved.credentialId)
+                              }
+                            />
+                          )}
+                        </>
+                      }
+                      identity={
+                        selectingPrimary || saved.paused ? (
+                          <strong className="ai-key-static-name">
+                            {keyName(saved)}
+                          </strong>
+                        ) : (
+                          <AiKeyName
+                            saved={saved}
+                            blocked={blocked || working}
+                            workspaceBlocked={blocked}
+                            setWorking={setWorking}
+                            onSaved={savedName}
+                          />
+                        )
+                      }
+                      actions={
+                        <AiKeyMenu
+                          saved={saved}
+                          blocked={blocked || working}
+                          onTest={() => void reviewTest(saved)}
+                          onPause={() =>
+                            void changeKey(
+                              saved,
+                              saved.paused ? "unpause" : "pause",
+                            )
+                          }
+                          onRemove={() => setRemoveConfirm(saved.credentialId)}
+                        />
+                      }
+                    />
+                    {removeConfirm === saved.credentialId && (
+                      <div
+                        className="ai-confirm"
+                        role="group"
+                        aria-label="Confirm provider credential removal"
+                      >
+                        <p>
+                          Remove {keyName(saved)} from the vault? Activity
+                          stays.{" "}
+                          {isPrimary
+                            ? "No primary key will remain selected."
+                            : "Your primary key won’t change."}
+                        </p>
+                        <div className="button-row">
+                          <button
+                            type="button"
+                            className="button--secondary"
+                            onClick={() => setRemoveConfirm(null)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="button--danger"
+                            disabled={blocked || working}
+                            onClick={() => void changeKey(saved, "remove")}
+                          >
+                            Remove key
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {testTarget?.credentialId === saved.credentialId &&
+                      testPreview && (
+                        <div
+                          className="ai-confirm"
+                          role="group"
+                          aria-label="Confirm synthetic provider request"
+                        >
+                          <strong>
+                            Test {keyName(saved)} · {testPreview.model}
+                          </strong>
+                          <p>
+                            Fixed test only; no resume or personal content. At
+                            most {testPreview.estimatedInputTokens} tokens of
+                            input.
+                          </p>
+                          <p>
+                            Conservative maximum reservation:{" "}
+                            {(
+                              testPreview.maximumCostMicros / 1_000_000
+                            ).toFixed(4)}{" "}
+                            {testPreview.currency}.
+                          </p>
+                          <p className="ai-help">
+                            Provider terms, retention and privacy practices
+                            apply. Actual billing may differ.
+                          </p>
+                          <div className="button-row">
+                            <button
+                              type="button"
+                              className="button--secondary"
+                              onClick={() => setTestPreview(null)}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={blocked || working}
+                              onClick={() => void confirmTest()}
+                            >
+                              Confirm and send test
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    {testTarget?.credentialId === saved.credentialId &&
+                      testActive && (
+                        <button
+                          type="button"
+                          className="button--secondary"
+                          onClick={() => void cancelTest()}
+                        >
+                          Cancel active test
+                        </button>
+                      )}
+                    {testTarget?.credentialId === saved.credentialId &&
+                      testOutput && (
+                        <details>
+                          <summary>Test response</summary>
+                          <pre>{testOutput}</pre>
+                        </details>
+                      )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+        <div
+          className="ai-page-panels"
+          hidden={page !== "data"}
+          aria-label="AI usage data"
+        >
+          <section className="ai-panel" aria-labelledby="ai-usage-title">
+            <div className="ai-panel-heading">
+              <h3 id="ai-usage-title">Usage</h3>
               <div className="button-row">
                 <button
                   type="button"
-                  className="button--secondary"
-                  onClick={() => setRemoveConfirm(false)}
+                  className="button--quiet button--compact"
+                  disabled={!monitoring || blocked || working}
+                  onClick={() => void exportMonitoring()}
                 >
-                  Cancel
+                  Export aggregate JSON
                 </button>
                 <button
                   type="button"
-                  className="button--danger"
+                  className="button--quiet button--compact"
+                  disabled={!monitoring?.attempts || blocked || working}
                   onClick={() => {
-                    setRemoveConfirm(false);
-                    void removeCredential();
+                    setClearPeriod(period);
+                    setClearKey(keyFilter);
+                    setClearConfirm(true);
                   }}
                 >
-                  Remove credential
+                  Clear selected activity
                 </button>
               </div>
             </div>
-          ) : null}
-        </form>
-        <div className="data-card" aria-label="Synthetic AI connection test">
-          <h4>Connection test</h4>
-          <p>
-            A test sends only a fixed synthetic JSON request to the selected
-            provider. It does not send your resume or application materials.
-          </p>
-          <button
-            type="button"
-            className="button--secondary"
-            disabled={blocked || working || connection?.mode !== "direct_api"}
-            onClick={() => void reviewTest()}
-          >
-            Review synthetic test
-          </button>
-          {testPreview ? (
-            <div role="group" aria-label="Confirm synthetic provider request">
-              <p>
-                {testPreview.provider} · {testPreview.model}
-              </p>
-              <p>
-                Content sent: one fixed synthetic connection-test instruction
-                and JSON value only—no resume, job, question, or user
-                instruction content. Estimated preflight input: at most{" "}
-                {testPreview.estimatedInputTokens} tokens.
-              </p>
-              <p>
-                Conservative maximum reservation:{" "}
-                {(testPreview.maximumCostMicros / 1_000_000).toFixed(4)}{" "}
-                {testPreview.currency}. Actual provider billing may differ.
-              </p>
-              <p>
-                The selected provider’s terms, retention and privacy practices,
-                rate limits, direct charges, and account eligibility apply. Open
-                Resume Toolkit cannot recover the provider account, refund
-                charges, or guarantee provider availability.
-              </p>
-              <button
-                type="button"
-                className="button--secondary"
-                onClick={() => setTestPreview(null)}
+            <div className="ai-chart-toolbar">
+              <div
+                className="ai-segments"
+                role="group"
+                aria-label="Monitoring period"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={blocked || working}
-                onClick={() => void confirmTest()}
-              >
-                Confirm and send test
-              </button>
+                {(["Week", "Month", "Year", "All time"] as const).map(
+                  (value) => (
+                    <button
+                      type="button"
+                      className="button--secondary"
+                      aria-pressed={period === value}
+                      key={value}
+                      onClick={() => {
+                        setPeriod(value);
+                        setClearConfirm(false);
+                      }}
+                    >
+                      {value}
+                    </button>
+                  ),
+                )}
+              </div>
+              <div className="ai-field-row">
+                <label className="field">
+                  Activity by key
+                  <select
+                    value={keyFilter}
+                    onChange={(event) => {
+                      setKeyFilter(event.target.value);
+                      setClearConfirm(false);
+                    }}
+                  >
+                    <option value="">All keys</option>
+                    {activityKeys.map((saved) => (
+                      <option
+                        key={saved.credentialId}
+                        value={saved.credentialId}
+                      >
+                        {keyLabel(saved.credentialId)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  Y axis
+                  <select
+                    value={metric}
+                    onChange={(event) =>
+                      setMetric(event.target.value as typeof metric)
+                    }
+                  >
+                    <option value="cost">Estimated price</option>
+                    <option value="tokens">Estimated tokens</option>
+                  </select>
+                </label>
+                {metric === "cost" && currencies.length > 1 && (
+                  <label className="field">
+                    Currency
+                    <select
+                      value={chartCurrency}
+                      onChange={(event) => setCurrency(event.target.value)}
+                    >
+                      {currencies.map((value) => (
+                        <option key={value}>{value}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
             </div>
-          ) : null}
-          {testActive ? (
-            <button
-              type="button"
-              className="button--secondary"
-              onClick={() => void cancelTest()}
-            >
-              Cancel active test
-            </button>
-          ) : null}
-          {testOutput ? <pre aria-live="polite">{testOutput}</pre> : null}
-        </div>
-        <div className="data-card" aria-label="Direct API spending caps">
-          <h4>Spending caps</h4>
-          <p>
-            Caps are local estimated-cost guardrails for this credential only.
-            They do not limit provider billing outside this installation.
-          </p>
-          <form onSubmit={(event) => void saveCap(event)}>
-            <label>
-              Calendar period
-              <select
-                value={capPeriod}
-                disabled={
-                  blocked || working || connection?.mode !== "direct_api"
-                }
-                onChange={(event) =>
-                  setCapPeriod(event.target.value as CapPeriod)
-                }
+            {clearConfirm && (
+              <div
+                className="ai-confirm"
+                role="group"
+                aria-label="Confirm AI activity clearing"
               >
-                <option value="week">Week</option>
-                <option value="month">Month</option>
-                <option value="year">Year</option>
-                <option value="all_time">All time</option>
-              </select>
-            </label>
-            <label>
-              Estimated cost limit
-              <input
-                inputMode="decimal"
-                value={capAmount}
-                disabled={
-                  blocked || working || connection?.mode !== "direct_api"
-                }
-                onChange={(event) => setCapAmount(event.target.value)}
-                aria-describedby="cap-disclosure"
-              />
-            </label>
-            <p id="cap-disclosure">
-              {caps.find((cap) => cap.period === capPeriod)?.currency ??
-                "Catalog currency"}
-              ; week boundaries begin Monday 00:00. New caps start at zero when
-              activated in{" "}
-              {caps.find((cap) => cap.period === capPeriod)?.timeZone ??
-                Intl.DateTimeFormat().resolvedOptions().timeZone}{" "}
-              and do not include earlier ORT or outside-provider calls. This
-              credential identity is included; successful estimated cost and
-              unresolved post-dispatch reservations count, while a cancelled
-              never-dispatched reservation does not.
-            </p>
-            <button
-              type="submit"
-              disabled={
-                blocked ||
-                working ||
-                connection?.mode !== "direct_api" ||
-                !capAmount
-              }
-            >
-              Save cap
-            </button>
-          </form>
-          {caps.length ? (
-            <div>
-              {[...caps]
-                .sort((a, b) => a.period.localeCompare(b.period))
-                .map((cap) => {
-                  const exposure =
-                    cap.countedMicros +
-                    cap.reservedMicros +
-                    cap.unresolvedMicros;
-                  const percent = Math.floor(
-                    (exposure * 100) / cap.limitMicros,
-                  );
-                  const warning =
-                    percent >= 100
-                      ? "Blocked at 100%"
-                      : percent >= 80
-                        ? "Warning: at least 80% used"
-                        : percent >= 50
-                          ? "Warning: at least 50% used"
-                          : null;
-                  return (
-                    <p key={cap.period}>
-                      <strong>{cap.period.replace("_", " ")}</strong>:{" "}
-                      {(exposure / 1_000_000).toFixed(4)} /{" "}
-                      {(cap.limitMicros / 1_000_000).toFixed(4)} {cap.currency}{" "}
-                      ({percent}%) · active{" "}
-                      {new Date(cap.activatedAtUnixMs).toLocaleString()} ·{" "}
-                      {cap.periodEndUnixMs
-                        ? `resets ${new Date(cap.periodEndUnixMs).toLocaleString()} (${cap.timeZone})`
-                        : `no automatic reset (${cap.timeZone})`}
-                      {warning ? ` · ${warning}` : ""}
-                    </p>
-                  );
-                })}
-            </div>
-          ) : (
-            <p>No spending caps enabled.</p>
-          )}
-          {caps.some((cap) => cap.period === capPeriod) ? (
-            <div className="button-row">
-              <button
-                type="button"
-                className="button--secondary"
-                disabled={blocked || working}
-                onClick={() => setCapConfirm("disable")}
-              >
-                Disable selected cap
-              </button>
-              {capPeriod === "all_time" ? (
+                <p>
+                  Clear completed activity for {clearPeriod.toLowerCase()} ·{" "}
+                  {clearKey ? keyLabel(clearKey) : "All keys"}? This does not
+                  reset spending caps or provider billing.
+                </p>
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="button--secondary"
+                    onClick={() => setClearConfirm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="button--danger"
+                    disabled={blocked || working}
+                    onClick={() => void clearMonitoring()}
+                  >
+                    Clear activity
+                  </button>
+                </div>
+              </div>
+            )}
+            {monitoringError && (
+              <p role="alert">AI Monitoring is unavailable.</p>
+            )}
+            {!monitoring && !monitoringError && (
+              <p role="status">Loading local activity…</p>
+            )}
+            {monitoring && (
+              <>
+                <div className="ai-usage-summary">
+                  <div>
+                    <span>Estimated recorded cost</span>
+                    <strong>
+                      {Object.entries(monitoring.costByCurrencyMicros)
+                        .map(
+                          ([name, micros]) =>
+                            `${(micros / 1_000_000).toFixed(6)} ${name}`,
+                        )
+                        .join(" · ") || "No recorded cost"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Estimated tokens</span>
+                    <strong>
+                      {totalTokens(monitoring.usage).toLocaleString()}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Activity</span>
+                    <strong>
+                      {monitoring.logicalOperations} operations ·{" "}
+                      {monitoring.attempts} attempts
+                    </strong>
+                  </div>
+                </div>
+                {monitoring.partial && (
+                  <p className="ai-partial" role="status">
+                    Partial or unknown usage: {monitoring.unknownCount}{" "}
+                    attempts. Unresolved reserved exposure:{" "}
+                    {monitoring.unresolvedReservedMicros} micros. Missing usage
+                    is not zero spend.
+                  </p>
+                )}
+                {monitoring.attempts === 0 && (
+                  <p className="ai-help">
+                    No recorded activity for {period.toLowerCase()}.
+                  </p>
+                )}
+                <AiUsageChart
+                  key={`${period}-${keyFilter}-${metric}-${chartCurrency}-${monitoringRevision}`}
+                  buckets={monitoring.timeBuckets}
+                  period={period}
+                  currency={chartCurrency}
+                  metric={metric}
+                />
+                {monitoring.attempts > 0 && (
+                  <details className="ai-details">
+                    <summary>Activity breakdown</summary>
+                    <table className="ai-breakdown-table">
+                      <caption className="visually-hidden">
+                        Activity by provider, model, preset, operation and
+                        outcome
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Category</th>
+                          <th scope="col">Name</th>
+                          <th scope="col">Attempts</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          ["Providers", monitoring.byProvider],
+                          ["Models", monitoring.byModel],
+                          ["Presets", monitoring.byPreset],
+                          ["Operation types", monitoring.byOperationType],
+                          ["Outcomes", monitoring.byStatus],
+                        ].flatMap(([label, data]) =>
+                          Object.entries(data).map(([name, count]) => (
+                            <tr key={`${label}-${name}`}>
+                              <td>{label as string}</td>
+                              <td>{name}</td>
+                              <td>{count}</td>
+                            </tr>
+                          )),
+                        )}
+                      </tbody>
+                    </table>
+                  </details>
+                )}
+              </>
+            )}
+            <div className="ai-retention" aria-label="AI activity retention">
+              <div>
+                <h4>Activity retention</h4>
+                <p className="ai-help">
+                  Automatically delete older local activity. Cap counters and
+                  provider records are unchanged.
+                </p>
+              </div>
+              <div className="ai-retention-controls">
+                <label className="field">
+                  Retention policy
+                  <select
+                    value={retention}
+                    disabled={blocked || working}
+                    onChange={(event) =>
+                      setRetention(event.target.value as RetentionPolicy)
+                    }
+                  >
+                    <option value="30_days">30 days</option>
+                    <option value="90_days">90 days</option>
+                    <option value="one_year">One year</option>
+                    <option value="retain_until_cleared">
+                      Retain until cleared
+                    </option>
+                  </select>
+                </label>
                 <button
                   type="button"
                   className="button--secondary"
                   disabled={blocked || working}
-                  onClick={() => setCapConfirm("reset")}
+                  onClick={() => void saveRetention()}
                 >
-                  Reset all-time baseline
+                  Apply retention
                 </button>
-              ) : null}
-            </div>
-          ) : null}
-          {capConfirm ? (
-            <div role="group" aria-label={`Confirm ${capConfirm} cap`}>
-              <p>
-                {capConfirm === "disable"
-                  ? "Disabling stops enforcement for this period. Counters and activity are not transferred to another credential."
-                  : "Resetting sets counted, reserved, and unresolved all-time guardrail totals to zero. It does not clear activity or provider billing."}
-              </p>
-              <button
-                type="button"
-                className="button--secondary"
-                onClick={() => setCapConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="button--danger"
-                onClick={() => void capAction(capConfirm)}
-              >
-                Confirm {capConfirm}
-              </button>
-            </div>
-          ) : null}
-        </div>
-        {notice ? (
-          <p className="notice" role="status">
-            {notice}
-          </p>
-        ) : null}
-      </div>
-      <div className="data-card">
-        <p className="eyebrow">AI Monitoring</p>
-        <h3>Local aggregate activity</h3>
-        <div className="button-row" role="group" aria-label="Monitoring period">
-          {(["Week", "Month", "Year", "All time"] as const).map((value) => (
-            <button
-              type="button"
-              className="button--secondary"
-              aria-pressed={period === value}
-              onClick={() => setPeriod(value)}
-              key={value}
-            >
-              {value}
-            </button>
-          ))}
-        </div>
-        {monitoringError ? (
-          <p role="alert">AI Monitoring is unavailable.</p>
-        ) : null}
-        {!monitoring && !monitoringError ? (
-          <p>Loading local activity…</p>
-        ) : null}
-        {monitoring?.attempts === 0 ? (
-          <p>No recorded activity for {period.toLowerCase()}.</p>
-        ) : null}
-        {monitoring && monitoring.attempts > 0 ? (
-          <div>
-            <p>
-              {monitoring.logicalOperations} operations · {monitoring.attempts}{" "}
-              attempts
-            </p>
-            <p>
-              {monitoring.usage.inputTokens} input tokens ·{" "}
-              {monitoring.usage.outputTokens} output tokens
-            </p>
-            {Object.entries(monitoring.costByCurrencyMicros).map(
-              ([currency, micros]) => (
-                <p key={currency}>
-                  Estimated recorded cost: {(micros / 1_000_000).toFixed(4)}{" "}
-                  {currency}
-                </p>
-              ),
-            )}
-            {monitoring.partial ? (
-              <p>
-                Partial or unknown usage: {monitoring.unknownCount} attempts.
-                Reserved exposure: {monitoring.unresolvedReservedMicros} micros;
-                this is not zero spend.
-              </p>
-            ) : null}
-            {monitoring.timeBuckets.length ? (
-              <div aria-label="Token usage over time">
-                <h4>Token usage over time</h4>
-                {monitoring.timeBuckets.map((bucket) => {
-                  const tokens =
-                    bucket.usage.inputTokens +
-                    (bucket.usage.cachedInputTokens ?? 0) +
-                    (bucket.usage.cacheWriteTokens ?? 0) +
-                    bucket.usage.outputTokens +
-                    (bucket.usage.reasoningTokens ?? 0);
-                  const maximum = Math.max(
-                    1,
-                    ...monitoring.timeBuckets.map(
-                      (entry) =>
-                        entry.usage.inputTokens +
-                        (entry.usage.cachedInputTokens ?? 0) +
-                        (entry.usage.cacheWriteTokens ?? 0) +
-                        entry.usage.outputTokens +
-                        (entry.usage.reasoningTokens ?? 0),
-                    ),
-                  );
-                  return (
-                    <div key={bucket.label}>
-                      <span>
-                        {bucket.label}: {tokens} tokens · {bucket.attempts}{" "}
-                        attempts
-                        {bucket.partial
-                          ? ` · ${bucket.unknownCount} partial`
-                          : ""}
-                      </span>
-                      <progress
-                        aria-label={`Token usage on ${bucket.label}`}
-                        value={tokens}
-                        max={maximum}
-                      >
-                        {tokens}
-                      </progress>
-                      {Object.entries(bucket.costByCurrencyMicros).map(
-                        ([currency, micros]) => {
-                          const maximumCost = Math.max(
-                            1,
-                            ...monitoring.timeBuckets.map(
-                              (entry) =>
-                                entry.costByCurrencyMicros[currency] ?? 0,
-                            ),
-                          );
-                          return (
-                            <span key={currency}>
-                              {" "}
-                              · Estimated {(micros / 1_000_000).toFixed(4)}{" "}
-                              {currency}
-                              <progress
-                                aria-label={`Estimated ${currency} cost on ${bucket.label}`}
-                                value={micros}
-                                max={maximumCost}
-                              >
-                                {micros}
-                              </progress>
-                            </span>
-                          );
-                        },
-                      )}
-                    </div>
-                  );
-                })}
               </div>
-            ) : null}
-            <p>
-              Providers:{" "}
-              {Object.entries(monitoring.byProvider)
-                .map(([name, count]) => `${name} ${count}`)
-                .join(" · ")}
+            </div>
+            <p className="ai-help ai-billing-note">
+              Estimates cover this installation only. Your provider’s billing
+              dashboard is the source of truth.
             </p>
-            <p>
-              Models:{" "}
-              {Object.entries(monitoring.byModel)
-                .map(([name, count]) => `${name} ${count}`)
-                .join(" · ")}
-            </p>
-            <p>
-              Presets:{" "}
-              {Object.entries(monitoring.byPreset)
-                .map(([name, count]) => `${name} ${count}`)
-                .join(" · ")}
-            </p>
-            <p>
-              Operation types:{" "}
-              {Object.entries(monitoring.byOperationType)
-                .map(([name, count]) => `${name} ${count}`)
-                .join(" · ")}
-            </p>
-            <p>
-              Outcomes:{" "}
-              {Object.entries(monitoring.byStatus)
-                .map(([name, count]) => `${name} ${count}`)
-                .join(" · ")}
-            </p>
-          </div>
-        ) : null}
-        <button
-          type="button"
-          className="button--secondary"
-          disabled={!monitoring || blocked}
-          onClick={() => void exportMonitoring()}
-        >
-          Export aggregate JSON
-        </button>
-        <button
-          type="button"
-          className="button--secondary"
-          disabled={!monitoring || blocked}
-          onClick={() => setClearConfirm(true)}
-        >
-          Clear selected activity
-        </button>
-        {clearConfirm ? (
-          <div role="group" aria-label="Confirm AI activity clearing">
-            <p>
-              This removes completed activity for {period.toLowerCase()} from
-              this profile. It does not reset spending caps or affect provider
-              billing.
-            </p>
-            <button
-              type="button"
-              className="button--secondary"
-              onClick={() => setClearConfirm(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="button--danger"
-              onClick={() => void clearMonitoring()}
-            >
-              Clear activity
-            </button>
-          </div>
-        ) : null}
-        <div className="data-card" aria-label="AI activity retention">
-          <h4>Activity retention</h4>
-          <p>
-            Retain-until-cleared is the default. Applying an age limit
-            permanently clears older content-free activity; it does not reset
-            cap counters or delete provider-side records.
-          </p>
-          <label>
-            Retention policy
-            <select
-              value={retention}
-              disabled={blocked || working}
-              onChange={(event) =>
-                setRetention(event.target.value as RetentionPolicy)
-              }
-            >
-              <option value="30_days">30 days</option>
-              <option value="90_days">90 days</option>
-              <option value="one_year">One year</option>
-              <option value="retain_until_cleared">Retain until cleared</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            className="button--secondary"
-            disabled={blocked || working}
-            onClick={() => void saveRetention()}
-          >
-            Apply retention
-          </button>
+          </section>
         </div>
-        <p>
-          Provider billing may include use outside this installation. Check your
-          provider’s own usage and billing dashboard for authoritative charges
-          and account-wide limits.
-        </p>
-        <p>
-          Spending caps are disabled until explicitly configured. Unknown or
-          unpriced usage is never treated as zero.
-        </p>
       </div>
     </section>
   );
