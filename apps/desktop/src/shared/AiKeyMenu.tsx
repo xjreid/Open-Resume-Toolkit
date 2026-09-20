@@ -32,9 +32,9 @@ export function AiKeyMenu({
     if (blocked) setOpen(false);
   }, [blocked]);
   function act(action: () => void) {
+    action();
     setOpen(false);
     trigger.current?.focus();
-    action();
   }
   return (
     <div
@@ -106,6 +106,7 @@ export function AiKeyMenu({
             role="menuitem"
             aria-label={`Test key #${saved.identificationNumber}`}
             disabled={saved.cleanupRequired}
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => act(onTest)}
           >
             Test key
@@ -115,6 +116,7 @@ export function AiKeyMenu({
             role="menuitem"
             aria-label={`${saved.paused ? "Unpause" : "Pause"} key #${saved.identificationNumber}`}
             disabled={saved.cleanupRequired}
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => act(onPause)}
           >
             {saved.paused ? "Unpause" : "Pause"}
@@ -124,6 +126,7 @@ export function AiKeyMenu({
             role="menuitem"
             className="ai-key-menu-remove"
             aria-label={`Remove key #${saved.identificationNumber}`}
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => act(onRemove)}
           >
             Remove

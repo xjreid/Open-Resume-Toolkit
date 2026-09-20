@@ -11,6 +11,9 @@ use uuid::Uuid;
 
 use crate::{EncryptedStore, StorageError};
 
+/// Reserved policy identity for the profile-wide AI spending guardrail.
+pub const AI_GENERAL_CAP_CREDENTIAL_ID: Uuid = Uuid::from_u128(0);
+
 // Durable, content-free lifetime totals use encrypted settings and survive retention and cap resets.
 fn lifetime_cost(
     connection: &rusqlite::Connection,
@@ -19,6 +22,45 @@ fn lifetime_cost(
     currency: &str,
 ) -> Result<i64, StorageError> {
     lifetime_counter(connection, profile, credential, currency, false)
+}
+fn all_lifetime_counter(
+    connection: &rusqlite::Connection,
+    profile: &str,
+    currency: &str,
+    unknown: bool,
+) -> Result<i64, StorageError> {
+    let namespace = if unknown {
+        "ai.lifetime_unknown.v1"
+    } else {
+        "ai.lifetime.v1"
+    };
+    let suffix = format!(".{currency}");
+    let prefix = format!("{namespace}.");
+    let mut statement = connection.prepare(
+        "SELECT DISTINCT credential_id FROM ai_attempts WHERE profile_id = ?1 AND currency = ?4
+         UNION SELECT substr(setting_key, length(?2) + 1, length(setting_key) - length(?2) - length(?3))
+         FROM settings WHERE profile_id = ?1 AND substr(setting_key, 1, length(?2)) = ?2 AND substr(setting_key, -length(?3)) = ?3",
+    ).map_err(|_| StorageError::Unavailable)?;
+    let credentials = statement
+        .query_map(params![profile, prefix, suffix, currency], |row| {
+            row.get::<_, String>(0)
+        })
+        .map_err(|_| StorageError::Unavailable)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| StorageError::Unavailable)?;
+    credentials
+        .into_iter()
+        .try_fold(0_i64, |total, credential| {
+            total
+                .checked_add(lifetime_counter(
+                    connection,
+                    profile,
+                    &credential,
+                    currency,
+                    unknown,
+                )?)
+                .ok_or(StorageError::InvalidData)
+        })
 }
 fn lifetime_counter(
     connection: &rusqlite::Connection,
@@ -678,19 +720,28 @@ impl EncryptedStore {
         ).map_err(|_| StorageError::Unavailable)?;
         if unified {
             if is_new {
-                let total = lifetime_cost(
-                    &connection,
-                    &profile,
-                    &policy.credential_id.to_string(),
-                    &policy.currency,
-                )?;
-                let unknown = lifetime_counter(
-                    &connection,
-                    &profile,
-                    &policy.credential_id.to_string(),
-                    &policy.currency,
-                    true,
-                )?;
+                let (total, unknown) = if policy.credential_id == AI_GENERAL_CAP_CREDENTIAL_ID {
+                    (
+                        all_lifetime_counter(&connection, &profile, &policy.currency, false)?,
+                        all_lifetime_counter(&connection, &profile, &policy.currency, true)?,
+                    )
+                } else {
+                    (
+                        lifetime_cost(
+                            &connection,
+                            &profile,
+                            &policy.credential_id.to_string(),
+                            &policy.currency,
+                        )?,
+                        lifetime_counter(
+                            &connection,
+                            &profile,
+                            &policy.credential_id.to_string(),
+                            &policy.currency,
+                            true,
+                        )?,
+                    )
+                };
                 connection.execute("UPDATE ai_guardrail_policies SET counted_micros = ?1, unresolved_micros = ?4 WHERE profile_id = ?2 AND credential_id = ?3 AND period = 'all_time'", params![total, profile, policy.credential_id.to_string(), unknown]).map_err(|_| StorageError::Unavailable)?;
             }
             connection.execute("UPDATE ai_guardrail_policies SET unresolved_micros = MAX(unresolved_micros, COALESCE((SELECT MAX(unresolved_micros) FROM ai_guardrail_policies WHERE profile_id = ?1 AND credential_id = ?2 AND currency = ?3 AND period != 'all_time'), 0)) WHERE profile_id = ?1 AND credential_id = ?2 AND period = 'all_time'", params![profile, policy.credential_id.to_string(), policy.currency]).map_err(|_| StorageError::Unavailable)?;
@@ -782,10 +833,10 @@ impl EncryptedStore {
             .map_err(|_| StorageError::Unavailable)?;
         }
         let wrong_currency: i64 = tx.query_row(
-            "SELECT COUNT(*) FROM ai_guardrail_policies WHERE profile_id = ?1 AND credential_id = ?2
+            "SELECT COUNT(*) FROM ai_guardrail_policies WHERE profile_id = ?1 AND credential_id IN (?2, ?5)
              AND currency != ?3 AND activated_at_unix_ms <= ?4 AND period_start_unix_ms <= ?4
              AND (period_end_unix_ms IS NULL OR ?4 < period_end_unix_ms)",
-            params![profile, preflight.credential_id.to_string(), preflight.currency, preflight.started_at_unix_ms],
+            params![profile, preflight.credential_id.to_string(), preflight.currency, preflight.started_at_unix_ms, AI_GENERAL_CAP_CREDENTIAL_ID.to_string()],
             |row| row.get(0),
         ).map_err(|_| StorageError::Unavailable)?;
         if wrong_currency != 0 {
@@ -793,7 +844,7 @@ impl EncryptedStore {
         }
         let mut cap_statement = tx.prepare(
             "SELECT limit_micros, counted_micros, reserved_micros, unresolved_micros
-             FROM ai_guardrail_policies WHERE profile_id = ?1 AND credential_id = ?2
+             FROM ai_guardrail_policies WHERE profile_id = ?1 AND credential_id IN (?2, ?5)
              AND currency = ?3 AND activated_at_unix_ms <= ?4
              AND period_start_unix_ms <= ?4 AND (period_end_unix_ms IS NULL OR ?4 < period_end_unix_ms)",
         ).map_err(|_| StorageError::Unavailable)?;
@@ -803,7 +854,8 @@ impl EncryptedStore {
                     profile,
                     preflight.credential_id.to_string(),
                     preflight.currency,
-                    preflight.started_at_unix_ms
+                    preflight.started_at_unix_ms,
+                    AI_GENERAL_CAP_CREDENTIAL_ID.to_string()
                 ],
                 |row| {
                     Ok((
@@ -842,10 +894,10 @@ impl EncryptedStore {
         ).map_err(|_| StorageError::Unavailable)?;
         tx.execute(
             "UPDATE ai_guardrail_policies SET reserved_micros = reserved_micros + ?1, revision = revision + 1
-             WHERE profile_id = ?2 AND credential_id = ?3 AND currency = ?4
+             WHERE profile_id = ?2 AND credential_id IN (?3, ?6) AND currency = ?4
              AND activated_at_unix_ms <= ?5 AND period_start_unix_ms <= ?5
              AND (period_end_unix_ms IS NULL OR ?5 < period_end_unix_ms)",
-            params![maximum_cost, profile, preflight.credential_id.to_string(), preflight.currency, preflight.started_at_unix_ms],
+            params![maximum_cost, profile, preflight.credential_id.to_string(), preflight.currency, preflight.started_at_unix_ms, AI_GENERAL_CAP_CREDENTIAL_ID.to_string()],
         ).map_err(|_| StorageError::Unavailable)?;
         tx.commit().map_err(|_| StorageError::Unavailable)
     }
@@ -979,10 +1031,10 @@ impl EncryptedStore {
         .map_err(|_| StorageError::Unavailable)?;
         tx.execute(
             "UPDATE ai_guardrail_policies SET reserved_micros = reserved_micros - ?1,
-            revision = revision + 1 WHERE profile_id = ?2 AND credential_id = ?3 AND currency = ?4
+            revision = revision + 1 WHERE profile_id = ?2 AND credential_id IN (?3, ?6) AND currency = ?4
             AND activated_at_unix_ms <= ?5 AND period_start_unix_ms <= ?5
             AND (period_end_unix_ms IS NULL OR ?5 < period_end_unix_ms)",
-            params![reserved, profile, credential, currency, started],
+            params![reserved, profile, credential, currency, started, AI_GENERAL_CAP_CREDENTIAL_ID.to_string()],
         )
         .map_err(|_| StorageError::Unavailable)?;
         tx.commit().map_err(|_| StorageError::Unavailable)
@@ -1082,7 +1134,7 @@ impl EncryptedStore {
         tx.execute(
             "UPDATE ai_guardrail_policies SET reserved_micros = reserved_micros - ?1,
              counted_micros = counted_micros + ?2, unresolved_micros = unresolved_micros + ?3,
-             revision = revision + 1 WHERE profile_id = ?4 AND credential_id = ?5 AND currency = ?6
+             revision = revision + 1 WHERE profile_id = ?4 AND credential_id IN (?5, ?8) AND currency = ?6
              AND activated_at_unix_ms <= ?7 AND period_start_unix_ms <= ?7
              AND (period_end_unix_ms IS NULL OR ?7 < period_end_unix_ms)",
             params![
@@ -1093,6 +1145,7 @@ impl EncryptedStore {
                 credential,
                 currency,
                 started
+                , AI_GENERAL_CAP_CREDENTIAL_ID.to_string()
             ],
         )
         .map_err(|_| StorageError::Unavailable)?;
@@ -1415,7 +1468,27 @@ impl EncryptedStore {
         to_unix_ms: i64,
         credential_id: Option<Uuid>,
     ) -> Result<u64, StorageError> {
-        if from_unix_ms < 0 || from_unix_ms >= to_unix_ms {
+        self.clear_ai_activity_ranges_for_key(&[(from_unix_ms, to_unix_ms)], credential_id)
+    }
+
+    /// Atomically clears terminal operations in non-overlapping ranges for one
+    /// credential, or all credentials. Durable lifetime totals and guardrail
+    /// counters are preserved.
+    /// # Errors
+    /// Rejects empty, invalid, overlapping ranges or matching active operations.
+    pub fn clear_ai_activity_ranges_for_key(
+        &self,
+        ranges: &[(i64, i64)],
+        credential_id: Option<Uuid>,
+    ) -> Result<u64, StorageError> {
+        if ranges.is_empty() || ranges.len() > 1_200 {
+            return Err(StorageError::InvalidData);
+        }
+        let mut ranges = ranges.to_vec();
+        ranges.sort_unstable();
+        if ranges.iter().any(|(from, to)| *from < 0 || from >= to)
+            || ranges.windows(2).any(|pair| pair[0].1 > pair[1].0)
+        {
             return Err(StorageError::InvalidData);
         }
         let mut connection = self
@@ -1426,29 +1499,37 @@ impl EncryptedStore {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|_| StorageError::Unavailable)?;
         let profile = self.manifest.profile_id.to_string();
-        let active: i64 = tx
-            .query_row(
+        for (from_unix_ms, to_unix_ms) in &ranges {
+            let active: i64 = tx
+                .query_row(
                 "SELECT COUNT(*) FROM ai_operations WHERE profile_id = ?1
             AND started_at_unix_ms >= ?2 AND started_at_unix_ms < ?3 AND status = 'active'
             AND (?4 IS NULL OR EXISTS (SELECT 1 FROM ai_attempts a WHERE a.operation_id = ai_operations.operation_id AND a.credential_id = ?4))",
-                params![profile, from_unix_ms, to_unix_ms, credential_id.map(|id| id.to_string())],
+                params![&profile, from_unix_ms, to_unix_ms, credential_id.map(|id| id.to_string())],
                 |row| row.get(0),
             )
             .map_err(|_| StorageError::Unavailable)?;
-        if active != 0 {
-            return Err(StorageError::RevisionConflict);
+            if active != 0 {
+                return Err(StorageError::RevisionConflict);
+            }
         }
         preserve_lifetime_totals(&tx, &profile)?;
-        let changed = tx
-            .execute(
+        let mut changed = 0_u64;
+        for (from_unix_ms, to_unix_ms) in ranges {
+            let range_changed = tx
+                .execute(
                 "DELETE FROM ai_operations WHERE profile_id = ?1
             AND started_at_unix_ms >= ?2 AND started_at_unix_ms < ?3 AND status != 'active'
             AND (?4 IS NULL OR EXISTS (SELECT 1 FROM ai_attempts a WHERE a.operation_id = ai_operations.operation_id AND a.credential_id = ?4))",
-                params![profile, from_unix_ms, to_unix_ms, credential_id.map(|id| id.to_string())],
+                params![&profile, from_unix_ms, to_unix_ms, credential_id.map(|id| id.to_string())],
             )
             .map_err(|_| StorageError::Unavailable)?;
+            changed = changed
+                .checked_add(u64::try_from(range_changed).map_err(|_| StorageError::InvalidData)?)
+                .ok_or(StorageError::InvalidData)?;
+        }
         tx.commit().map_err(|_| StorageError::Unavailable)?;
-        u64::try_from(changed).map_err(|_| StorageError::InvalidData)
+        Ok(changed)
     }
 
     /// Explicitly establishes a new zero baseline for one all-time cap. This
@@ -1535,6 +1616,57 @@ impl EncryptedStore {
                 ))
             })
             .collect()
+    }
+
+    /// Profile-wide lifetime estimated spend by currency across every credential.
+    /// # Errors
+    /// Rejects unavailable storage, corrupt counters, or arithmetic overflow.
+    pub fn ai_lifetime_spend_all(&self) -> Result<BTreeMap<String, u64>, StorageError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let profile = self.manifest.profile_id.to_string();
+        let prefix = "ai.lifetime.v1.";
+        let mut statement = connection.prepare(
+            "SELECT DISTINCT currency FROM ai_attempts WHERE profile_id = ?1 UNION SELECT substr(setting_key, length(setting_key) - 2) FROM settings WHERE profile_id = ?1 AND substr(setting_key, 1, length(?2)) = ?2",
+        ).map_err(|_| StorageError::Unavailable)?;
+        let currencies = statement
+            .query_map(params![profile, prefix], |row| row.get::<_, String>(0))
+            .map_err(|_| StorageError::Unavailable)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| StorageError::Unavailable)?;
+        currencies
+            .into_iter()
+            .map(|currency| {
+                let total = all_lifetime_counter(&connection, &profile, &currency, false)?;
+                Ok((
+                    currency,
+                    u64::try_from(total).map_err(|_| StorageError::InvalidData)?,
+                ))
+            })
+            .collect()
+    }
+
+    /// Whether any credential has retained partially priced lifetime activity.
+    /// # Errors
+    /// Rejects unavailable storage or corrupt retained metadata.
+    pub fn ai_lifetime_spend_all_is_partial(&self) -> Result<bool, StorageError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let profile = self.manifest.profile_id.to_string();
+        let count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM settings WHERE profile_id = ?1 AND substr(setting_key, 1, length('ai.lifetime_partial.v1.')) = 'ai.lifetime_partial.v1.' AND value_json = CAST('true' AS BLOB)",
+            [&profile], |row| row.get(0)).map_err(|_| StorageError::Unavailable)?;
+        if count != 0 {
+            return Ok(true);
+        }
+        let attempts: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1 AND estimate_completeness != 'complete' AND status NOT IN ('reserved', 'dispatching', 'streaming')",
+            [&profile], |row| row.get(0)).map_err(|_| StorageError::Unavailable)?;
+        Ok(attempts != 0)
     }
 
     /// Whether some historical spend could not be estimated; retained after activity clearing.
@@ -1687,6 +1819,144 @@ mod tests {
         drop(store);
         let reopened = EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
         assert_eq!(reopened.ai_lifetime_spend(id).unwrap()["USD"], 80);
+    }
+
+    #[test]
+    fn multi_range_clearing_preserves_lifetime_spend_and_cap_progress() {
+        let temp = tempfile::tempdir().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+        let id = Uuid::from_u128(42);
+        for (started, cost) in [(1_000, 10), (5_000, 20), (9_000, 30)] {
+            let mut attempt = preflight(cost + 10);
+            attempt.started_at_unix_ms = started;
+            store.reserve_ai_attempt(&attempt).unwrap();
+            store.mark_ai_dispatching(attempt.attempt_id).unwrap();
+            store
+                .settle_ai_attempt(&AiAttemptSettlement {
+                    attempt_id: attempt.attempt_id,
+                    status: AiTerminalStatus::Succeeded,
+                    effective_model: Some("fixture-model".into()),
+                    usage: Some(Usage {
+                        input_tokens: 10,
+                        ..Usage::default()
+                    }),
+                    settled_cost_micros: Some(cost),
+                    usage_complete: true,
+                    error_category: None,
+                    ended_at_unix_ms: started + 1,
+                    keep_operation_active: false,
+                })
+                .unwrap();
+        }
+        store
+            .save_ai_unified_cap(&AiCapPolicy {
+                credential_id: id,
+                period: AiPeriod::AllTime,
+                currency: "USD".into(),
+                time_zone: "UTC".into(),
+                limit_micros: 100,
+                activated_at_unix_ms: 500,
+                period_start_unix_ms: 500,
+                period_end_unix_ms: None,
+                expected_revision: None,
+            })
+            .unwrap();
+        assert_eq!(store.ai_cap_policies(id).unwrap()[0].counted_micros, 60);
+
+        assert_eq!(
+            store
+                .clear_ai_activity_ranges_for_key(&[(0, 3_000), (8_000, 10_000)], Some(id))
+                .unwrap(),
+            2
+        );
+        assert_eq!(store.ai_lifetime_spend(id).unwrap()["USD"], 60);
+        assert_eq!(store.ai_cap_policies(id).unwrap()[0].counted_micros, 60);
+        assert_eq!(
+            store
+                .ai_monitoring_summary_for_key(0, 10_000, "UTC", AiBucketSize::Day, Some(id),)
+                .unwrap()
+                .estimated_cost_micros,
+            20
+        );
+    }
+
+    #[test]
+    fn general_and_key_caps_are_reserved_and_settled_together() {
+        let temp = tempfile::tempdir().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+        for (credential_id, limit_micros) in [
+            (Uuid::from_u128(42), 200),
+            (AI_GENERAL_CAP_CREDENTIAL_ID, 100),
+        ] {
+            store
+                .save_ai_unified_cap(&AiCapPolicy {
+                    credential_id,
+                    period: AiPeriod::AllTime,
+                    currency: "USD".into(),
+                    time_zone: "UTC".into(),
+                    limit_micros,
+                    activated_at_unix_ms: 1,
+                    period_start_unix_ms: 1,
+                    period_end_unix_ms: None,
+                    expected_revision: None,
+                })
+                .unwrap();
+        }
+        let first = preflight(60);
+        store.reserve_ai_attempt(&first).unwrap();
+        assert_eq!(
+            store.ai_cap_policies(Uuid::from_u128(42)).unwrap()[0].reserved_micros,
+            60
+        );
+        assert_eq!(
+            store.ai_cap_policies(AI_GENERAL_CAP_CREDENTIAL_ID).unwrap()[0].reserved_micros,
+            60
+        );
+        store.mark_ai_dispatching(first.attempt_id).unwrap();
+        store
+            .settle_ai_attempt(&AiAttemptSettlement {
+                attempt_id: first.attempt_id,
+                status: AiTerminalStatus::Succeeded,
+                effective_model: Some("fixture-model".into()),
+                usage: Some(Usage {
+                    input_tokens: 10,
+                    ..Usage::default()
+                }),
+                settled_cost_micros: Some(60),
+                usage_complete: true,
+                error_category: None,
+                ended_at_unix_ms: 2_000,
+                keep_operation_active: false,
+            })
+            .unwrap();
+        for id in [Uuid::from_u128(42), AI_GENERAL_CAP_CREDENTIAL_ID] {
+            let cap = &store.ai_cap_policies(id).unwrap()[0];
+            assert_eq!(cap.reserved_micros, 0);
+            assert_eq!(cap.counted_micros, 60);
+        }
+        assert_eq!(
+            store.reserve_ai_attempt(&preflight(50)),
+            Err(StorageError::InvalidData)
+        );
+        assert_eq!(store.ai_lifetime_spend_all().unwrap().get("USD"), Some(&60));
+        store
+            .reset_ai_cap(AI_GENERAL_CAP_CREDENTIAL_ID, AiPeriod::AllTime, 2_500)
+            .unwrap();
+        let second = preflight(50);
+        store.reserve_ai_attempt(&second).unwrap();
+        store
+            .cancel_reserved_ai_attempt(second.attempt_id, 3_000)
+            .unwrap();
+        assert_eq!(
+            store.ai_cap_policies(AI_GENERAL_CAP_CREDENTIAL_ID).unwrap()[0].reserved_micros,
+            0
+        );
+        assert_eq!(
+            store.ai_cap_policies(Uuid::from_u128(42)).unwrap()[0].reserved_micros,
+            0
+        );
     }
 
     #[test]

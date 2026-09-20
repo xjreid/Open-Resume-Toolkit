@@ -247,6 +247,18 @@ Object.defineProperty(window, "__TAURI_INTERNALS__", {
             },
           };
           break;
+        case "load_ai_general_settings":
+          value = {
+            lifetimeSpendPartial: partial,
+            cap: caps.find((item) => item.credentialId === "general") ?? null,
+            lifetimeSpendByCurrencyMicros: {
+              USD: lifetimeRecords.reduce(
+                (sum, item) => sum + item.costByCurrencyMicros.USD,
+                0,
+              ),
+            },
+          };
+          break;
         case "set_ai_key_preset":
           registry = {
             ...registry,
@@ -386,12 +398,32 @@ Object.defineProperty(window, "__TAURI_INTERNALS__", {
             value as Record<string, any>,
           ];
           break;
+        case "save_ai_general_cap":
+          value = {
+            ...cap("all_time", args.limitMicros, "general"),
+            countedMicros:
+              caps.find((item) => item.credentialId === "general")
+                ?.countedMicros ??
+              lifetimeRecords.reduce(
+                (sum, item) => sum + item.costByCurrencyMicros.USD,
+                0,
+              ),
+          };
+          caps = [
+            ...caps.filter((item) => item.credentialId !== "general"),
+            value as Record<string, any>,
+          ];
+          break;
         case "disable_ai_cap":
           caps = caps.filter(
             (item) =>
               item.period !== args.request.period ||
               item.credentialId !== args.request.credentialId,
           );
+          value = true;
+          break;
+        case "disable_ai_general_cap":
+          caps = caps.filter((item) => item.credentialId !== "general");
           value = true;
           break;
         case "reset_ai_cap":
@@ -403,17 +435,46 @@ Object.defineProperty(window, "__TAURI_INTERNALS__", {
           );
           value = true;
           break;
-        case "save_ai_retention":
-          retention = args.policy;
-          value = { policy: retention, removedOperations: 0 };
+        case "reset_ai_general_cap":
+          caps = caps.map((item) =>
+            item.credentialId === "general"
+              ? { ...item, countedMicros: 0 }
+              : item,
+          );
+          value = true;
           break;
+        case "save_ai_retention": {
+          retention = args.policy;
+          const retentionDays =
+            retention === "30_days"
+              ? 30
+              : retention === "90_days"
+                ? 90
+                : retention === "one_year"
+                  ? 365
+                  : null;
+          const before = records.length;
+          if (retentionDays !== null) {
+            const cutoff = now.getTime() - retentionDays * 24 * 60 * 60 * 1_000;
+            records = records.filter((record) => record.at >= cutoff);
+          }
+          value = {
+            policy: retention,
+            removedOperations: before - records.length,
+          };
+          break;
+        }
         case "clear_ai_monitoring": {
           const before = records.length;
           records = records.filter(
             (record) =>
-              record.at < args.fromUnixMs ||
-              record.at >= args.toUnixMs ||
-              (args.credentialId && record.credentialId !== args.credentialId),
+              !args.months.some(
+                (month: { fromUnixMs: number; toUnixMs: number }) =>
+                  record.at >= month.fromUnixMs &&
+                  record.at < month.toUnixMs &&
+                  (!args.credentialId ||
+                    record.credentialId === args.credentialId),
+              ),
           );
           value = before - records.length;
           break;

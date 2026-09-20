@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::{DesktopState, ai_keys::AiConnectionState, storage_unavailable, window_not_authorized};
 use ort_domain::CommandResponse;
 use ort_platform::{ExportDestination, ExportFileType, ExportWriteError};
+use ort_storage::ai_activity::AI_GENERAL_CAP_CREDENTIAL_ID;
 use ort_storage::ai_activity::{AiBucketSize, AiMonitoringSummary};
 use ort_storage::ai_activity::{AiCapPolicy, AiCapPolicySummary, AiPeriod, ai_calendar_bounds};
 use tauri::Manager;
@@ -14,6 +15,45 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use crate::text_export::ExportState;
 
 const RETENTION_SETTING: &str = "ai.history_retention.v1";
+const MAX_UNIX_MS: i64 = 8_640_000_000_000_000;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiActivityMonth {
+    label: String,
+    from_unix_ms: i64,
+    to_unix_ms: i64,
+}
+
+fn normalize_activity_months(mut months: Vec<AiActivityMonth>) -> Option<Vec<AiActivityMonth>> {
+    if months.is_empty() || months.len() > 1_200 {
+        return None;
+    }
+    months.sort_by_key(|month| month.from_unix_ms);
+    let valid_label = |label: &str| {
+        let bytes = label.as_bytes();
+        bytes.len() == 7
+            && bytes[4] == b'-'
+            && bytes[..4].iter().all(u8::is_ascii_digit)
+            && bytes[5..].iter().all(u8::is_ascii_digit)
+            && matches!(
+                &label[5..],
+                "01" | "02" | "03" | "04" | "05" | "06" | "07" | "08" | "09" | "10" | "11" | "12"
+            )
+    };
+    if months.iter().any(|month| {
+        !valid_label(&month.label)
+            || month.from_unix_ms < 0
+            || month.to_unix_ms <= month.from_unix_ms
+            || month.to_unix_ms > MAX_UNIX_MS
+    }) || months
+        .windows(2)
+        .any(|pair| pair[0].to_unix_ms > pair[1].from_unix_ms || pair[0].label == pair[1].label)
+    {
+        return None;
+    }
+    Some(months)
+}
 
 #[cfg(test)]
 mod key_budget_tests {
@@ -263,6 +303,34 @@ pub struct AiKeySettings {
     lifetime_spend_by_currency_micros: std::collections::BTreeMap<String, u64>,
     lifetime_spend_partial: bool,
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiGeneralSettings {
+    cap: Option<AiCapPolicySummary>,
+    lifetime_spend_by_currency_micros: std::collections::BTreeMap<String, u64>,
+    lifetime_spend_partial: bool,
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn load_ai_general_settings(
+    window: WebviewWindow,
+    state: State<'_, DesktopState>,
+) -> CommandResponse<AiGeneralSettings> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    match state.with_store(|store| {
+        Ok(AiGeneralSettings {
+            cap: unified_cap(store, AI_GENERAL_CAP_CREDENTIAL_ID)?,
+            lifetime_spend_by_currency_micros: store.ai_lifetime_spend_all()?,
+            lifetime_spend_partial: store.ai_lifetime_spend_all_is_partial()?,
+        })
+    }) {
+        Ok(value) => CommandResponse::success(value),
+        Err(_) => storage_unavailable(),
+    }
+}
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn load_ai_key_settings(
@@ -400,6 +468,102 @@ pub fn save_ai_cap(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
+pub fn save_ai_general_cap(
+    window: WebviewWindow,
+    state: State<'_, DesktopState>,
+    limit_micros: u64,
+    time_zone: String,
+    expected_revision: Option<u64>,
+) -> CommandResponse<AiCapPolicySummary> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if limit_micros == 0 || limit_micros > 9_007_199_254_740_991 || time_zone.len() > 128 {
+        return CommandResponse::failure("AI_CAP_INVALID", "errors.aiCapInvalid", false);
+    }
+    let Some(now) = now_unix_ms() else {
+        return storage_unavailable();
+    };
+    let result = state.with_store(|store| {
+        let existing = unified_cap(store, AI_GENERAL_CAP_CREDENTIAL_ID)?;
+        let (activated, start) = existing.as_ref().map_or((now, now), |cap| {
+            (cap.activated_at_unix_ms, cap.period_start_unix_ms)
+        });
+        store.save_ai_unified_cap(&AiCapPolicy {
+            credential_id: AI_GENERAL_CAP_CREDENTIAL_ID,
+            period: AiPeriod::AllTime,
+            currency: existing
+                .as_ref()
+                .map_or_else(|| "USD".into(), |cap| cap.currency.clone()),
+            time_zone: existing
+                .as_ref()
+                .map_or_else(|| time_zone.clone(), |cap| cap.time_zone.clone()),
+            limit_micros,
+            activated_at_unix_ms: activated,
+            period_start_unix_ms: start,
+            period_end_unix_ms: None,
+            expected_revision,
+        })?;
+        unified_cap(store, AI_GENERAL_CAP_CREDENTIAL_ID)?.ok_or(ort_storage::StorageError::NotFound)
+    });
+    match result {
+        Ok(value) => CommandResponse::success(value),
+        Err(ort_storage::StorageError::RevisionConflict) => {
+            CommandResponse::failure("AI_CAP_CHANGED", "errors.aiCapChanged", true)
+        }
+        Err(ort_storage::StorageError::InvalidData) => {
+            CommandResponse::failure("AI_CAP_INVALID", "errors.aiCapInvalid", false)
+        }
+        Err(_) => storage_unavailable(),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn disable_ai_general_cap(
+    window: WebviewWindow,
+    state: State<'_, DesktopState>,
+) -> CommandResponse<bool> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    match state
+        .with_store(|store| store.disable_ai_cap(AI_GENERAL_CAP_CREDENTIAL_ID, AiPeriod::AllTime))
+    {
+        Ok(()) => CommandResponse::success(true),
+        Err(ort_storage::StorageError::RevisionConflict) => {
+            CommandResponse::failure("AI_BUSY", "errors.aiBusy", true)
+        }
+        Err(_) => storage_unavailable(),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn reset_ai_general_cap(
+    window: WebviewWindow,
+    state: State<'_, DesktopState>,
+) -> CommandResponse<bool> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    match state.with_store(|store| {
+        store.reset_ai_cap(
+            AI_GENERAL_CAP_CREDENTIAL_ID,
+            AiPeriod::AllTime,
+            now_unix_ms().ok_or(ort_storage::StorageError::Unavailable)?,
+        )
+    }) {
+        Ok(()) => CommandResponse::success(true),
+        Err(ort_storage::StorageError::RevisionConflict) => {
+            CommandResponse::failure("AI_BUSY", "errors.aiBusy", true)
+        }
+        Err(_) => storage_unavailable(),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
 pub fn disable_ai_cap(
     window: WebviewWindow,
     state: State<'_, DesktopState>,
@@ -493,19 +657,20 @@ pub fn load_ai_monitoring(
 pub fn clear_ai_monitoring(
     window: WebviewWindow,
     state: State<'_, DesktopState>,
-    from_unix_ms: i64,
-    to_unix_ms: i64,
+    months: Vec<AiActivityMonth>,
     credential_id: Option<Uuid>,
 ) -> CommandResponse<u64> {
     if window.label() != "main" {
         return window_not_authorized();
     }
-    if from_unix_ms < 0 || to_unix_ms <= from_unix_ms || to_unix_ms > 8_640_000_000_000_000 {
+    let Some(months) = normalize_activity_months(months) else {
         return CommandResponse::failure("AI_PERIOD_INVALID", "errors.aiPeriodInvalid", false);
-    }
-    match state.with_store(|store| {
-        store.clear_ai_activity_for_key(from_unix_ms, to_unix_ms, credential_id)
-    }) {
+    };
+    let ranges = months
+        .iter()
+        .map(|month| (month.from_unix_ms, month.to_unix_ms))
+        .collect::<Vec<_>>();
+    match state.with_store(|store| store.clear_ai_activity_ranges_for_key(&ranges, credential_id)) {
         Ok(cleared) => CommandResponse::success(cleared),
         Err(ort_storage::StorageError::RevisionConflict) => {
             CommandResponse::failure("AI_BUSY", "errors.aiBusy", true)
@@ -517,41 +682,44 @@ pub fn clear_ai_monitoring(
 #[tauri::command]
 pub async fn export_ai_monitoring(
     window: WebviewWindow,
-    from_unix_ms: i64,
-    to_unix_ms: i64,
+    months: Vec<AiActivityMonth>,
     time_zone: String,
-    bucket_size: String,
     credential_id: Option<Uuid>,
 ) -> CommandResponse<String> {
     if window.label() != "main" {
         return window_not_authorized();
     }
-    if from_unix_ms < 0 || to_unix_ms <= from_unix_ms || to_unix_ms > 8_640_000_000_000_000 {
+    let Some(months) = normalize_activity_months(months) else {
         return CommandResponse::failure("AI_PERIOD_INVALID", "errors.aiPeriodInvalid", false);
-    }
+    };
     let app = window.app_handle().clone();
     let state = app.state::<DesktopState>();
     let exports = app.state::<ExportState>();
     let Some(lease) = exports.begin() else {
         return CommandResponse::failure("EXPORT_BUSY", "errors.aiExport", true);
     };
-    let bucket_size = match bucket_size.as_str() {
-        "day" => AiBucketSize::Day,
-        "month" => AiBucketSize::Month,
-        _ => return CommandResponse::failure("AI_PERIOD_INVALID", "errors.aiPeriodInvalid", false),
-    };
     let Ok(bytes) = state.with_store(|store| {
-        let summary = store.ai_monitoring_summary_for_key(
-            from_unix_ms,
-            to_unix_ms,
-            &time_zone,
-            bucket_size,
-            credential_id,
-        )?;
-        let mut value =
-            serde_json::to_value(summary).map_err(|_| ort_storage::StorageError::InvalidData)?;
-        value["selectedCredentialId"] = json!(credential_id);
-        serde_json::to_vec(&value).map_err(|_| ort_storage::StorageError::InvalidData)
+        let month_values = months
+            .iter()
+            .map(|month| {
+                let summary = store.ai_monitoring_summary_for_key(
+                    month.from_unix_ms,
+                    month.to_unix_ms,
+                    &time_zone,
+                    AiBucketSize::Day,
+                    credential_id,
+                )?;
+                Ok(json!({ "month": month.label, "summary": summary }))
+            })
+            .collect::<Result<Vec<_>, ort_storage::StorageError>>()?;
+        serde_json::to_vec(&json!({
+            "schemaVersion": 1,
+            "selectedCredentialId": credential_id,
+            "timeZone": time_zone,
+            "selectedMonths": months.iter().map(|month| &month.label).collect::<Vec<_>>(),
+            "months": month_values,
+        }))
+        .map_err(|_| ort_storage::StorageError::InvalidData)
     }) else {
         return storage_unavailable();
     };

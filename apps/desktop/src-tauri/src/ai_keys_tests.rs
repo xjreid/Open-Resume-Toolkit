@@ -285,6 +285,31 @@ fn primary_switch_pause_and_unpause_have_no_implicit_failover() {
 }
 
 #[test]
+fn clearing_primary_is_explicit_and_idempotent() {
+    let (_temp, store, vault) = fixture();
+    let id = add(&store, &vault, "openai").keys[0].credential_id;
+    action(&store, &vault, id, AiKeyAction::SelectPrimary);
+    assert_eq!(
+        load_registry(&store).unwrap().0.primary_credential_id,
+        Some(id)
+    );
+
+    assert!(
+        clear_primary(&store)
+            .unwrap()
+            .primary_credential_id
+            .is_none()
+    );
+    assert!(
+        clear_primary(&store)
+            .unwrap()
+            .primary_credential_id
+            .is_none()
+    );
+    assert_eq!(request_connection(&store, None).unwrap().mode, "no_ai");
+}
+
+#[test]
 fn explicit_test_can_use_paused_key_without_unpausing_or_selecting_it() {
     let (_temp, store, vault) = fixture();
     let registry = add(&store, &vault, "openai");

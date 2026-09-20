@@ -126,6 +126,11 @@ beforeEach(async () => {
         ok: true,
         value: { cap: null, lifetimeSpendByCurrencyMicros: { USD: 250_000 } },
       });
+    if (command === "load_ai_general_settings")
+      return Promise.resolve({
+        ok: true,
+        value: { cap: null, lifetimeSpendByCurrencyMicros: { USD: 500_000 } },
+      });
     if (command === "load_ai_retention")
       return Promise.resolve({
         ok: true,
@@ -200,6 +205,38 @@ it("requires an estimate review before the synthetic provider request", async ()
   );
   expect(document.body.textContent).toContain("Synthetic request completed");
   expect(document.body.textContent).toContain("10 input, 2 cached input");
+});
+
+it("shows test and removal details in click-away popups outside key cards", async () => {
+  await clickAccessible("Test key #1");
+  const testPopup = document.querySelector(
+    '[aria-label="Confirm synthetic provider request"]',
+  )!;
+  expect(testPopup.closest(".ai-key-row")).toBeNull();
+  await act(async () => {
+    testPopup.parentElement!.dispatchEvent(
+      new dom.window.Event("pointerdown", { bubbles: true }),
+    );
+  });
+  expect(
+    document.querySelector('[aria-label="Confirm synthetic provider request"]'),
+  ).toBeNull();
+
+  await clickAccessible("Remove key #1");
+  const removePopup = document.querySelector(
+    '[aria-label="Confirm provider credential removal"]',
+  )!;
+  expect(removePopup.closest(".ai-key-row")).toBeNull();
+  await act(async () => {
+    removePopup.parentElement!.dispatchEvent(
+      new dom.window.Event("pointerdown", { bubbles: true }),
+    );
+  });
+  expect(
+    document.querySelector(
+      '[aria-label="Confirm provider credential removal"]',
+    ),
+  ).toBeNull();
 });
 
 it("keeps cancellation available while a request is active", async () => {
@@ -320,7 +357,7 @@ it("saves an inline cap on click-away without changing primary", async () => {
   expect(document.body.textContent).not.toContain("Calendar period");
 });
 
-it("shows selected-period buckets and content-free breakdowns", async () => {
+it("shows selected-period buckets without the redundant activity breakdown", async () => {
   native.invoke.mockImplementation(
     (command: string, args?: Record<string, unknown>) => {
       if (command === "load_ai_catalog") return Promise.resolve(catalog);
@@ -369,31 +406,62 @@ it("shows selected-period buckets and content-free breakdowns", async () => {
     },
   );
   await click("Week");
-  const metric = document.querySelector<HTMLSelectElement>(
-    '.ai-chart-toolbar select:has(option[value="tokens"])',
-  )!;
-  await act(async () => {
-    metric.value = "tokens";
-    metric.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
-  });
+  await click("Tokens");
   const point = document.querySelector('[aria-label="2026-09-15: 10 tokens"]')!;
   await act(async () => {
     point.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   });
-  expect(document.body.textContent).toContain("2026-09-15: 10 tokens");
   const tooltip = document.querySelector('[role="tooltip"]')!;
+  expect(tooltip.textContent).toContain("15 Tue");
+  expect(tooltip.textContent).toContain("10Estimated total tokens");
+  expect(tooltip.textContent).toContain("1 attempt");
   expect(tooltip.closest(".ai-chart__plot")).not.toBeNull();
   expect(tooltip.querySelector("dl")?.textContent).toContain(
     "Input8Output2Cached input0Cache write0Reasoning0",
   );
   expect(document.querySelector(".ai-chart__readout")).toBeNull();
-  const rows = [
-    ...document.querySelectorAll(".ai-breakdown-table tbody tr"),
-  ].map((row) =>
-    [...row.querySelectorAll("td")].map((cell) => cell.textContent),
+  expect(document.body.textContent).not.toContain("Activity breakdown");
+});
+
+it("places metric and timeframe controls on the chart and settings below it", async () => {
+  await click("Data");
+  const chart = document.querySelector(".ai-chart")!;
+  expect(chart.querySelector('[aria-label="Y axis metric"]')?.textContent).toBe(
+    "PriceTokens",
   );
-  expect(rows).toContainEqual(["Models", "fixture-model", "1"]);
-  expect(rows).toContainEqual(["Operation types", "credential_test", "1"]);
+  expect(
+    chart.querySelector('[aria-label="Monitoring period"]'),
+  ).not.toBeNull();
+  expect(document.querySelector(".ai-chart-toolbar")).toBeNull();
+  expect(document.querySelector(".ai-usage-summary")).toBeNull();
+  const settings = document.querySelector(".ai-data-settings")!;
+  expect(
+    chart.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(chart.closest(".ai-panel")).not.toBe(settings);
+  expect(settings.textContent).toContain("Settings");
+  expect(settings.textContent).toContain("Export activity");
+  expect(settings.textContent).toContain("Clear activity");
+  expect(settings.textContent).toContain("Activity retention");
+  expect(document.querySelector(".ai-data-heading")?.textContent).toContain(
+    "All keysGeneral activity · Every provider and model",
+  );
+  await click("Choose view");
+  const picker = document.querySelector('[aria-label="Choose activity view"]')!;
+  expect(picker.textContent).toContain("OpenAI");
+  expect(picker.textContent).toContain("fixture-model");
+  const results = await axe.run(picker, {
+    rules: { "color-contrast": { enabled: false } },
+  });
+  expect(results.violations).toEqual([]);
+  await act(async () => {
+    document.body.dispatchEvent(
+      new dom.window.Event("pointerdown", { bubbles: true }),
+    );
+  });
+  expect(
+    document.querySelector('[aria-label="Choose activity view"]'),
+  ).toBeNull();
 });
 
 it("applies the disclosed retain-until-cleared policy separately from caps", async () => {
@@ -421,6 +489,41 @@ it("applies the disclosed retain-until-cleared policy separately from caps", asy
     policy: "retain_until_cleared",
   });
   expect(document.body.textContent).toContain("Spending caps were not reset");
+});
+
+it("confirms retention policies before permanently deleting older activity", async () => {
+  const previous = native.invoke.getMockImplementation()!;
+  native.invoke.mockImplementation((command: string, args?: unknown) => {
+    if (command === "save_ai_retention")
+      return Promise.resolve({
+        ok: true,
+        value: { policy: "30_days", removedOperations: 4 },
+      });
+    return previous(command, args);
+  });
+  await choose("Retention policy", "30_days");
+  await click("Apply retention");
+  expect(
+    native.invoke.mock.calls.some(
+      ([command]) => command === "save_ai_retention",
+    ),
+  ).toBe(false);
+  const dialog = document.querySelector(
+    '[aria-labelledby="ai-retention-confirm-title"]',
+  )!;
+  expect(dialog.textContent).toContain(
+    "Activity older than 30 days will be permanently deleted",
+  );
+  expect(dialog.textContent).toContain(
+    "Lifetime spend and spending-cap progress on My Keys will not change",
+  );
+  await click("Permanently delete older activity");
+  expect(native.invoke).toHaveBeenCalledWith("save_ai_retention", {
+    policy: "30_days",
+  });
+  expect(document.body.textContent).toContain(
+    "Retention saved; 4 older operations were cleared",
+  );
 });
 
 it("labels the AI and Monitoring controls for accessibility", async () => {
@@ -504,9 +607,11 @@ it("saves names immediately while typing and exits on click-away", async () => {
   });
   expect(document.querySelector('[aria-label="Key #1 name"]')).toBeNull();
   expect(document.querySelector(".ai-key-name")?.textContent).toBe("Personal");
+  await click("Choose view");
   expect(
-    document.querySelector('option[value="fixture-id"]')?.textContent,
-  ).toBe("Personal · OpenAI");
+    document.querySelector('[aria-label="View activity for Personal"]')
+      ?.textContent,
+  ).toContain("Personal");
 });
 
 it("serializes rapid name saves without replacing newer draft text", async () => {
@@ -592,6 +697,85 @@ it("shows all key information and controls without expansion", async () => {
   );
 });
 
+it("manages one general cap across all keys while keeping lifetime spend", async () => {
+  let cap: any = null;
+  const previous = native.invoke.getMockImplementation()!;
+  native.invoke.mockImplementation((command: string, args?: any) => {
+    if (command === "load_ai_general_settings")
+      return Promise.resolve({
+        ok: true,
+        value: { cap, lifetimeSpendByCurrencyMicros: { USD: 2_000_000 } },
+      });
+    if (command === "save_ai_general_cap") {
+      cap = {
+        credentialId: "general",
+        period: "all_time",
+        currency: "USD",
+        timeZone: "UTC",
+        limitMicros: args.limitMicros,
+        countedMicros: 2_000_000,
+        reservedMicros: 0,
+        unresolvedMicros: 0,
+        revision: 1,
+      };
+      return Promise.resolve({ ok: true, value: cap });
+    }
+    if (command === "reset_ai_general_cap") {
+      cap = { ...cap, countedMicros: 0 };
+      return Promise.resolve({ ok: true, value: true });
+    }
+    if (command === "disable_ai_general_cap") {
+      cap = null;
+      return Promise.resolve({ ok: true, value: true });
+    }
+    return previous(command, args);
+  });
+  await act(async () => {
+    root.render(<AiWorkspace key="general-cap" blocked={false} />);
+  });
+  expect(document.querySelector(".ai-general-spending")?.textContent).toContain(
+    "$2.00/Unlimited0%",
+  );
+  await act(async () => {
+    document
+      .querySelector<HTMLButtonElement>(
+        '[aria-label="Edit general spending limit"]',
+      )!
+      .click();
+  });
+  const input = document.querySelector<HTMLInputElement>(
+    '[aria-label="General spending limit"]',
+  )!;
+  await typeInput(input, "5");
+  await act(async () => {
+    input.blur();
+  });
+  expect(native.invoke).toHaveBeenCalledWith(
+    "save_ai_general_cap",
+    expect.objectContaining({ limitMicros: 5_000_000, expectedRevision: null }),
+  );
+  expect(document.querySelector(".ai-general-spending")?.textContent).toContain(
+    "$2.00/$5.00",
+  );
+  const general = document.querySelector(".ai-general-spending")!;
+  await act(async () => {
+    general
+      .querySelectorAll<HTMLButtonElement>(".ai-key-cap-actions button")[0]
+      .click();
+  });
+  await click("Confirm restart");
+  expect(native.invoke).toHaveBeenCalledWith("reset_ai_general_cap");
+  expect(general.textContent).toContain("$0.00/$5.00");
+  expect(general.textContent).toContain("$2.00Total spent across all keys");
+  await act(async () => {
+    general
+      .querySelectorAll<HTMLButtonElement>(".ai-key-cap-actions button")[1]
+      .click();
+  });
+  expect(native.invoke).toHaveBeenCalledWith("disable_ai_general_cap");
+  expect(general.textContent).toContain("$2.00/Unlimited0%");
+});
+
 it("fails closed when spending data cannot be loaded", async () => {
   const previous = native.invoke.getMockImplementation()!;
   native.invoke.mockImplementation((command: string, args?: unknown) =>
@@ -647,6 +831,10 @@ async function clickAccessible(label: string) {
     button.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   });
 }
+async function chooseDataView(label: string) {
+  await click("Choose view");
+  await clickAccessible(`View activity for ${label}`);
+}
 async function choose(label: string, value: string) {
   const select = [...document.querySelectorAll("select")].find((element) =>
     element.closest("label")?.textContent?.trim().startsWith(label),
@@ -663,6 +851,8 @@ function returnRegistry(value: typeof connection.value) {
       return Promise.resolve({ ok: true, value });
     if (command === "change_ai_key")
       return Promise.resolve({ ok: true, value });
+    if (command === "clear_ai_primary")
+      return Promise.resolve({ ok: true, value });
     return previous(command, args);
   });
 }
@@ -676,7 +866,7 @@ it("changes primary only after selection and Confirm", async () => {
     document.querySelector<HTMLButtonElement>(
       '[aria-label="Confirm primary key"]',
     )?.disabled,
-  ).toBe(true);
+  ).toBe(false);
   await act(async () => {
     document
       .querySelectorAll(".ai-key-row")[1]
@@ -700,6 +890,39 @@ it("changes primary only after selection and Confirm", async () => {
   expect(
     document.querySelector('input[name="primary-key-selection"]'),
   ).toBeNull();
+});
+
+it("clears the primary when Confirm is clicked with no key selected", async () => {
+  returnRegistry({ ...connection.value, primaryCredentialId: null });
+  await click("Set primary key");
+  expect(
+    document.querySelector<HTMLInputElement>(
+      '[aria-label="Select key #1 as primary"]',
+    )?.checked,
+  ).toBe(false);
+  await clickAccessible("Confirm primary key");
+  expect(native.invoke).toHaveBeenCalledWith("clear_ai_primary");
+  expect(document.querySelector(".ai-primary")?.textContent).toContain(
+    "No primary key selected",
+  );
+});
+
+it("allows a pending primary choice to be deselected before Confirm", async () => {
+  returnRegistry({ ...connection.value, primaryCredentialId: null });
+  await click("Set primary key");
+  await selectCandidate(2);
+  expect(document.querySelectorAll(".ai-key-row--candidate")).toHaveLength(1);
+  await act(async () => {
+    document
+      .querySelectorAll(".ai-key-row")[1]
+      .dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  });
+  expect(document.querySelectorAll(".ai-key-row--candidate")).toHaveLength(0);
+  await clickAccessible("Confirm primary key");
+  expect(native.invoke).toHaveBeenCalledWith("clear_ai_primary");
+  expect(
+    native.invoke.mock.calls.some(([command]) => command === "change_ai_key"),
+  ).toBe(false);
 });
 
 it("cancels primary selection without changing the active key", async () => {
@@ -733,7 +956,7 @@ it("invalidates a pending primary choice when that key is paused", async () => {
     document.querySelector<HTMLButtonElement>(
       '[aria-label="Confirm primary key"]',
     )?.disabled,
-  ).toBe(true);
+  ).toBe(false);
   expect(document.querySelectorAll(".ai-key-row--candidate")).toHaveLength(0);
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
     "Key #1",
@@ -879,19 +1102,25 @@ it("removing the primary preserves its activity filter and never selects another
     "No primary key selected",
   );
   expect(document.querySelectorAll(".ai-key-row")).toHaveLength(1);
-  expect(document.body.textContent).toContain("Key #1 · OpenAI · Removed");
+  await click("Choose view");
+  expect(
+    document.querySelector('[aria-label="View activity for Key #1"]')
+      ?.textContent,
+  ).toContain("OpenAI · Balanced: fixture-model · Removed");
   expect(native.invoke).toHaveBeenCalledWith("change_ai_key", {
     request: { credentialId: "fixture-id", action: "remove" },
   });
 });
 
 it("requires both key and provider when adding; the provider is immutable afterward", async () => {
-  await click("Add key");
+  await clickAccessible("Add key");
   const form = document.querySelector('[aria-label="Add new API key"]')!;
   const password = form.querySelector<HTMLInputElement>(
     'input[type="password"]',
   )!;
-  expect(form.querySelector("select")?.value).toBe("");
+  expect(
+    form.querySelectorAll('.ai-provider-option[aria-pressed="true"]'),
+  ).toHaveLength(0);
   await act(async () => {
     Object.getOwnPropertyDescriptor(
       dom.window.HTMLInputElement.prototype,
@@ -906,7 +1135,33 @@ it("requires both key and provider when adding; the provider is immutable afterw
       (button) => button.textContent === "Save key",
     )?.disabled,
   ).toBe(true);
-  await choose("Provider", "gemini");
+  await clickAccessible("Show API key");
+  expect(form.querySelector<HTMLInputElement>("input")?.type).toBe("text");
+  await clickAccessible("Hide API key");
+  expect(form.querySelector<HTMLInputElement>("input")?.type).toBe("password");
+  await clickAccessible("Select Gemini");
+  expect(
+    form
+      .querySelector('[aria-label="Select Gemini"]')
+      ?.getAttribute("aria-pressed"),
+  ).toBe("true");
+  expect(
+    form
+      .querySelector('[aria-label="Select OpenAI"]')
+      ?.getAttribute("aria-pressed"),
+  ).toBe("false");
+  await clickAccessible("Select Gemini");
+  expect(
+    form
+      .querySelector('[aria-label="Select Gemini"]')
+      ?.getAttribute("aria-pressed"),
+  ).toBe("false");
+  expect(
+    [...form.querySelectorAll("button")].find(
+      (button) => button.textContent === "Save key",
+    )?.disabled,
+  ).toBe(true);
+  await clickAccessible("Select Gemini");
   const previous = native.invoke.getMockImplementation()!;
   const next = {
     ...connection.value,
@@ -941,6 +1196,33 @@ it("requires both key and provider when adding; the provider is immutable afterw
     ),
   ).toBeNull();
   expect(document.body.textContent).not.toContain("test-only-key");
+});
+
+it("discards an unfinished add-key popup when clicking away", async () => {
+  await clickAccessible("Add key");
+  await clickAccessible("Select OpenAI");
+  const form = document.querySelector('[aria-label="Add new API key"]')!;
+  const input = form.querySelector<HTMLInputElement>("input")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(input, "discard-me");
+    input.dispatchEvent(new dom.window.InputEvent("input", { bubbles: true }));
+  });
+  await act(async () => {
+    form.parentElement!.dispatchEvent(
+      new dom.window.Event("pointerdown", { bubbles: true }),
+    );
+  });
+  expect(document.querySelector('[aria-label="Add new API key"]')).toBeNull();
+
+  await clickAccessible("Add key");
+  const reopened = document.querySelector('[aria-label="Add new API key"]')!;
+  expect(reopened.querySelector<HTMLInputElement>("input")?.value).toBe("");
+  expect(
+    reopened.querySelectorAll('.ai-provider-option[aria-pressed="true"]'),
+  ).toHaveLength(0);
 });
 
 it("testing a non-primary key passes its identity through preview and confirmation without switching primary", async () => {
@@ -1112,73 +1394,103 @@ it("blocks key use if a failed mutation cannot refresh backend state", async () 
   );
   expect(document.querySelectorAll(".ai-key-row")).toHaveLength(0);
   expect(
-    [...document.querySelectorAll("button")].find(
-      (button) => button.textContent === "Add key",
-    )?.disabled,
+    document.querySelector<HTMLButtonElement>('[aria-label="Add key"]')
+      ?.disabled,
   ).toBe(true);
 });
 
-it("filters, exports and clears activity only for the selected key", async () => {
+it("chooses export and clear months independently from the graph", async () => {
   const previous = native.invoke.getMockImplementation()!;
   native.invoke.mockImplementation((command: string, args?: unknown) => {
-    if (command === "load_ai_monitoring")
+    if (command === "load_ai_monitoring") {
+      const request = args as Record<string, unknown>;
       return Promise.resolve({
         ok: true,
-        value: { ...emptyMonitoring.value, attempts: 1 },
+        value: {
+          ...emptyMonitoring.value,
+          attempts: 1,
+          timeBuckets:
+            request.fromUnixMs === 0 && request.bucketSize === "month"
+              ? [
+                  { label: "2026-08", attempts: 3 },
+                  { label: "2026-09", attempts: 5 },
+                ]
+              : [],
+        },
       });
+    }
     if (command === "clear_ai_monitoring")
       return Promise.resolve({ ok: true, value: 1 });
     if (command === "export_ai_monitoring")
       return Promise.resolve({ ok: true, value: "exported" });
     return previous(command, args);
   });
-  await choose("Activity by key", "second-id");
+  await chooseDataView("Key #2");
   expect(native.invoke).toHaveBeenCalledWith(
     "load_ai_monitoring",
     expect.objectContaining({ credentialId: "second-id" }),
   );
-  await click("Export aggregate JSON");
+  await click("Export JSON…");
+  expect(
+    document.querySelector('[aria-labelledby="ai-data-action-title"]')
+      ?.textContent,
+  ).toContain("Step 1 of 2Export activity");
+  await clickAccessible("Select Key #1");
+  await click("Continue");
+  expect(document.body.textContent).toContain("Only months with activity");
+  await clickAccessible("Select September 2026");
+  await clickAccessible("Select August 2026");
+  await click("Export 2 months");
   expect(native.invoke).toHaveBeenCalledWith(
     "export_ai_monitoring",
-    expect.objectContaining({ credentialId: "second-id" }),
+    expect.objectContaining({
+      credentialId: "fixture-id",
+      months: [
+        expect.objectContaining({ label: "2026-09" }),
+        expect.objectContaining({ label: "2026-08" }),
+      ],
+    }),
   );
-  await click("Clear selected activity");
+  await click("Choose activity…");
+  await clickAccessible("Select all keys");
+  await click("Continue");
   expect(
-    document.querySelector('[aria-label="Confirm AI activity clearing"]')
+    document.querySelector('[aria-labelledby="ai-data-action-title"]')
       ?.textContent,
-  ).toContain("Key #2");
-  await click("Clear activity");
+  ).toContain("All keys");
+  await clickAccessible("Select September 2026");
+  await click("Clear 1 month");
   expect(native.invoke).toHaveBeenCalledWith(
     "clear_ai_monitoring",
-    expect.objectContaining({ credentialId: "second-id" }),
+    expect.objectContaining({
+      credentialId: null,
+      months: [expect.objectContaining({ label: "2026-09" })],
+    }),
   );
-  await choose("Activity by key", "");
+  await chooseDataView("all keys");
   expect(native.invoke).toHaveBeenCalledWith(
     "load_ai_monitoring",
     expect.objectContaining({ credentialId: null }),
   );
 });
 
-it("closes stale clearing confirmations when changing key or time period", async () => {
-  const previous = native.invoke.getMockImplementation()!;
-  native.invoke.mockImplementation((command: string, args?: unknown) =>
-    command === "load_ai_monitoring"
-      ? Promise.resolve({
-          ok: true,
-          value: { ...emptyMonitoring.value, attempts: 1 },
-        })
-      : previous(command, args),
-  );
-  await click("Week");
-  await click("Clear selected activity");
-  await click("Year");
+it("requires explicit scope choices and can cancel the activity workflow", async () => {
+  await click("Choose activity…");
+  const continueButton = [...document.querySelectorAll("button")].find(
+    (button) => button.textContent === "Continue",
+  ) as HTMLButtonElement;
+  expect(continueButton.disabled).toBe(true);
+  await clickAccessible("Select Key #2");
+  expect(continueButton.disabled).toBe(false);
+  await click("Continue");
+  const clearButton = document.querySelector<HTMLButtonElement>(
+    ".ai-data-action-footer .button--danger",
+  )!;
+  expect(clearButton.disabled).toBe(true);
+  await click("Back");
+  await click("Cancel");
   expect(
-    document.querySelector('[aria-label="Confirm AI activity clearing"]'),
-  ).toBeNull();
-  await click("Clear selected activity");
-  await choose("Activity by key", "second-id");
-  expect(
-    document.querySelector('[aria-label="Confirm AI activity clearing"]'),
+    document.querySelector('[aria-labelledby="ai-data-action-title"]'),
   ).toBeNull();
   expect(
     native.invoke.mock.calls.some(

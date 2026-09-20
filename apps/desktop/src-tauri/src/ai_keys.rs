@@ -374,6 +374,13 @@ fn change_key<V: ProviderCredentialVault>(
     save_registry(store, &registry, revision)?;
     Ok(registry)
 }
+fn clear_primary(store: &EncryptedStore) -> Result<AiKeyRegistry, &'static str> {
+    let (mut registry, revision) = load_registry(store).map_err(|_| STORAGE)?;
+    if registry.primary_credential_id.take().is_some() {
+        save_registry(store, &registry, revision)?;
+    }
+    Ok(registry)
+}
 fn response(
     result: Result<Result<AiKeyRegistry, &'static str>, StorageError>,
 ) -> CommandResponse<AiKeyRegistry> {
@@ -547,6 +554,22 @@ pub fn change_ai_key(
             request,
         ))
     }))
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn clear_ai_primary(
+    window: WebviewWindow,
+    state: State<'_, DesktopState>,
+    gate: State<'_, AiRequestGate>,
+) -> CommandResponse<AiKeyRegistry> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    let Some(_lease) = gate.begin(Uuid::now_v7()) else {
+        return CommandResponse::failure("AI_BUSY", "errors.aiBusy", true);
+    };
+    response(state.with_store(|store| Ok(clear_primary(store))))
 }
 
 #[cfg(test)]

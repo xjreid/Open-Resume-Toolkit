@@ -103,11 +103,21 @@ export function AiUsageChart({
   period,
   currency,
   metric,
+  onMetricChange,
+  onPeriodChange,
+  summary,
+  currencies,
+  onCurrencyChange,
 }: {
   buckets: UsageBucket[];
   period: UsagePeriod;
   currency: string;
   metric: "cost" | "tokens";
+  onMetricChange: (metric: "cost" | "tokens") => void;
+  onPeriodChange: (period: UsagePeriod) => void;
+  summary: { label: string; value: string; detail: string };
+  currencies: string[];
+  onCurrencyChange: (currency: string) => void;
 }) {
   const [active, setActive] = useState<number | null>(null);
   const points = chartBuckets(buckets, period);
@@ -158,11 +168,49 @@ export function AiUsageChart({
   ];
   return (
     <div className="ai-chart" aria-label="Token usage over time">
-      <p className="ai-chart__axis">
-        {metric === "tokens"
-          ? "Estimated tokens"
-          : `Estimated price (${currency})`}
-      </p>
+      <div className="ai-chart__header">
+        <div className="ai-chart__metric">
+          <span>Estimated</span>
+          <div
+            className="ai-chart__metric-buttons"
+            role="group"
+            aria-label="Y axis metric"
+          >
+            <button
+              type="button"
+              aria-pressed={metric === "cost"}
+              onClick={() => onMetricChange("cost")}
+            >
+              Price
+            </button>
+            <button
+              type="button"
+              aria-pressed={metric === "tokens"}
+              onClick={() => onMetricChange("tokens")}
+            >
+              Tokens
+            </button>
+          </div>
+          {metric === "cost" && currencies.length > 1 && (
+            <label>
+              Currency
+              <select
+                value={currency}
+                onChange={(event) => onCurrencyChange(event.target.value)}
+              >
+                {currencies.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        <div className="ai-chart__summary">
+          <span>{summary.label}</span>
+          <strong>{summary.value}</strong>
+          <small>{summary.detail}</small>
+        </div>
+      </div>
       <div className="ai-chart__plot">
         <svg
           viewBox="0 0 810 280"
@@ -184,6 +232,12 @@ export function AiUsageChart({
           }}
           onPointerLeave={() => setActive(null)}
         >
+          <defs>
+            <linearGradient id="ai-chart-area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#3e719f" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#3e719f" stopOpacity="0.01" />
+            </linearGradient>
+          </defs>
           {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
             <g key={fraction}>
               <line
@@ -203,11 +257,24 @@ export function AiUsageChart({
             </g>
           ))}
           <polyline
+            points={`78,230 ${values.map((value, index) => `${x(index)},${y(value)}`).join(" ")} 778,230`}
+            className="ai-chart__area"
+          />
+          <polyline
             points={values
               .map((value, index) => `${x(index)},${y(value)}`)
               .join(" ")}
             className="ai-chart__line"
           />
+          {active !== null && (
+            <line
+              x1={x(active)}
+              x2={x(active)}
+              y1="40"
+              y2="230"
+              className="ai-chart__guide"
+            />
+          )}
           {points.map((bucket, index) => (
             <circle
               key={bucket.label}
@@ -252,12 +319,19 @@ export function AiUsageChart({
             }}
           >
             <>
-              <strong>
-                {selected.label}:{" "}
-                {metric === "tokens"
-                  ? `${totalTokens(selected.usage).toLocaleString()} tokens`
-                  : `${((selected.costByCurrencyMicros[currency] ?? 0) / 1_000_000).toFixed(6)} ${currency}`}
-              </strong>
+              <div className="ai-chart__tooltip-heading">
+                <span>{dateLabel(selected.label)}</span>
+                <strong>
+                  {metric === "tokens"
+                    ? totalTokens(selected.usage).toLocaleString()
+                    : `${((selected.costByCurrencyMicros[currency] ?? 0) / 1_000_000).toFixed(6)} ${currency}`}
+                </strong>
+                <small>
+                  {metric === "tokens"
+                    ? "Estimated total tokens"
+                    : "Estimated recorded cost"}
+                </small>
+              </div>
               {metric === "tokens" && (
                 <dl>
                   {[
@@ -274,6 +348,10 @@ export function AiUsageChart({
                   ))}
                 </dl>
               )}
+              <div className="ai-chart__tooltip-activity">
+                {selected.attempts.toLocaleString()}{" "}
+                {selected.attempts === 1 ? "attempt" : "attempts"}
+              </div>
               {selected.partial && (
                 <span>
                   Partial usage · {selected.unknownCount} unknown attempts.
@@ -283,6 +361,26 @@ export function AiUsageChart({
             </>
           </div>
         )}
+      </div>
+      <div className="ai-chart__timeframe">
+        <span>Timeframe</span>
+        <div
+          className="ai-segments"
+          role="group"
+          aria-label="Monitoring period"
+        >
+          {(["Week", "Month", "Year", "All time"] as const).map((value) => (
+            <button
+              type="button"
+              className="button--secondary"
+              aria-pressed={period === value}
+              key={value}
+              onClick={() => onPeriodChange(value)}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
