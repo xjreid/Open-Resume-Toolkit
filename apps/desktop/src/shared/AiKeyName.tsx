@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useRef, useState } from "react";
+import { keyDisplayName } from "./AiKeyPresentation";
 import type { KeyRegistry, SavedKey } from "./AiWorkspace";
 
 export function AiKeyName({
@@ -22,6 +23,7 @@ export function AiKeyName({
   const saving = useRef(false);
   const activeName = useRef<string | null>(null);
   const confirmed = useRef(saved.name ?? "");
+  const label = keyDisplayName(saved);
 
   // Serialize writes and coalesce intermediate keystrokes so a late reply
   // cannot overwrite a newer name. Other mutations wait until this queue drains.
@@ -80,11 +82,11 @@ export function AiKeyName({
       {editing ? (
         <input
           autoFocus
-          aria-label={`Key #${saved.identificationNumber} name`}
+          aria-label={`Name for ${label}`}
           className="ai-key-name-input"
           value={draft}
           maxLength={80}
-          placeholder={`Key #${saved.identificationNumber}`}
+          placeholder="Name this key"
           disabled={workspaceBlocked}
           onChange={(event) => {
             setDraft(event.target.value);
@@ -103,8 +105,8 @@ export function AiKeyName({
         <button
           type="button"
           className="ai-key-name"
-          aria-label={`Rename key #${saved.identificationNumber}`}
-          aria-description={saved.name || `Key #${saved.identificationNumber}`}
+          aria-label={`Rename ${label}`}
+          aria-description={label}
           title="Rename key"
           disabled={blocked}
           onClick={() => {
@@ -115,7 +117,7 @@ export function AiKeyName({
             setEditing(true);
           }}
         >
-          {saved.name || `Key #${saved.identificationNumber}`}
+          {label}
         </button>
       )}
       {error && (

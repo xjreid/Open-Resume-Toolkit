@@ -1,5 +1,19 @@
 # Development
 
+## Application behavior reference
+
+Before changing user-visible workflows, read the applicable document in
+[`docs/application-behavior/`](docs/application-behavior/README.md). This
+reference records the desktop application's implemented behavior, including
+resume Edit/View/publish/export semantics, AI key states and organization,
+spending limits, Data aggregation, export, retention, and deletion boundaries.
+
+Update the applicable behavior document in the same change whenever a control,
+state transition, failure/retry path, aggregation rule, or persistence boundary
+changes. The folder is descriptive implementation documentation and does not
+replace the authority of `Product Plans/`, architecture decisions, generated
+contracts, or tested code.
+
 Open Resume Toolkit implements the M0 architecture skeleton, the local M1
 encrypted-storage slice, and the completed M2 offline resume path for macOS Apple Silicon development. The development
 app can autosave synthetic resume drafts and publish immutable snapshots through

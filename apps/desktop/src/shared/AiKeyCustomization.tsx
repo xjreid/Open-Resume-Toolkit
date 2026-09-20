@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState, type ReactNode } from "react";
+import {
+  keyDisplayName,
+  providerName,
+  ProviderLogo,
+} from "./AiKeyPresentation";
 import type { Catalog, KeyRegistry, SavedKey } from "./AiWorkspace";
 
 type Cap = {
@@ -36,7 +41,6 @@ export function AiKeyCustomization({
   onRegistry,
   onChanged,
   identity,
-  status,
   actions,
 }: {
   saved: SavedKey;
@@ -47,7 +51,6 @@ export function AiKeyCustomization({
   onRegistry: (value: KeyRegistry) => void;
   onChanged: () => void;
   identity: ReactNode;
-  status: ReactNode;
   actions: ReactNode;
 }) {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -58,6 +61,7 @@ export function AiKeyCustomization({
   const [notice, setNotice] = useState("");
   const [confirm, setConfirm] = useState<"reset" | "disable" | null>(null);
   const id = saved.credentialId;
+  const label = keyDisplayName(saved);
   useEffect(() => {
     let current = true;
     setRefreshing(true);
@@ -203,25 +207,25 @@ export function AiKeyCustomization({
     <>
       <div
         className="ai-key-card-layout"
-        aria-label={`Key #${saved.identificationNumber} settings`}
+        aria-label={`${label} settings`}
         aria-busy={refreshing}
       >
         <div className="ai-key-card-info">
-          <div className="ai-key-selection">{status}</div>
           <div className="ai-key-card-identity">
-            {identity}
-            <span className="ai-key-provider">
-              {saved.provider === "openai"
-                ? "OpenAI"
-                : saved.provider === "anthropic"
-                  ? "Anthropic"
-                  : "Gemini"}{" "}
-              · #{saved.identificationNumber}
-            </span>
-            <label className="ai-key-preset">
-              <span className="visually-hidden">
-                Model preset for key #{saved.identificationNumber}
+            <div className="ai-key-identity-line">
+              <span className="ai-key-provider-logo">
+                <ProviderLogo provider={saved.provider} />
               </span>
+              <span className="ai-key-provider-name">
+                {providerName(saved.provider)}
+              </span>
+              <span className="ai-key-identity-separator" aria-hidden="true">
+                ·
+              </span>
+              {identity}
+            </div>
+            <label className="ai-key-preset">
+              <span className="visually-hidden">Model preset for {label}</span>
               <select
                 value={saved.preset}
                 disabled={disabled || !catalog || !entry}
@@ -294,7 +298,7 @@ export function AiKeyCustomization({
                     <input
                       autoFocus
                       className="ai-key-limit-input"
-                      aria-label={`Key #${saved.identificationNumber} spending limit`}
+                      aria-label={`${label} spending limit`}
                       inputMode="decimal"
                       placeholder="Unlimited"
                       value={amount}
@@ -310,7 +314,7 @@ export function AiKeyCustomization({
                     <button
                       type="button"
                       className="ai-key-limit-value"
-                      aria-label={`Edit key #${saved.identificationNumber} spending limit`}
+                      aria-label={`Edit ${label} spending limit`}
                       title="Edit spending limit"
                       disabled={disabled}
                       onClick={() => {
@@ -331,7 +335,7 @@ export function AiKeyCustomization({
                 <span>{settings ? `${percent}%` : "—"}</span>
               </div>
               <progress
-                aria-label={`Key #${saved.identificationNumber} spending cap used`}
+                aria-label={`${label} spending cap used`}
                 value={
                   settings
                     ? cap
@@ -375,7 +379,7 @@ export function AiKeyCustomization({
         <div
           className="ai-confirm"
           role="group"
-          aria-label={`Confirm ${confirm} cap for key #${saved.identificationNumber}`}
+          aria-label={`Confirm ${confirm} cap for ${label}`}
         >
           <p>
             Restart this key’s cap usage at zero? Lifetime spend and activity in

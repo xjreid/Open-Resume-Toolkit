@@ -18,7 +18,7 @@ const STORAGE: &str = "STORAGE_UNAVAILABLE";
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SavedAiKey {
     pub credential_id: Uuid,
-    pub identification_number: u64,
+    pub created_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub provider: String,
@@ -27,21 +27,11 @@ pub struct SavedAiKey {
     pub removed: bool,
     pub cleanup_required: bool,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AiKeyRegistry {
     pub keys: Vec<SavedAiKey>,
     pub primary_credential_id: Option<Uuid>,
-    pub next_identification_number: u64,
-}
-impl Default for AiKeyRegistry {
-    fn default() -> Self {
-        Self {
-            keys: vec![],
-            primary_credential_id: None,
-            next_identification_number: 1,
-        }
-    }
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -52,10 +42,41 @@ pub(crate) struct AiConnectionState {
     pub credential_id: Option<Uuid>,
 }
 impl AiKeyRegistry {
+    #[cfg(test)]
     fn from_value(value: serde_json::Value) -> Result<Self, StorageError> {
+        Self::from_value_with_migration(value).map(|(registry, _)| registry)
+    }
+
+    fn from_value_with_migration(
+        mut value: serde_json::Value,
+    ) -> Result<(Self, bool), StorageError> {
+        let mut migrated = false;
         let registry = if value.get("keys").is_some() {
+            let object = value.as_object_mut().ok_or(StorageError::InvalidData)?;
+            migrated |= object.remove("nextIdentificationNumber").is_some();
+            let keys = object
+                .get_mut("keys")
+                .and_then(serde_json::Value::as_array_mut)
+                .ok_or(StorageError::InvalidData)?;
+            for key in keys {
+                let key = key.as_object_mut().ok_or(StorageError::InvalidData)?;
+                migrated |= key.remove("identificationNumber").is_some();
+                if !key.contains_key("createdAt") {
+                    let id = key
+                        .get("credentialId")
+                        .and_then(serde_json::Value::as_str)
+                        .and_then(|value| Uuid::parse_str(value).ok())
+                        .ok_or(StorageError::InvalidData)?;
+                    key.insert(
+                        "createdAt".into(),
+                        serde_json::Value::String(created_at_for(id)),
+                    );
+                    migrated = true;
+                }
+            }
             serde_json::from_value(value).map_err(|_| StorageError::InvalidData)?
         } else {
+            migrated = true;
             let legacy: AiConnectionState =
                 serde_json::from_value(value).map_err(|_| StorageError::InvalidData)?;
             if !matches!(legacy.mode.as_str(), "direct_api" | "no_ai") {
@@ -65,7 +86,7 @@ impl AiKeyRegistry {
                 (Some(id), Some(provider), Some(preset)) => Self {
                     keys: vec![SavedAiKey {
                         credential_id: id,
-                        identification_number: 1,
+                        created_at: created_at_for(id),
                         name: None,
                         provider,
                         preset,
@@ -74,30 +95,21 @@ impl AiKeyRegistry {
                         cleanup_required: false,
                     }],
                     primary_credential_id: (legacy.mode == "direct_api").then_some(id),
-                    next_identification_number: 2,
                 },
                 (None, None, None) => Self::default(),
                 _ => return Err(StorageError::InvalidData),
             }
         };
         registry.validate()?;
-        Ok(registry)
+        Ok((registry, migrated))
     }
     fn validate(&self) -> Result<(), StorageError> {
         let mut ids = std::collections::HashSet::new();
-        let mut numbers = std::collections::HashSet::new();
-        if self.next_identification_number == 0
-            || self.next_identification_number > 9_007_199_254_740_991
-        {
-            return Err(StorageError::InvalidData);
-        }
         for key in &self.keys {
             if !matches!(key.provider.as_str(), "openai" | "anthropic" | "gemini")
                 || !matches!(key.preset.as_str(), "economy" | "balanced" | "quality")
-                || key.identification_number == 0
-                || key.identification_number >= self.next_identification_number
                 || !ids.insert(key.credential_id)
-                || !numbers.insert(key.identification_number)
+                || key.created_at.parse::<jiff::Timestamp>().is_err()
                 || key.name.as_ref().is_some_and(|name| !valid_key_name(name))
                 || ((key.removed || key.cleanup_required) && !key.paused)
             {
@@ -169,12 +181,29 @@ pub(crate) fn load_registry(
     store: &EncryptedStore,
 ) -> Result<(AiKeyRegistry, Option<i64>), StorageError> {
     match store.load_setting(SETTING)? {
-        Some(saved) => Ok((
-            AiKeyRegistry::from_value(saved.value)?,
-            Some(saved.revision),
-        )),
+        Some(saved) => {
+            let (registry, migrated) = AiKeyRegistry::from_value_with_migration(saved.value)?;
+            if migrated {
+                let revision = store
+                    .save_setting(SETTING, Some(saved.revision), &json!(registry))?
+                    .revision;
+                Ok((registry, Some(revision)))
+            } else {
+                Ok((registry, Some(saved.revision)))
+            }
+        }
         None => Ok((AiKeyRegistry::default(), None)),
     }
+}
+
+fn created_at_for(id: Uuid) -> String {
+    id.get_timestamp()
+        .and_then(|timestamp| {
+            let (seconds, nanos) = timestamp.to_unix();
+            jiff::Timestamp::new(i64::try_from(seconds).ok()?, i32::try_from(nanos).ok()?).ok()
+        })
+        .unwrap_or_else(jiff::Timestamp::now)
+        .to_string()
 }
 fn save_registry(
     store: &EncryptedStore,
@@ -251,6 +280,8 @@ pub(crate) fn suspend_for_deletion(store: &EncryptedStore) -> Result<(), Storage
 pub struct AddAiKeyRequest {
     provider: String,
     api_key: String,
+    #[serde(default)]
+    name: Option<String>,
 }
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -267,11 +298,31 @@ pub struct ChangeAiKeyRequest {
     action: AiKeyAction,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DeleteRemovedKeyDataRequest {
+    credential_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteRemovedKeyDataResult {
+    registry: AiKeyRegistry,
+    cleared_operations: u64,
+}
+
 fn add_key<V: ProviderCredentialVault>(
     store: &EncryptedStore,
     vault: &V,
     request: AddAiKeyRequest,
 ) -> Result<AiKeyRegistry, &'static str> {
+    let name = request
+        .name
+        .map(|name| name.trim().to_owned())
+        .filter(|name| !name.is_empty());
+    if name.as_ref().is_some_and(|name| !valid_key_name(name)) {
+        return Err("AI_KEY_NAME_INVALID");
+    }
     let provider = match request.provider.as_str() {
         "openai" => ort_ai::Provider::OpenAi,
         "anthropic" => ort_ai::Provider::Anthropic,
@@ -290,12 +341,11 @@ fn add_key<V: ProviderCredentialVault>(
     let secret = ProviderSecret::from_bytes(request.api_key.into_bytes())
         .map_err(|_| "AI_CREDENTIAL_INVALID")?;
     let (mut registry, revision) = load_registry(store).map_err(|_| STORAGE)?;
-    let number = registry.next_identification_number;
-    registry.next_identification_number = number.checked_add(1).ok_or(STORAGE)?;
+    let credential_id = Uuid::now_v7();
     let key = SavedAiKey {
-        credential_id: Uuid::now_v7(),
-        identification_number: number,
-        name: None,
+        credential_id,
+        created_at: created_at_for(credential_id),
+        name,
         provider: request.provider,
         preset: "balanced".into(),
         paused: true,
@@ -374,12 +424,53 @@ fn change_key<V: ProviderCredentialVault>(
     save_registry(store, &registry, revision)?;
     Ok(registry)
 }
+
 fn clear_primary(store: &EncryptedStore) -> Result<AiKeyRegistry, &'static str> {
     let (mut registry, revision) = load_registry(store).map_err(|_| STORAGE)?;
     if registry.primary_credential_id.take().is_some() {
         save_registry(store, &registry, revision)?;
     }
     Ok(registry)
+}
+
+fn delete_removed_key_data(
+    store: &EncryptedStore,
+    request: &DeleteRemovedKeyDataRequest,
+) -> Result<DeleteRemovedKeyDataResult, &'static str> {
+    if request.credential_ids.is_empty() || request.credential_ids.len() > 1_000 {
+        return Err("AI_KEY_SELECTION_INVALID");
+    }
+    let selected = request
+        .credential_ids
+        .iter()
+        .copied()
+        .collect::<std::collections::HashSet<_>>();
+    if selected.len() != request.credential_ids.len() {
+        return Err("AI_KEY_SELECTION_INVALID");
+    }
+    let (mut registry, revision) = load_registry(store).map_err(|_| STORAGE)?;
+    if selected.iter().any(|id| {
+        !registry
+            .keys
+            .iter()
+            .any(|key| key.credential_id == *id && key.removed && !key.cleanup_required)
+    }) {
+        return Err("AI_KEY_NOT_REMOVED");
+    }
+    let cleared_operations = store
+        .clear_all_ai_activity_for_keys(&request.credential_ids)
+        .map_err(|error| match error {
+            StorageError::RevisionConflict => "AI_BUSY",
+            _ => STORAGE,
+        })?;
+    registry
+        .keys
+        .retain(|key| !selected.contains(&key.credential_id));
+    save_registry(store, &registry, revision)?;
+    Ok(DeleteRemovedKeyDataResult {
+        registry,
+        cleared_operations,
+    })
 }
 fn response(
     result: Result<Result<AiKeyRegistry, &'static str>, StorageError>,
@@ -570,6 +661,28 @@ pub fn clear_ai_primary(
         return CommandResponse::failure("AI_BUSY", "errors.aiBusy", true);
     };
     response(state.with_store(|store| Ok(clear_primary(store))))
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn delete_removed_ai_key_data(
+    window: WebviewWindow,
+    state: State<'_, DesktopState>,
+    gate: State<'_, AiRequestGate>,
+    request: DeleteRemovedKeyDataRequest,
+) -> CommandResponse<DeleteRemovedKeyDataResult> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    let Some(_lease) = gate.begin(Uuid::now_v7()) else {
+        return CommandResponse::failure("AI_BUSY", "errors.aiBusy", true);
+    };
+    match state.with_store(|store| Ok(delete_removed_key_data(store, &request))) {
+        Ok(Ok(value)) => CommandResponse::success(value),
+        Ok(Err("AI_BUSY")) => CommandResponse::failure("AI_BUSY", "errors.aiBusy", true),
+        Ok(Err(STORAGE)) | Err(_) => storage_unavailable(),
+        Ok(Err(code)) => CommandResponse::failure(code, "errors.aiKey", false),
+    }
 }
 
 #[cfg(test)]

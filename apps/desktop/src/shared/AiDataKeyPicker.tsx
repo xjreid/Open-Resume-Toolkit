@@ -1,17 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  formatKeyCreatedAt,
+  keyDisplayName,
+  providerName,
+  ProviderLogo,
+} from "./AiKeyPresentation";
 import type { Catalog, SavedKey } from "./AiWorkspace";
 
-const provider = (value: SavedKey["provider"]) =>
-  value === "openai"
-    ? "OpenAI"
-    : value === "anthropic"
-      ? "Anthropic"
-      : "Gemini";
-const title = (key: SavedKey) =>
-  key.name ||
-  (key.identificationNumber
-    ? `Key #${key.identificationNumber}`
-    : `Archived key · ${key.credentialId.slice(0, 8)}`);
 const model = (key: SavedKey, catalog: Catalog | null) =>
   catalog?.entries.find(
     (entry) =>
@@ -55,6 +50,7 @@ export function AiDataKeyPicker({
     setOpen(false);
     trigger.current?.focus();
   }
+  const selected = keys.find((key) => key.credentialId === value);
   return (
     <div
       className="ai-data-key-picker"
@@ -69,13 +65,20 @@ export function AiDataKeyPicker({
       <button
         ref={trigger}
         type="button"
-        className="button--secondary ai-data-key-trigger"
+        className="ai-data-key-trigger"
+        aria-label="Choose view"
         aria-haspopup="dialog"
         aria-expanded={open}
         disabled={disabled}
         onClick={() => setOpen(!open)}
       >
-        Choose view
+        <span>
+          <small>Activity view</small>
+          <strong>{selected ? keyDisplayName(selected) : "All keys"}</strong>
+        </span>
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="m5.5 7.5 4.5 4 4.5-4" />
+        </svg>
       </button>
       {open && (
         <div
@@ -90,17 +93,20 @@ export function AiDataKeyPicker({
           </div>
           <button
             type="button"
-            className={`ai-data-key-option${value === "" ? " ai-data-key-option--selected" : ""}`}
+            className={`ai-data-key-option ai-data-key-option--all${value === "" ? " ai-data-key-option--selected" : ""}`}
             aria-label="View activity for all keys"
             aria-pressed={value === ""}
             onClick={() => choose("")}
           >
-            <span className="ai-data-key-option-icon">∑</span>
-            <span>
+            <span className="ai-data-key-option-copy">
               <strong>All keys</strong>
               <small>General activity · Every provider and model</small>
             </span>
-            {value === "" && <span aria-hidden="true">✓</span>}
+            {value === "" && (
+              <span className="ai-data-key-option-check" aria-hidden="true">
+                ✓
+              </span>
+            )}
           </button>
           <div className="ai-data-key-options">
             {keys.map((key) => (
@@ -108,24 +114,27 @@ export function AiDataKeyPicker({
                 type="button"
                 key={key.credentialId}
                 className={`ai-data-key-option${value === key.credentialId ? " ai-data-key-option--selected" : ""}`}
-                aria-label={`View activity for ${title(key)}`}
+                aria-label={`View activity for ${keyDisplayName(key)}`}
                 aria-pressed={value === key.credentialId}
                 onClick={() => choose(key.credentialId)}
               >
-                <span className="ai-data-key-option-icon">
-                  {key.identificationNumber || "–"}
+                <span className="ai-data-key-option-logo">
+                  <ProviderLogo provider={key.provider} />
                 </span>
-                <span>
-                  <strong>{title(key)}</strong>
+                <span className="ai-data-key-option-copy">
+                  <strong>{keyDisplayName(key)}</strong>
                   <small>
-                    {provider(key.provider)} · {preset(key.preset)}:{" "}
+                    {providerName(key.provider)} · {preset(key.preset)}:{" "}
                     {model(key, catalog)}
                     {key.removed ? " · Removed" : ""}
                   </small>
                 </span>
-                {value === key.credentialId && (
-                  <span aria-hidden="true">✓</span>
-                )}
+                <span className="ai-data-key-option-meta">
+                  <small>{formatKeyCreatedAt(key.createdAt)}</small>
+                  {value === key.credentialId && (
+                    <span aria-hidden="true">✓</span>
+                  )}
+                </span>
               </button>
             ))}
           </div>
@@ -141,8 +150,8 @@ export function dataKeyDescription(
 ) {
   return key
     ? {
-        title: title(key),
-        detail: `${provider(key.provider)} · ${preset(key.preset)}: ${model(key, catalog)}${key.removed ? " · Removed" : ""}`,
+        title: keyDisplayName(key),
+        detail: `${providerName(key.provider)} · ${preset(key.preset)}: ${model(key, catalog)}${key.removed ? " · Removed" : ""}`,
       }
     : {
         title: "All keys",

@@ -55,6 +55,20 @@ fn normalize_activity_months(mut months: Vec<AiActivityMonth>) -> Option<Vec<AiA
     Some(months)
 }
 
+fn normalize_credential_ids(credential_ids: Option<Vec<Uuid>>) -> Option<Option<Vec<Uuid>>> {
+    let Some(ids) = credential_ids else {
+        return Some(None);
+    };
+    let unique = ids
+        .iter()
+        .copied()
+        .collect::<std::collections::HashSet<_>>();
+    if ids.is_empty() || ids.len() > 1_000 || unique.len() != ids.len() {
+        return None;
+    }
+    Some(Some(ids))
+}
+
 #[cfg(test)]
 mod key_budget_tests {
     use super::*;
@@ -658,7 +672,7 @@ pub fn clear_ai_monitoring(
     window: WebviewWindow,
     state: State<'_, DesktopState>,
     months: Vec<AiActivityMonth>,
-    credential_id: Option<Uuid>,
+    credential_ids: Option<Vec<Uuid>>,
 ) -> CommandResponse<u64> {
     if window.label() != "main" {
         return window_not_authorized();
@@ -666,11 +680,20 @@ pub fn clear_ai_monitoring(
     let Some(months) = normalize_activity_months(months) else {
         return CommandResponse::failure("AI_PERIOD_INVALID", "errors.aiPeriodInvalid", false);
     };
+    let Some(credential_ids) = normalize_credential_ids(credential_ids) else {
+        return CommandResponse::failure(
+            "AI_KEY_SELECTION_INVALID",
+            "errors.aiPeriodInvalid",
+            false,
+        );
+    };
     let ranges = months
         .iter()
         .map(|month| (month.from_unix_ms, month.to_unix_ms))
         .collect::<Vec<_>>();
-    match state.with_store(|store| store.clear_ai_activity_ranges_for_key(&ranges, credential_id)) {
+    match state.with_store(|store| {
+        store.clear_ai_activity_ranges_for_keys(&ranges, credential_ids.as_deref())
+    }) {
         Ok(cleared) => CommandResponse::success(cleared),
         Err(ort_storage::StorageError::RevisionConflict) => {
             CommandResponse::failure("AI_BUSY", "errors.aiBusy", true)
@@ -684,13 +707,20 @@ pub async fn export_ai_monitoring(
     window: WebviewWindow,
     months: Vec<AiActivityMonth>,
     time_zone: String,
-    credential_id: Option<Uuid>,
+    credential_ids: Option<Vec<Uuid>>,
 ) -> CommandResponse<String> {
     if window.label() != "main" {
         return window_not_authorized();
     }
     let Some(months) = normalize_activity_months(months) else {
         return CommandResponse::failure("AI_PERIOD_INVALID", "errors.aiPeriodInvalid", false);
+    };
+    let Some(credential_ids) = normalize_credential_ids(credential_ids) else {
+        return CommandResponse::failure(
+            "AI_KEY_SELECTION_INVALID",
+            "errors.aiPeriodInvalid",
+            false,
+        );
     };
     let app = window.app_handle().clone();
     let state = app.state::<DesktopState>();
@@ -702,19 +732,19 @@ pub async fn export_ai_monitoring(
         let month_values = months
             .iter()
             .map(|month| {
-                let summary = store.ai_monitoring_summary_for_key(
+                let summary = store.ai_monitoring_summary_for_keys(
                     month.from_unix_ms,
                     month.to_unix_ms,
                     &time_zone,
                     AiBucketSize::Day,
-                    credential_id,
+                    credential_ids.as_deref(),
                 )?;
                 Ok(json!({ "month": month.label, "summary": summary }))
             })
             .collect::<Result<Vec<_>, ort_storage::StorageError>>()?;
         serde_json::to_vec(&json!({
-            "schemaVersion": 1,
-            "selectedCredentialId": credential_id,
+            "schemaVersion": 2,
+            "selectedCredentialIds": credential_ids,
             "timeZone": time_zone,
             "selectedMonths": months.iter().map(|month| &month.label).collect::<Vec<_>>(),
             "months": month_values,

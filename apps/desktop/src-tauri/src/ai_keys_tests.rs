@@ -119,7 +119,12 @@ fn renamed_keys_keep_identity_and_primary_and_accept_default_reset() {
     )
     .unwrap();
     assert_eq!(renamed.keys[0].name.as_deref(), Some("Personal"));
-    assert_eq!(renamed.keys[0].identification_number, 1);
+    assert!(
+        renamed.keys[0]
+            .created_at
+            .parse::<jiff::Timestamp>()
+            .is_ok()
+    );
     assert_eq!(renamed.primary_credential_id, Some(id));
     assert_eq!(renamed.keys[0].provider, "openai");
     assert_eq!(
@@ -158,9 +163,37 @@ fn add(store: &EncryptedStore, vault: &TestVault, provider: &str) -> AiKeyRegist
         AddAiKeyRequest {
             provider: provider.into(),
             api_key: "synthetic-provider-key".into(),
+            name: None,
         },
     )
     .unwrap()
+}
+#[test]
+fn adding_a_key_saves_an_optional_trimmed_name() {
+    let (_temp, store, vault) = fixture();
+    let named = add_key(
+        &store,
+        &vault,
+        AddAiKeyRequest {
+            provider: "openai".into(),
+            api_key: "synthetic-provider-key".into(),
+            name: Some("  Research key  ".into()),
+        },
+    )
+    .unwrap();
+    assert_eq!(named.keys[0].name.as_deref(), Some("Research key"));
+
+    let unnamed = add_key(
+        &store,
+        &vault,
+        AddAiKeyRequest {
+            provider: "gemini".into(),
+            api_key: "synthetic-provider-key".into(),
+            name: Some("   ".into()),
+        },
+    )
+    .unwrap();
+    assert!(unnamed.keys[1].name.is_none());
 }
 fn action(
     store: &EncryptedStore,
@@ -187,7 +220,12 @@ fn legacy_key_keeps_identity_provider_and_active_or_paused_state() {
         )
         .unwrap();
         assert_eq!(registry.keys[0].credential_id, id);
-        assert_eq!(registry.keys[0].identification_number, 1);
+        assert!(
+            registry.keys[0]
+                .created_at
+                .parse::<jiff::Timestamp>()
+                .is_ok()
+        );
         assert_eq!(registry.keys[0].provider, "openai");
         assert_eq!(registry.keys[0].paused, mode == "no_ai");
         assert_eq!(
@@ -196,8 +234,49 @@ fn legacy_key_keeps_identity_provider_and_active_or_paused_state() {
         );
     }
 }
+
 #[test]
-fn adding_keys_never_overwrites_primary_or_reuses_numbers_or_serializes_secrets() {
+fn numbered_rosters_migrate_once_to_persisted_creation_timestamps() {
+    let (_temp, store, _vault) = fixture();
+    let id = Uuid::now_v7();
+    store
+        .save_setting(
+            SETTING,
+            None,
+            &json!({
+                "keys": [{
+                    "credentialId": id,
+                    "identificationNumber": 1,
+                    "provider": "openai",
+                    "preset": "balanced",
+                    "paused": false,
+                    "removed": false,
+                    "cleanupRequired": false
+                }],
+                "primaryCredentialId": id,
+                "nextIdentificationNumber": 2
+            }),
+        )
+        .unwrap();
+
+    let registry = load_registry(&store).unwrap().0;
+    assert!(
+        registry.keys[0]
+            .created_at
+            .parse::<jiff::Timestamp>()
+            .is_ok()
+    );
+    let persisted = store.load_setting(SETTING).unwrap().unwrap().value;
+    assert!(persisted.get("nextIdentificationNumber").is_none());
+    assert!(persisted["keys"][0].get("identificationNumber").is_none());
+    assert_eq!(
+        persisted["keys"][0]["createdAt"],
+        registry.keys[0].created_at
+    );
+}
+
+#[test]
+fn adding_keys_assigns_creation_dates_without_serializing_secrets() {
     let (_temp, store, vault) = fixture();
     let first = add(&store, &vault, "openai").keys[0].credential_id;
     assert!(
@@ -210,11 +289,11 @@ fn adding_keys_never_overwrites_primary_or_reuses_numbers_or_serializes_secrets(
     action(&store, &vault, first, AiKeyAction::SelectPrimary);
     let second = add(&store, &vault, "anthropic");
     assert_eq!(second.primary_credential_id, Some(first));
-    assert_eq!(second.keys[1].identification_number, 2);
+    assert!(second.keys[1].created_at.parse::<jiff::Timestamp>().is_ok());
     assert_eq!(vault.secrets.lock().unwrap().len(), 2);
     action(&store, &vault, first, AiKeyAction::Remove);
     let third = add(&store, &vault, "openai");
-    assert_eq!(third.keys[2].identification_number, 3);
+    assert!(third.keys[2].created_at.parse::<jiff::Timestamp>().is_ok());
     assert!(third.keys[0].removed);
     assert_ne!(third.keys[0].credential_id, third.keys[2].credential_id);
     assert!(third.primary_credential_id.is_none());
@@ -226,6 +305,38 @@ fn adding_keys_never_overwrites_primary_or_reuses_numbers_or_serializes_secrets(
         .to_string();
     assert!(!saved.contains("synthetic-provider-key"));
     assert!(!saved.contains("apiKey"));
+    assert!(!saved.contains("identificationNumber"));
+    assert!(!saved.contains("nextIdentificationNumber"));
+}
+
+#[test]
+fn removed_key_data_deletion_rejects_saved_keys_and_forgets_only_removed_tombstones() {
+    let (_temp, store, vault) = fixture();
+    let removed = add(&store, &vault, "openai").keys[0].credential_id;
+    let active = add(&store, &vault, "anthropic").keys[1].credential_id;
+    action(&store, &vault, removed, AiKeyAction::Remove);
+
+    assert_eq!(
+        delete_removed_key_data(
+            &store,
+            &DeleteRemovedKeyDataRequest {
+                credential_ids: vec![active],
+            },
+        )
+        .unwrap_err(),
+        "AI_KEY_NOT_REMOVED"
+    );
+    let deleted = delete_removed_key_data(
+        &store,
+        &DeleteRemovedKeyDataRequest {
+            credential_ids: vec![removed],
+        },
+    )
+    .unwrap();
+    assert_eq!(deleted.cleared_operations, 0);
+    assert_eq!(deleted.registry.keys.len(), 1);
+    assert_eq!(deleted.registry.keys[0].credential_id, active);
+    assert!(!deleted.registry.keys[0].removed);
 }
 #[test]
 fn primary_switch_pause_and_unpause_have_no_implicit_failover() {
@@ -374,7 +485,8 @@ fn partial_vault_write_retains_a_removable_disabled_address() {
             &vault,
             AddAiKeyRequest {
                 provider: "gemini".into(),
-                api_key: "synthetic-provider-key".into()
+                api_key: "synthetic-provider-key".into(),
+                name: None,
             }
         )
         .unwrap_err(),
@@ -424,13 +536,13 @@ fn failed_removal_clears_primary_and_can_be_retried() {
     assert!(action(&store, &vault, id, AiKeyAction::Remove).keys[0].removed);
 }
 #[test]
-fn duplicate_numbers_and_paused_primary_fail_closed() {
+fn invalid_creation_dates_and_paused_primary_fail_closed() {
     let (_temp, store, vault) = fixture();
     add(&store, &vault, "openai");
     let mut registry = add(&store, &vault, "gemini");
-    registry.keys[1].identification_number = 1;
+    registry.keys[1].created_at = "not-a-date".into();
     assert!(registry.validate().is_err());
-    registry.keys[1].identification_number = 2;
+    registry.keys[1].created_at = jiff::Timestamp::now().to_string();
     registry.primary_credential_id = Some(registry.keys[0].credential_id);
     registry.keys[0].paused = true;
     assert!(registry.validate().is_err());

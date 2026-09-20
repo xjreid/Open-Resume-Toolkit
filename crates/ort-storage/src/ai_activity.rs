@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use jiff::{Timestamp, ToSpan, civil::Weekday};
 use ort_ai::{OperationType, Price, Provider, Usage};
-use rusqlite::{OptionalExtension, TransactionBehavior, params};
+use rusqlite::{OptionalExtension, TransactionBehavior, params, params_from_iter, types::Value};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -1290,8 +1290,41 @@ impl EncryptedStore {
         bucket_size: AiBucketSize,
         credential_id: Option<Uuid>,
     ) -> Result<AiMonitoringSummary, StorageError> {
+        let selected = credential_id.map(|id| [id]);
+        self.ai_monitoring_summary_for_keys(
+            from_unix_ms,
+            to_unix_ms,
+            time_zone,
+            bucket_size,
+            selected.as_ref().map(<[Uuid; 1]>::as_slice),
+        )
+    }
+
+    /// Aggregates a non-empty set of credentials, or all credentials when the
+    /// selection is `None`, including removed-key history.
+    /// # Errors
+    /// Rejects invalid periods, empty/duplicate/oversized selections,
+    /// persisted usage, or overflow.
+    #[allow(clippy::too_many_lines)]
+    pub fn ai_monitoring_summary_for_keys(
+        &self,
+        from_unix_ms: i64,
+        to_unix_ms: i64,
+        time_zone: &str,
+        bucket_size: AiBucketSize,
+        credential_ids: Option<&[Uuid]>,
+    ) -> Result<AiMonitoringSummary, StorageError> {
         if from_unix_ms < 0 || from_unix_ms >= to_unix_ms {
             return Err(StorageError::InvalidData);
+        }
+        if let Some(ids) = credential_ids {
+            let unique = ids
+                .iter()
+                .copied()
+                .collect::<std::collections::HashSet<_>>();
+            if ids.is_empty() || ids.len() > 1_000 || unique.len() != ids.len() {
+                return Err(StorageError::InvalidData);
+            }
         }
         Timestamp::from_millisecond(to_unix_ms)
             .map_err(|_| StorageError::InvalidData)?
@@ -1301,44 +1334,54 @@ impl EncryptedStore {
             .connection
             .lock()
             .map_err(|_| StorageError::Unavailable)?;
-        let mut statement = connection
-            .prepare(
-                "SELECT a.operation_id, a.provider, a.status, a.usage_json, a.usage_complete,
+        let mut sql = String::from(
+            "SELECT a.operation_id, a.provider, a.status, a.usage_json, a.usage_complete,
                     a.settled_cost_micros, a.reserved_cost_micros, a.currency,
                     a.started_at_unix_ms, COALESCE(a.effective_model, a.requested_model),
                     a.preset_version, o.operation_type, a.credential_id
              FROM ai_attempts a JOIN ai_operations o ON o.operation_id = a.operation_id
              WHERE a.profile_id = ?1 AND a.started_at_unix_ms >= ?2
-             AND a.started_at_unix_ms < ?3 AND (?4 IS NULL OR a.credential_id = ?4)
-             ORDER BY a.started_at_unix_ms, a.attempt_id",
-            )
+             AND a.started_at_unix_ms < ?3",
+        );
+        let mut query_params = vec![
+            Value::Text(self.manifest.profile_id.to_string()),
+            Value::Integer(from_unix_ms),
+            Value::Integer(to_unix_ms),
+        ];
+        if let Some(ids) = credential_ids {
+            sql.push_str(" AND a.credential_id IN (");
+            for (index, id) in ids.iter().enumerate() {
+                if index != 0 {
+                    sql.push(',');
+                }
+                sql.push('?');
+                sql.push_str(&(index + 4).to_string());
+                query_params.push(Value::Text(id.to_string()));
+            }
+            sql.push(')');
+        }
+        sql.push_str(" ORDER BY a.started_at_unix_ms, a.attempt_id");
+        let mut statement = connection
+            .prepare(&sql)
             .map_err(|_| StorageError::Unavailable)?;
         let rows = statement
-            .query_map(
-                params![
-                    self.manifest.profile_id.to_string(),
-                    from_unix_ms,
-                    to_unix_ms,
-                    credential_id.map(|id| id.to_string())
-                ],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, Option<Vec<u8>>>(3)?,
-                        row.get::<_, i64>(4)?,
-                        row.get::<_, Option<i64>>(5)?,
-                        row.get::<_, i64>(6)?,
-                        row.get::<_, String>(7)?,
-                        row.get::<_, i64>(8)?,
-                        row.get::<_, String>(9)?,
-                        row.get::<_, String>(10)?,
-                        row.get::<_, String>(11)?,
-                        row.get::<_, String>(12)?,
-                    ))
-                },
-            )
+            .query_map(params_from_iter(query_params), |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<Vec<u8>>>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, Option<i64>>(5)?,
+                    row.get::<_, i64>(6)?,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, i64>(8)?,
+                    row.get::<_, String>(9)?,
+                    row.get::<_, String>(10)?,
+                    row.get::<_, String>(11)?,
+                    row.get::<_, String>(12)?,
+                ))
+            })
             .map_err(|_| StorageError::Unavailable)?;
         let mut summary = AiMonitoringSummary::default();
         let mut operations = std::collections::HashSet::new();
@@ -1471,6 +1514,73 @@ impl EncryptedStore {
         self.clear_ai_activity_ranges_for_key(&[(from_unix_ms, to_unix_ms)], credential_id)
     }
 
+    /// Atomically clears all terminal activity associated with the selected
+    /// credential identities. Durable lifetime totals and guardrail counters
+    /// are preserved.
+    /// # Errors
+    /// Rejects an empty, duplicate, or oversized selection and any matching
+    /// active operation.
+    pub fn clear_all_ai_activity_for_keys(
+        &self,
+        credential_ids: &[Uuid],
+    ) -> Result<u64, StorageError> {
+        if credential_ids.is_empty() || credential_ids.len() > 1_000 {
+            return Err(StorageError::InvalidData);
+        }
+        let unique = credential_ids
+            .iter()
+            .copied()
+            .collect::<std::collections::HashSet<_>>();
+        if unique.len() != credential_ids.len() {
+            return Err(StorageError::InvalidData);
+        }
+        let mut connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let tx = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|_| StorageError::Unavailable)?;
+        let profile = self.manifest.profile_id.to_string();
+        for credential_id in credential_ids {
+            let active: i64 = tx
+                .query_row(
+                    "SELECT COUNT(*) FROM ai_operations WHERE profile_id = ?1
+                    AND status = 'active' AND EXISTS (
+                        SELECT 1 FROM ai_attempts a
+                        WHERE a.operation_id = ai_operations.operation_id
+                        AND a.credential_id = ?2
+                    )",
+                    params![&profile, credential_id.to_string()],
+                    |row| row.get(0),
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+            if active != 0 {
+                return Err(StorageError::RevisionConflict);
+            }
+        }
+        preserve_lifetime_totals(&tx, &profile)?;
+        let mut changed = 0_u64;
+        for credential_id in credential_ids {
+            let key_changed = tx
+                .execute(
+                    "DELETE FROM ai_operations WHERE profile_id = ?1
+                    AND status != 'active' AND EXISTS (
+                        SELECT 1 FROM ai_attempts a
+                        WHERE a.operation_id = ai_operations.operation_id
+                        AND a.credential_id = ?2
+                    )",
+                    params![&profile, credential_id.to_string()],
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+            changed = changed
+                .checked_add(u64::try_from(key_changed).map_err(|_| StorageError::InvalidData)?)
+                .ok_or(StorageError::InvalidData)?;
+        }
+        tx.commit().map_err(|_| StorageError::Unavailable)?;
+        Ok(changed)
+    }
+
     /// Atomically clears terminal operations in non-overlapping ranges for one
     /// credential, or all credentials. Durable lifetime totals and guardrail
     /// counters are preserved.
@@ -1481,8 +1591,32 @@ impl EncryptedStore {
         ranges: &[(i64, i64)],
         credential_id: Option<Uuid>,
     ) -> Result<u64, StorageError> {
+        let selected = credential_id.map(|id| [id]);
+        self.clear_ai_activity_ranges_for_keys(ranges, selected.as_ref().map(<[Uuid; 1]>::as_slice))
+    }
+
+    /// Atomically clears terminal activity in non-overlapping ranges for a
+    /// non-empty set of credentials, or all credentials when the selection is
+    /// `None`. Durable lifetime totals and guardrail counters are preserved.
+    /// # Errors
+    /// Rejects invalid ranges, empty/duplicate/oversized selections, or any
+    /// matching active operation.
+    pub fn clear_ai_activity_ranges_for_keys(
+        &self,
+        ranges: &[(i64, i64)],
+        credential_ids: Option<&[Uuid]>,
+    ) -> Result<u64, StorageError> {
         if ranges.is_empty() || ranges.len() > 1_200 {
             return Err(StorageError::InvalidData);
+        }
+        if let Some(ids) = credential_ids {
+            let unique = ids
+                .iter()
+                .copied()
+                .collect::<std::collections::HashSet<_>>();
+            if ids.is_empty() || ids.len() > 1_000 || unique.len() != ids.len() {
+                return Err(StorageError::InvalidData);
+            }
         }
         let mut ranges = ranges.to_vec();
         ranges.sort_unstable();
@@ -1499,34 +1633,43 @@ impl EncryptedStore {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|_| StorageError::Unavailable)?;
         let profile = self.manifest.profile_id.to_string();
+        let selected = credential_ids
+            .map(|ids| ids.iter().copied().map(Some).collect::<Vec<_>>())
+            .unwrap_or_else(|| vec![None]);
         for (from_unix_ms, to_unix_ms) in &ranges {
-            let active: i64 = tx
-                .query_row(
-                "SELECT COUNT(*) FROM ai_operations WHERE profile_id = ?1
-            AND started_at_unix_ms >= ?2 AND started_at_unix_ms < ?3 AND status = 'active'
-            AND (?4 IS NULL OR EXISTS (SELECT 1 FROM ai_attempts a WHERE a.operation_id = ai_operations.operation_id AND a.credential_id = ?4))",
-                params![&profile, from_unix_ms, to_unix_ms, credential_id.map(|id| id.to_string())],
-                |row| row.get(0),
-            )
-            .map_err(|_| StorageError::Unavailable)?;
-            if active != 0 {
-                return Err(StorageError::RevisionConflict);
+            for credential_id in &selected {
+                let active: i64 = tx
+                    .query_row(
+                    "SELECT COUNT(*) FROM ai_operations WHERE profile_id = ?1
+                AND started_at_unix_ms >= ?2 AND started_at_unix_ms < ?3 AND status = 'active'
+                AND (?4 IS NULL OR EXISTS (SELECT 1 FROM ai_attempts a WHERE a.operation_id = ai_operations.operation_id AND a.credential_id = ?4))",
+                    params![&profile, from_unix_ms, to_unix_ms, credential_id.map(|id| id.to_string())],
+                    |row| row.get(0),
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+                if active != 0 {
+                    return Err(StorageError::RevisionConflict);
+                }
             }
         }
         preserve_lifetime_totals(&tx, &profile)?;
         let mut changed = 0_u64;
         for (from_unix_ms, to_unix_ms) in ranges {
-            let range_changed = tx
-                .execute(
-                "DELETE FROM ai_operations WHERE profile_id = ?1
-            AND started_at_unix_ms >= ?2 AND started_at_unix_ms < ?3 AND status != 'active'
-            AND (?4 IS NULL OR EXISTS (SELECT 1 FROM ai_attempts a WHERE a.operation_id = ai_operations.operation_id AND a.credential_id = ?4))",
-                params![&profile, from_unix_ms, to_unix_ms, credential_id.map(|id| id.to_string())],
-            )
-            .map_err(|_| StorageError::Unavailable)?;
-            changed = changed
-                .checked_add(u64::try_from(range_changed).map_err(|_| StorageError::InvalidData)?)
-                .ok_or(StorageError::InvalidData)?;
+            for credential_id in &selected {
+                let range_changed = tx
+                    .execute(
+                    "DELETE FROM ai_operations WHERE profile_id = ?1
+                AND started_at_unix_ms >= ?2 AND started_at_unix_ms < ?3 AND status != 'active'
+                AND (?4 IS NULL OR EXISTS (SELECT 1 FROM ai_attempts a WHERE a.operation_id = ai_operations.operation_id AND a.credential_id = ?4))",
+                    params![&profile, from_unix_ms, to_unix_ms, credential_id.map(|id| id.to_string())],
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+                changed = changed
+                    .checked_add(
+                        u64::try_from(range_changed).map_err(|_| StorageError::InvalidData)?,
+                    )
+                    .ok_or(StorageError::InvalidData)?;
+            }
         }
         tx.commit().map_err(|_| StorageError::Unavailable)?;
         Ok(changed)
@@ -1994,6 +2137,28 @@ mod tests {
             .unwrap();
         assert_eq!(all.attempts, 2);
         assert_eq!(all.by_credential_id.len(), 2);
+        let selected_pair = store
+            .ai_monitoring_summary_for_keys(
+                0,
+                3000,
+                "UTC",
+                AiBucketSize::Day,
+                Some(&[first.credential_id, second.credential_id]),
+            )
+            .unwrap();
+        assert_eq!(selected_pair.attempts, 2);
+        assert_eq!(selected_pair.estimated_cost_micros, 140);
+        assert_eq!(selected_pair.by_credential_id.len(), 2);
+        assert_eq!(
+            store.ai_monitoring_summary_for_keys(
+                0,
+                3000,
+                "UTC",
+                AiBucketSize::Day,
+                Some(&[first.credential_id, first.credential_id]),
+            ),
+            Err(StorageError::InvalidData)
+        );
         let selected = store
             .ai_monitoring_summary_for_key(
                 0,
@@ -2021,6 +2186,10 @@ mod tests {
             80
         );
         assert_eq!(
+            store.ai_lifetime_spend_all().unwrap().get("USD"),
+            Some(&140)
+        );
+        assert_eq!(
             store
                 .ai_monitoring_summary_for_key(
                     0,
@@ -2033,16 +2202,36 @@ mod tests {
                 .attempts,
             0
         );
-        let active = preflight(20);
-        store.reserve_ai_attempt(&active).unwrap();
         assert_eq!(
             store
-                .clear_ai_activity_for_key(0, 3000, Some(second.credential_id))
+                .clear_ai_activity_ranges_for_keys(
+                    &[(0, 3000)],
+                    Some(&[second.credential_id, Uuid::from_u128(999)]),
+                )
                 .unwrap(),
             1
         );
         assert_eq!(
-            store.clear_ai_activity_for_key(0, 3000, Some(active.credential_id)),
+            store
+                .ai_monitoring_summary(0, 3000, "UTC", AiBucketSize::Day)
+                .unwrap()
+                .attempts,
+            0
+        );
+        assert_eq!(
+            store.ai_lifetime_spend_all().unwrap().get("USD"),
+            Some(&140)
+        );
+        let active = preflight(20);
+        store.reserve_ai_attempt(&active).unwrap();
+        assert_eq!(
+            store
+                .clear_all_ai_activity_for_keys(&[second.credential_id])
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            store.clear_all_ai_activity_for_keys(&[active.credential_id]),
             Err(StorageError::RevisionConflict)
         );
     }

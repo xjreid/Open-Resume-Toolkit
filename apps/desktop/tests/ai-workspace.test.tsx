@@ -19,11 +19,10 @@ const connection = {
   ok: true,
   value: {
     primaryCredentialId: "fixture-id",
-    nextIdentificationNumber: 3,
     keys: [
       {
         credentialId: "fixture-id",
-        identificationNumber: 1,
+        createdAt: "2026-09-01T12:00:00Z",
         provider: "openai",
         preset: "balanced",
         paused: false,
@@ -32,7 +31,7 @@ const connection = {
       },
       {
         credentialId: "second-id",
-        identificationNumber: 2,
+        createdAt: "2026-09-02T12:00:00Z",
         provider: "anthropic",
         preset: "balanced",
         paused: false,
@@ -182,7 +181,7 @@ async function click(label: string) {
 }
 
 it("requires an estimate review before the synthetic provider request", async () => {
-  await clickAccessible("Test key #1");
+  await clickAccessible("Test OpenAI key");
   expect(document.body.textContent).toContain(
     "Conservative maximum reservation: 0.1230 USD",
   );
@@ -208,7 +207,7 @@ it("requires an estimate review before the synthetic provider request", async ()
 });
 
 it("shows test and removal details in click-away popups outside key cards", async () => {
-  await clickAccessible("Test key #1");
+  await clickAccessible("Test OpenAI key");
   const testPopup = document.querySelector(
     '[aria-label="Confirm synthetic provider request"]',
   )!;
@@ -222,7 +221,7 @@ it("shows test and removal details in click-away popups outside key cards", asyn
     document.querySelector('[aria-label="Confirm synthetic provider request"]'),
   ).toBeNull();
 
-  await clickAccessible("Remove key #1");
+  await clickAccessible("Remove OpenAI key");
   const removePopup = document.querySelector(
     '[aria-label="Confirm provider credential removal"]',
   )!;
@@ -262,7 +261,7 @@ it("keeps cancellation available while a request is active", async () => {
       return Promise.resolve({ ok: true, value: true });
     return Promise.reject(new Error(`unexpected ${command}`));
   });
-  await clickAccessible("Test key #1");
+  await clickAccessible("Test OpenAI key");
   await click("Confirm and send test");
   await click("Cancel active test");
   expect(native.invoke).toHaveBeenCalledWith("cancel_ai_test");
@@ -293,7 +292,7 @@ it("surfaces a missing-usage failure without treating reserved exposure as zero"
       });
     return Promise.reject(new Error(`unexpected ${command}`));
   });
-  await clickAccessible("Test key #1");
+  await clickAccessible("Test OpenAI key");
   await click("Confirm and send test");
   expect(document.body.textContent).toContain("reservation remains unresolved");
 });
@@ -323,7 +322,7 @@ it("saves an inline cap on click-away without changing primary", async () => {
     }
     return previous(command, args);
   });
-  await clickAccessible("Edit key #2 spending limit");
+  await clickAccessible("Edit Anthropic key spending limit");
   expect(native.invoke).toHaveBeenCalledWith("load_ai_key_settings", {
     credentialId: "second-id",
   });
@@ -352,7 +351,7 @@ it("saves an inline cap on click-away without changing primary", async () => {
   expect(document.body.textContent).toContain("$0.25/$1.25");
   expect(document.body.textContent).toContain("20%");
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Key #1",
+    "OpenAI key",
   );
   expect(document.body.textContent).not.toContain("Calendar period");
 });
@@ -446,10 +445,24 @@ it("places metric and timeframe controls on the chart and settings below it", as
   expect(document.querySelector(".ai-data-heading")?.textContent).toContain(
     "All keysGeneral activity · Every provider and model",
   );
-  await click("Choose view");
+  await clickAccessible("Choose view");
   const picker = document.querySelector('[aria-label="Choose activity view"]')!;
   expect(picker.textContent).toContain("OpenAI");
   expect(picker.textContent).toContain("fixture-model");
+  const allKeys = picker.querySelector(
+    '[aria-label="View activity for all keys"]',
+  )!;
+  expect(allKeys.querySelector(".ai-data-key-option-logo")).toBeNull();
+  const openAiKey = picker.querySelector(
+    '[aria-label="View activity for OpenAI key"]',
+  )!;
+  expect(
+    openAiKey.querySelector(".ai-data-key-option-logo img"),
+  ).not.toBeNull();
+  expect(
+    openAiKey.querySelector(".ai-data-key-option-meta")?.textContent,
+  ).toContain("2026");
+  expect(picker.querySelector(".ai-data-key-option-icon")).toBeNull();
   const results = await axe.run(picker, {
     rules: { "color-contrast": { enabled: false } },
   });
@@ -531,12 +544,6 @@ it("labels the AI and Monitoring controls for accessibility", async () => {
     rules: { "color-contrast": { enabled: false } },
   });
   expect(result.violations.map((item) => item.id)).toEqual([]);
-  await click("Set primary key");
-  const selectionResult = await axe.run(document.getElementById("root")!, {
-    rules: { "color-contrast": { enabled: false } },
-  });
-  expect(selectionResult.violations.map((item) => item.id)).toEqual([]);
-  await click("Cancel selection");
   await click("Data");
   const dataResult = await axe.run(document.getElementById("root")!, {
     rules: { "color-contrast": { enabled: false } },
@@ -566,9 +573,9 @@ it("separates General and Data using the resume navigation pattern", async () =>
   expect(document.body.textContent).not.toContain("Connect your provider.");
   expect(document.querySelector(".ai-key-status")).toBeNull();
   expect(document.querySelector(".ai-key-primary")).toBeNull();
-  expect(document.querySelector('[aria-label="Pause key #1"]')).toBeNull();
+  expect(document.querySelector('[aria-label="Pause OpenAI key"]')).toBeNull();
   expect(
-    document.querySelector('[aria-label="Key #1 options"]'),
+    document.querySelector('[aria-label="Options for OpenAI key"]'),
   ).not.toBeNull();
 });
 
@@ -589,9 +596,9 @@ it("saves names immediately while typing and exits on click-away", async () => {
         })
       : previous(command, args),
   );
-  await clickAccessible("Rename key #1");
+  await clickAccessible("Rename OpenAI key");
   const input = document.querySelector<HTMLInputElement>(
-    '[aria-label="Key #1 name"]',
+    '[aria-label="Name for OpenAI key"]',
   )!;
   await typeInput(input, "Personal");
   expect(native.invoke).toHaveBeenCalledWith("rename_ai_key", {
@@ -599,15 +606,15 @@ it("saves names immediately while typing and exits on click-away", async () => {
   });
   expect(document.querySelector('[aria-label="Save key name"]')).toBeNull();
   expect(document.querySelector('[aria-label="Cancel rename"]')).toBeNull();
-  expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Personal · OpenAI",
-  );
+  expect(input.value).toBe("Personal");
   await act(async () => {
     input.blur();
   });
-  expect(document.querySelector('[aria-label="Key #1 name"]')).toBeNull();
+  expect(
+    document.querySelector('[aria-label="Name for OpenAI key"]'),
+  ).toBeNull();
   expect(document.querySelector(".ai-key-name")?.textContent).toBe("Personal");
-  await click("Choose view");
+  await clickAccessible("Choose view");
   expect(
     document.querySelector('[aria-label="View activity for Personal"]')
       ?.textContent,
@@ -625,9 +632,9 @@ it("serializes rapid name saves without replacing newer draft text", async () =>
         )
       : previous(command, args),
   );
-  await clickAccessible("Rename key #1");
+  await clickAccessible("Rename OpenAI key");
   const input = document.querySelector<HTMLInputElement>(
-    '[aria-label="Key #1 name"]',
+    '[aria-label="Name for OpenAI key"]',
   )!;
   await typeInput(input, "P");
   await typeInput(input, "Pe");
@@ -638,7 +645,7 @@ it("serializes rapid name saves without replacing newer draft text", async () =>
     value: {
       ...connection.value,
       keys: connection.value.keys.map((key) =>
-        key.identificationNumber === 1 ? { ...key, name } : key,
+        key.credentialId === "fixture-id" ? { ...key, name } : key,
       ),
     },
   });
@@ -665,31 +672,43 @@ it("reports failed name saves without pretending the name was saved", async () =
       ? Promise.resolve({ ok: false, error: { code: "STORAGE_UNAVAILABLE" } })
       : previous(command, args),
   );
-  await clickAccessible("Rename key #1");
+  await clickAccessible("Rename OpenAI key");
   const input = document.querySelector<HTMLInputElement>(
-    '[aria-label="Key #1 name"]',
+    '[aria-label="Name for OpenAI key"]',
   )!;
   await typeInput(input, "Unsaved");
   await act(async () => {
     input.blur();
   });
   expect(document.body.textContent).toContain("Name not saved");
-  expect(document.querySelector(".ai-key-name")?.textContent).toBe("Key #1");
+  expect(document.querySelector(".ai-key-name")?.textContent).toBe(
+    "OpenAI key",
+  );
 });
 
 it("shows all key information and controls without expansion", async () => {
   expect(document.querySelectorAll(".ai-key-card-layout")).toHaveLength(2);
+  const firstCard = document.querySelector<HTMLElement>(".ai-key-row")!;
+  expect(firstCard.querySelector(".ai-key-drag-handle")).toBeNull();
+  expect(firstCard.tabIndex).toBe(0);
+  expect(firstCard.querySelector(".ai-key-provider-logo img")).not.toBeNull();
+  expect(
+    firstCard.querySelector(".ai-key-identity-line")?.textContent,
+  ).toContain("OpenAI·OpenAI key");
+  expect(firstCard.textContent).not.toContain("Sep 1, 2026");
   expect(document.body.textContent).toContain("Balanced: fixture-model");
   expect(document.body.textContent).not.toContain("ORT-tested input limit");
   expect(document.body.textContent).not.toContain("Pricing & model details");
   expect(document.querySelector(".ai-key-customization")).toBeNull();
-  expect(document.querySelector('[aria-label="Customize key #1"]')).toBeNull();
+  expect(
+    document.querySelector('[aria-label="Customize OpenAI key"]'),
+  ).toBeNull();
   expect(
     document.querySelector(".ai-key-card-layout")?.firstElementChild?.className,
   ).toBe("ai-key-card-info");
   expect(
     document.querySelector<HTMLProgressElement>(
-      '[aria-label="Key #1 spending cap used"]',
+      '[aria-label="OpenAI key spending cap used"]',
     )!.value,
   ).toBe(0);
   expect(document.querySelector(".ai-key-card-budget")?.textContent).toContain(
@@ -793,7 +812,7 @@ it("fails closed when spending data cannot be loaded", async () => {
     )?.disabled,
   ).toBe(true);
   expect(
-    document.querySelector('[aria-label="Edit key #1 spending limit"]'),
+    document.querySelector('[aria-label="Edit OpenAI key spending limit"]'),
   ).toBeNull();
 });
 
@@ -806,21 +825,14 @@ async function typeInput(input: HTMLInputElement, value: string) {
     input.dispatchEvent(new dom.window.InputEvent("input", { bubbles: true }));
   });
 }
-async function selectCandidate(number: number) {
-  const radio = document.querySelector<HTMLInputElement>(
-    `[aria-label="Select key #${number} as primary"]`,
-  )!;
-  expect(radio.disabled).toBe(false);
-  await act(async () => {
-    radio.click();
-  });
-}
 async function clickAccessible(label: string) {
   if (
-    /^(Test|Pause|Unpause|Remove) key #\d+$/.test(label) &&
+    /^(Test|Pause|Unpause|Remove) .+$/.test(label) &&
     !document.querySelector(`button[aria-label="${label}"]`)
   ) {
-    await clickAccessible(`Key #${label.match(/#(\d+)/)![1]} options`);
+    await clickAccessible(
+      `Options for ${label.replace(/^(Test|Pause|Unpause|Remove) /, "")}`,
+    );
   }
   const button = document.querySelector<HTMLButtonElement>(
     `button[aria-label="${label}"]`,
@@ -832,7 +844,7 @@ async function clickAccessible(label: string) {
   });
 }
 async function chooseDataView(label: string) {
-  await click("Choose view");
+  await clickAccessible("Choose view");
   await clickAccessible(`View activity for ${label}`);
 }
 async function choose(label: string, value: string) {
@@ -856,111 +868,124 @@ function returnRegistry(value: typeof connection.value) {
     return previous(command, args);
   });
 }
-it("changes primary only after selection and Confirm", async () => {
+it("moves a key into the Active key bucket and returns the previous key to All keys", async () => {
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Key #1",
+    "OpenAI key",
   );
   returnRegistry({ ...connection.value, primaryCredentialId: "second-id" });
-  await click("Set primary key");
-  expect(
-    document.querySelector<HTMLButtonElement>(
-      '[aria-label="Confirm primary key"]',
-    )?.disabled,
-  ).toBe(false);
   await act(async () => {
     document
-      .querySelectorAll(".ai-key-row")[1]
-      .dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+      .querySelector<HTMLElement>('[aria-label="Anthropic key · Anthropic"]')!
+      .dispatchEvent(
+        new dom.window.KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+        }),
+      );
   });
-  expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Key #1",
-  );
-  expect(
-    native.invoke.mock.calls.some(([command]) => command === "change_ai_key"),
-  ).toBe(false);
-  expect(document.querySelectorAll(".ai-key-row--candidate")).toHaveLength(1);
-  await clickAccessible("Confirm primary key");
   expect(native.invoke).toHaveBeenCalledWith("change_ai_key", {
     request: { credentialId: "second-id", action: "select_primary" },
   });
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Key #2",
+    "Anthropic key",
   );
-  expect(document.querySelectorAll(".ai-key-row--primary")).toHaveLength(1);
   expect(
-    document.querySelector('input[name="primary-key-selection"]'),
-  ).toBeNull();
+    document.querySelector(".ai-key-bucket--available")?.textContent,
+  ).toContain("OpenAI key");
+  expect(document.querySelectorAll(".ai-key-row--active")).toHaveLength(1);
 });
 
-it("clears the primary when Confirm is clicked with no key selected", async () => {
+it("moves the active key back to All keys and leaves no active key", async () => {
   returnRegistry({ ...connection.value, primaryCredentialId: null });
-  await click("Set primary key");
-  expect(
-    document.querySelector<HTMLInputElement>(
-      '[aria-label="Select key #1 as primary"]',
-    )?.checked,
-  ).toBe(false);
-  await clickAccessible("Confirm primary key");
-  expect(native.invoke).toHaveBeenCalledWith("clear_ai_primary");
-  expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "No primary key selected",
-  );
-});
-
-it("allows a pending primary choice to be deselected before Confirm", async () => {
-  returnRegistry({ ...connection.value, primaryCredentialId: null });
-  await click("Set primary key");
-  await selectCandidate(2);
-  expect(document.querySelectorAll(".ai-key-row--candidate")).toHaveLength(1);
   await act(async () => {
     document
-      .querySelectorAll(".ai-key-row")[1]
-      .dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+      .querySelector<HTMLElement>('[aria-label="OpenAI key · OpenAI"]')!
+      .dispatchEvent(
+        new dom.window.KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+        }),
+      );
   });
-  expect(document.querySelectorAll(".ai-key-row--candidate")).toHaveLength(0);
-  await clickAccessible("Confirm primary key");
   expect(native.invoke).toHaveBeenCalledWith("clear_ai_primary");
-  expect(
-    native.invoke.mock.calls.some(([command]) => command === "change_ai_key"),
-  ).toBe(false);
-});
-
-it("cancels primary selection without changing the active key", async () => {
-  await click("Set primary key");
-  await selectCandidate(2);
-  await click("Cancel selection");
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Key #1",
+    "No active key selected",
   );
   expect(
-    native.invoke.mock.calls.some(([command]) => command === "change_ai_key"),
-  ).toBe(false);
+    document.querySelector(".ai-key-bucket--available")?.textContent,
+  ).toContain("OpenAI key");
 });
 
-it("invalidates a pending primary choice when that key is paused", async () => {
-  await click("Set primary key");
-  await selectCandidate(2);
-  returnRegistry({
-    ...connection.value,
-    keys: connection.value.keys.map((key) =>
-      key.identificationNumber === 2 ? { ...key, paused: true } : key,
-    ),
+it("uses a vertically bounded drag to replace the active key", async () => {
+  returnRegistry({ ...connection.value, primaryCredentialId: "second-id" });
+  const buckets = document.querySelector<HTMLElement>(".ai-key-buckets")!;
+  const active = document.querySelector<HTMLElement>(".ai-key-bucket--active")!;
+  const available = document.querySelector<HTMLElement>(
+    ".ai-key-bucket--available",
+  )!;
+  const card = document.querySelector<HTMLElement>(
+    '.ai-key-bucket--available [aria-label="Anthropic key · Anthropic"]',
+  )!;
+  buckets.getBoundingClientRect = () =>
+    ({ left: 20, right: 820, top: 20, bottom: 520 }) as DOMRect;
+  active.getBoundingClientRect = () =>
+    ({ left: 20, right: 820, top: 20, bottom: 180 }) as DOMRect;
+  available.getBoundingClientRect = () =>
+    ({ left: 20, right: 820, top: 194, bottom: 520 }) as DOMRect;
+  card.getBoundingClientRect = () =>
+    ({
+      left: 32,
+      right: 808,
+      top: 240,
+      bottom: 340,
+      width: 776,
+      height: 100,
+    }) as DOMRect;
+  const pointer = (type: string, clientY: number) => {
+    const event = new dom.window.MouseEvent(type, {
+      bubbles: true,
+      button: 0,
+      clientX: 400,
+      clientY,
+    });
+    Object.defineProperty(event, "pointerId", { value: 7 });
+    return event;
+  };
+  await act(async () => {
+    card.dispatchEvent(pointer("pointerdown", 260));
+    dom.window.dispatchEvent(pointer("pointermove", 90));
   });
-  await clickAccessible("Pause key #2");
-  expect(
-    document.querySelector<HTMLInputElement>(
-      '[aria-label="Select key #2 as primary"]',
-    )?.disabled,
-  ).toBe(true);
-  expect(
-    document.querySelector<HTMLButtonElement>(
-      '[aria-label="Confirm primary key"]',
-    )?.disabled,
-  ).toBe(false);
-  expect(document.querySelectorAll(".ai-key-row--candidate")).toHaveLength(0);
-  expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Key #1",
+  const ghost = document.querySelector<HTMLElement>(".ai-key-drag-ghost")!;
+  expect(ghost).not.toBeNull();
+  expect(ghost.style.left).toBe("32px");
+  expect(document.querySelector(".ai-key-bucket--drop-target")).toBe(active);
+  await act(async () => {
+    dom.window.dispatchEvent(pointer("pointerup", 90));
+  });
+  expect(native.invoke).toHaveBeenCalledWith("change_ai_key", {
+    request: { credentialId: "second-id", action: "select_primary" },
+  });
+});
+
+it("keeps All keys sorted by creation date", async () => {
+  const previous = native.invoke.getMockImplementation()!;
+  const unsorted = {
+    ...connection.value,
+    primaryCredentialId: null,
+    keys: [...connection.value.keys].reverse(),
+  };
+  native.invoke.mockImplementation((command: string, args?: unknown) =>
+    command === "load_ai_connection"
+      ? Promise.resolve({ ok: true, value: unsorted })
+      : previous(command, args),
   );
+  await act(async () => {
+    root.render(<AiWorkspace key="sorted-keys" blocked={false} />);
+  });
+  const ids = [
+    ...document.querySelectorAll(".ai-key-bucket--available .ai-key-row"),
+  ].map((row) => row.getAttribute("data-key-id"));
+  expect(ids).toEqual(["fixture-id", "second-id"]);
 });
 
 it("removes the limit back to Unlimited with an empty meter without clearing history", async () => {
@@ -1016,9 +1041,9 @@ it("removes the limit back to Unlimited with an empty meter without clearing his
 });
 
 it("rejects invalid inline limits without writing or changing the meter", async () => {
-  await clickAccessible("Edit key #1 spending limit");
+  await clickAccessible("Edit OpenAI key spending limit");
   const input = document.querySelector<HTMLInputElement>(
-    '[aria-label="Key #1 spending limit"]',
+    '[aria-label="OpenAI key spending limit"]',
   )!;
   await typeInput(input, "1.0000001");
   await act(async () => {
@@ -1032,12 +1057,12 @@ it("rejects invalid inline limits without writing or changing the meter", async 
   ).toBe(false);
   expect(
     document.querySelector<HTMLProgressElement>(
-      '[aria-label="Key #1 spending cap used"]',
+      '[aria-label="OpenAI key spending cap used"]',
     )?.value,
   ).toBe(0);
 });
 
-it("pausing the primary leaves no selected key; unpausing does not select one", async () => {
+it("pausing the active key leaves no active key; unpausing keeps it in All keys", async () => {
   returnRegistry({
     ...connection.value,
     primaryCredentialId: null,
@@ -1045,26 +1070,23 @@ it("pausing the primary leaves no selected key; unpausing does not select one", 
       key.credentialId === "fixture-id" ? { ...key, paused: true } : key,
     ),
   });
-  await clickAccessible("Pause key #1");
+  await clickAccessible("Pause OpenAI key");
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "No primary key selected",
+    "No active key selected",
   );
-  await click("Set primary key");
   expect(
-    document.querySelector<HTMLInputElement>(
-      '[aria-label="Select key #1 as primary"]',
-    )?.disabled,
-  ).toBe(true);
-  await click("Cancel selection");
-  expect(document.querySelector('[aria-label="Rename key #1"]')).toBeNull();
+    document.querySelector<HTMLElement>('[aria-label="OpenAI key · OpenAI"]')
+      ?.tabIndex,
+  ).toBe(-1);
+  expect(document.querySelector('[aria-label="Rename OpenAI key"]')).toBeNull();
   expect(
     document.querySelector<HTMLSelectElement>(
-      '[aria-label="Key #1 settings"] select',
+      '[aria-label="OpenAI key settings"] select',
     )?.disabled,
   ).toBe(true);
-  await clickAccessible("Key #1 options");
+  await clickAccessible("Options for OpenAI key");
   expect(
-    document.querySelector<HTMLButtonElement>('[aria-label="Test key #1"]')
+    document.querySelector<HTMLButtonElement>('[aria-label="Test OpenAI key"]')
       ?.disabled,
   ).toBe(false);
   await act(async () => {
@@ -1073,20 +1095,17 @@ it("pausing the primary leaves no selected key; unpausing does not select one", 
     );
   });
   returnRegistry({ ...connection.value, primaryCredentialId: null });
-  await clickAccessible("Unpause key #1");
+  await clickAccessible("Unpause OpenAI key");
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "No primary key selected",
+    "No active key selected",
   );
-  await click("Set primary key");
   expect(
-    document.querySelector<HTMLInputElement>(
-      '[aria-label="Select key #1 as primary"]',
-    )?.disabled,
-  ).toBe(false);
-  await click("Cancel selection");
+    document.querySelector<HTMLElement>('[aria-label="OpenAI key · OpenAI"]')
+      ?.tabIndex,
+  ).toBe(0);
 });
 
-it("removing the primary preserves its activity filter and never selects another key", async () => {
+it("removing the active key preserves its activity filter and never selects another key", async () => {
   returnRegistry({
     ...connection.value,
     primaryCredentialId: null,
@@ -1096,15 +1115,15 @@ it("removing the primary preserves its activity filter and never selects another
         : key,
     ),
   });
-  await clickAccessible("Remove key #1");
+  await clickAccessible("Remove OpenAI key");
   await click("Remove key");
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "No primary key selected",
+    "No active key selected",
   );
   expect(document.querySelectorAll(".ai-key-row")).toHaveLength(1);
-  await click("Choose view");
+  await clickAccessible("Choose view");
   expect(
-    document.querySelector('[aria-label="View activity for Key #1"]')
+    document.querySelector('[aria-label="View activity for Archived key"]')
       ?.textContent,
   ).toContain("OpenAI · Balanced: fixture-model · Removed");
   expect(native.invoke).toHaveBeenCalledWith("change_ai_key", {
@@ -1118,6 +1137,14 @@ it("requires both key and provider when adding; the provider is immutable afterw
   const password = form.querySelector<HTMLInputElement>(
     'input[type="password"]',
   )!;
+  const name = form.querySelector<HTMLInputElement>('input[name="keyName"]')!;
+  const providers = form.querySelector(".ai-provider-picker")!;
+  expect(
+    name.compareDocumentPosition(providers) &
+      dom.window.Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(name.placeholder).toBe("Enter a name");
+  expect(name.getAttribute("aria-label")).toBe("Key name");
   expect(
     form.querySelectorAll('.ai-provider-option[aria-pressed="true"]'),
   ).toHaveLength(0);
@@ -1136,10 +1163,11 @@ it("requires both key and provider when adding; the provider is immutable afterw
     )?.disabled,
   ).toBe(true);
   await clickAccessible("Show API key");
-  expect(form.querySelector<HTMLInputElement>("input")?.type).toBe("text");
+  expect(password.type).toBe("text");
   await clickAccessible("Hide API key");
-  expect(form.querySelector<HTMLInputElement>("input")?.type).toBe("password");
+  expect(password.type).toBe("password");
   await clickAccessible("Select Gemini");
+  expect(name.placeholder).toBe("Gemini key");
   expect(
     form
       .querySelector('[aria-label="Select Gemini"]')
@@ -1162,17 +1190,24 @@ it("requires both key and provider when adding; the provider is immutable afterw
     )?.disabled,
   ).toBe(true);
   await clickAccessible("Select Gemini");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      dom.window.HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(name, "Research key");
+    name.dispatchEvent(new dom.window.InputEvent("input", { bubbles: true }));
+  });
   const previous = native.invoke.getMockImplementation()!;
   const next = {
     ...connection.value,
-    nextIdentificationNumber: 4,
     keys: [
       ...connection.value.keys,
       {
         ...connection.value.keys[0],
         credentialId: "third-id",
-        identificationNumber: 3,
+        createdAt: "2026-09-03T12:00:00Z",
         provider: "gemini",
+        name: "Research key",
       },
     ],
   };
@@ -1183,16 +1218,20 @@ it("requires both key and provider when adding; the provider is immutable afterw
   );
   await click("Save key");
   expect(native.invoke).toHaveBeenCalledWith("add_ai_key", {
-    request: { provider: "gemini", apiKey: "test-only-key" },
+    request: {
+      provider: "gemini",
+      apiKey: "test-only-key",
+      name: "Research key",
+    },
   });
   expect(document.querySelector('[aria-label="Add new API key"]')).toBeNull();
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Key #1",
+    "OpenAI key",
   );
   expect(document.querySelectorAll(".ai-key-row")).toHaveLength(3);
   expect(
     document.querySelector(
-      '[aria-label="Key #3 · Gemini"] option[value="openai"]',
+      '[aria-label="Research key · Gemini"] option[value="openai"]',
     ),
   ).toBeNull();
   expect(document.body.textContent).not.toContain("test-only-key");
@@ -1219,13 +1258,18 @@ it("discards an unfinished add-key popup when clicking away", async () => {
 
   await clickAccessible("Add key");
   const reopened = document.querySelector('[aria-label="Add new API key"]')!;
-  expect(reopened.querySelector<HTMLInputElement>("input")?.value).toBe("");
+  expect(
+    reopened.querySelector<HTMLInputElement>('input[name="keyName"]')?.value,
+  ).toBe("");
+  expect(
+    reopened.querySelector<HTMLInputElement>('input[type="password"]')?.value,
+  ).toBe("");
   expect(
     reopened.querySelectorAll('.ai-provider-option[aria-pressed="true"]'),
   ).toHaveLength(0);
 });
 
-it("testing a non-primary key passes its identity through preview and confirmation without switching primary", async () => {
+it("testing a non-active key preserves the active key", async () => {
   const previous = native.invoke.getMockImplementation()!;
   native.invoke.mockImplementation((command: string, args?: unknown) =>
     command === "preview_ai_test"
@@ -1239,7 +1283,7 @@ it("testing a non-primary key passes its identity through preview and confirmati
         })
       : previous(command, args),
   );
-  await clickAccessible("Test key #2");
+  await clickAccessible("Test Anthropic key");
   expect(native.invoke).toHaveBeenCalledWith("preview_ai_test", {
     credentialId: "second-id",
   });
@@ -1249,21 +1293,42 @@ it("testing a non-primary key passes its identity through preview and confirmati
     expect.objectContaining({ credentialId: "second-id" }),
   );
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Key #1",
+    "OpenAI key",
   );
   expect(
     native.invoke.mock.calls.some(([command]) => command === "change_ai_key"),
   ).toBe(false);
 });
 
-it("shows cleanup-required keys as unusable after failed vault cleanup", async () => {
+it("keeps failed removals visible and requires an explicit retry", async () => {
   const previous = native.invoke.getMockImplementation()!;
+  let removalAttempts = 0;
   native.invoke.mockImplementation((command: string, args?: unknown) => {
-    if (command === "change_ai_key")
-      return Promise.resolve({
-        ok: false,
-        error: { code: "AI_CREDENTIAL_CLEANUP_REQUIRED" },
-      });
+    if (command === "change_ai_key") {
+      removalAttempts += 1;
+      return removalAttempts === 1
+        ? Promise.resolve({
+            ok: false,
+            error: { code: "AI_CREDENTIAL_CLEANUP_REQUIRED" },
+          })
+        : Promise.resolve({
+            ok: true,
+            value: {
+              ...connection.value,
+              primaryCredentialId: null,
+              keys: connection.value.keys.map((key) =>
+                key.credentialId === "fixture-id"
+                  ? {
+                      ...key,
+                      paused: true,
+                      removed: true,
+                      cleanupRequired: false,
+                    }
+                  : key,
+              ),
+            },
+          });
+    }
     if (command === "load_ai_connection")
       return Promise.resolve({
         ok: true,
@@ -1279,42 +1344,32 @@ it("shows cleanup-required keys as unusable after failed vault cleanup", async (
       });
     return previous(command, args);
   });
-  await clickAccessible("Remove key #1");
+  await clickAccessible("Remove OpenAI key");
   await click("Remove key");
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "No primary key selected",
+    "No active key selected",
   );
-  expect(document.body.textContent).toContain("Key cleanup could not finish");
-  await clickAccessible("Key #1 options");
+  expect(document.body.textContent).toContain("Removal failed");
   expect(
-    document.querySelector<HTMLButtonElement>('[aria-label="Unpause key #1"]')
-      ?.disabled,
-  ).toBe(true);
-  await act(async () => {
-    document.body.dispatchEvent(
-      new dom.window.Event("pointerdown", { bubbles: true }),
-    );
-  });
-  await click("Set primary key");
+    document.querySelector('[aria-label="OpenAI key · OpenAI"]')?.textContent,
+  ).toContain("Removal failed");
+  expect(document.querySelectorAll(".ai-key-row")).toHaveLength(2);
+  await clickAccessible("Options for OpenAI key");
+  await click("Retry removal");
+  expect(document.body.textContent).toContain("Retry removing OpenAI key?");
+  await click("Retry removal");
+  expect(removalAttempts).toBe(2);
   expect(
-    document.querySelector<HTMLInputElement>(
-      '[aria-label="Select key #1 as primary"]',
-    )?.disabled,
-  ).toBe(true);
-  await click("Cancel selection");
-  await clickAccessible("Key #1 options");
-  expect(
-    document.querySelector<HTMLButtonElement>('[aria-label="Remove key #1"]')
-      ?.disabled,
-  ).toBe(false);
+    document.querySelector('[aria-label="OpenAI key · OpenAI"]'),
+  ).toBeNull();
 });
 
 it("dismisses the key menu on outside click and Escape, with keyboard navigation", async () => {
-  await clickAccessible("Key #1 options");
+  await clickAccessible("Options for OpenAI key");
   const menu = document.querySelector('[role="menu"]')!;
   expect(menu.textContent).toBe("Test keyPauseRemove");
   expect(document.activeElement?.getAttribute("aria-label")).toBe(
-    "Test key #1",
+    "Test OpenAI key",
   );
   await act(async () => {
     document.activeElement?.dispatchEvent(
@@ -1325,7 +1380,7 @@ it("dismisses the key menu on outside click and Escape, with keyboard navigation
     );
   });
   expect(document.activeElement?.getAttribute("aria-label")).toBe(
-    "Pause key #1",
+    "Pause OpenAI key",
   );
   const results = await axe.run(menu, {
     rules: { "color-contrast": { enabled: false } },
@@ -1338,9 +1393,9 @@ it("dismisses the key menu on outside click and Escape, with keyboard navigation
   });
   expect(document.querySelector('[role="menu"]')).toBeNull();
   expect(document.activeElement?.getAttribute("aria-label")).toBe(
-    "Key #1 options",
+    "Options for OpenAI key",
   );
-  await clickAccessible("Key #1 options");
+  await clickAccessible("Options for OpenAI key");
   await act(async () => {
     document.body.dispatchEvent(
       new dom.window.Event("pointerdown", { bubbles: true }),
@@ -1357,16 +1412,16 @@ it("locks paused card settings but permits an explicit test without enabling the
       key.credentialId === "fixture-id" ? { ...key, paused: true } : key,
     ),
   });
-  await clickAccessible("Pause key #1");
+  await clickAccessible("Pause OpenAI key");
   const card = document.querySelector(".ai-key-row--paused")!;
-  expect(card.querySelector('[aria-label="Rename key #1"]')).toBeNull();
+  expect(card.querySelector('[aria-label="Rename OpenAI key"]')).toBeNull();
   expect(card.querySelector<HTMLSelectElement>("select")?.disabled).toBe(true);
   expect(
     card.querySelector<HTMLButtonElement>(
-      '[aria-label="Edit key #1 spending limit"]',
+      '[aria-label="Edit OpenAI key spending limit"]',
     )?.disabled,
   ).toBe(true);
-  await clickAccessible("Test key #1");
+  await clickAccessible("Test OpenAI key");
   expect(
     document.querySelector('[aria-label="Confirm synthetic provider request"]'),
   ).not.toBeNull();
@@ -1388,9 +1443,9 @@ it("blocks key use if a failed mutation cannot refresh backend state", async () 
       });
     return previous(command, args);
   });
-  await clickAccessible("Pause key #1");
+  await clickAccessible("Pause OpenAI key");
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Primary key unavailable",
+    "Active key unavailable",
   );
   expect(document.querySelectorAll(".ai-key-row")).toHaveLength(0);
   expect(
@@ -1425,7 +1480,7 @@ it("chooses export and clear months independently from the graph", async () => {
       return Promise.resolve({ ok: true, value: "exported" });
     return previous(command, args);
   });
-  await chooseDataView("Key #2");
+  await chooseDataView("Anthropic key");
   expect(native.invoke).toHaveBeenCalledWith(
     "load_ai_monitoring",
     expect.objectContaining({ credentialId: "second-id" }),
@@ -1435,8 +1490,12 @@ it("chooses export and clear months independently from the graph", async () => {
     document.querySelector('[aria-labelledby="ai-data-action-title"]')
       ?.textContent,
   ).toContain("Step 1 of 2Export activity");
-  await clickAccessible("Select Key #1");
+  await clickAccessible("Select OpenAI key");
+  await clickAccessible("Select Anthropic key");
+  await clickAccessible("Deselect Anthropic key");
+  await clickAccessible("Select Anthropic key");
   await click("Continue");
+  expect(document.body.textContent).toContain("2 keys · Only months with activity");
   expect(document.body.textContent).toContain("Only months with activity");
   await clickAccessible("Select September 2026");
   await clickAccessible("Select August 2026");
@@ -1444,7 +1503,7 @@ it("chooses export and clear months independently from the graph", async () => {
   expect(native.invoke).toHaveBeenCalledWith(
     "export_ai_monitoring",
     expect.objectContaining({
-      credentialId: "fixture-id",
+      credentialIds: ["fixture-id", "second-id"],
       months: [
         expect.objectContaining({ label: "2026-09" }),
         expect.objectContaining({ label: "2026-08" }),
@@ -1453,6 +1512,7 @@ it("chooses export and clear months independently from the graph", async () => {
   );
   await click("Choose activity…");
   await clickAccessible("Select all keys");
+  await clickAccessible("Select OpenAI key");
   await click("Continue");
   expect(
     document.querySelector('[aria-labelledby="ai-data-action-title"]')
@@ -1463,7 +1523,7 @@ it("chooses export and clear months independently from the graph", async () => {
   expect(native.invoke).toHaveBeenCalledWith(
     "clear_ai_monitoring",
     expect.objectContaining({
-      credentialId: null,
+      credentialIds: null,
       months: [expect.objectContaining({ label: "2026-09" })],
     }),
   );
@@ -1474,13 +1534,76 @@ it("chooses export and clear months independently from the graph", async () => {
   );
 });
 
+it("permanently deletes data only for removed keys after explicit confirmation", async () => {
+  const removedKey = {
+    ...connection.value.keys[0],
+    credentialId: "removed-id",
+    createdAt: "2026-08-01T12:00:00Z",
+    name: "Old Gemini",
+    provider: "gemini" as const,
+    paused: true,
+    removed: true,
+  };
+  const withRemoved = {
+    ...connection.value,
+    keys: [...connection.value.keys, removedKey],
+  };
+  const withoutRemoved = {
+    ...connection.value,
+    keys: [...connection.value.keys],
+  };
+  const previous = native.invoke.getMockImplementation()!;
+  native.invoke.mockImplementation((command: string, args?: unknown) => {
+    if (command === "load_ai_connection")
+      return Promise.resolve({ ok: true, value: withRemoved });
+    if (command === "delete_removed_ai_key_data")
+      return Promise.resolve({
+        ok: true,
+        value: { registry: withoutRemoved, clearedOperations: 4 },
+      });
+    return previous(command, args);
+  });
+  await act(async () => {
+    root.render(<AiWorkspace key="removed-key-data" blocked={false} />);
+  });
+
+  await click("Data");
+  await click("Choose removed keys…");
+  expect(
+    document.querySelector('[aria-label="Select removed key Old Gemini"]'),
+  ).not.toBeNull();
+  expect(
+    document.querySelector('[aria-label="Select removed key OpenAI key"]'),
+  ).toBeNull();
+  await clickAccessible("Select removed key Old Gemini");
+  await click("Continue");
+  expect(document.body.textContent).toContain("This cannot be undone");
+  expect(document.body.textContent).toContain(
+    "removed from the All keys data display",
+  );
+  expect(document.body.textContent).toContain(
+    "spending totals on My Keys will not change",
+  );
+  await click("Permanently delete data");
+  expect(native.invoke).toHaveBeenCalledWith("delete_removed_ai_key_data", {
+    request: { credentialIds: ["removed-id"] },
+  });
+  expect(document.body.textContent).toContain(
+    "All keys data was updated; My Keys spending totals were not changed",
+  );
+  await clickAccessible("Choose view");
+  expect(
+    document.querySelector('[aria-label="View activity for Old Gemini"]'),
+  ).toBeNull();
+});
+
 it("requires explicit scope choices and can cancel the activity workflow", async () => {
   await click("Choose activity…");
   const continueButton = [...document.querySelectorAll("button")].find(
     (button) => button.textContent === "Continue",
   ) as HTMLButtonElement;
   expect(continueButton.disabled).toBe(true);
-  await clickAccessible("Select Key #2");
+  await clickAccessible("Select Anthropic key");
   expect(continueButton.disabled).toBe(false);
   await click("Continue");
   const clearButton = document.querySelector<HTMLButtonElement>(
@@ -1568,7 +1691,7 @@ it("restarts only the expanded key cap while preserving lifetime spend and Data"
     "Lifetime spend and Data are unchanged.",
   );
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
-    "Key #1",
+    "OpenAI key",
   );
   expect(
     native.invoke.mock.calls.some(

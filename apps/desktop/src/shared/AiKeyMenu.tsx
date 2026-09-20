@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { keyDisplayName } from "./AiKeyPresentation";
 import type { SavedKey } from "./AiWorkspace";
 
 export function AiKeyMenu({
@@ -14,6 +15,7 @@ export function AiKeyMenu({
   onPause: () => void;
   onRemove: () => void;
 }) {
+  const label = keyDisplayName(saved);
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -77,7 +79,7 @@ export function AiKeyMenu({
         ref={trigger}
         type="button"
         className="ai-key-menu-trigger"
-        aria-label={`Key #${saved.identificationNumber} options`}
+        aria-label={`Options for ${label}`}
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={blocked}
@@ -99,12 +101,12 @@ export function AiKeyMenu({
         <div
           className="ai-key-menu-popover"
           role="menu"
-          aria-label={`Key #${saved.identificationNumber} actions`}
+          aria-label={`Actions for ${label}`}
         >
           <button
             type="button"
             role="menuitem"
-            aria-label={`Test key #${saved.identificationNumber}`}
+            aria-label={`Test ${label}`}
             disabled={saved.cleanupRequired}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => act(onTest)}
@@ -114,7 +116,7 @@ export function AiKeyMenu({
           <button
             type="button"
             role="menuitem"
-            aria-label={`${saved.paused ? "Unpause" : "Pause"} key #${saved.identificationNumber}`}
+            aria-label={`${saved.paused ? "Unpause" : "Pause"} ${label}`}
             disabled={saved.cleanupRequired}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => act(onPause)}
@@ -125,11 +127,11 @@ export function AiKeyMenu({
             type="button"
             role="menuitem"
             className="ai-key-menu-remove"
-            aria-label={`Remove key #${saved.identificationNumber}`}
+            aria-label={`Remove ${label}`}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => act(onRemove)}
           >
-            Remove
+            {saved.cleanupRequired ? "Retry removal" : "Remove"}
           </button>
         </div>
       )}

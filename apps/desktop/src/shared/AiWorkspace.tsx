@@ -1,10 +1,18 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { useEffect, useState, type FormEvent } from "react";
-import anthropicLogo from "../assets/providers/anthropic.svg";
-import geminiLogo from "../assets/providers/gemini.png";
-import openAiLogo from "../assets/providers/openai.svg";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { AiKeyName } from "./AiKeyName";
 import { AiKeyMenu } from "./AiKeyMenu";
+import {
+  keyDisplayName,
+  providerName,
+  ProviderLogo,
+} from "./AiKeyPresentation";
 import { AiGeneralSpending } from "./AiGeneralSpending";
 import { AiDataKeyPicker, dataKeyDescription } from "./AiDataKeyPicker";
 import {
@@ -14,11 +22,12 @@ import {
   type DataAction,
 } from "./AiDataActionDialog";
 import { AiKeyCustomization } from "./AiKeyCustomization";
+import { AiRemovedKeyDataDialog } from "./AiRemovedKeyDataDialog";
 import { AiUsageChart, totalTokens, type Usage } from "./AiUsageChart";
 
 export type SavedKey = {
   credentialId: string;
-  identificationNumber: number;
+  createdAt: string | null;
   name?: string | null;
   provider: "openai" | "anthropic" | "gemini";
   preset: "economy" | "balanced" | "quality";
@@ -29,27 +38,11 @@ export type SavedKey = {
 export type KeyRegistry = {
   keys: SavedKey[];
   primaryCredentialId: string | null;
-  nextIdentificationNumber: number;
 };
 type Response =
   | { ok: true; value: KeyRegistry }
   | { ok: false; error: { code: string } };
-const providerName = (provider: SavedKey["provider"]) =>
-  provider === "openai"
-    ? "OpenAI"
-    : provider === "anthropic"
-      ? "Anthropic"
-      : "Gemini";
-const keyName = (key: SavedKey) =>
-  key.name || `Key #${key.identificationNumber}`;
-const providerLogos: Record<SavedKey["provider"], string> = {
-  openai: openAiLogo,
-  anthropic: anthropicLogo,
-  gemini: geminiLogo,
-};
-function ProviderMark({ provider }: { provider: SavedKey["provider"] }) {
-  return <img src={providerLogos[provider]} alt="" aria-hidden="true" />;
-}
+const keyName = keyDisplayName;
 type Monitoring = {
   logicalOperations: number;
   attempts: number;
@@ -195,10 +188,12 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   const [addOpen, setAddOpen] = useState(false);
   const [keyFilter, setKeyFilter] = useState("");
   const [dataAction, setDataAction] = useState<DataAction | null>(null);
+  const [removedDataOpen, setRemovedDataOpen] = useState(false);
   const [testTarget, setTestTarget] = useState<SavedKey | null>(null);
   const [provider, setProvider] = useState<
     "" | "openai" | "anthropic" | "gemini"
   >("");
+  const [newKeyName, setNewKeyName] = useState("");
   const [key, setKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [working, setWorking] = useState(false);
@@ -218,8 +213,32 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   );
   const [retentionConfirm, setRetentionConfirm] = useState(false);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [selectingPrimary, setSelectingPrimary] = useState(false);
-  const [primaryCandidate, setPrimaryCandidate] = useState<string | null>(null);
+  const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  const [keyDropTarget, setKeyDropTarget] = useState<
+    "active" | "available" | null
+  >(null);
+  const [keyDragPosition, setKeyDragPosition] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    label: string;
+    provider: string;
+  } | null>(null);
+  const keyBuckets = useRef<HTMLDivElement>(null);
+  const activeKeyBucket = useRef<HTMLDivElement>(null);
+  const availableKeyBucket = useRef<HTMLDivElement>(null);
+  const keyPointerDrag = useRef<{
+    id: string;
+    pointerId: number;
+    startY: number;
+    offsetY: number;
+    originX: number;
+    width: number;
+    height: number;
+    source: "active" | "available";
+    dragging: boolean;
+  } | null>(null);
+  const keyDropTargetRef = useRef<"active" | "available" | null>(null);
 
   useEffect(() => {
     void invoke<{ ok: true; value: Catalog } | { ok: false }>("load_ai_catalog")
@@ -298,7 +317,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   }, []);
 
   async function clearMonitoring(
-    targetKey: string,
+    targetKeys: string[],
     selectedMonths: ActivityMonth[],
   ) {
     if (blocked || working) return;
@@ -313,7 +332,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
           fromUnixMs,
           toUnixMs,
         })),
-        credentialId: targetKey || null,
+        credentialIds: targetKeys.includes("") ? null : targetKeys,
       });
       if (response.ok) {
         setNotice(
@@ -442,7 +461,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   }
 
   async function exportMonitoring(
-    targetKey: string,
+    targetKeys: string[],
     selectedMonths: ActivityMonth[],
   ) {
     if (blocked || working) return;
@@ -458,7 +477,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
           toUnixMs,
         })),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        credentialId: targetKey || null,
+        credentialIds: targetKeys.includes("") ? null : targetKeys,
       });
       if (response.ok && response.value === "exported")
         setNotice(
@@ -475,6 +494,45 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     }
   }
 
+  async function deleteRemovedKeyData(credentialIds: string[]) {
+    if (blocked || working || credentialIds.length === 0) return;
+    setRemovedDataOpen(false);
+    setWorking(true);
+    setNotice("");
+    try {
+      const response = await invoke<
+        | {
+            ok: true;
+            value: { registry: KeyRegistry; clearedOperations: number };
+          }
+        | { ok: false; error: { code: string } }
+      >("delete_removed_ai_key_data", {
+        request: { credentialIds },
+      });
+      if (response.ok) {
+        applyRegistry(response.value.registry);
+        if (credentialIds.includes(keyFilter)) setKeyFilter("");
+        setMonitoring(null);
+        setNotice(
+          `${response.value.clearedOperations} completed AI operations permanently deleted. All keys data was updated; My Keys spending totals were not changed.`,
+        );
+        setMonitoringRevision((value) => value + 1);
+      } else {
+        setNotice(
+          response.error.code === "AI_BUSY"
+            ? "Finish or cancel the active AI request before deleting removed-key data."
+            : response.error.code === "AI_KEY_NOT_REMOVED"
+              ? "Only keys already removed from My Keys can have their data deleted."
+              : "Removed-key data could not be deleted.",
+        );
+      }
+    } catch {
+      setNotice("Removed-key data could not be deleted.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function addKey(event: FormEvent) {
     event.preventDefault();
     if (blocked || working || !registry || !key.trim() || !provider) return;
@@ -482,15 +540,16 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     setNotice("");
     try {
       const response = await invoke<Response>("add_ai_key", {
-        request: { provider, apiKey: key },
+        request: { provider, apiKey: key, name: newKeyName.trim() || null },
       });
       setKey("");
       if (response.ok) {
         applyRegistry(response.value);
         setAddOpen(false);
+        setNewKeyName("");
         setProvider("");
         setShowKey(false);
-        setNotice("Key saved securely. Use Set primary key to select it.");
+        setNotice("Key saved securely. Drag it into Active key when ready.");
       } else {
         await refreshKeys();
         setNotice(
@@ -525,12 +584,12 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
         applyRegistry(response.value);
         setNotice(
           action === "select_primary"
-            ? `Key #${target.identificationNumber} is now primary.`
+            ? `${keyName(target)} is now active.`
             : action === "remove"
-              ? `Key #${target.identificationNumber} removed. Its activity history remains.`
+              ? `${keyName(target)} removed. Its activity history remains.`
               : action === "pause"
-                ? `Key #${target.identificationNumber} paused.`
-                : `Key #${target.identificationNumber} unpaused. Use Set primary key to select it.`,
+                ? `${keyName(target)} paused.`
+                : `${keyName(target)} unpaused. Drag it into Active key to use it.`,
         );
         setMonitoringRevision((value) => value + 1);
         return true;
@@ -540,7 +599,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
           response.error.code === "AI_BUSY"
             ? "Finish or cancel the active test first."
             : response.error.code === "AI_CREDENTIAL_CLEANUP_REQUIRED"
-              ? "Key cleanup could not finish. The key is paused and cannot be primary. Retry removal."
+              ? "Removal failed. The key is paused and cannot be used. Open its menu and choose Retry removal."
               : "The key could not be updated. Check the credential vault and try again.",
         );
       }
@@ -552,58 +611,154 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     }
   }
 
-  useEffect(() => {
+  async function clearActiveKey() {
+    if (blocked || working) return false;
+    setWorking(true);
+    setNotice("");
+    try {
+      const response = await invoke<Response>("clear_ai_primary");
+      if (response.ok) {
+        applyRegistry(response.value);
+        setNotice("No active key is selected.");
+        setMonitoringRevision((value) => value + 1);
+        return true;
+      }
+      await refreshKeys();
+      setNotice("The active key could not be cleared. Try again.");
+    } catch {
+      await refreshKeys();
+      setNotice("The active key could not be cleared. Reload before retrying.");
+    } finally {
+      setWorking(false);
+    }
+    return false;
+  }
+
+  function clearKeyDrag() {
+    window.document.body.classList.remove("is-key-sorting");
+    keyPointerDrag.current = null;
+    keyDropTargetRef.current = null;
+    setDraggingKey(null);
+    setKeyDropTarget(null);
+    setKeyDragPosition(null);
+  }
+
+  async function moveKeyToBucket(
+    saved: SavedKey,
+    target: "active" | "available",
+  ) {
+    const isActive = saved.credentialId === primaryKey?.credentialId;
+    if (target === "active" && !isActive)
+      await changeKey(saved, "select_primary");
+    if (target === "available" && isActive) await clearActiveKey();
+  }
+
+  function startKeyDrag(
+    event: ReactPointerEvent<HTMLElement>,
+    saved: SavedKey,
+    source: "active" | "available",
+  ) {
     if (
-      primaryCandidate &&
-      !registry?.keys.some(
-        (key) =>
-          key.credentialId === primaryCandidate &&
-          !key.paused &&
-          !key.removed &&
-          !key.cleanupRequired,
+      event.button !== 0 ||
+      blocked ||
+      working ||
+      saved.cleanupRequired ||
+      (source === "available" && saved.paused)
+    )
+      return;
+    if (
+      (event.target as HTMLElement).closest(
+        "button, input, select, textarea, label, a, form, [role='menu'], [role='dialog']",
       )
     )
-      setPrimaryCandidate(null);
-  }, [registry, primaryCandidate]);
-  async function confirmPrimary() {
-    if (!primaryCandidate) {
-      if (blocked || working) return;
-      setWorking(true);
-      setNotice("");
-      try {
-        const response = await invoke<Response>("clear_ai_primary");
-        if (response.ok) {
-          applyRegistry(response.value);
-          setNotice("No primary key is selected.");
-          setSelectingPrimary(false);
-          setMonitoringRevision((value) => value + 1);
-        } else {
-          await refreshKeys();
-          setNotice("The primary key could not be cleared. Try again.");
-        }
-      } catch {
-        await refreshKeys();
-        setNotice(
-          "The primary key could not be cleared. Reload before retrying.",
-        );
-      } finally {
-        setWorking(false);
-      }
       return;
-    }
-    const target = registry?.keys.find(
-      (key) =>
-        key.credentialId === primaryCandidate &&
-        !key.paused &&
-        !key.removed &&
-        !key.cleanupRequired,
-    );
-    if (!target || blocked || working) return;
-    if (await changeKey(target, "select_primary")) {
-      setSelectingPrimary(false);
-      setPrimaryCandidate(null);
-    }
+    const bounds = event.currentTarget.getBoundingClientRect();
+    keyPointerDrag.current = {
+      id: saved.credentialId,
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      offsetY: event.clientY - bounds.top,
+      originX: bounds.left,
+      width: bounds.width,
+      height: bounds.height,
+      source,
+      dragging: false,
+    };
   }
+
+  useEffect(() => {
+    function moveKeyPointer(event: PointerEvent) {
+      const gesture = keyPointerDrag.current;
+      if (!gesture || gesture.pointerId !== event.pointerId) return;
+      if (!gesture.dragging) {
+        if (Math.abs(event.clientY - gesture.startY) < 6) return;
+        gesture.dragging = true;
+        setDraggingKey(gesture.id);
+        window.document.body.classList.add("is-key-sorting");
+      }
+      event.preventDefault();
+      const bounds = keyBuckets.current?.getBoundingClientRect();
+      const activeBounds = activeKeyBucket.current?.getBoundingClientRect();
+      const availableBounds =
+        availableKeyBucket.current?.getBoundingClientRect();
+      if (!bounds || !activeBounds || !availableBounds) return;
+      const minimumX = bounds.left;
+      const maximumX = Math.max(minimumX, bounds.right - gesture.width);
+      const minimumY = bounds.top;
+      const maximumY = Math.max(minimumY, bounds.bottom - gesture.height);
+      const splitY = (activeBounds.bottom + availableBounds.top) / 2;
+      const target = event.clientY < splitY ? "active" : "available";
+      keyDropTargetRef.current = target;
+      setKeyDropTarget(target);
+      const dragged = registry?.keys.find(
+        (saved) => saved.credentialId === gesture.id,
+      );
+      setKeyDragPosition({
+        x: Math.min(maximumX, Math.max(minimumX, gesture.originX)),
+        y: Math.min(
+          maximumY,
+          Math.max(minimumY, event.clientY - gesture.offsetY),
+        ),
+        width: gesture.width,
+        label: dragged ? keyName(dragged) : "API key",
+        provider: dragged ? providerName(dragged.provider) : "",
+      });
+    }
+
+    function finishKeyPointer(event: PointerEvent) {
+      const gesture = keyPointerDrag.current;
+      if (!gesture || gesture.pointerId !== event.pointerId) return;
+      const target = keyDropTargetRef.current;
+      const saved = registry?.keys.find(
+        (key) => key.credentialId === gesture.id,
+      );
+      if (gesture.dragging) {
+        if (saved && target && target !== gesture.source)
+          void moveKeyToBucket(saved, target);
+      }
+      clearKeyDrag();
+    }
+
+    function cancelKeyPointer(event: PointerEvent) {
+      if (keyPointerDrag.current?.pointerId === event.pointerId) clearKeyDrag();
+    }
+
+    function cancelKeyPointerOnBlur() {
+      if (keyPointerDrag.current) clearKeyDrag();
+    }
+
+    window.addEventListener("pointermove", moveKeyPointer, { passive: false });
+    window.addEventListener("pointerup", finishKeyPointer);
+    window.addEventListener("pointercancel", cancelKeyPointer);
+    window.addEventListener("blur", cancelKeyPointerOnBlur);
+    return () => {
+      window.document.body.classList.remove("is-key-sorting");
+      window.removeEventListener("pointermove", moveKeyPointer);
+      window.removeEventListener("pointerup", finishKeyPointer);
+      window.removeEventListener("pointercancel", cancelKeyPointer);
+      window.removeEventListener("blur", cancelKeyPointerOnBlur);
+    };
+  }, [blocked, registry, working]);
   function savedName(id: string, name: string | null) {
     setRegistry((current) =>
       current
@@ -618,12 +773,21 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   }
 
   const visibleKeys = registry?.keys.filter((key) => !key.removed) ?? [];
+  const removedKeys = registry?.keys.filter((key) => key.removed) ?? [];
+  const availableKeys = visibleKeys
+    .filter((key) => key.credentialId !== primaryKey?.credentialId)
+    .sort(
+      (left, right) =>
+        (Date.parse(left.createdAt ?? "") || 0) -
+          (Date.parse(right.createdAt ?? "") || 0) ||
+        left.credentialId.localeCompare(right.credentialId),
+    );
   const activityKeys = [...(registry?.keys ?? [])];
   for (const id of Object.keys(monitoring?.byCredentialId ?? {})) {
     if (!activityKeys.some((key) => key.credentialId === id))
       activityKeys.push({
         credentialId: id,
-        identificationNumber: 0,
+        createdAt: null,
         provider: "openai",
         preset: "balanced",
         paused: true,
@@ -639,6 +803,88 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     (saved) => saved.credentialId === keyFilter,
   );
   const activityView = dataKeyDescription(selectedActivityKey, catalog);
+
+  function renderKeyCard(saved: SavedKey, bucket: "active" | "available") {
+    const isActive = bucket === "active";
+    const dragDisabled =
+      blocked ||
+      working ||
+      saved.cleanupRequired ||
+      (!isActive && saved.paused);
+    return (
+      <div
+        className={`ai-key-row ai-key-row--draggable${saved.paused ? " ai-key-row--paused" : ""}${saved.cleanupRequired ? " ai-key-row--cleanup" : ""}${isActive ? " ai-key-row--active" : ""}${draggingKey === saved.credentialId ? " ai-key-row--dragging" : ""}`}
+        key={saved.credentialId}
+        data-key-id={saved.credentialId}
+        aria-label={`${keyName(saved)} · ${providerName(saved.provider)}`}
+        aria-description={
+          dragDisabled
+            ? undefined
+            : `Drag vertically or press Enter to move this key to ${isActive ? "All keys" : "Active key"}.`
+        }
+        tabIndex={dragDisabled ? -1 : 0}
+        onPointerDown={(event) =>
+          startKeyDrag(event, saved, isActive ? "active" : "available")
+        }
+        onKeyDown={(event) => {
+          if (
+            event.target === event.currentTarget &&
+            (event.key === "Enter" || event.key === " ") &&
+            !dragDisabled
+          ) {
+            event.preventDefault();
+            void moveKeyToBucket(saved, isActive ? "available" : "active");
+          }
+        }}
+      >
+        <AiKeyCustomization
+          saved={saved}
+          catalog={catalog}
+          blocked={blocked || working || saved.paused}
+          refreshRevision={monitoringRevision}
+          setWorking={setWorking}
+          onRegistry={applyRegistry}
+          onChanged={() => setMonitoringRevision((value) => value + 1)}
+          identity={
+            saved.paused ? (
+              <>
+                <strong className="ai-key-static-name">{keyName(saved)}</strong>
+                {saved.cleanupRequired && (
+                  <span className="ai-key-cleanup-status">Removal failed</span>
+                )}
+              </>
+            ) : (
+              <AiKeyName
+                saved={saved}
+                blocked={blocked || working}
+                workspaceBlocked={blocked}
+                setWorking={setWorking}
+                onSaved={savedName}
+              />
+            )
+          }
+          actions={
+            <AiKeyMenu
+              saved={saved}
+              blocked={blocked || working}
+              onTest={() => {
+                setRemoveConfirm(null);
+                void reviewTest(saved);
+              }}
+              onPause={() =>
+                void changeKey(saved, saved.paused ? "unpause" : "pause")
+              }
+              onRemove={() => {
+                setTestPreview(null);
+                setTestTarget(null);
+                setRemoveConfirm(saved.credentialId);
+              }}
+            />
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <section className="ai-workspace" aria-label="AI settings">
@@ -671,8 +917,8 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
               <div>
                 <h3 id="ai-connection-title">API keys</h3>
                 <p className="ai-help">
-                  Keys stay in your operating-system vault. Only the primary key
-                  is used for AI.
+                  Keys stay in your operating-system vault. Drag one into Active
+                  key to use it for AI.
                 </p>
               </div>
               <button
@@ -684,6 +930,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                 title="Add key"
                 onClick={() => {
                   setKey("");
+                  setNewKeyName("");
                   setProvider("");
                   setShowKey(false);
                   setAddOpen(true);
@@ -691,80 +938,6 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
               >
                 <span aria-hidden="true">+</span>
               </button>
-            </div>
-            <div
-              className={
-                primaryKey ? "ai-primary ai-primary--selected" : "ai-primary"
-              }
-              role="status"
-            >
-              <span
-                className={
-                  primaryKey ? "ai-badge ai-badge--active" : "ai-badge"
-                }
-              >
-                {keysUnavailable
-                  ? "Primary key unavailable"
-                  : !registry
-                    ? "Loading keys…"
-                    : primaryKey
-                      ? "Primary"
-                      : "No primary key selected"}
-              </span>
-              <span>
-                {keysUnavailable
-                  ? "Reload to check your keys before using AI."
-                  : !registry
-                    ? ""
-                    : primaryKey
-                      ? `${keyName(primaryKey)} · ${providerName(primaryKey.provider)}`
-                      : "Select an unpaused key to enable AI."}
-              </span>
-              <div className="button-row ai-primary-controls">
-                {selectingPrimary ? (
-                  <>
-                    <span className="ai-help ai-primary-prompt">
-                      Choose a key below, or confirm with none selected
-                    </span>
-                    <button
-                      type="button"
-                      className="button--quiet button--compact"
-                      onClick={() => {
-                        setSelectingPrimary(false);
-                        setPrimaryCandidate(null);
-                      }}
-                    >
-                      Cancel selection
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Confirm primary key"
-                      disabled={blocked || working}
-                      onClick={() => void confirmPrimary()}
-                    >
-                      Confirm
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="button--secondary button--compact"
-                    disabled={
-                      blocked ||
-                      working ||
-                      !visibleKeys.some(
-                        (key) => !key.paused && !key.cleanupRequired,
-                      )
-                    }
-                    onClick={() => {
-                      setSelectingPrimary(true);
-                      setPrimaryCandidate(null);
-                    }}
-                  >
-                    Set primary key
-                  </button>
-                )}
-              </div>
             </div>
             {addOpen && (
               <div
@@ -774,6 +947,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                   if (event.target === event.currentTarget && !working) {
                     setAddOpen(false);
                     setKey("");
+                    setNewKeyName("");
                     setProvider("");
                     setShowKey(false);
                   }
@@ -787,6 +961,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                     if (event.key === "Escape" && !working) {
                       setAddOpen(false);
                       setKey("");
+                      setNewKeyName("");
                       setProvider("");
                       setShowKey(false);
                     }
@@ -795,6 +970,23 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                   <div className="ai-add-key-popup__heading">
                     <strong>Add API key</strong>
                     <span>Choose a provider, then enter its API key.</span>
+                  </div>
+                  <div className="field ai-api-key-field">
+                    <input
+                      name="keyName"
+                      type="text"
+                      aria-label="Key name"
+                      autoComplete="off"
+                      maxLength={80}
+                      placeholder={
+                        provider
+                          ? `${providerName(provider)} key`
+                          : "Enter a name"
+                      }
+                      value={newKeyName}
+                      disabled={blocked || working}
+                      onChange={(event) => setNewKeyName(event.target.value)}
+                    />
                   </div>
                   <fieldset className="ai-provider-picker">
                     <legend>Provider</legend>
@@ -820,7 +1012,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                             }
                           >
                             <span className="ai-provider-mark">
-                              <ProviderMark provider={option} />
+                              <ProviderLogo provider={option} />
                             </span>
                             <span>{providerName(option)}</span>
                             <span
@@ -859,7 +1051,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                   </label>
                   <p className="ai-help">
                     The selected provider is fixed after saving. This won’t
-                    change your primary key.
+                    change your active key.
                   </p>
                   <div className="button-row ai-key-action-popup__actions">
                     <button
@@ -869,6 +1061,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                       onClick={() => {
                         setAddOpen(false);
                         setKey("");
+                        setNewKeyName("");
                         setProvider("");
                         setShowKey(false);
                       }}
@@ -892,115 +1085,93 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
             ) : (
               !registry && <p className="ai-help">Loading saved keys…</p>
             )}
-            {registry && !visibleKeys.length && (
-              <div className="ai-keys-empty">
-                No saved keys. Add one to get started.
-              </div>
-            )}
-            <div className="ai-key-list">
-              {visibleKeys.map((saved) => {
-                const isPrimary =
-                  saved.credentialId === primaryKey?.credentialId;
-                return (
-                  <div
-                    className={`ai-key-row${saved.paused ? " ai-key-row--paused" : ""}${isPrimary ? " ai-key-row--primary" : ""}${selectingPrimary && primaryCandidate === saved.credentialId ? " ai-key-row--candidate" : ""}${selectingPrimary && !saved.paused && !saved.cleanupRequired ? " ai-key-row--selectable" : ""}`}
-                    key={saved.credentialId}
-                    onClick={(event) => {
-                      if (
-                        selectingPrimary &&
-                        !blocked &&
-                        !working &&
-                        !saved.paused &&
-                        !saved.cleanupRequired &&
-                        !(event.target as HTMLElement).closest(
-                          "button, input, select, form",
-                        )
-                      )
-                        setPrimaryCandidate((current) =>
-                          current === saved.credentialId
-                            ? null
-                            : saved.credentialId,
-                        );
-                    }}
-                    aria-label={`${keyName(saved)} · ${providerName(saved.provider)}`}
-                  >
-                    <AiKeyCustomization
-                      saved={saved}
-                      catalog={catalog}
-                      blocked={
-                        blocked || working || selectingPrimary || saved.paused
-                      }
-                      refreshRevision={monitoringRevision}
-                      setWorking={setWorking}
-                      onRegistry={applyRegistry}
-                      onChanged={() =>
-                        setMonitoringRevision((value) => value + 1)
-                      }
-                      status={
-                        <>
-                          {selectingPrimary && (
-                            <input
-                              type="checkbox"
-                              name="primary-key-selection"
-                              aria-label={`Select key #${saved.identificationNumber} as primary`}
-                              checked={primaryCandidate === saved.credentialId}
-                              disabled={
-                                blocked ||
-                                working ||
-                                saved.paused ||
-                                saved.cleanupRequired
-                              }
-                              onChange={() =>
-                                setPrimaryCandidate((current) =>
-                                  current === saved.credentialId
-                                    ? null
-                                    : saved.credentialId,
-                                )
-                              }
-                            />
-                          )}
-                        </>
-                      }
-                      identity={
-                        selectingPrimary || saved.paused ? (
-                          <strong className="ai-key-static-name">
-                            {keyName(saved)}
-                          </strong>
-                        ) : (
-                          <AiKeyName
-                            saved={saved}
-                            blocked={blocked || working}
-                            workspaceBlocked={blocked}
-                            setWorking={setWorking}
-                            onSaved={savedName}
-                          />
-                        )
-                      }
-                      actions={
-                        <AiKeyMenu
-                          saved={saved}
-                          blocked={blocked || working}
-                          onTest={() => {
-                            setRemoveConfirm(null);
-                            void reviewTest(saved);
-                          }}
-                          onPause={() =>
-                            void changeKey(
-                              saved,
-                              saved.paused ? "unpause" : "pause",
-                            )
-                          }
-                          onRemove={() => {
-                            setTestPreview(null);
-                            setTestTarget(null);
-                            setRemoveConfirm(saved.credentialId);
-                          }}
-                        />
-                      }
-                    />
+            <div
+              className={`ai-key-buckets${draggingKey ? " ai-key-buckets--dragging" : ""}`}
+              ref={keyBuckets}
+            >
+              <div
+                ref={activeKeyBucket}
+                className={`ai-key-bucket ai-key-bucket--active ai-primary${keyDropTarget === "active" ? " ai-key-bucket--drop-target" : ""}`}
+                aria-labelledby="ai-active-key-title"
+              >
+                <div className="ai-key-bucket__heading">
+                  <div>
+                    <h4 id="ai-active-key-title">Active key</h4>
+                    <p>AI requests use the one key placed here.</p>
                   </div>
-                );
-              })}
+                  <span className="ai-key-bucket__count">
+                    {primaryKey ? "1 of 1" : "0 of 1"}
+                  </span>
+                </div>
+                <div className="ai-key-bucket__slot">
+                  {keysUnavailable ? (
+                    <div className="ai-key-bucket__empty">
+                      <strong>Active key unavailable</strong>
+                      <span>Reload before sending an AI request.</span>
+                    </div>
+                  ) : primaryKey ? (
+                    renderKeyCard(primaryKey, "active")
+                  ) : (
+                    <div className="ai-key-bucket__empty">
+                      <strong>No active key selected</strong>
+                      <span>Drag an unpaused key here to make it active.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                ref={availableKeyBucket}
+                className={`ai-key-bucket ai-key-bucket--available${keyDropTarget === "available" ? " ai-key-bucket--drop-target" : ""}`}
+                aria-labelledby="ai-all-keys-title"
+              >
+                <div className="ai-key-bucket__heading">
+                  <div>
+                    <h4 id="ai-all-keys-title">All keys</h4>
+                    <p>Stored keys are sorted by creation date.</p>
+                  </div>
+                  <span className="ai-key-bucket__count">
+                    {availableKeys.length}
+                  </span>
+                </div>
+                <div className="ai-key-list">
+                  {availableKeys.length ? (
+                    availableKeys.map((saved) =>
+                      renderKeyCard(saved, "available"),
+                    )
+                  ) : (
+                    <div className="ai-key-bucket__empty ai-key-bucket__empty--compact">
+                      <strong>
+                        {visibleKeys.length
+                          ? "No other saved keys"
+                          : "No saved keys"}
+                      </strong>
+                      <span>
+                        {visibleKeys.length
+                          ? "Drag the active key here to stop using it."
+                          : "Add a key to get started."}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {keyDragPosition ? (
+                <div
+                  className="ai-key-drag-ghost"
+                  style={{
+                    left: keyDragPosition.x,
+                    top: keyDragPosition.y,
+                    width: keyDragPosition.width,
+                  }}
+                  aria-hidden="true"
+                >
+                  <span>
+                    <strong>{keyDragPosition.label}</strong>
+                    <small>{keyDragPosition.provider}</small>
+                  </span>
+                </div>
+              ) : null}
             </div>
             {(() => {
               const target = visibleKeys.find(
@@ -1028,13 +1199,14 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                         setRemoveConfirm(null);
                     }}
                   >
-                    <strong>Remove {keyName(target)}?</strong>
+                    <strong>
+                      {target.cleanupRequired ? "Retry removing" : "Remove"}{" "}
+                      {keyName(target)}?
+                    </strong>
                     <p>
-                      This removes the key from the vault. Its activity history
-                      stays.{" "}
-                      {isPrimary
-                        ? "No primary key will remain selected."
-                        : "Your primary key won’t change."}
+                      {target.cleanupRequired
+                        ? "The previous removal did not finish. Retry removing the key from the secure vault. Its activity history will stay."
+                        : `This removes the key from the vault. Its activity history stays. ${isPrimary ? "No active key will remain selected." : "Your active key won’t change."}`}
                     </p>
                     <div className="button-row ai-key-action-popup__actions">
                       <button
@@ -1051,7 +1223,9 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                         disabled={blocked || working}
                         onClick={() => void changeKey(target, "remove")}
                       >
-                        Remove key
+                        {target.cleanupRequired
+                          ? "Retry removal"
+                          : "Remove key"}
                       </button>
                     </div>
                   </div>
@@ -1274,6 +1448,33 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                   Choose activity…
                 </button>
               </div>
+              <div className="ai-data-setting-row">
+                <div>
+                  <strong>Delete removed key data</strong>
+                  <span>
+                    Forget selected removed keys and delete their retained
+                    activity from Data.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="button--secondary"
+                  disabled={
+                    blocked ||
+                    working ||
+                    keysUnavailable ||
+                    removedKeys.length === 0
+                  }
+                  title={
+                    removedKeys.length === 0
+                      ? "No removed keys have retained data"
+                      : undefined
+                  }
+                  onClick={() => setRemovedDataOpen(true)}
+                >
+                  Choose removed keys…
+                </button>
+              </div>
               <div
                 className="ai-data-setting-row ai-data-setting-row--retention"
                 aria-label="AI activity retention"
@@ -1392,12 +1593,22 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
               catalog={catalog}
               disabled={blocked || working}
               onCancel={() => setDataAction(null)}
-              onConfirm={(targetKey, selectedMonths) => {
+              onConfirm={(targetKeys, selectedMonths) => {
                 if (dataAction === "export")
-                  void exportMonitoring(targetKey, selectedMonths);
+                  void exportMonitoring(targetKeys, selectedMonths);
                 else if (dataAction === "clear")
-                  void clearMonitoring(targetKey, selectedMonths);
+                  void clearMonitoring(targetKeys, selectedMonths);
               }}
+            />
+            <AiRemovedKeyDataDialog
+              open={removedDataOpen}
+              keys={removedKeys}
+              catalog={catalog}
+              disabled={blocked || working}
+              onCancel={() => setRemovedDataOpen(false)}
+              onConfirm={(credentialIds) =>
+                void deleteRemovedKeyData(credentialIds)
+              }
             />
           </section>
         </div>

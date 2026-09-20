@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { dataKeyDescription } from "./AiDataKeyPicker";
+import { formatKeyCreatedAt, ProviderLogo } from "./AiKeyPresentation";
 import type { Catalog, SavedKey } from "./AiWorkspace";
 
 export type ActivityPeriod = "Week" | "Month" | "Year" | "All time";
@@ -54,10 +55,10 @@ export function AiDataActionDialog({
   catalog: Catalog | null;
   disabled: boolean;
   onCancel: () => void;
-  onConfirm: (key: string, months: ActivityMonth[]) => void;
+  onConfirm: (keys: string[], months: ActivityMonth[]) => void;
 }) {
   const [step, setStep] = useState<"key" | "months">("key");
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [months, setMonths] = useState<ActivityMonth[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [monthsLoading, setMonthsLoading] = useState(false);
@@ -67,7 +68,7 @@ export function AiDataActionDialog({
   useEffect(() => {
     if (!action) return;
     setStep("key");
-    setSelectedKey(null);
+    setSelectedKeys([]);
     setMonths([]);
     setSelectedMonths([]);
     setMonthsError(false);
@@ -75,28 +76,46 @@ export function AiDataActionDialog({
   }, [action]);
 
   useEffect(() => {
-    if (!action || step !== "months" || selectedKey === null) return;
+    if (!action || step !== "months" || selectedKeys.length === 0) return;
     let current = true;
     setMonthsLoading(true);
     setMonthsError(false);
     setMonths([]);
     setSelectedMonths([]);
-    void invoke<MonthResponse>("load_ai_monitoring", {
-      fromUnixMs: 0,
-      toUnixMs: Date.now() + 1,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      bucketSize: "month",
-      credentialId: selectedKey || null,
-    })
-      .then((response) => {
+    const allKeysSelected = selectedKeys.includes("");
+    const scopes: Array<string | null> = allKeysSelected
+      ? [null]
+      : selectedKeys;
+    void Promise.all(
+      scopes.map((credentialId) =>
+        invoke<MonthResponse>("load_ai_monitoring", {
+          fromUnixMs: 0,
+          toUnixMs: Date.now() + 1,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          bucketSize: "month",
+          credentialId,
+        }),
+      ),
+    )
+      .then((responses) => {
         if (!current) return;
-        if (!response.ok) {
+        if (responses.some((response) => !response.ok)) {
           setMonthsError(true);
           return;
         }
+        const attemptsByMonth = new Map<string, number>();
+        for (const response of responses) {
+          if (!response.ok) continue;
+          for (const bucket of response.value.timeBuckets) {
+            attemptsByMonth.set(
+              bucket.label,
+              (attemptsByMonth.get(bucket.label) ?? 0) + bucket.attempts,
+            );
+          }
+        }
         setMonths(
-          response.value.timeBuckets
-            .map((bucket) => monthRange(bucket.label, bucket.attempts))
+          [...attemptsByMonth]
+            .map(([label, attempts]) => monthRange(label, attempts))
             .filter((month): month is ActivityMonth => month !== null)
             .sort((a, b) => b.label.localeCompare(a.label)),
         );
@@ -110,15 +129,20 @@ export function AiDataActionDialog({
     return () => {
       current = false;
     };
-  }, [action, selectedKey, step]);
+  }, [action, selectedKeys, step]);
 
   if (!action) return null;
 
   const isClear = action === "clear";
-  const selectedDescription = dataKeyDescription(
-    keys.find((key) => key.credentialId === selectedKey),
-    catalog,
+  const allKeysSelected = selectedKeys.includes("");
+  const selectedKeyRecords = keys.filter((key) =>
+    selectedKeys.includes(key.credentialId),
   );
+  const selectedDescription = allKeysSelected
+    ? "All keys"
+    : selectedKeyRecords.length === 1
+      ? dataKeyDescription(selectedKeyRecords[0], catalog).title
+      : `${selectedKeyRecords.length} keys`;
   const allSelected =
     months.length > 0 && selectedMonths.length === months.length;
 
@@ -127,6 +151,14 @@ export function AiDataActionDialog({
       current.includes(label)
         ? current.filter((item) => item !== label)
         : [...current, label],
+    );
+  }
+
+  function toggleKey(credentialId: string) {
+    setSelectedKeys((current) =>
+      current.includes(credentialId)
+        ? current.filter((item) => item !== credentialId)
+        : [...current, credentialId],
     );
   }
 
@@ -169,45 +201,46 @@ export function AiDataActionDialog({
           <>
             <div className="ai-data-action-copy">
               <strong>Which activity?</strong>
-              <span>Choose all keys or one API key.</span>
+              <span>Choose one or more API keys, or select All keys.</span>
             </div>
             <div className="ai-data-action-options">
               <button
                 ref={firstChoice}
                 type="button"
-                className={`ai-data-key-option${selectedKey === "" ? " ai-data-key-option--selected" : ""}`}
-                aria-label="Select all keys"
-                aria-pressed={selectedKey === ""}
-                onClick={() => setSelectedKey("")}
+                className={`ai-data-key-option ai-data-key-option--all${allKeysSelected ? " ai-data-key-option--selected" : ""}`}
+                aria-label={`${allKeysSelected ? "Deselect" : "Select"} all keys`}
+                aria-pressed={allKeysSelected}
+                onClick={() => toggleKey("")}
               >
-                <span className="ai-data-key-option-icon">∑</span>
-                <span>
+                <span className="ai-data-key-option-copy">
                   <strong>All keys</strong>
                   <small>Activity from every provider and model</small>
                 </span>
-                {selectedKey === "" && <span aria-hidden="true">✓</span>}
+                {allKeysSelected && <span aria-hidden="true">✓</span>}
               </button>
               {keys.map((key) => {
                 const description = dataKeyDescription(key, catalog);
+                const selected = selectedKeys.includes(key.credentialId);
                 return (
                   <button
                     type="button"
                     key={key.credentialId}
-                    className={`ai-data-key-option${selectedKey === key.credentialId ? " ai-data-key-option--selected" : ""}`}
-                    aria-label={`Select ${description.title}`}
-                    aria-pressed={selectedKey === key.credentialId}
-                    onClick={() => setSelectedKey(key.credentialId)}
+                    className={`ai-data-key-option${selected ? " ai-data-key-option--selected" : ""}`}
+                    aria-label={`${selected ? "Deselect" : "Select"} ${description.title}`}
+                    aria-pressed={selected}
+                    onClick={() => toggleKey(key.credentialId)}
                   >
-                    <span className="ai-data-key-option-icon">
-                      {key.identificationNumber || "–"}
+                    <span className="ai-data-key-option-logo">
+                      <ProviderLogo provider={key.provider} />
                     </span>
-                    <span>
+                    <span className="ai-data-key-option-copy">
                       <strong>{description.title}</strong>
                       <small>{description.detail}</small>
                     </span>
-                    {selectedKey === key.credentialId && (
-                      <span aria-hidden="true">✓</span>
-                    )}
+                    <span className="ai-data-key-option-meta">
+                      <small>{formatKeyCreatedAt(key.createdAt)}</small>
+                      {selected && <span aria-hidden="true">✓</span>}
+                    </span>
                   </button>
                 );
               })}
@@ -223,7 +256,7 @@ export function AiDataActionDialog({
               </button>
               <button
                 type="button"
-                disabled={disabled || selectedKey === null}
+                disabled={disabled || selectedKeys.length === 0}
                 onClick={() => setStep("months")}
               >
                 Continue
@@ -236,7 +269,7 @@ export function AiDataActionDialog({
               <div>
                 <strong>Select months</strong>
                 <span>
-                  {selectedDescription.title} · Only months with activity
+                  {selectedDescription} · Only months with activity
                 </span>
               </div>
               {months.length > 0 && (
@@ -317,9 +350,8 @@ export function AiDataActionDialog({
                 className={isClear ? "button--danger" : undefined}
                 disabled={disabled || selectedMonths.length === 0}
                 onClick={() => {
-                  if (selectedKey === null) return;
                   onConfirm(
-                    selectedKey,
+                    selectedKeys,
                     months.filter((month) =>
                       selectedMonths.includes(month.label),
                     ),

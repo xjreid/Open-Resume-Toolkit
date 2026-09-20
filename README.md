@@ -16,6 +16,10 @@ platform expansions; shared CI builds are portability signals, not native suppor
 Start with the [next milestone guide](<Implementation Plans/Next_Milestones.md>).
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) to configure a development machine and run the shell.
+Developers changing user-visible workflows must also review and maintain the
+[application behavior reference](docs/application-behavior/README.md), which
+maps current resume, AI key, spending, monitoring, export, and deletion
+behavior for development and troubleshooting.
 
 ## Start here
 
