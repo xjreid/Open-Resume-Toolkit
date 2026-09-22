@@ -23,7 +23,12 @@ import {
 } from "./AiDataActionDialog";
 import { AiKeyCustomization } from "./AiKeyCustomization";
 import { AiRemovedKeyDataDialog } from "./AiRemovedKeyDataDialog";
-import { AiUsageChart, totalTokens, type Usage } from "./AiUsageChart";
+import {
+  AiUsageChart,
+  periodStart,
+  totalTokens,
+  type Usage,
+} from "./AiUsageChart";
 
 export type SavedKey = {
   credentialId: string;
@@ -125,16 +130,8 @@ export type Catalog = {
 };
 function periodBounds(period: ActivityPeriod) {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (period === "Week")
-    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  if (period === "Month") start.setDate(1);
-  if (period === "Year") {
-    start.setMonth(0);
-    start.setDate(1);
-  }
   return {
-    fromUnixMs: period === "All time" ? 0 : start.getTime(),
+    fromUnixMs: period === "All time" ? 0 : periodStart(period, now).getTime(),
     toUnixMs: now.getTime() + 1,
   };
 }

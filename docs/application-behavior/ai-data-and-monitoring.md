@@ -29,8 +29,10 @@ The graph supports two Y-axis metrics:
 
 The X-axis timeframe choices are Week, Month, Year, and All time:
 
-- Week and Month use daily buckets and include quiet days.
-- Year uses monthly buckets beginning in January.
+- Week shows the last seven calendar days, including today and quiet days.
+- Month shows the last 30 calendar days, including today and quiet days.
+- Year shows the last 12 calendar months, including the current month and
+  months with no activity.
 - All time starts at the earliest retained month. When it exceeds 24 monthly
   points, the display aggregates into yearly points.
 

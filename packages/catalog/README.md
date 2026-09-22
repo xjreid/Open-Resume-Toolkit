@@ -7,6 +7,11 @@ trust. Runtime verification also enforces chronology, minimum app version,
 expiry, rollback, supported-operation, price-dimension, and emergency-disable
 rules before an entry is selectable.
 
+The catalog files are forced to LF in `.gitattributes` because the signature
+covers the JSON's exact bytes. The deterministic checkout test exercises real
+Git conversion with Windows-style `core.autocrlf=true` so a platform checkout
+cannot silently invalidate the bundled signature.
+
 The current development catalog records the three Balanced fixtures used for
 the M3 adapter boundary. Economy and Quality remain structurally supported but
 are not advertised by this dated catalog until their release verification is

@@ -3,3 +3,8 @@
 crates/ort-documents/src/docx/*.xml text eol=lf
 # Typst source bytes identify the PDF template in versioned render receipts.
 templates/resume/*.typ text eol=lf
+# The provider catalog signature covers the exact JSON bytes. Keep the signed
+# payload and its companion trust artifacts byte-identical on Windows checkouts.
+packages/catalog/*.json text eol=lf
+packages/catalog/*.sig text eol=lf
+packages/catalog/*.pub text eol=lf

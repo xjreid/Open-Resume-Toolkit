@@ -12,14 +12,13 @@ export const WORKSPACE_DESTINATIONS = [
 export type WorkspaceDestination =
   (typeof WORKSPACE_DESTINATIONS)[number]["id"];
 
-export function Brand({ title }: { title: string }) {
+export function Brand() {
   return (
     <div className="brand-lockup">
       <img className="brand-icon" src={logo} alt="" width="36" height="36" />
-      <div>
-        <p className="eyebrow">Open Resume Toolkit</p>
-        <h1>{title}</h1>
-      </div>
+      <h1 aria-label="Open Resume Toolkit">
+        <span>Open</span> <span>Resume Toolkit</span>
+      </h1>
     </div>
   );
 }
@@ -40,17 +39,7 @@ export function AppShell({
   return (
     <main className="shell shell--editor">
       <header className="masthead masthead--workspace">
-        <Brand
-          title={
-            destination === "resume"
-              ? "Resume workspace"
-              : destination === "import"
-                ? "Import resume"
-                : destination === "ai"
-                  ? "AI & monitoring"
-                  : "Settings"
-          }
-        />
+        <Brand />
         {status}
         <nav className="workspace-shortcuts" aria-label="Workspace areas">
           {WORKSPACE_DESTINATIONS.map((item) => (

@@ -18,6 +18,11 @@ const assetPath = "crates/ort-documents/src/docx";
 const assets = readdirSync(join(root, assetPath)).filter((name) =>
   name.endsWith(".xml"),
 );
+const catalogAssets = [
+  "packages/catalog/direct-v1.json",
+  "packages/catalog/direct-v1.sig",
+  "packages/catalog/direct-v1.pub",
+];
 const attributes = readFileSync(join(root, ".gitattributes"));
 
 // Exercise real Git checkout conversion, not a regex over .gitattributes.
@@ -68,6 +73,12 @@ function checkout(t, autocrlf, policy) {
     assert(bytes.includes(10), `${relative}: positive line-ending control`);
     originals.set(relative, bytes);
   }
+  for (const relative of catalogAssets) {
+    const bytes = readFileSync(join(root, relative));
+    assert(!bytes.includes(13), `${relative}: signed asset must use LF`);
+    assert(bytes.includes(10), `${relative}: positive line-ending control`);
+    originals.set(relative, bytes);
+  }
   // New template files must also match the rule; unrelated text/binary files
   // must retain ordinary Git behavior rather than a repository-wide rewrite.
   originals.set(`${assetPath}/future-template.xml`, Buffer.from("<future/>\n"));
@@ -104,7 +115,7 @@ function checkout(t, autocrlf, policy) {
 }
 
 for (const mode of ["true", "false", "input"]) {
-  test(`embedded DOCX XML stays byte-identical with core.autocrlf=${mode}`, (t) => {
+  test(`embedded deterministic assets stay byte-identical with core.autocrlf=${mode}`, (t) => {
     const { originals, read } = checkout(t, mode, attributes);
     for (const [relative, bytes] of originals) {
       const expected =

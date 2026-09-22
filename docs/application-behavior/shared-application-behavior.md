@@ -6,6 +6,8 @@ The desktop navigation contains Master resume, Import resume, AI & monitoring,
 and Settings. Switching destinations does not discard the owning workspace's
 in-memory state. Navigation is temporarily disabled while a blocking native
 operation or confirmation is active.
+The top-left brand always reads **Open Resume Toolkit**, with Open on the first
+line and Resume Toolkit on the second; it does not change with the destination.
 
 The storage-health badge reflects typed native health state. Features that
 require encrypted storage remain disabled or fail closed when storage is not
@@ -75,4 +77,3 @@ requires restart/recovery rather than pretending deletion fully finished.
 - Failure states remain actionable: reload when storage state is unknown,
   retry explicit cleanup when cleanup failed, or preserve edits when a save was
   not confirmed.
-

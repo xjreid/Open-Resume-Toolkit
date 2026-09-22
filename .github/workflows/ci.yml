@@ -28,7 +28,7 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
 
-      - name: Verify deterministic DOCX checkout policy
+      - name: Verify deterministic embedded-asset checkout policy
         run: node --test tools/tests/docx-checkout.test.mjs
 
       - name: Use pinned pnpm
@@ -97,7 +97,7 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
 
-      - name: Verify deterministic DOCX checkout policy
+      - name: Verify deterministic embedded-asset checkout policy
         run: node --test tools/tests/docx-checkout.test.mjs
 
       - name: Use pinned pnpm

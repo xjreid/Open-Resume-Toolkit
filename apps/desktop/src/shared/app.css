@@ -3122,6 +3122,18 @@ select:hover {
   font-weight: 720;
   letter-spacing: -0.025em;
 }
+.brand-lockup h1 {
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.brand-lockup h1 span {
+  display: block;
+}
+.brand-lockup h1 span:first-child {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
 .masthead .eyebrow {
   display: none;
 }

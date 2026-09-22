@@ -1633,9 +1633,10 @@ impl EncryptedStore {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|_| StorageError::Unavailable)?;
         let profile = self.manifest.profile_id.to_string();
-        let selected = credential_ids
-            .map(|ids| ids.iter().copied().map(Some).collect::<Vec<_>>())
-            .unwrap_or_else(|| vec![None]);
+        let selected = credential_ids.map_or_else(
+            || vec![None],
+            |ids| ids.iter().copied().map(Some).collect::<Vec<_>>(),
+        );
         for (from_unix_ms, to_unix_ms) in &ranges {
             for credential_id in &selected {
                 let active: i64 = tx
@@ -1859,6 +1860,28 @@ mod tests {
             currency: "USD".into(),
             retry_of: None,
         }
+    }
+
+    fn settle_success(store: &EncryptedStore, attempt: &AiAttemptPreflight) {
+        store.reserve_ai_attempt(attempt).unwrap();
+        store.mark_ai_dispatching(attempt.attempt_id).unwrap();
+        store
+            .settle_ai_attempt(&AiAttemptSettlement {
+                attempt_id: attempt.attempt_id,
+                status: AiTerminalStatus::Succeeded,
+                effective_model: Some("fixture-model".into()),
+                usage: Some(Usage {
+                    input_tokens: 10,
+                    output_tokens: 2,
+                    ..Usage::default()
+                }),
+                settled_cost_micros: Some(attempt.maximum_cost_micros),
+                usage_complete: true,
+                error_category: None,
+                ended_at_unix_ms: 2_000,
+                keep_operation_active: false,
+            })
+            .unwrap();
     }
 
     #[test]
@@ -2112,53 +2135,13 @@ mod tests {
         let mut second = preflight(80);
         second.credential_id = Uuid::from_u128(43);
         for attempt in [&first, &second] {
-            store.reserve_ai_attempt(attempt).unwrap();
-            store.mark_ai_dispatching(attempt.attempt_id).unwrap();
-            store
-                .settle_ai_attempt(&AiAttemptSettlement {
-                    attempt_id: attempt.attempt_id,
-                    status: AiTerminalStatus::Succeeded,
-                    effective_model: Some("fixture-model".into()),
-                    usage: Some(Usage {
-                        input_tokens: 10,
-                        output_tokens: 2,
-                        ..Usage::default()
-                    }),
-                    settled_cost_micros: Some(attempt.maximum_cost_micros),
-                    usage_complete: true,
-                    error_category: None,
-                    ended_at_unix_ms: 2_000,
-                    keep_operation_active: false,
-                })
-                .unwrap();
+            settle_success(&store, attempt);
         }
         let all = store
             .ai_monitoring_summary(0, 3000, "UTC", AiBucketSize::Day)
             .unwrap();
         assert_eq!(all.attempts, 2);
         assert_eq!(all.by_credential_id.len(), 2);
-        let selected_pair = store
-            .ai_monitoring_summary_for_keys(
-                0,
-                3000,
-                "UTC",
-                AiBucketSize::Day,
-                Some(&[first.credential_id, second.credential_id]),
-            )
-            .unwrap();
-        assert_eq!(selected_pair.attempts, 2);
-        assert_eq!(selected_pair.estimated_cost_micros, 140);
-        assert_eq!(selected_pair.by_credential_id.len(), 2);
-        assert_eq!(
-            store.ai_monitoring_summary_for_keys(
-                0,
-                3000,
-                "UTC",
-                AiBucketSize::Day,
-                Some(&[first.credential_id, first.credential_id]),
-            ),
-            Err(StorageError::InvalidData)
-        );
         let selected = store
             .ai_monitoring_summary_for_key(
                 0,
@@ -2202,18 +2185,58 @@ mod tests {
                 .attempts,
             0
         );
+        let active = preflight(20);
+        store.reserve_ai_attempt(&active).unwrap();
         assert_eq!(
             store
-                .clear_ai_activity_ranges_for_keys(
-                    &[(0, 3000)],
-                    Some(&[second.credential_id, Uuid::from_u128(999)]),
-                )
+                .clear_all_ai_activity_for_keys(&[second.credential_id])
                 .unwrap(),
             1
         );
         assert_eq!(
+            store.clear_all_ai_activity_for_keys(&[active.credential_id]),
+            Err(StorageError::RevisionConflict)
+        );
+    }
+
+    #[test]
+    fn multi_key_monitoring_and_range_clearing_use_the_exact_selection() {
+        let temp = tempfile::tempdir().unwrap();
+        let store =
+            EncryptedStore::open_or_initialize(temp.path(), "test", &MemoryDatabaseKeyVault::new())
+                .unwrap();
+        let first = preflight(60);
+        let mut second = preflight(80);
+        second.credential_id = Uuid::from_u128(43);
+        for attempt in [&first, &second] {
+            settle_success(&store, attempt);
+        }
+        let selected = [first.credential_id, second.credential_id];
+        let summary = store
+            .ai_monitoring_summary_for_keys(0, 3_000, "UTC", AiBucketSize::Day, Some(&selected))
+            .unwrap();
+        assert_eq!(summary.attempts, 2);
+        assert_eq!(summary.estimated_cost_micros, 140);
+        assert_eq!(summary.by_credential_id.len(), 2);
+        assert_eq!(
+            store.ai_monitoring_summary_for_keys(
+                0,
+                3_000,
+                "UTC",
+                AiBucketSize::Day,
+                Some(&[first.credential_id, first.credential_id]),
+            ),
+            Err(StorageError::InvalidData)
+        );
+        assert_eq!(
             store
-                .ai_monitoring_summary(0, 3000, "UTC", AiBucketSize::Day)
+                .clear_ai_activity_ranges_for_keys(&[(0, 3_000)], Some(&selected))
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            store
+                .ai_monitoring_summary(0, 3_000, "UTC", AiBucketSize::Day)
                 .unwrap()
                 .attempts,
             0
@@ -2225,13 +2248,10 @@ mod tests {
         let active = preflight(20);
         store.reserve_ai_attempt(&active).unwrap();
         assert_eq!(
-            store
-                .clear_all_ai_activity_for_keys(&[second.credential_id])
-                .unwrap(),
-            0
-        );
-        assert_eq!(
-            store.clear_all_ai_activity_for_keys(&[active.credential_id]),
+            store.clear_ai_activity_ranges_for_keys(
+                &[(0, 3_000)],
+                Some(&[active.credential_id, Uuid::from_u128(999)]),
+            ),
             Err(StorageError::RevisionConflict)
         );
     }

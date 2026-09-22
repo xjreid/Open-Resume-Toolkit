@@ -268,9 +268,7 @@ export function AiDataActionDialog({
             <div className="ai-data-action-copy ai-data-action-copy--months">
               <div>
                 <strong>Select months</strong>
-                <span>
-                  {selectedDescription} · Only months with activity
-                </span>
+                <span>{selectedDescription} · Only months with activity</span>
               </div>
               {months.length > 0 && (
                 <button

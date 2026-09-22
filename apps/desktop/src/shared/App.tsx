@@ -3453,7 +3453,7 @@ function OverlayStatus() {
   return (
     <main className="shell shell--overlay">
       <header className="masthead">
-        <Brand title="Application workspace" />
+        <Brand />
       </header>
       <section className="status-card">
         <h2>Your resume workspace is in the main window</h2>

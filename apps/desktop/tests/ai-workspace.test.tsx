@@ -1495,7 +1495,9 @@ it("chooses export and clear months independently from the graph", async () => {
   await clickAccessible("Deselect Anthropic key");
   await clickAccessible("Select Anthropic key");
   await click("Continue");
-  expect(document.body.textContent).toContain("2 keys · Only months with activity");
+  expect(document.body.textContent).toContain(
+    "2 keys · Only months with activity",
+  );
   expect(document.body.textContent).toContain("Only months with activity");
   await clickAccessible("Select September 2026");
   await clickAccessible("Select August 2026");

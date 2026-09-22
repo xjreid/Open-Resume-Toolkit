@@ -16,6 +16,18 @@ export type UsageBucket = {
   unknownCount: number;
 };
 export type UsagePeriod = "Week" | "Month" | "Year" | "All time";
+// Rolling windows include today/current month, even when they cross a calendar boundary.
+export function periodStart(period: UsagePeriod, now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === "Week") start.setDate(start.getDate() - 6);
+  if (period === "Month") start.setDate(start.getDate() - 29);
+  if (period === "Year") {
+    start.setDate(1);
+    start.setMonth(start.getMonth() - 11);
+  }
+  if (period === "All time") start.setDate(1);
+  return start;
+}
 export const totalTokens = (usage: Usage) =>
   usage.inputTokens +
   (usage.cachedInputTokens ?? 0) +
@@ -30,12 +42,7 @@ export function chartBuckets(
   now = new Date(),
 ) {
   const monthly = period === "Year" || period === "All time";
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (period === "Week")
-    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  if (period === "Month") start.setDate(1);
-  if (monthly) start.setDate(1);
-  if (period === "Year") start.setMonth(0);
+  const start = periodStart(period, now);
   if (period === "All time" && buckets.length) {
     const first = buckets.map((bucket) => bucket.label).sort()[0];
     const [year, month] = first.split("-").map(Number);

@@ -55,18 +55,18 @@ fn normalize_activity_months(mut months: Vec<AiActivityMonth>) -> Option<Vec<AiA
     Some(months)
 }
 
-fn normalize_credential_ids(credential_ids: Option<Vec<Uuid>>) -> Option<Option<Vec<Uuid>>> {
+fn normalize_credential_ids(credential_ids: Option<Vec<Uuid>>) -> Result<Option<Vec<Uuid>>, ()> {
     let Some(ids) = credential_ids else {
-        return Some(None);
+        return Ok(None);
     };
     let unique = ids
         .iter()
         .copied()
         .collect::<std::collections::HashSet<_>>();
     if ids.is_empty() || ids.len() > 1_000 || unique.len() != ids.len() {
-        return None;
+        return Err(());
     }
-    Some(Some(ids))
+    Ok(Some(ids))
 }
 
 #[cfg(test)]
@@ -680,7 +680,7 @@ pub fn clear_ai_monitoring(
     let Some(months) = normalize_activity_months(months) else {
         return CommandResponse::failure("AI_PERIOD_INVALID", "errors.aiPeriodInvalid", false);
     };
-    let Some(credential_ids) = normalize_credential_ids(credential_ids) else {
+    let Ok(credential_ids) = normalize_credential_ids(credential_ids) else {
         return CommandResponse::failure(
             "AI_KEY_SELECTION_INVALID",
             "errors.aiPeriodInvalid",
@@ -715,7 +715,7 @@ pub async fn export_ai_monitoring(
     let Some(months) = normalize_activity_months(months) else {
         return CommandResponse::failure("AI_PERIOD_INVALID", "errors.aiPeriodInvalid", false);
     };
-    let Some(credential_ids) = normalize_credential_ids(credential_ids) else {
+    let Ok(credential_ids) = normalize_credential_ids(credential_ids) else {
         return CommandResponse::failure(
             "AI_KEY_SELECTION_INVALID",
             "errors.aiPeriodInvalid",
