@@ -37,6 +37,7 @@ const DATABASE_FILENAME: &str = "profile.db";
 const MANIFEST_FILENAME: &str = "profile.json";
 const PREVIOUS_MANIFEST_FILENAME: &str = "profile.json.previous";
 const MANIFEST_UPDATE_FILENAME: &str = ".profile-update.tmp";
+const INITIALIZATION_MARKER_FILENAME: &str = ".ort-initializing.json";
 const RESTORE_MARKER_FILENAME: &str = ".ort-restore-pending.json";
 const RESTORE_STAGING_DIRECTORY: &str = ".ort-restore-staged";
 const RESTORE_SAFETY_DIRECTORY: &str = ".ort-restore-safety";
@@ -380,11 +381,14 @@ impl EncryptedStore {
             return Err(StorageError::UnsafeLocation);
         };
         validate_active_profile_root(root)?;
+        reject_directory_symlink(root)?;
         recover_pending_all_data_deletion(root, channel, vault)?;
         recover_pending_safety_deletion(parent, channel, vault)?;
+        recover_initialization_marker(root, channel, vault)?;
         let marker = parent.join(RESTORE_MARKER_FILENAME);
         match fs::symlink_metadata(&marker) {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                recover_uncommitted_restore_staging(root, channel, vault)?;
                 return Self::open_or_initialize(root, channel, vault).map(|store| (store, false));
             }
             Err(_) => return Err(StorageError::Unavailable),
@@ -489,6 +493,8 @@ impl EncryptedStore {
         let manifest_path = root.join(MANIFEST_FILENAME);
         let database_path = root.join(DATABASE_FILENAME);
         recover_manifest_update(root, &manifest_path, &database_path)?;
+        let initialization_marker = root.join(INITIALIZATION_MARKER_FILENAME);
+        recover_initialization_marker(root, channel, vault)?;
 
         if manifest_path.exists() {
             reject_symlink(&manifest_path)?;
@@ -511,6 +517,8 @@ impl EncryptedStore {
                 replace_manifest_atomically(root, &manifest_path, &manifest)?;
             }
             set_private_database_permissions(&database_path)?;
+            remove_exact_optional_file(&initialization_marker)?;
+            sync_directory(root)?;
             return Ok(Self {
                 connection: Mutex::new(connection),
                 manifest,
@@ -533,6 +541,7 @@ impl EncryptedStore {
             created_at: now_string(),
         };
         let reference = manifest.vault_reference()?;
+        write_manifest_atomically(root, &initialization_marker, &manifest)?;
         let key = DatabaseKey::generate().map_err(|error| map_vault_creation_error(&error))?;
         vault
             .store_new(&reference, &key)
@@ -549,14 +558,28 @@ impl EncryptedStore {
         })();
 
         match initialized {
-            Ok(connection) => Ok(Self {
-                connection: Mutex::new(connection),
-                manifest,
-                database_path,
-            }),
+            Ok(connection) => {
+                remove_exact_optional_file(&initialization_marker)?;
+                sync_directory(root)?;
+                Ok(Self {
+                    connection: Mutex::new(connection),
+                    manifest,
+                    database_path,
+                })
+            }
             Err(error) => {
-                let _ = remove_exact_database_files(&database_path);
-                let _ = vault.delete(&reference);
+                // A manifest rename may have committed even if its following
+                // sync failed. Never discard a profile after that boundary.
+                if !manifest_path.exists() {
+                    // Keep the marker if cleanup fails so startup can finish it.
+                    if vault.delete(&reference).is_ok()
+                        && remove_exact_database_files(&database_path).is_ok()
+                        && sync_directory(root).is_ok()
+                    {
+                        let _ = remove_exact_optional_file(&initialization_marker)
+                            .and_then(|()| sync_directory(root));
+                    }
+                }
                 Err(error)
             }
         }
@@ -2609,6 +2632,88 @@ fn open_existing_profile(
     EncryptedStore::open_or_initialize(root, channel, vault)
 }
 
+fn recover_initialization_marker(
+    root: &Path,
+    channel: &str,
+    vault: &dyn DatabaseKeyVault,
+) -> Result<(), StorageError> {
+    let marker = root.join(INITIALIZATION_MARKER_FILENAME);
+    if !known_optional_file(&marker)? {
+        return Ok(());
+    }
+    let initializing = read_manifest(&marker, channel)?;
+    let manifest = root.join(MANIFEST_FILENAME);
+    if known_optional_file(&manifest)? {
+        if read_manifest(&manifest, channel)? != initializing {
+            return Err(StorageError::IncompleteInitialization);
+        }
+        return Ok(());
+    }
+    // Nothing was committed. The marker was durable before its key or DB.
+    validate_cleanup_profile_directory(root)?;
+    vault
+        .delete(&initializing.vault_reference()?)
+        .map_err(|_| StorageError::VaultKeyUnavailable)?;
+    remove_exact_database_files(&root.join(DATABASE_FILENAME))?;
+    sync_directory(root)?;
+    remove_exact_optional_file(&marker)?;
+    sync_directory(root)
+}
+
+fn recover_uncommitted_restore_staging(
+    root: &Path,
+    channel: &str,
+    vault: &dyn DatabaseKeyVault,
+) -> Result<(), StorageError> {
+    let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
+    let staging = parent.join(RESTORE_STAGING_DIRECTORY);
+    if !known_optional_directory(&staging)? {
+        return Ok(());
+    }
+    recover_manifest_update(
+        &staging,
+        &staging.join(MANIFEST_FILENAME),
+        &staging.join(DATABASE_FILENAME),
+    )?;
+    recover_initialization_marker(&staging, channel, vault)?;
+    validate_cleanup_profile_directory(&staging)?;
+    let staged_manifest = staging.join(MANIFEST_FILENAME);
+    let staged_reference = if known_optional_file(&staged_manifest)? {
+        Some(read_manifest(&staged_manifest, channel)?.vault_reference()?)
+    } else {
+        None
+    };
+    let active_manifest = root.join(MANIFEST_FILENAME);
+    let active_reference = if known_optional_file(&active_manifest)? {
+        Some(read_manifest(&active_manifest, channel)?.vault_reference()?)
+    } else {
+        if known_optional_file(&root.join(DATABASE_FILENAME))? {
+            return Err(StorageError::IncompleteInitialization);
+        }
+        None
+    };
+    let safety_root = parent.join(RESTORE_SAFETY_DIRECTORY);
+    let safety_manifest = safety_root.join(MANIFEST_FILENAME);
+    let safety_reference = if known_optional_file(&safety_manifest)? {
+        Some(read_manifest(&safety_manifest, channel)?.vault_reference()?)
+    } else {
+        if known_optional_directory(&safety_root)? {
+            return Err(StorageError::IncompleteInitialization);
+        }
+        None
+    };
+    if let Some(reference) = staged_reference
+        && Some(&reference) != active_reference.as_ref()
+        && Some(&reference) != safety_reference.as_ref()
+    {
+        vault
+            .delete(&reference)
+            .map_err(|_| StorageError::VaultKeyUnavailable)?;
+    }
+    cleanup_profile_directory(&staging)?;
+    sync_directory(parent)
+}
+
 fn validate_active_profile_root(root: &Path) -> Result<(), StorageError> {
     let name = root
         .file_name()
@@ -2694,15 +2799,27 @@ fn validate_all_data_deletion_targets(
         }
         validate_cleanup_profile_directory(&candidate)?;
         let manifest_path = candidate.join(MANIFEST_FILENAME);
-        if !known_optional_file(&manifest_path)? {
-            if require_manifests {
-                return Err(StorageError::IncompleteInitialization);
-            }
-            continue;
+        let initialization_path = candidate.join(INITIALIZATION_MARKER_FILENAME);
+        let has_manifest = known_optional_file(&manifest_path)?;
+        if !has_manifest && require_manifests {
+            return Err(StorageError::IncompleteInitialization);
         }
-        let reference = read_manifest(&manifest_path, channel)?.vault_reference()?;
-        if !references.contains(&reference) {
-            references.push(reference);
+        let manifest = has_manifest
+            .then(|| read_manifest(&manifest_path, channel))
+            .transpose()?;
+        let initializing = known_optional_file(&initialization_path)?
+            .then(|| read_manifest(&initialization_path, channel))
+            .transpose()?;
+        if let (Some(manifest), Some(initializing)) = (&manifest, &initializing)
+            && manifest != initializing
+        {
+            return Err(StorageError::IncompleteInitialization);
+        }
+        for entry in [manifest, initializing].into_iter().flatten() {
+            let reference = entry.vault_reference()?;
+            if !references.contains(&reference) {
+                references.push(reference);
+            }
         }
     }
     if require_manifests && references.is_empty() {
@@ -2781,6 +2898,7 @@ fn cleanup_profile_directory(root: &Path) -> Result<(), StorageError> {
         MANIFEST_FILENAME,
         PREVIOUS_MANIFEST_FILENAME,
         MANIFEST_UPDATE_FILENAME,
+        INITIALIZATION_MARKER_FILENAME,
     ] {
         remove_exact_optional_file(&root.join(name))?;
     }
@@ -2807,6 +2925,7 @@ fn validate_cleanup_profile_directory(root: &Path) -> Result<(), StorageError> {
                 | MANIFEST_FILENAME
                 | PREVIOUS_MANIFEST_FILENAME
                 | MANIFEST_UPDATE_FILENAME
+                | INITIALIZATION_MARKER_FILENAME
         ) {
             return Err(StorageError::UnsafeLocation);
         }
@@ -4051,6 +4170,86 @@ mod tests {
     }
 
     #[test]
+    fn interrupted_first_initialization_discards_only_uncommitted_state() {
+        for database_started in [false, true] {
+            let temporary = TempDir::new().unwrap();
+            let root = temporary.path().join("active");
+            let vault = MemoryDatabaseKeyVault::new();
+            create_private_directory(&root).unwrap();
+            let manifest = ProfileManifest {
+                manifest_version: 1,
+                database_format_version: DATABASE_FORMAT_VERSION,
+                schema_version: SCHEMA_VERSION,
+                install_id: Uuid::now_v7(),
+                profile_id: Uuid::now_v7(),
+                channel: "test".into(),
+                created_at: now_string(),
+            };
+            write_manifest_atomically(&root, &root.join(INITIALIZATION_MARKER_FILENAME), &manifest)
+                .unwrap();
+            let old_reference = manifest.vault_reference().unwrap();
+            let key = DatabaseKey::generate().unwrap();
+            vault.store_new(&old_reference, &key).unwrap();
+            if database_started {
+                let connection =
+                    open_encrypted_connection(&root.join(DATABASE_FILENAME), &key, true).unwrap();
+                initialize_schema(&connection, &manifest).unwrap();
+                drop(connection);
+            }
+
+            let recovered = EncryptedStore::open_or_initialize(&root, "test", &vault).unwrap();
+            assert_ne!(recovered.manifest().profile_id, manifest.profile_id);
+            assert!(vault.load(&old_reference).is_err());
+            assert!(!root.join(INITIALIZATION_MARKER_FILENAME).exists());
+            recovered.verify_integrity().unwrap();
+        }
+    }
+
+    #[test]
+    fn completed_first_initialization_with_leftover_marker_keeps_its_profile() {
+        let temporary = TempDir::new().unwrap();
+        let root = temporary.path().join("active");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(&root, "test", &vault).unwrap();
+        let manifest = store.manifest().clone();
+        store
+            .create_draft(&ResumeDocument::empty("Keep committed draft"))
+            .unwrap();
+        drop(store);
+        write_manifest_atomically(&root, &root.join(INITIALIZATION_MARKER_FILENAME), &manifest)
+            .unwrap();
+
+        let reopened = EncryptedStore::open_or_initialize(&root, "test", &vault).unwrap();
+        assert_eq!(reopened.manifest(), &manifest);
+        assert_eq!(
+            reopened.load_draft().unwrap().unwrap().document.title,
+            "Keep committed draft"
+        );
+        assert!(!root.join(INITIALIZATION_MARKER_FILENAME).exists());
+    }
+
+    #[test]
+    fn mismatched_initialization_marker_never_deletes_a_committed_key() {
+        let temporary = TempDir::new().unwrap();
+        let root = temporary.path().join("active");
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(&root, "test", &vault).unwrap();
+        let reference = store.manifest().vault_reference().unwrap();
+        let mut other = store.manifest().clone();
+        other.profile_id = Uuid::now_v7();
+        drop(store);
+        write_manifest_atomically(&root, &root.join(INITIALIZATION_MARKER_FILENAME), &other)
+            .unwrap();
+
+        assert_eq!(
+            EncryptedStore::open_or_initialize(&root, "test", &vault).err(),
+            Some(StorageError::IncompleteInitialization)
+        );
+        assert!(vault.load(&reference).is_ok());
+        assert!(root.join(DATABASE_FILENAME).is_file());
+    }
+
+    #[test]
     fn diagnostics_accept_only_bounded_non_sensitive_metadata() {
         let temporary = TempDir::new().expect("temporary directory");
         let vault = MemoryDatabaseKeyVault::new();
@@ -4580,6 +4779,63 @@ mod tests {
     }
 
     #[test]
+    fn startup_discards_uncommitted_restore_staging_and_its_key() {
+        let temporary = TempDir::new().unwrap();
+        let root = temporary.path().join("active");
+        let staging = temporary.path().join(RESTORE_STAGING_DIRECTORY);
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&root, "test", &vault).unwrap();
+        active
+            .create_draft(&ResumeDocument::empty("Keep active"))
+            .unwrap();
+        let staged = EncryptedStore::open_or_initialize(&staging, "test", &vault).unwrap();
+        let staged_reference = staged.manifest().vault_reference().unwrap();
+        drop(staged);
+        drop(active);
+
+        let (reopened, activated) =
+            EncryptedStore::open_or_activate_pending_restore(&root, "test", &vault).unwrap();
+        assert!(!activated);
+        assert!(!staging.exists());
+        assert!(vault.load(&staged_reference).is_err());
+        assert_eq!(
+            reopened.load_draft().unwrap().unwrap().document.title,
+            "Keep active"
+        );
+        assert!(
+            !reopened
+                .backup_recovery_status()
+                .unwrap()
+                .restart_operation_pending
+        );
+    }
+
+    #[test]
+    fn startup_discards_uncommitted_rollback_staging_without_deleting_safety_key() {
+        let temporary = TempDir::new().unwrap();
+        let root = temporary.path().join("active");
+        let safety = temporary.path().join(RESTORE_SAFETY_DIRECTORY);
+        let staging = temporary.path().join(RESTORE_STAGING_DIRECTORY);
+        let vault = MemoryDatabaseKeyVault::new();
+        let active = EncryptedStore::open_or_initialize(&root, "test", &vault).unwrap();
+        let safety_store = EncryptedStore::open_or_initialize(&safety, "test", &vault).unwrap();
+        let safety_reference = safety_store.manifest().vault_reference().unwrap();
+        safety_store
+            .create_encrypted_checkpoint(&staging, &vault)
+            .unwrap();
+        drop(safety_store);
+        drop(active);
+
+        EncryptedStore::open_or_activate_pending_restore(&root, "test", &vault).unwrap();
+        assert!(!staging.exists());
+        assert!(vault.load(&safety_reference).is_ok());
+        EncryptedStore::open_or_initialize(&safety, "test", &vault)
+            .unwrap()
+            .verify_integrity()
+            .unwrap();
+    }
+
+    #[test]
     fn pending_restore_recovers_the_old_profile_if_staging_disappears() {
         let temporary = TempDir::new().expect("temporary directory");
         let source_root = temporary.path().join("source");
@@ -5034,6 +5290,10 @@ mod tests {
                 .err()
                 .expect("must reject symlink"),
             StorageError::UnsafeLocation
+        );
+        assert_eq!(
+            EncryptedStore::open_or_activate_pending_restore(&linked, "test", &vault).err(),
+            Some(StorageError::UnsafeLocation)
         );
     }
 

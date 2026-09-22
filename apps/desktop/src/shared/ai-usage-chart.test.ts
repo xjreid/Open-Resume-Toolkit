@@ -25,6 +25,18 @@ it("totals all normalized token categories without dropping caches or reasoning"
   expect(totalTokens(bucket("2026-09-15").usage)).toBe(21);
 });
 
+it("uses provider-normalized totals and preserves them when months roll up to years", () => {
+  const normalized = { ...bucket("2023-02"), totalTokens: 20 };
+  expect(totalTokens(normalized.usage, normalized.totalTokens)).toBe(20);
+  const points = chartBuckets(
+    [normalized, { ...bucket("2023-03"), totalTokens: 19 }],
+    "All time",
+    new Date(2026, 8, 17),
+  );
+  expect(points[0].totalTokens).toBe(39);
+  expect(totalTokens(points[0].usage, points[0].totalTokens)).toBe(39);
+});
+
 it("fills exactly seven rolling days, including quiet days", () => {
   const points = chartBuckets(
     [bucket("2026-09-15")],

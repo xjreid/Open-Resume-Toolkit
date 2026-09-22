@@ -25,7 +25,8 @@ The graph supports two Y-axis metrics:
 - **Price**: recorded estimated cost, separated by currency when multiple
   currencies exist;
 - **Tokens**: total estimated tokens, composed of input, output, cached input,
-  cache-write, and reasoning categories.
+  cache-write, and reasoning categories. OpenAI reasoning is a breakdown of
+  output tokens and counts only once in the total.
 
 The X-axis timeframe choices are Week, Month, Year, and All time:
 

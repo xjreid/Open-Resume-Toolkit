@@ -52,6 +52,7 @@ type Monitoring = {
   logicalOperations: number;
   attempts: number;
   usage: Usage;
+  totalTokens?: number;
   estimatedCostMicros: number;
   unresolvedReservedMicros: number;
   currency: string | null;
@@ -74,6 +75,7 @@ type Monitoring = {
       outputTokens: number;
       reasoningTokens?: number;
     };
+    totalTokens?: number;
     costByCurrencyMicros: Record<string, number>;
     partial: boolean;
     unknownCount: number;
@@ -1234,7 +1236,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                 className="ai-key-action-backdrop"
                 role="presentation"
                 onPointerDown={(event) => {
-                  if (event.target === event.currentTarget) {
+                  if (event.target === event.currentTarget && !testActive) {
                     setTestPreview(null);
                     setTestTarget(null);
                   }
@@ -1246,7 +1248,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                   aria-modal="false"
                   aria-label="Confirm synthetic provider request"
                   onKeyDown={(event) => {
-                    if (event.key === "Escape") {
+                    if (event.key === "Escape" && !testActive) {
                       setTestPreview(null);
                       setTestTarget(null);
                     }
@@ -1376,7 +1378,10 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                                 `${(micros / 1_000_000).toFixed(6)} ${name}`,
                             )
                             .join(" · ") || "No recorded cost"
-                        : totalTokens(monitoring.usage).toLocaleString(),
+                        : totalTokens(
+                            monitoring.usage,
+                            monitoring.totalTokens,
+                          ).toLocaleString(),
                     detail: `${monitoring.logicalOperations} operations · ${monitoring.attempts} attempts`,
                   }}
                 />

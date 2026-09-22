@@ -263,6 +263,20 @@ it("keeps cancellation available while a request is active", async () => {
   });
   await clickAccessible("Test OpenAI key");
   await click("Confirm and send test");
+  const activePopup = document.querySelector(
+    '[aria-label="Confirm synthetic provider request"]',
+  )!;
+  await act(async () => {
+    activePopup.parentElement!.dispatchEvent(
+      new dom.window.Event("pointerdown", { bubbles: true }),
+    );
+    activePopup.dispatchEvent(
+      new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+  });
+  expect(
+    document.querySelector('[aria-label="Confirm synthetic provider request"]'),
+  ).not.toBeNull();
   await click("Cancel active test");
   expect(native.invoke).toHaveBeenCalledWith("cancel_ai_test");
   await act(async () => {
@@ -373,7 +387,8 @@ it("shows selected-period buckets without the redundant activity breakdown", asy
             ...emptyMonitoring.value,
             logicalOperations: 1,
             attempts: 1,
-            usage: { inputTokens: 8, outputTokens: 2 },
+            usage: { inputTokens: 8, outputTokens: 5, reasoningTokens: 3 },
+            totalTokens: 13,
             costByCurrencyMicros: { USD: 10_000 },
             byProvider: { openai: 1 },
             byStatus: { succeeded: 1 },
@@ -384,7 +399,8 @@ it("shows selected-period buckets without the redundant activity breakdown", asy
               {
                 label: "2026-09-15",
                 attempts: 1,
-                usage: { inputTokens: 8, outputTokens: 2 },
+                usage: { inputTokens: 8, outputTokens: 5, reasoningTokens: 3 },
+                totalTokens: 13,
                 costByCurrencyMicros: { USD: 10_000 },
                 partial: false,
                 unknownCount: 0,
@@ -406,17 +422,20 @@ it("shows selected-period buckets without the redundant activity breakdown", asy
   );
   await click("Week");
   await click("Tokens");
-  const point = document.querySelector('[aria-label="2026-09-15: 10 tokens"]')!;
+  expect(document.querySelector(".ai-chart__summary strong")?.textContent).toBe(
+    "13",
+  );
+  const point = document.querySelector('[aria-label="2026-09-15: 13 tokens"]')!;
   await act(async () => {
     point.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   });
   const tooltip = document.querySelector('[role="tooltip"]')!;
   expect(tooltip.textContent).toContain("15 Tue");
-  expect(tooltip.textContent).toContain("10Estimated total tokens");
+  expect(tooltip.textContent).toContain("13Estimated total tokens");
   expect(tooltip.textContent).toContain("1 attempt");
   expect(tooltip.closest(".ai-chart__plot")).not.toBeNull();
   expect(tooltip.querySelector("dl")?.textContent).toContain(
-    "Input8Output2Cached input0Cache write0Reasoning0",
+    "Input8Output5Cached input0Cache write0Reasoning3",
   );
   expect(document.querySelector(".ai-chart__readout")).toBeNull();
   expect(document.body.textContent).not.toContain("Activity breakdown");

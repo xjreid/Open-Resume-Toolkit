@@ -11,6 +11,7 @@ export type UsageBucket = {
   label: string;
   attempts: number;
   usage: Usage;
+  totalTokens?: number;
   costByCurrencyMicros: Record<string, number>;
   partial: boolean;
   unknownCount: number;
@@ -28,12 +29,15 @@ export function periodStart(period: UsagePeriod, now = new Date()) {
   if (period === "All time") start.setDate(1);
   return start;
 }
-export const totalTokens = (usage: Usage) =>
+// The native aggregate accounts for provider-specific overlap: OpenAI reasoning
+// tokens are already included in output tokens.
+export const totalTokens = (usage: Usage, normalizedTotal?: number) =>
+  normalizedTotal ??
   usage.inputTokens +
-  (usage.cachedInputTokens ?? 0) +
-  (usage.cacheWriteTokens ?? 0) +
-  usage.outputTokens +
-  (usage.reasoningTokens ?? 0);
+    (usage.cachedInputTokens ?? 0) +
+    (usage.cacheWriteTokens ?? 0) +
+    usage.outputTokens +
+    (usage.reasoningTokens ?? 0);
 
 // Calendar buckets include quiet intervals; spacing never compresses gaps in time.
 export function chartBuckets(
@@ -82,6 +86,8 @@ export function chartBuckets(
       unknownCount: 0,
     };
     year.attempts += bucket.attempts;
+    year.totalTokens =
+      (year.totalTokens ?? 0) + totalTokens(bucket.usage, bucket.totalTokens);
     year.partial ||= bucket.partial;
     year.unknownCount += bucket.unknownCount;
     for (const category of [
@@ -130,7 +136,7 @@ export function AiUsageChart({
   const points = chartBuckets(buckets, period);
   const values = points.map((bucket) =>
     metric === "tokens"
-      ? totalTokens(bucket.usage)
+      ? totalTokens(bucket.usage, bucket.totalTokens)
       : (bucket.costByCurrencyMicros[currency] ?? 0) / 1_000_000,
   );
   const rawStep = Math.max(metric === "tokens" ? 4 : 0.000004, ...values) / 4;
@@ -330,7 +336,10 @@ export function AiUsageChart({
                 <span>{dateLabel(selected.label)}</span>
                 <strong>
                   {metric === "tokens"
-                    ? totalTokens(selected.usage).toLocaleString()
+                    ? totalTokens(
+                        selected.usage,
+                        selected.totalTokens,
+                      ).toLocaleString()
                     : `${((selected.costByCurrencyMicros[currency] ?? 0) / 1_000_000).toFixed(6)} ${currency}`}
                 </strong>
                 <small>

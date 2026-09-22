@@ -241,6 +241,8 @@ pub struct AiMonitoringSummary {
     pub logical_operations: u64,
     pub attempts: u64,
     pub usage: Usage,
+    /// Provider-normalized total; `OpenAI` reasoning is already part of output.
+    pub total_tokens: u64,
     pub estimated_cost_micros: u64,
     pub unresolved_reserved_micros: u64,
     pub currency: Option<String>,
@@ -263,6 +265,7 @@ pub struct AiMonitoringBucket {
     pub label: String,
     pub attempts: u64,
     pub usage: Usage,
+    pub total_tokens: u64,
     pub cost_by_currency_micros: BTreeMap<String, u64>,
     pub partial: bool,
     pub unknown_count: u64,
@@ -1245,7 +1248,7 @@ impl EncryptedStore {
             tx.execute(
                 "UPDATE ai_guardrail_policies SET reserved_micros = reserved_micros - ?1,
                 unresolved_micros = unresolved_micros + ?2, revision = revision + 1
-                WHERE profile_id = ?3 AND credential_id = ?4 AND currency = ?5
+                WHERE profile_id = ?3 AND credential_id IN (?4, ?7) AND currency = ?5
                 AND activated_at_unix_ms <= ?6 AND period_start_unix_ms <= ?6
                 AND (period_end_unix_ms IS NULL OR ?6 < period_end_unix_ms)",
                 params![
@@ -1254,11 +1257,23 @@ impl EncryptedStore {
                     profile,
                     credential,
                     currency,
-                    started
+                    started,
+                    AI_GENERAL_CAP_CREDENTIAL_ID.to_string()
                 ],
             )
             .map_err(|_| StorageError::Unavailable)?;
         }
+        // A crash after a transient failure is settled but before its retry is
+        // reserved leaves an active operation with no active attempt.
+        tx.execute(
+            "UPDATE ai_operations SET status = 'failed', ended_at_unix_ms = MAX(started_at_unix_ms, ?2)
+             WHERE profile_id = ?1 AND status = 'active'
+             AND NOT EXISTS (SELECT 1 FROM ai_attempts
+                 WHERE ai_attempts.operation_id = ai_operations.operation_id
+                 AND ai_attempts.status IN ('reserved', 'dispatching', 'streaming'))",
+            params![profile, now_unix_ms],
+        )
+        .map_err(|_| StorageError::Unavailable)?;
         tx.commit().map_err(|_| StorageError::Unavailable)?;
         u64::try_from(rows.len()).map_err(|_| StorageError::InvalidData)
     }
@@ -1408,7 +1423,7 @@ impl EncryptedStore {
                 .attempts
                 .checked_add(1)
                 .ok_or(StorageError::InvalidData)?;
-            *summary.by_provider.entry(provider).or_default() += 1;
+            *summary.by_provider.entry(provider.clone()).or_default() += 1;
             *summary.by_credential_id.entry(credential).or_default() += 1;
             *summary.by_status.entry(status).or_default() += 1;
             *summary.by_model.entry(model).or_default() += 1;
@@ -1428,6 +1443,28 @@ impl EncryptedStore {
             if let Some(bytes) = usage {
                 let value: Usage =
                     serde_json::from_slice(&bytes).map_err(|_| StorageError::InvalidData)?;
+                let normalized_total = [
+                    value.input_tokens,
+                    value.cached_input_tokens,
+                    value.cache_write_tokens,
+                    value.output_tokens,
+                    if provider == Provider::OpenAi.as_str() {
+                        0
+                    } else {
+                        value.reasoning_tokens
+                    },
+                ]
+                .into_iter()
+                .try_fold(0_u64, u64::checked_add)
+                .ok_or(StorageError::InvalidData)?;
+                summary.total_tokens = summary
+                    .total_tokens
+                    .checked_add(normalized_total)
+                    .ok_or(StorageError::InvalidData)?;
+                bucket.total_tokens = bucket
+                    .total_tokens
+                    .checked_add(normalized_total)
+                    .ok_or(StorageError::InvalidData)?;
                 add_usage(&mut summary.usage, value)?;
                 add_usage(&mut bucket.usage, value)?;
             }
@@ -2495,6 +2532,122 @@ mod tests {
         assert_eq!(summary.by_status.get("outcome_unknown"), Some(&1));
         assert!(summary.partial);
         assert_eq!(store.recover_ai_attempts(4_000).unwrap(), 0);
+    }
+
+    #[test]
+    fn recovery_reconciles_general_and_key_caps_for_reserved_and_dispatched_attempts() {
+        for dispatched in [false, true] {
+            let temp = tempfile::tempdir().unwrap();
+            let store = EncryptedStore::open_or_initialize(
+                temp.path(),
+                "test",
+                &MemoryDatabaseKeyVault::new(),
+            )
+            .unwrap();
+            for credential_id in [Uuid::from_u128(42), AI_GENERAL_CAP_CREDENTIAL_ID] {
+                store
+                    .save_ai_unified_cap(&AiCapPolicy {
+                        credential_id,
+                        period: AiPeriod::AllTime,
+                        currency: "USD".into(),
+                        time_zone: "UTC".into(),
+                        limit_micros: 100,
+                        activated_at_unix_ms: 1,
+                        period_start_unix_ms: 1,
+                        period_end_unix_ms: None,
+                        expected_revision: None,
+                    })
+                    .unwrap();
+            }
+            let attempt = preflight(60);
+            store.reserve_ai_attempt(&attempt).unwrap();
+            if dispatched {
+                store.mark_ai_dispatching(attempt.attempt_id).unwrap();
+            }
+            store.recover_ai_attempts(2_000).unwrap();
+            for credential_id in [Uuid::from_u128(42), AI_GENERAL_CAP_CREDENTIAL_ID] {
+                let cap = &store.ai_cap_policies(credential_id).unwrap()[0];
+                assert_eq!(cap.reserved_micros, 0);
+                assert_eq!(cap.unresolved_micros, if dispatched { 60 } else { 0 });
+            }
+            assert_eq!(
+                store.reserve_ai_attempt(&preflight(50)),
+                if dispatched {
+                    Err(StorageError::InvalidData)
+                } else {
+                    Ok(())
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn recovery_closes_operation_left_active_before_retry_reservation() {
+        let temp = tempfile::tempdir().unwrap();
+        let store =
+            EncryptedStore::open_or_initialize(temp.path(), "test", &MemoryDatabaseKeyVault::new())
+                .unwrap();
+        let attempt = preflight(25);
+        store.reserve_ai_attempt(&attempt).unwrap();
+        store.mark_ai_dispatching(attempt.attempt_id).unwrap();
+        store
+            .settle_ai_attempt(&AiAttemptSettlement {
+                attempt_id: attempt.attempt_id,
+                status: AiTerminalStatus::Failed,
+                effective_model: None,
+                usage: None,
+                settled_cost_micros: None,
+                usage_complete: false,
+                error_category: Some("transient".into()),
+                ended_at_unix_ms: 1_500,
+                keep_operation_active: true,
+            })
+            .unwrap();
+        assert_eq!(
+            store.reserve_ai_attempt(&preflight(25)),
+            Err(StorageError::RevisionConflict)
+        );
+        assert_eq!(store.recover_ai_attempts(2_000).unwrap(), 0);
+        store.reserve_ai_attempt(&preflight(25)).unwrap();
+    }
+
+    #[test]
+    fn monitoring_total_counts_openai_reasoning_only_once() {
+        let temp = tempfile::tempdir().unwrap();
+        let store =
+            EncryptedStore::open_or_initialize(temp.path(), "test", &MemoryDatabaseKeyVault::new())
+                .unwrap();
+        let mut expected_total = 0;
+        for (provider, attempt_total) in [(Provider::OpenAi, 15), (Provider::Gemini, 18)] {
+            let mut attempt = preflight(25);
+            attempt.provider = provider;
+            store.reserve_ai_attempt(&attempt).unwrap();
+            store.mark_ai_dispatching(attempt.attempt_id).unwrap();
+            store
+                .settle_ai_attempt(&AiAttemptSettlement {
+                    attempt_id: attempt.attempt_id,
+                    status: AiTerminalStatus::Succeeded,
+                    effective_model: Some("fixture-model".into()),
+                    usage: Some(Usage {
+                        input_tokens: 10,
+                        output_tokens: 5,
+                        reasoning_tokens: 3,
+                        ..Usage::default()
+                    }),
+                    settled_cost_micros: Some(25),
+                    usage_complete: true,
+                    error_category: None,
+                    ended_at_unix_ms: 2_000,
+                    keep_operation_active: false,
+                })
+                .unwrap();
+            let summary = store
+                .ai_monitoring_summary(0, 3_000, "UTC", AiBucketSize::Day)
+                .unwrap();
+            expected_total += attempt_total;
+            assert_eq!(summary.total_tokens, expected_total);
+            assert_eq!(summary.time_buckets[0].total_tokens, summary.total_tokens);
+        }
     }
 
     #[test]
