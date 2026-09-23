@@ -29,6 +29,7 @@ use uuid::Uuid;
 use crate::{DesktopState, storage_unavailable, window_not_authorized};
 
 const OUTPUT_LIMIT: u32 = 64;
+const GEMINI_TEST_OUTPUT_LIMIT: u32 = 512;
 const TEST_INPUT_ESTIMATE: u32 = 512;
 const TEST_INPUT_RESERVATION_BOUND: u32 = 4_096;
 
@@ -244,7 +245,7 @@ fn maximum_cost(entry: &ort_ai::CatalogEntry, provider: Provider) -> Option<u64>
         return None;
     }
     let input = u64::from(TEST_INPUT_RESERVATION_BOUND);
-    let output = u64::from(OUTPUT_LIMIT);
+    let output = u64::from(test_output_limit(provider));
     let mut usage = Usage::default();
     for price in &entry.prices {
         match price.category {
@@ -259,6 +260,14 @@ fn maximum_cost(entry: &ort_ai::CatalogEntry, provider: Provider) -> Option<u64>
         return None;
     }
     estimate_cost(entry, usage).ok()
+}
+
+const fn test_output_limit(provider: Provider) -> u32 {
+    if matches!(provider, Provider::Gemini) {
+        GEMINI_TEST_OUTPUT_LIMIT
+    } else {
+        OUTPUT_LIMIT
+    }
 }
 
 #[derive(Default)]
@@ -468,7 +477,7 @@ pub async fn test_ai_connection(
         model: entry.model.clone(),
         system: "Return only a JSON object with the boolean field ok set to true. No tools, files, user content, or additional text.".into(),
         input: json!({"test":"Open Resume Toolkit synthetic connection test"}),
-        max_output_tokens: OUTPUT_LIMIT,
+        max_output_tokens: test_output_limit(provider),
     };
     let Ok(reference) = ProviderCredentialReference::new(
         &channel,
@@ -900,6 +909,16 @@ pub async fn test_ai_connection(
     let usage = synthetic.usage;
     let effective_model = synthetic.effective_model;
     if !valid {
+        // A provider can report complete usage even when it produced no usable
+        // content (for example, Gemini exhausting its thinking/output limit).
+        // Price that usage only when the serving model matches the signed entry.
+        let cost = if effective_model.as_deref() == Some(entry.model.as_str()) {
+            usage
+                .and_then(|value| estimate_cost(&entry, value).ok())
+                .filter(|amount| *amount <= maximum_cost_micros)
+        } else {
+            None
+        };
         return fail_after_settlement(
             &state,
             AiAttemptSettlement {
@@ -907,8 +926,8 @@ pub async fn test_ai_connection(
                 status: AiTerminalStatus::Failed,
                 effective_model,
                 usage,
-                settled_cost_micros: None,
-                usage_complete: false,
+                settled_cost_micros: cost,
+                usage_complete: cost.is_some(),
                 error_category: Some("invalid_output".into()),
                 ended_at_unix_ms: ended,
                 keep_operation_active: false,
@@ -1050,6 +1069,8 @@ mod tests {
     #[test]
     fn bundled_balanced_test_has_a_nonzero_conservative_reservation() {
         let catalog = builtin_catalog("2026-09-15T00:00:00Z", None).unwrap();
+        assert_eq!(test_output_limit(Provider::Gemini), 512);
+        assert_eq!(test_output_limit(Provider::OpenAi), 64);
         for provider in [Provider::OpenAi, Provider::Anthropic, Provider::Gemini] {
             let entry = catalog
                 .resolve(provider, Preset::Balanced, OperationType::CredentialTest)
@@ -1068,9 +1089,11 @@ mod tests {
                     ort_ai::PriceCategory::CacheWrite => {
                         usage.cache_write_tokens = u64::from(TEST_INPUT_RESERVATION_BOUND);
                     }
-                    ort_ai::PriceCategory::Output => usage.output_tokens = u64::from(OUTPUT_LIMIT),
+                    ort_ai::PriceCategory::Output => {
+                        usage.output_tokens = u64::from(test_output_limit(provider));
+                    }
                     ort_ai::PriceCategory::Reasoning => {
-                        usage.reasoning_tokens = u64::from(OUTPUT_LIMIT);
+                        usage.reasoning_tokens = u64::from(test_output_limit(provider));
                     }
                 }
                 assert!(reserved >= estimate_cost(entry, usage).unwrap());
@@ -1100,6 +1123,12 @@ data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"outpu
             StreamEvent::Finished,
         ]);
         assert!(!failed.valid(Provider::OpenAi, "fixture-model"));
+
+        let gemini = br#"data: {"candidates":[{"content":{"parts":[{"text":"{\"ok\":true}"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":20,"candidatesTokenCount":6,"thoughtsTokenCount":17},"modelVersion":"gemini-3.6-flash"}
+"#;
+        let parsed = SyntheticStreamState::from_events(GeminiAdapter.parse_stream(gemini).unwrap());
+        assert!(parsed.valid(Provider::Gemini, "gemini-3.6-flash"));
+        assert_eq!(parsed.usage.unwrap().reasoning_tokens, 17);
     }
 }
 

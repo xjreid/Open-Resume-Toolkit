@@ -492,16 +492,30 @@ impl ProviderAdapter for GeminiAdapter {
         {
             return Err(AiError::UnsupportedModel);
         }
-        Ok(HttpRequest { url: format!("https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?alt=sse", r.model), headers: BTreeMap::from([("x-goog-api-key".into(), key.text()?.into()), ("content-type".into(), "application/json".into())]), body: serde_json::to_vec(&json!({"systemInstruction":{"parts":[{"text":r.system}]},"contents":[{"role":"user","parts":[{"text":encoded(&r.input)?}]}],"generationConfig":{"maxOutputTokens":r.max_output_tokens,"responseMimeType":"application/json"}})).map_err(|_| AiError::InvalidResponse)? })
+        let mut generation_config = json!({
+            "maxOutputTokens": r.max_output_tokens,
+            "responseMimeType": "application/json"
+        });
+        if r.operation == OperationType::CredentialTest && r.model.starts_with("gemini-3.") {
+            generation_config["thinkingConfig"] = json!({"thinkingLevel":"low"});
+        }
+        Ok(HttpRequest { url: format!("https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?alt=sse", r.model), headers: BTreeMap::from([("x-goog-api-key".into(), key.text()?.into()), ("content-type".into(), "application/json".into())]), body: serde_json::to_vec(&json!({"systemInstruction":{"parts":[{"text":r.system}]},"contents":[{"role":"user","parts":[{"text":encoded(&r.input)?}]}],"generationConfig":generation_config})).map_err(|_| AiError::InvalidResponse)? })
     }
     fn parse_stream(&self, bytes: &[u8]) -> Result<Vec<StreamEvent>, AiError> {
         parse_sse(bytes, |v| {
             let mut events = Vec::new();
-            if let Some(s) = v
-                .pointer("/candidates/0/content/parts/0/text")
-                .and_then(Value::as_str)
+            if let Some(parts) = v
+                .pointer("/candidates/0/content/parts")
+                .and_then(Value::as_array)
             {
-                events.push(StreamEvent::Text(s.into()));
+                for part in parts {
+                    if part.get("thought").and_then(Value::as_bool) == Some(true) {
+                        continue;
+                    }
+                    if let Some(text) = part.get("text").and_then(Value::as_str) {
+                        events.push(StreamEvent::Text(text.into()));
+                    }
+                }
             }
             if let Some(usage) = v.get("usageMetadata") {
                 match gemini_usage(usage) {
@@ -591,7 +605,9 @@ fn gemini_usage(v: &Value) -> Result<Usage, AiError> {
     Ok(Usage {
         input_tokens: total.checked_sub(cached).ok_or(AiError::InvalidResponse)?,
         cached_input_tokens: cached,
-        output_tokens: required(v, "/candidatesTokenCount")?,
+        // Proto JSON may omit a zero count when thinking consumed the entire
+        // output allowance and no visible candidate was produced.
+        output_tokens: optional(v, "/candidatesTokenCount"),
         reasoning_tokens: optional(v, "/thoughtsTokenCount"),
         cache_write_tokens: 0,
     })

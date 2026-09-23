@@ -126,6 +126,35 @@ data: {"type":"message_stop"}
 }
 
 #[test]
+fn gemini_credential_test_limits_thinking_and_reads_visible_parts() {
+    let key = ApiKey::new(b"SYNTHETIC_SECRET_VALUE").unwrap();
+    let mut test = request();
+    test.operation = OperationType::CredentialTest;
+    test.model = "gemini-3.6-flash".into();
+    test.max_output_tokens = 512;
+    let built = GeminiAdapter.build_request(&test, &key).unwrap();
+    let body: Value = serde_json::from_slice(&built.body).unwrap();
+    assert_eq!(body["generationConfig"]["maxOutputTokens"], 512);
+    assert_eq!(
+        body["generationConfig"]["thinkingConfig"]["thinkingLevel"],
+        "low"
+    );
+
+    let response = br#"data: {"candidates":[{"content":{"parts":[{"thought":true,"text":"hidden reasoning"},{"text":"{\"ok\":true}"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":20,"thoughtsTokenCount":12},"modelVersion":"gemini-3.6-flash"}
+"#;
+    let events = GeminiAdapter.parse_stream(response).unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, StreamEvent::Text(text) if text == "{\"ok\":true}"))
+    );
+    assert!(!events.iter().any(
+        |event| matches!(event, StreamEvent::Text(text) if text.contains("hidden reasoning"))
+    ));
+    assert!(events.iter().any(|event| matches!(event, StreamEvent::Usage(usage) if usage.output_tokens == 0 && usage.reasoning_tokens == 12)));
+}
+
+#[test]
 fn openai_reasoning_breakdown_is_not_billed_twice() {
     let raw = br#"data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":10,"output_tokens_details":{"reasoning_tokens":5}}}}"#;
     let usage = OpenAiAdapter
