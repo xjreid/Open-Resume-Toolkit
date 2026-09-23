@@ -24,6 +24,7 @@ pub struct StorageUsageResponse {
     pub drafts: u32,
     pub published_snapshots: u32,
     pub settings: u32,
+    pub tracker_entries: u32,
     pub render_manifests: u32,
     pub diagnostic_events: u32,
     pub database_bytes: u64,

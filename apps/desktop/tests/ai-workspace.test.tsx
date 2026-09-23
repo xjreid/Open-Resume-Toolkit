@@ -311,6 +311,25 @@ it("surfaces a missing-usage failure without treating reserved exposure as zero"
   expect(document.body.textContent).toContain("reservation remains unresolved");
 });
 
+it("explains a provider 503 instead of showing the generic test failure", async () => {
+  const previous = native.invoke.getMockImplementation()!;
+  native.invoke.mockImplementation((command: string, args?: unknown) =>
+    command === "test_ai_connection"
+      ? Promise.resolve({
+          ok: false,
+          error: { code: "AI_PROVIDER_SERVICE_UNAVAILABLE" },
+        })
+      : previous(command, args),
+  );
+  await clickAccessible("Test OpenAI key");
+  await click("Confirm and send test");
+  expect(document.body.textContent).toContain("HTTP 503");
+  expect(document.body.textContent).toContain("temporarily unavailable");
+  expect(document.body.textContent).not.toContain(
+    "Synthetic provider request failed",
+  );
+});
+
 it("saves an inline cap on click-away without changing primary", async () => {
   const previous = native.invoke.getMockImplementation()!;
   let savedCap: Record<string, unknown> | null = null;

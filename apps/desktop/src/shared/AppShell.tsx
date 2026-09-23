@@ -7,6 +7,7 @@ export const WORKSPACE_DESTINATIONS = [
   { id: "resume", label: "Master resume" },
   { id: "import", label: "Import resume" },
   { id: "ai", label: "AI & monitoring" },
+  { id: "tracker", label: "Application tracker" },
   { id: "settings", label: "Settings" },
 ] as const;
 export type WorkspaceDestination =
@@ -26,12 +27,14 @@ export function Brand() {
 export function AppShell({
   destination,
   onNavigate,
+  onOpenApplication,
   navigationBlocked,
   status,
   children,
 }: {
   destination: WorkspaceDestination;
   onNavigate: (destination: WorkspaceDestination) => void;
+  onOpenApplication: () => void;
   navigationBlocked: boolean;
   status: ReactNode;
   children: ReactNode;
@@ -42,6 +45,14 @@ export function AppShell({
         <Brand />
         {status}
         <nav className="workspace-shortcuts" aria-label="Workspace areas">
+          <button
+            type="button"
+            className="button--secondary"
+            disabled={navigationBlocked}
+            onClick={onOpenApplication}
+          >
+            Application workspace
+          </button>
           {WORKSPACE_DESTINATIONS.map((item) => (
             <button
               key={item.id}

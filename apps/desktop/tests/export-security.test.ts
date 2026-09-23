@@ -7,7 +7,15 @@ describe("native-only export authority", () => {
     for (const file of readdirSync(root)) {
       if (!file.endsWith(".json")) continue;
       const capability = JSON.parse(readFileSync(new URL(file, root), "utf8"));
-      expect(capability.permissions).toEqual(["core:default"]);
+      expect(capability.permissions).toEqual(
+        file === "overlay.json"
+          ? [
+              "core:default",
+              "core:event:allow-emit-to",
+              "core:window:allow-set-size",
+            ]
+          : ["core:default", "core:event:allow-emit-to"],
+      );
       expect(capability.remote).toBeUndefined();
     }
     const config = JSON.parse(

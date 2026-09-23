@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { emitTo } from "@tauri-apps/api/event";
 import type { CloseDecision } from "@ort/contracts/lifecycle";
 import type { EditorState } from "./editor-state";
 import { requestCloseStatus, resolveClose } from "./command-client";
 import { closeDisposition } from "./close-policy";
 import { subscribeToCloseRequests } from "./close-subscription";
+import { probeOverlayClose } from "./overlay-close-probe";
 
-export function useCloseGuard(editor: EditorState) {
+export function useCloseGuard(editor: EditorState, otherUnsavedWork = false) {
   const [attempt, setAttempt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [connection, setConnection] = useState(0);
+  const [overlayDirty, setOverlayDirty] = useState(false);
+  const [overlayCheckFailed, setOverlayCheckFailed] = useState(false);
+  const probeGeneration = useRef(0);
   const inFlight = useRef(false);
   const mounted = useRef(false);
   const subscription = useRef<ReturnType<
@@ -27,8 +32,40 @@ export function useCloseGuard(editor: EditorState) {
       },
       (result) => {
         if (result.ok) {
-          setAttempt(result.value.pendingAttempt);
-          setError(null);
+          const pending = result.value.pendingAttempt;
+          const generation = ++probeGeneration.current;
+          if (!pending) {
+            setAttempt(null);
+            setOverlayDirty(false);
+            setOverlayCheckFailed(false);
+            setError(null);
+            return;
+          }
+          void probeOverlayClose(pending, {
+            listen: async (reply) =>
+              getCurrentWebviewWindow().listen<{
+                attempt: string;
+                dirty: boolean;
+              }>("ort:overlay-close-reply", (event) => reply(event.payload)),
+            emit: (id) =>
+              emitTo("overlay", "ort:overlay-close-probe", { attempt: id }),
+          })
+            .then((unsaved) => {
+              if (!mounted.current || generation !== probeGeneration.current)
+                return;
+              setOverlayDirty(unsaved);
+              setOverlayCheckFailed(false);
+              setAttempt(pending);
+              setError(null);
+            })
+            .catch(() => {
+              if (!mounted.current || generation !== probeGeneration.current)
+                return;
+              setOverlayDirty(true);
+              setOverlayCheckFailed(true);
+              setAttempt(pending);
+              setError(null);
+            });
         } else
           setError(
             "The app could not check its quit request. Retry the connection; your editor remains open.",
@@ -42,6 +79,7 @@ export function useCloseGuard(editor: EditorState) {
     subscription.current = current;
     return () => {
       mounted.current = false;
+      probeGeneration.current += 1;
       current.dispose();
     };
   }, [connection]);
@@ -55,6 +93,10 @@ export function useCloseGuard(editor: EditorState) {
       const result = await resolveClose(attempt, decision);
       if (!mounted.current) return;
       inFlight.current = false;
+      if (decision === "cancel")
+        void emitTo("overlay", "ort:overlay-close-cancelled", {}).catch(
+          () => {},
+        );
       if (result.ok && decision === "quit") return; // Remain frozen until native exit.
       setResolving(false);
       if (result.ok) {
@@ -82,14 +124,24 @@ export function useCloseGuard(editor: EditorState) {
       attempt &&
       !resolving &&
       !error &&
-      closeDisposition(editor) === "quit"
+      closeDisposition(editor, otherUnsavedWork || overlayDirty) === "quit"
     ) {
       void resolve("quit");
     }
-  }, [attempt, resolving, error, editor, resolve]);
+  }, [
+    attempt,
+    resolving,
+    error,
+    editor,
+    otherUnsavedWork,
+    overlayDirty,
+    resolve,
+  ]);
 
   return {
     pending: attempt !== null,
+    overlayDirty,
+    overlayCheckFailed,
     resolving,
     error,
     cancel: () => void resolve("cancel"),

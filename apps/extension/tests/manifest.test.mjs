@@ -7,9 +7,10 @@ const root = resolve(import.meta.dirname, "..");
 const load = (name) =>
   JSON.parse(readFileSync(resolve(root, `manifest/${name}.json`), "utf8"));
 
-test("M0 base manifest has no browsing or native authority", () => {
+test("unsigned development manifest has no capture authority", () => {
   const manifest = load("base");
   assert.deepEqual(manifest.permissions, []);
+  assert.equal(manifest.action.default_popup, undefined);
   assert.equal(manifest.host_permissions, undefined);
   assert.equal(manifest.content_scripts, undefined);
   assert.equal(manifest.externally_connectable, undefined);

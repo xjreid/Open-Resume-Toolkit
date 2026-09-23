@@ -132,6 +132,7 @@ export function StoragePanel({
                 ["Master drafts", usage.drafts],
                 ["Published snapshots", usage.publishedSnapshots],
                 ["Portable settings", usage.settings],
+                ["Tracker applications", usage.trackerEntries],
                 ["PDF render manifests", usage.renderManifests],
                 ["Diagnostic events", usage.diagnosticEvents],
               ]}

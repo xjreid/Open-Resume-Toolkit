@@ -1,5 +1,7 @@
 //! Direct-AI provider, catalog, accounting, monitoring, and guardrail boundary.
 
+pub mod materials;
+
 use base64::Engine as _;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};

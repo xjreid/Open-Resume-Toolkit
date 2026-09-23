@@ -33,12 +33,17 @@ pub(crate) async fn delete_all_local_data(
         };
         let state = app.state::<DesktopState>();
         let previews = app.state::<PdfState>();
-        delete_and_reinitialize(
+        let result = delete_and_reinitialize(
             &state,
             &previews,
             &OsDatabaseKeyVault::new(),
             &OsProviderCredentialVault::new(),
-        )
+        );
+        if matches!(result, CommandResponse::Success { .. }) {
+            app.state::<super::application_materials::DragFiles>()
+                .clear();
+        }
+        result
     })
     .await
     {

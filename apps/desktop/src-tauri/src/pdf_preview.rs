@@ -1183,6 +1183,7 @@ mod tests {
                 document: first,
             }],
             settings: std::collections::BTreeMap::new(),
+            tracker_entries: Vec::new(),
             render_manifests: vec![
                 current_draft.clone(),
                 publication.clone(),
@@ -1270,6 +1271,7 @@ mod tests {
             }),
             published_resumes: Vec::new(),
             settings: std::collections::BTreeMap::new(),
+            tracker_entries: Vec::new(),
             render_manifests: vec![manifest.clone()],
             ai_operations: Vec::new(),
             ai_attempts: Vec::new(),
@@ -1335,6 +1337,7 @@ mod tests {
                 master_draft: None,
                 published_resumes,
                 settings: std::collections::BTreeMap::new(),
+                tracker_entries: Vec::new(),
                 render_manifests,
                 ai_operations: Vec::new(),
                 ai_attempts: Vec::new(),

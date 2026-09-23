@@ -59,6 +59,11 @@
       "format": "uint64",
       "minimum": 0
     },
+    "trackerEntries": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
     "walBytes": {
       "type": "integer",
       "format": "uint64",
@@ -71,6 +76,7 @@
     "drafts",
     "publishedSnapshots",
     "settings",
+    "trackerEntries",
     "renderManifests",
     "diagnosticEvents",
     "databaseBytes",

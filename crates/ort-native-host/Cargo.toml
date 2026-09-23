@@ -8,3 +8,8 @@ repository.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+jiff.workspace = true
+ort-ipc = { path = "../ort-ipc" }
+serde_json.workspace = true

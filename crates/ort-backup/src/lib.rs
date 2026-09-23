@@ -21,11 +21,12 @@ use zeroize::{Zeroize, Zeroizing};
 
 const MAGIC: &[u8; 4] = b"ORTB";
 const FORMAT_MAJOR: u16 = 1;
-const FORMAT_MINOR: u16 = 4;
+const FORMAT_MINOR: u16 = 5;
 const DATABASE_SCHEMA_V1_0: u16 = 1;
 const DATABASE_SCHEMA_V1_1: u16 = 2;
 const DATABASE_SCHEMA_V1_2: u16 = 3;
 const DATABASE_SCHEMA_V1_3: u16 = 4;
+const DATABASE_SCHEMA_V1_4: u16 = 5;
 const KDF_ARGON2ID: u8 = 1;
 const HEADER_LEN: usize = 76;
 const SALT_LEN: usize = 16;
@@ -45,7 +46,12 @@ const MAX_RENDER_MANIFESTS: usize = 100;
 const MAX_AI_OPERATIONS: usize = 10_000;
 const MAX_AI_ATTEMPTS: usize = 20_000;
 const MAX_SETTINGS: usize = 128;
+const MAX_TRACKER_ENTRIES: usize = 100_000;
+const MAX_TRACKER_ENTRY_BYTES: usize = 1_024 * 1_024;
 const MAX_SETTING_BYTES: usize = 64 * 1_024;
+const MAX_APPLICATION_WORKSPACE_BYTES: usize = 1_024 * 1_024;
+const MAX_APPLICATION_STAGE_ONE_BYTES: usize = 256 * 1_024;
+const MAX_APPLICATION_CAPTURE_PENDING_BYTES: usize = 256 * 1_024;
 const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -174,12 +180,22 @@ pub struct PortableAiPriceV1 {
     pub micros_per_million: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortableTrackerEntryV1 {
+    pub id: String,
+    pub revision: i64,
+    pub value: Value,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PortableProfileV1 {
     pub master_draft: Option<PortableResumeRevisionV1>,
     pub published_resumes: Vec<PortablePublishedResumeV1>,
     pub settings: BTreeMap<String, PortableSettingV1>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tracker_entries: Vec<PortableTrackerEntryV1>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub render_manifests: Vec<PortableRenderManifestV1>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -194,6 +210,8 @@ pub struct BackupInventoryV1 {
     pub master_drafts: u16,
     pub published_resumes: u16,
     pub settings: u16,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub tracker_entries: u32,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub render_manifests: u16,
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -290,7 +308,7 @@ fn create_backup_with_entropy(
         salt,
         nonce,
         format_minor,
-        DATABASE_SCHEMA_V1_3,
+        DATABASE_SCHEMA_V1_4,
     )
 }
 
@@ -310,8 +328,10 @@ fn create_backup_with_entropy_for_format(
         && request.profile.render_manifests.is_empty())
         || (matches!(format_minor, 1 | 2) && database_schema == DATABASE_SCHEMA_V1_1)
         || (format_minor == 3 && database_schema == DATABASE_SCHEMA_V1_2)
-        || (format_minor == 4 && database_schema == DATABASE_SCHEMA_V1_3);
+        || (format_minor == 4 && database_schema == DATABASE_SCHEMA_V1_3)
+        || (format_minor == 5 && database_schema == DATABASE_SCHEMA_V1_4);
     let supported_writer = supported_writer
+        && (format_minor >= 5 || request.profile.tracker_entries.is_empty())
         && ((format_minor <= 1 && document_schema == 1)
             || (format_minor == 2 && document_schema == 2)
             || (format_minor >= 3 && matches!(document_schema, 1 | 2)));
@@ -566,6 +586,7 @@ fn validate_payload(
         1 | 2 => DATABASE_SCHEMA_V1_1,
         3 => DATABASE_SCHEMA_V1_2,
         4 => DATABASE_SCHEMA_V1_3,
+        5 => DATABASE_SCHEMA_V1_4,
         _ => return Err(BackupError::InvalidBackup),
     };
     if payload.manifest.format_major != FORMAT_MAJOR
@@ -634,6 +655,7 @@ fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
     if profile.published_resumes.len() > MAX_PUBLISHED_RESUMES
         || profile.render_manifests.len() > MAX_RENDER_MANIFESTS
         || profile.settings.len() > MAX_SETTINGS
+        || profile.tracker_entries.len() > MAX_TRACKER_ENTRIES
         || profile.ai_operations.len() > MAX_AI_OPERATIONS
         || profile.ai_attempts.len() > MAX_AI_ATTEMPTS
     {
@@ -661,6 +683,18 @@ fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
             return Err(BackupError::InvalidContent);
         }
         validate_setting(key, &setting.value)?;
+    }
+    let mut tracker_ids = BTreeSet::new();
+    for entry in &profile.tracker_entries {
+        let id = uuid::Uuid::parse_str(&entry.id).map_err(|_| BackupError::InvalidContent)?;
+        let bytes = serde_json::to_vec(&entry.value).map_err(|_| BackupError::InvalidContent)?;
+        if id.to_string() != entry.id
+            || entry.revision < 1
+            || bytes.len() > MAX_TRACKER_ENTRY_BYTES
+            || !tracker_ids.insert(&entry.id)
+        {
+            return Err(BackupError::InvalidContent);
+        }
     }
     validate_render_manifests(&profile.render_manifests)?;
     validate_ai_activity(&profile.ai_operations, &profile.ai_attempts)?;
@@ -901,7 +935,16 @@ fn validate_setting(key: &str, value: &Value) -> Result<(), BackupError> {
             .iter()
             .any(|forbidden| normalized.contains(forbidden));
     let serialized = serde_json::to_vec(value).map_err(|_| BackupError::InvalidContent)?;
-    if !valid_key || serialized.len() > MAX_SETTING_BYTES {
+    let limit = if key == "application.workspace.v1" {
+        MAX_APPLICATION_WORKSPACE_BYTES
+    } else if key == "application.stage1.v1" {
+        MAX_APPLICATION_STAGE_ONE_BYTES
+    } else if key == "application.capture.pending.v1" {
+        MAX_APPLICATION_CAPTURE_PENDING_BYTES
+    } else {
+        MAX_SETTING_BYTES
+    };
+    if !valid_key || serialized.len() > limit {
         return Err(BackupError::InvalidContent);
     }
     Ok(())
@@ -913,6 +956,8 @@ fn inventory_for(profile: &PortableProfileV1) -> Result<BackupInventoryV1, Backu
         published_resumes: u16::try_from(profile.published_resumes.len())
             .map_err(|_| BackupError::InvalidContent)?,
         settings: u16::try_from(profile.settings.len()).map_err(|_| BackupError::InvalidContent)?,
+        tracker_entries: u32::try_from(profile.tracker_entries.len())
+            .map_err(|_| BackupError::InvalidContent)?,
         render_manifests: u16::try_from(profile.render_manifests.len())
             .map_err(|_| BackupError::InvalidContent)?,
         ai_operations: u16::try_from(profile.ai_operations.len())
@@ -927,6 +972,10 @@ fn inventory_for(profile: &PortableProfileV1) -> Result<BackupInventoryV1, Backu
     reason = "serde skip_serializing_if requires a shared-reference predicate"
 )]
 const fn is_zero(value: &u16) -> bool {
+    *value == 0
+}
+
+const fn is_zero_u32(value: &u32) -> bool {
     *value == 0
 }
 
@@ -1092,8 +1141,8 @@ mod tests {
             create_backup_with_entropy(&passphrase, request, [0x11; 16], [0x22; 24]).unwrap();
         let header = inspect_backup(&bytes).unwrap();
         let mut payload = restore_backup(&bytes, &passphrase).unwrap();
-        assert_eq!(header.format_minor, 4);
-        assert_eq!(payload.manifest.database_schema, 4);
+        assert_eq!(header.format_minor, 5);
+        assert_eq!(payload.manifest.database_schema, 5);
         assert_eq!(payload.manifest.document_schema, 2);
         payload.manifest.document_schema = 1;
         assert_eq!(
@@ -1111,7 +1160,7 @@ mod tests {
         let digest = hex::encode(Sha256::digest(&backup));
         assert_eq!(
             digest,
-            "e8f30a5393d77308c4dcbc28d56761a0e14b88c3d83e9dba27f4aa2ef56ac9f6"
+            "a689c09ccbbaeeb381dd443abdd2c806faa6533109e09cf02ec4897625ca47f4"
         );
         let restored = restore_backup(&backup, &passphrase).expect("restore vector");
         assert_eq!(
@@ -1173,6 +1222,7 @@ mod tests {
                     document: published,
                 }],
                 settings,
+                tracker_entries: Vec::new(),
                 render_manifests: vec![PortableRenderManifestV1 {
                     manifest_id: "018f8b1b-50ad-7b4a-8f7d-38fd63e44088".to_owned(),
                     source: ExportSource::PublishedSnapshot,

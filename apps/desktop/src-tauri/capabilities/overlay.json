@@ -3,5 +3,9 @@
   "identifier": "overlay",
   "description": "Minimum core permissions for the local M0 overlay window.",
   "windows": ["overlay"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "core:event:allow-emit-to",
+    "core:window:allow-set-size"
+  ]
 }

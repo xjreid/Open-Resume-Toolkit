@@ -17,6 +17,7 @@ export interface StorageUsage {
   drafts: number;
   publishedSnapshots: number;
   settings: number;
+  trackerEntries: number;
   renderManifests: number;
   diagnosticEvents: number;
   databaseBytes: number;
@@ -85,6 +86,7 @@ function isStorageUsage(value: unknown): value is StorageUsage {
     "drafts",
     "publishedSnapshots",
     "settings",
+    "trackerEntries",
     "renderManifests",
     "diagnosticEvents",
     "databaseBytes",
@@ -102,6 +104,7 @@ function isStorageUsage(value: unknown): value is StorageUsage {
     record.drafts > 1 ||
     !isUint32(record.publishedSnapshots) ||
     !isUint32(record.settings) ||
+    !isUint32(record.trackerEntries) ||
     !isUint32(record.renderManifests) ||
     !isUint32(record.diagnosticEvents) ||
     !isNonNegativeSafeInteger(record.databaseBytes) ||

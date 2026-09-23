@@ -15,8 +15,8 @@ use jiff::Timestamp;
 use ort_backup::{
     BackupError, BackupExportRequestV1, BackupPassphrase, PortableAiAttemptV1,
     PortableAiOperationV1, PortableAiPriceV1, PortableProfileV1, PortablePublishedResumeV1,
-    PortableRenderManifestV1, PortableResumeRevisionV1, PortableSettingV1, create_backup,
-    restore_backup,
+    PortableRenderManifestV1, PortableResumeRevisionV1, PortableSettingV1, PortableTrackerEntryV1,
+    create_backup, restore_backup,
 };
 use ort_domain::{
     DocumentLimits, ExportSource, MAX_PDF_BYTES, MAX_PDF_PAGES, PdfRenderReceipt, ResumeDocument,
@@ -32,6 +32,7 @@ use uuid::Uuid;
 use zeroize::Zeroize;
 
 pub mod ai_activity;
+pub mod tracker;
 
 const DATABASE_FILENAME: &str = "profile.db";
 const MANIFEST_FILENAME: &str = "profile.json";
@@ -44,11 +45,29 @@ const RESTORE_SAFETY_DIRECTORY: &str = ".ort-restore-safety";
 const SAFETY_DELETE_DIRECTORY: &str = ".ort-safety-delete-pending";
 const DELETE_ALL_MARKER_FILENAME: &str = ".ort-delete-all-pending.json";
 const DATABASE_FORMAT_VERSION: u16 = 1;
-const SCHEMA_VERSION: i64 = 4;
+const SCHEMA_VERSION: i64 = 5;
 const MAX_RENDER_MANIFESTS: i64 = 100;
 const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 const MAX_MANIFEST_BYTES: u64 = 16 * 1_024;
 const MAX_SETTING_BYTES: usize = 64 * 1_024;
+const MAX_APPLICATION_WORKSPACE_BYTES: usize = 1_024 * 1_024;
+const MAX_APPLICATION_STAGE_ONE_BYTES: usize = 256 * 1_024;
+const MAX_APPLICATION_CAPTURE_PENDING_BYTES: usize = 256 * 1_024;
+const APPLICATION_WORKSPACE_SETTING_KEY: &str = "application.workspace.v1";
+const APPLICATION_STAGE_ONE_SETTING_KEY: &str = "application.stage1.v1";
+const APPLICATION_CAPTURE_PENDING_SETTING_KEY: &str = "application.capture.pending.v1";
+
+fn setting_size_limit(key: &str) -> usize {
+    if key == APPLICATION_WORKSPACE_SETTING_KEY {
+        MAX_APPLICATION_WORKSPACE_BYTES
+    } else if key == APPLICATION_STAGE_ONE_SETTING_KEY {
+        MAX_APPLICATION_STAGE_ONE_BYTES
+    } else if key == APPLICATION_CAPTURE_PENDING_SETTING_KEY {
+        MAX_APPLICATION_CAPTURE_PENDING_BYTES
+    } else {
+        MAX_SETTING_BYTES
+    }
+}
 const AI_CONNECTION_SETTING_KEY: &str = "ai.connection.v1";
 const MIGRATION_V1_SQL: &str = "CREATE TABLE schema_migrations (
          version INTEGER PRIMARY KEY,
@@ -178,6 +197,15 @@ const MIGRATION_V3_SQL: &str = "CREATE TABLE ai_operations (
 const MIGRATION_V4_SQL: &str =
     "ALTER TABLE ai_attempts ADD COLUMN catalog_effective_from TEXT NOT NULL DEFAULT 'unavailable';
      ALTER TABLE ai_attempts ADD COLUMN pricing_components_json BLOB NOT NULL DEFAULT X'5B5D';";
+const MIGRATION_V5_SQL: &str = "CREATE TABLE tracker_entries (
+         entry_id TEXT PRIMARY KEY,
+         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+         revision INTEGER NOT NULL CHECK (revision >= 1),
+         entry_json BLOB NOT NULL,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL
+     ) STRICT;
+     CREATE INDEX tracker_entries_profile ON tracker_entries (profile_id, updated_at DESC);";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum StorageError {
@@ -314,6 +342,7 @@ pub struct StorageUsage {
     pub drafts: u32,
     pub published_snapshots: u32,
     pub settings: u32,
+    pub tracker_entries: u32,
     pub render_manifests: u32,
     pub diagnostic_events: u32,
     pub database_bytes: u64,
@@ -613,6 +642,7 @@ impl EncryptedStore {
                  (SELECT COUNT(*) FROM resume_drafts WHERE profile_id = ?1), \
                  (SELECT COUNT(*) FROM published_resumes WHERE profile_id = ?1), \
                  (SELECT COUNT(*) FROM settings WHERE profile_id = ?1), \
+                 (SELECT COUNT(*) FROM tracker_entries WHERE profile_id = ?1), \
                  (SELECT COUNT(*) FROM render_manifests WHERE profile_id = ?1), \
                  (SELECT COUNT(*) FROM diagnostic_events WHERE profile_id = ?1)",
                 [self.manifest.profile_id.to_string()],
@@ -623,6 +653,7 @@ impl EncryptedStore {
                         row.get::<_, i64>(2)?,
                         row.get::<_, i64>(3)?,
                         row.get::<_, i64>(4)?,
+                        row.get::<_, i64>(5)?,
                     ))
                 },
             )
@@ -664,8 +695,9 @@ impl EncryptedStore {
             drafts: count_to_u32(counts.0)?,
             published_snapshots: count_to_u32(counts.1)?,
             settings: count_to_u32(counts.2)?,
-            render_manifests: count_to_u32(counts.3)?,
-            diagnostic_events: count_to_u32(counts.4)?,
+            tracker_entries: count_to_u32(counts.3)?,
+            render_manifests: count_to_u32(counts.4)?,
+            diagnostic_events: count_to_u32(counts.5)?,
             database_bytes,
             wal_bytes,
             shared_memory_bytes,
@@ -990,7 +1022,7 @@ impl EncryptedStore {
     ) -> Result<VersionedSetting, StorageError> {
         validate_setting_key(key)?;
         let json = serde_json::to_vec(value).map_err(|_| StorageError::InvalidData)?;
-        if json.len() > MAX_SETTING_BYTES {
+        if json.len() > setting_size_limit(key) {
             return Err(StorageError::InvalidData);
         }
         let connection = self
@@ -1045,6 +1077,106 @@ impl EncryptedStore {
             revision,
             value: value.clone(),
         })
+    }
+
+    /// Applies a reviewed browser capture to Stage 1 or Stage 2 and removes
+    /// the pending capture in one transaction. A conflict or failed write
+    /// preserves the pending capture and the previous workspace.
+    /// # Errors
+    /// Rejects stale revisions, unsupported destination keys, or oversized JSON.
+    pub fn resolve_application_capture(
+        &self,
+        pending_revision: i64,
+        destination: Option<(&str, Option<i64>, &Value)>,
+    ) -> Result<(), StorageError> {
+        if pending_revision < 1 {
+            return Err(StorageError::InvalidData);
+        }
+        let encoded = destination
+            .map(|(key, expected, value)| {
+                if !matches!(
+                    key,
+                    APPLICATION_STAGE_ONE_SETTING_KEY | APPLICATION_WORKSPACE_SETTING_KEY
+                ) || expected.is_some_and(|revision| revision < 1)
+                {
+                    return Err(StorageError::InvalidData);
+                }
+                let bytes = serde_json::to_vec(value).map_err(|_| StorageError::InvalidData)?;
+                if bytes.len() > setting_size_limit(key) || value.is_null() {
+                    return Err(StorageError::InvalidData);
+                }
+                Ok((key, expected, bytes))
+            })
+            .transpose()?;
+        let mut connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|_| StorageError::Unavailable)?;
+        let profile = self.manifest.profile_id.to_string();
+        let pending = transaction
+            .query_row(
+                "SELECT value_json FROM settings WHERE profile_id = ?1 AND setting_key = ?2 AND revision = ?3",
+                params![profile, APPLICATION_CAPTURE_PENDING_SETTING_KEY, pending_revision],
+                |row| row.get::<_, Vec<u8>>(0),
+            )
+            .optional()
+            .map_err(|_| StorageError::Unavailable)?;
+        if pending.is_none_or(|value| value == b"null") {
+            return Err(StorageError::RevisionConflict);
+        }
+        if let Some((key, expected, bytes)) = encoded {
+            let current = transaction
+                .query_row(
+                    "SELECT revision, value_json FROM settings WHERE profile_id = ?1 AND setting_key = ?2",
+                    params![profile, key],
+                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?)),
+                )
+                .optional()
+                .map_err(|_| StorageError::Unavailable)?;
+            match (expected, current) {
+                (None, None) => {
+                    transaction
+                        .execute(
+                            "INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) VALUES (?1, ?2, 1, ?3, ?4)",
+                            params![profile, key, bytes, now_string()],
+                        )
+                        .map_err(|_| StorageError::Unavailable)?;
+                }
+                (expected, Some((revision, old)))
+                    if expected == Some(revision) || (expected.is_none() && old == b"null") =>
+                {
+                    let next = revision.checked_add(1).ok_or(StorageError::InvalidData)?;
+                    if transaction
+                        .execute(
+                            "UPDATE settings SET revision = ?1, value_json = ?2, updated_at = ?3 WHERE profile_id = ?4 AND setting_key = ?5 AND revision = ?6",
+                            params![next, bytes, now_string(), profile, key, revision],
+                        )
+                        .map_err(|_| StorageError::Unavailable)?
+                        != 1
+                    {
+                        return Err(StorageError::RevisionConflict);
+                    }
+                }
+                _ => return Err(StorageError::RevisionConflict),
+            }
+        }
+        let next_pending = pending_revision
+            .checked_add(1)
+            .ok_or(StorageError::InvalidData)?;
+        if transaction
+            .execute(
+                "UPDATE settings SET revision = ?1, value_json = ?2, updated_at = ?3 WHERE profile_id = ?4 AND setting_key = ?5 AND revision = ?6",
+                params![next_pending, b"null", now_string(), profile, APPLICATION_CAPTURE_PENDING_SETTING_KEY, pending_revision],
+            )
+            .map_err(|_| StorageError::Unavailable)?
+            != 1
+        {
+            return Err(StorageError::RevisionConflict);
+        }
+        transaction.commit().map_err(|_| StorageError::Unavailable)
     }
 
     /// Loads a JSON setting.
@@ -1408,6 +1540,7 @@ impl EncryptedStore {
                  (SELECT COUNT(*) FROM resume_drafts WHERE profile_id = ?1) + \
                  (SELECT COUNT(*) FROM published_resumes WHERE profile_id = ?1) + \
                  (SELECT COUNT(*) FROM settings WHERE profile_id = ?1) + \
+                 (SELECT COUNT(*) FROM tracker_entries WHERE profile_id = ?1) + \
                  (SELECT COUNT(*) FROM render_manifests WHERE profile_id = ?1) + \
                  (SELECT COUNT(*) FROM ai_operations WHERE profile_id = ?1) + \
                  (SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1)",
@@ -1463,7 +1596,7 @@ impl EncryptedStore {
             validate_setting_key(key)?;
             let value_json =
                 serde_json::to_vec(&setting.value).map_err(|_| StorageError::InvalidData)?;
-            if value_json.len() > MAX_SETTING_BYTES {
+            if value_json.len() > setting_size_limit(key) {
                 return Err(StorageError::InvalidData);
             }
             transaction
@@ -1480,6 +1613,13 @@ impl EncryptedStore {
                     ],
                 )
                 .map_err(|_| StorageError::Unavailable)?;
+        }
+        for entry in &backup.profile.tracker_entries {
+            let bytes = serde_json::to_vec(&entry.value).map_err(|_| StorageError::InvalidData)?;
+            transaction.execute(
+                "INSERT INTO tracker_entries (entry_id, profile_id, revision, entry_json, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
+                params![entry.id, self.manifest.profile_id.to_string(), entry.revision, bytes, now],
+            ).map_err(|_| StorageError::Unavailable)?;
         }
         restore_render_manifests(
             &transaction,
@@ -1800,6 +1940,31 @@ impl EncryptedStore {
         };
         let mut settings = settings;
         settings.remove(AI_CONNECTION_SETTING_KEY);
+        let tracker_entries = {
+            let mut statement = transaction.prepare(
+                "SELECT entry_id, revision, entry_json FROM tracker_entries WHERE profile_id = ?1 ORDER BY entry_id",
+            ).map_err(|_| StorageError::Unavailable)?;
+            statement
+                .query_map([self.manifest.profile_id.to_string()], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, Vec<u8>>(2)?,
+                    ))
+                })
+                .map_err(|_| StorageError::Unavailable)?
+                .map(|row| {
+                    let (id, revision, bytes) = row.map_err(|_| StorageError::Unavailable)?;
+                    let value =
+                        serde_json::from_slice(&bytes).map_err(|_| StorageError::InvalidData)?;
+                    Ok(PortableTrackerEntryV1 {
+                        id,
+                        revision,
+                        value,
+                    })
+                })
+                .collect::<Result<Vec<_>, StorageError>>()?
+        };
         let render_manifests =
             read_portable_render_manifests(&transaction, &self.manifest.profile_id.to_string())?;
         let ai_operations = {
@@ -1849,6 +2014,7 @@ impl EncryptedStore {
             master_draft,
             published_resumes,
             settings,
+            tracker_entries,
             render_manifests,
             ai_operations,
             ai_attempts,
@@ -3271,6 +3437,10 @@ fn migrate_schema(connection: &Connection) -> Result<(), StorageError> {
         apply_migration(connection, 4, MIGRATION_V4_SQL, &migration_v4_checksum())?;
         latest = 4;
     }
+    if latest == 4 {
+        apply_migration(connection, 5, MIGRATION_V5_SQL, &migration_v5_checksum())?;
+        latest = 5;
+    }
     if latest == SCHEMA_VERSION {
         Ok(())
     } else {
@@ -3347,6 +3517,7 @@ fn verify_migration_receipts(migrations: &[(i64, String)]) -> Result<(), Storage
         (2, migration_v2_checksum()),
         (3, migration_v3_checksum()),
         (4, migration_v4_checksum()),
+        (5, migration_v5_checksum()),
     ];
     if migrations.len() > expected.len()
         || migrations.iter().zip(expected).any(
@@ -3374,6 +3545,10 @@ fn migration_v3_checksum() -> String {
 
 fn migration_v4_checksum() -> String {
     hex::encode(Sha256::digest(MIGRATION_V4_SQL.as_bytes()))
+}
+
+fn migration_v5_checksum() -> String {
+    hex::encode(Sha256::digest(MIGRATION_V5_SQL.as_bytes()))
 }
 
 fn verify_integrity(connection: &Connection) -> Result<(), StorageError> {
@@ -3670,7 +3845,7 @@ mod tests {
         let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("initialize encrypted store");
         let empty = store.storage_usage().expect("empty usage");
-        assert_eq!(empty.database_schema, 4);
+        assert_eq!(empty.database_schema, 5);
         assert_eq!(empty.drafts, 0);
         assert_eq!(empty.published_snapshots, 0);
         assert_eq!(empty.settings, 0);
@@ -3873,7 +4048,7 @@ mod tests {
                     "INSERT INTO schema_migrations \
                      (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
                       requires_safety_copy, applied_at) \
-                     VALUES (5, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
+                     VALUES (6, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
                     [super::now_string()],
                 )
                 .expect("seed newer schema marker");
@@ -3931,7 +4106,8 @@ mod tests {
             let connection = store.connection.lock().expect("lock test connection");
             connection
                 .execute_batch(
-                    "DROP TABLE ai_guardrail_policies;
+                    "DROP TABLE tracker_entries;
+                     DROP TABLE ai_guardrail_policies;
                      DROP TABLE ai_attempts;
                      DROP TABLE ai_operations;
                      DROP TABLE render_manifests;
@@ -3954,7 +4130,7 @@ mod tests {
 
         let upgraded = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("upgrade schema v1 profile");
-        assert_eq!(upgraded.manifest().schema_version, 4);
+        assert_eq!(upgraded.manifest().schema_version, 5);
         assert_eq!(
             upgraded
                 .load_draft()
@@ -3972,7 +4148,7 @@ mod tests {
             .expect("query migration versions")
             .collect::<Result<_, _>>()
             .expect("collect migration versions");
-        assert_eq!(versions, vec![1, 2, 3, 4]);
+        assert_eq!(versions, vec![1, 2, 3, 4, 5]);
     }
 
     #[test]

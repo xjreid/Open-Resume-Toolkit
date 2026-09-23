@@ -7,6 +7,9 @@ export function CloseDialog({
   canSave,
   error,
   saveError,
+  otherUnsavedWork = false,
+  overlayUnsavedWork = false,
+  overlayCheckFailed = false,
   onCancel,
   onSave,
   onDiscard,
@@ -18,6 +21,9 @@ export function CloseDialog({
   canSave: boolean;
   error: string | null;
   saveError: string | null;
+  otherUnsavedWork?: boolean;
+  overlayUnsavedWork?: boolean;
+  overlayCheckFailed?: boolean;
   onCancel: () => void;
   onSave: () => void;
   onDiscard: () => void;
@@ -67,6 +73,12 @@ export function CloseDialog({
         Unsaved edits will be lost if you discard them. Published snapshots and
         previously saved drafts are kept.
       </p>
+      {overlayCheckFailed && (
+        <p role="alert">
+          The application overlay did not answer the quit check. It may contain
+          unsaved work. Keep editing to retry, or explicitly discard and quit.
+        </p>
+      )}
       {busy ? (
         <p role="status">
           Waiting for the current operation to finish. The app will stay open if
@@ -75,8 +87,11 @@ export function CloseDialog({
       ) : null}
       {!canSave && !busy ? (
         <p>
-          To save, keep editing and correct any validation or storage errors
-          first.
+          {overlayUnsavedWork
+            ? "Keep editing, then save your application overlay edits before quitting."
+            : otherUnsavedWork
+              ? "Save or discard your tracker edits before quitting."
+              : "To save, keep editing and correct any validation or storage errors first."}
         </p>
       ) : null}
       {error ? <p role="alert">{error}</p> : null}

@@ -165,6 +165,12 @@ function testFailureMessage(code: string) {
       "The response could not be priced because usage was missing; the reservation remains unresolved.",
     AI_PROVIDER_UNAVAILABLE:
       "The provider connection failed or timed out. Monitoring preserves any uncertain exposure.",
+    AI_PROVIDER_SERVICE_UNAVAILABLE:
+      "The provider returned HTTP 503: its service is temporarily unavailable or overloaded. Wait before testing again. Monitoring keeps the unresolved reservation until usage can be verified.",
+    AI_PROVIDER_TEMPORARY:
+      "The provider returned a temporary server error. Wait before testing again and check Monitoring for unresolved exposure.",
+    AI_PROVIDER_FAILED:
+      "The provider rejected the request. Check that the selected model is available to this API key and review the provider dashboard. Monitoring keeps any unresolved exposure.",
   };
   return (
     messages[code] ??
@@ -1388,9 +1394,12 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                 {monitoring.partial && (
                   <p className="ai-partial" role="status">
                     Partial or unknown usage: {monitoring.unknownCount}{" "}
-                    attempts. Unresolved reserved exposure:{" "}
-                    {monitoring.unresolvedReservedMicros} micros. Missing usage
-                    is not zero spend.
+                    attempts. Unresolved reservation (maximum, not confirmed
+                    spend):{" "}
+                    {monitoring.currency
+                      ? `${(monitoring.unresolvedReservedMicros / 1_000_000).toFixed(6)} ${monitoring.currency}`
+                      : `${monitoring.unresolvedReservedMicros} micros`}
+                    . Missing usage is not zero spend.
                   </p>
                 )}
                 {monitoring.attempts === 0 && (

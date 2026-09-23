@@ -20,9 +20,11 @@ ort-backup = { path = "../../../crates/ort-backup" }
 ort-render = { path = "../../../crates/ort-render" }
 base64.workspace = true
 uuid.workspace = true
+url.workspace = true
 ort-documents = { path = "../../../crates/ort-documents" }
 ort-platform = { path = "../../../crates/ort-platform" }
 ort-domain = { path = "../../../crates/ort-domain" }
+ort-ipc = { path = "../../../crates/ort-ipc" }
 ort-storage = { path = "../../../crates/ort-storage" }
 ort-vault = { path = "../../../crates/ort-vault" }
 serde.workspace = true
@@ -33,9 +35,11 @@ ort-ai = { path = "../../../crates/ort-ai" }
 reqwest.workspace = true
 tokio.workspace = true
 jiff.workspace = true
+tempfile.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 ort-macos-lifecycle = { path = "../../../crates/ort-macos-lifecycle" }
+drag = "2.1.1"
 
 [dev-dependencies]
 ort-vault = { path = "../../../crates/ort-vault", features = ["test-support"] }

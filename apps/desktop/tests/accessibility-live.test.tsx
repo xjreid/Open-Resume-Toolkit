@@ -18,11 +18,20 @@ import {
 const native = vi.hoisted(() => ({
   invoke: vi.fn(),
   listen: vi.fn(async () => () => {}),
+  reply: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
   getCurrentWebviewWindow: () => ({ listen: native.listen }),
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  emitTo: vi.fn(
+    async (_target: string, event: string, payload: { attempt?: string }) => {
+      if (event === "ort:overlay-close-probe")
+        native.reply({ payload: { attempt: payload.attempt, dirty: false } });
+    },
+  ),
 }));
 
 const readyHealth = {
@@ -667,8 +676,9 @@ it("quits an idle review even after cancellation fails, but waits for actual imp
     sections: [],
     contacts: { fullName: "", email: "", phone: "", location: "" },
   };
-  native.listen.mockImplementation(async (_event, callback) => {
-    wake = callback;
+  native.listen.mockImplementation(async (event, callback) => {
+    if (event === "ort:close-requested") wake = callback;
+    if (event === "ort:overlay-close-reply") native.reply = callback;
     return () => {};
   });
   native.invoke.mockImplementation(async (command, ...args) => {

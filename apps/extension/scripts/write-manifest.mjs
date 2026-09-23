@@ -20,8 +20,10 @@ if (
 ) {
   throw new Error("M0 manifests must not expose page or external origins");
 }
-if (manifest.permissions.length !== 0) {
-  throw new Error("M0 manifests must remain permission-free");
+if (manifest.permissions.length !== 0 || manifest.action.default_popup) {
+  throw new Error(
+    "Unsigned development manifests must remain capture-disabled",
+  );
 }
 
 const output = resolve(packageRoot, `dist/${target}`);
@@ -30,4 +32,8 @@ writeFileSync(
   resolve(output, "manifest.json"),
   `${JSON.stringify(manifest, null, 2)}\n`,
 );
-console.log(`Generated permission-free ${target} development manifest.`);
+writeFileSync(
+  resolve(output, "popup.html"),
+  readFileSync(resolve(packageRoot, "src/popup.html")),
+);
+console.log(`Generated capture-disabled ${target} development manifest.`);

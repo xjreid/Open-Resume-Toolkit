@@ -10,7 +10,7 @@
 | M2.5 | Complete | Usable desktop layout, approved aesthetic and professional resume designs |
 | M3 | Complete | Direct AI foundation |
 | M4 | Planned | Tailoring, alerts and application materials |
-| M5 | Planned | Workspace, tracker and browser bridge |
+| M5 | In progress | Workspace, tracker and browser bridge |
 | M6 | Optional | External Codex integration |
 | M7 | Planned | Distribution and stable hardening |
 | M8 | Planned | Static project website |

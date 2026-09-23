@@ -16,6 +16,7 @@ describe("native quit policy", () => {
   it("allows saved and untouched new documents, but waits for startup", () => {
     expect(closeDisposition(initialEditorState)).toBe("wait");
     expect(closeDisposition(loaded())).toBe("quit");
+    expect(closeDisposition(loaded(), true)).toBe("confirm");
     const state = editorReducer(initialEditorState, {
       type: "loaded",
       empty: createResumeDocument(),

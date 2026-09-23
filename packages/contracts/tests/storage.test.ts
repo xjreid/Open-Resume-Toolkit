@@ -10,6 +10,7 @@ const usage = {
   drafts: 1,
   publishedSnapshots: 2,
   settings: 1,
+  trackerEntries: 2,
   renderManifests: 3,
   diagnosticEvents: 4,
   databaseBytes: 100,

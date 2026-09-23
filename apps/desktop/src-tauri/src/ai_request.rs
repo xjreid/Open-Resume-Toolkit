@@ -33,7 +33,7 @@ const TEST_INPUT_ESTIMATE: u32 = 512;
 const TEST_INPUT_RESERVATION_BOUND: u32 = 4_096;
 
 #[derive(Default)]
-pub(crate) struct AiRequestGate(Mutex<Option<(Uuid, Arc<CancelSignal>)>>);
+pub(crate) struct AiRequestGate(Mutex<Option<(Uuid, bool, Arc<CancelSignal>)>>);
 
 #[derive(Default)]
 struct CancelSignal {
@@ -64,7 +64,7 @@ pub(crate) struct AiRequestLease<'a> {
 impl Drop for AiRequestLease<'_> {
     fn drop(&mut self) {
         if let Ok(mut current) = self.gate.0.lock()
-            && current.as_ref().is_some_and(|(id, _)| *id == self.id)
+            && current.as_ref().is_some_and(|(id, _, _)| *id == self.id)
         {
             *current = None;
         }
@@ -72,25 +72,40 @@ impl Drop for AiRequestLease<'_> {
 }
 impl AiRequestGate {
     pub(crate) fn begin(&self, id: Uuid) -> Option<AiRequestLease<'_>> {
+        self.begin_owned(id, false)
+    }
+    pub(crate) fn begin_overlay(&self, id: Uuid) -> Option<AiRequestLease<'_>> {
+        self.begin_owned(id, true)
+    }
+    fn begin_owned(&self, id: Uuid, overlay: bool) -> Option<AiRequestLease<'_>> {
         let mut current = self.0.lock().ok()?;
         if current.is_some() {
             return None;
         }
         let signal = Arc::new(CancelSignal::default());
-        *current = Some((id, Arc::clone(&signal)));
+        *current = Some((id, overlay, Arc::clone(&signal)));
         Some(AiRequestLease {
             gate: self,
             id,
             signal,
         })
     }
-    fn cancel(&self) -> bool {
+    pub(crate) fn cancel(&self) -> bool {
+        self.cancel_owned(false)
+    }
+    pub(crate) fn cancel_overlay(&self) -> bool {
+        self.cancel_owned(true)
+    }
+    fn cancel_owned(&self, overlay: bool) -> bool {
         let Ok(current) = self.0.lock() else {
             return false;
         };
-        let Some((_, signal)) = &*current else {
+        let Some((_, current_overlay, signal)) = &*current else {
             return false;
         };
+        if *current_overlay != overlay {
+            return false;
+        }
         signal.cancel();
         true
     }
@@ -211,6 +226,16 @@ fn category(status: reqwest::StatusCode) -> &'static str {
         429 => "rate_limit",
         500..=599 => "transient",
         _ => "provider",
+    }
+}
+
+fn provider_failure(status: reqwest::StatusCode) -> (&'static str, bool) {
+    match status.as_u16() {
+        401 | 403 => ("AI_AUTHENTICATION_FAILED", false),
+        429 => ("AI_RATE_LIMITED", true),
+        503 => ("AI_PROVIDER_SERVICE_UNAVAILABLE", true),
+        500..=599 => ("AI_PROVIDER_TEMPORARY", true),
+        _ => ("AI_PROVIDER_FAILED", false),
     }
 }
 
@@ -637,6 +662,17 @@ pub async fn test_ai_connection(
             }
             return CommandResponse::failure("AI_CANCELLED", "errors.aiCancelled", false);
         }
+        tokio::select! {
+            () = tokio::time::sleep(Duration::from_secs(1)) => {},
+            () = lease.signal.wait() => {
+                if state.with_store(|store| {
+                    store.finish_ai_operation(operation_id, AiTerminalStatus::Cancelled, now_unix_ms().unwrap_or(ended))
+                }).is_err() {
+                    return storage_unavailable();
+                }
+                return CommandResponse::failure("AI_CANCELLED", "errors.aiCancelled", false);
+            }
+        }
         let previous_attempt = attempt_id;
         attempt_id = Uuid::now_v7();
         started = now_unix_ms().unwrap_or(ended);
@@ -718,6 +754,7 @@ pub async fn test_ai_connection(
     }
     if !response.status().is_success() {
         let error = category(response.status());
+        let (code, retryable) = provider_failure(response.status());
         let ended = now_unix_ms().unwrap_or(started);
         return fail_after_settlement(
             &state,
@@ -732,13 +769,9 @@ pub async fn test_ai_connection(
                 ended_at_unix_ms: ended,
                 keep_operation_active: false,
             },
-            match error {
-                "authentication" => "AI_AUTHENTICATION_FAILED",
-                "rate_limit" => "AI_RATE_LIMITED",
-                _ => "AI_PROVIDER_FAILED",
-            },
+            code,
             "errors.aiProviderFailed",
-            true,
+            retryable,
         );
     }
     if state
@@ -942,8 +975,29 @@ pub async fn test_ai_connection(
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_failures_preserve_retryable_server_status() {
+        assert_eq!(
+            provider_failure(reqwest::StatusCode::SERVICE_UNAVAILABLE),
+            ("AI_PROVIDER_SERVICE_UNAVAILABLE", true)
+        );
+        assert_eq!(
+            provider_failure(reqwest::StatusCode::INTERNAL_SERVER_ERROR),
+            ("AI_PROVIDER_TEMPORARY", true)
+        );
+        assert_eq!(
+            provider_failure(reqwest::StatusCode::BAD_REQUEST),
+            ("AI_PROVIDER_FAILED", false)
+        );
+        assert_eq!(
+            provider_failure(reqwest::StatusCode::UNAUTHORIZED),
+            ("AI_AUTHENTICATION_FAILED", false)
+        );
+    }
 
     #[test]
     fn request_gate_can_cancel_and_reuse_without_cross_request_signal() {
@@ -1047,4 +1101,282 @@ data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"outpu
         ]);
         assert!(!failed.valid(Provider::OpenAi, "fixture-model"));
     }
+}
+
+/// Sends one user-initiated application-material request through the same
+/// credential, pinned-host, cancellation, and accounting boundary as tests.
+/// The caller validates the returned structured text before making it current.
+#[allow(
+    clippy::items_after_test_module,
+    clippy::too_many_lines,
+    clippy::manual_let_else,
+    clippy::single_match_else
+)]
+pub(crate) async fn execute_material<T>(
+    window: &WebviewWindow,
+    operation: OperationType,
+    system: &str,
+    input: Value,
+    validate: impl FnOnce(&str) -> Result<T, ()>,
+) -> Result<T, &'static str> {
+    if window.label() != "overlay" {
+        return Err("WINDOW_NOT_AUTHORIZED");
+    }
+    let app = window.app_handle().clone();
+    let state = app.state::<DesktopState>();
+    let gate = app.state::<AiRequestGate>();
+    let operation_id = Uuid::now_v7();
+    let attempt_id = Uuid::now_v7();
+    let lease = gate.begin_overlay(operation_id).ok_or("AI_BUSY")?;
+    let (connection, channel, install, profile) = state
+        .with_store(|store| {
+            let connection = crate::ai_keys::request_connection(store, None)?;
+            let (channel, install, profile) = store.vault_identity();
+            Ok((connection, channel.to_owned(), install, profile))
+        })
+        .map_err(|_| "STORAGE_UNAVAILABLE")?;
+    if connection.mode != "direct_api" {
+        return Err("AI_DISABLED");
+    }
+    let provider = connection
+        .provider
+        .as_deref()
+        .and_then(provider)
+        .ok_or("AI_CONFIGURATION_INVALID")?;
+    let preset = connection
+        .preset
+        .as_deref()
+        .and_then(preset)
+        .ok_or("AI_CONFIGURATION_INVALID")?;
+    let credential_id = connection.credential_id.ok_or("AI_CREDENTIAL_MISSING")?;
+    let catalog = builtin_catalog(&jiff::Timestamp::now().to_string(), None)
+        .map_err(|_| "AI_CATALOG_UNAVAILABLE")?;
+    let entry = catalog
+        .resolve(provider, preset, operation)
+        .map_err(|_| "AI_PRESET_UNAVAILABLE")?
+        .clone();
+    let input_bytes = serde_json::to_vec(&input).map_err(|_| "AI_INPUT_INVALID")?;
+    if input_bytes.len() > 100_000 || system.len() > 12_000 {
+        return Err("AI_INPUT_INVALID");
+    }
+    // A byte is an upper bound on text token count for these request bytes.
+    let input_bound =
+        u32::try_from(input_bytes.len() + system.len() + 2_048).map_err(|_| "AI_INPUT_INVALID")?;
+    let output_bound = 6_000_u32;
+    if input_bound > entry.max_input_tokens {
+        return Err("AI_INPUT_TOO_LARGE");
+    }
+    let mut max_usage = Usage {
+        input_tokens: u64::from(input_bound),
+        output_tokens: u64::from(output_bound),
+        ..Usage::default()
+    };
+    for price in &entry.prices {
+        match price.category {
+            ort_ai::PriceCategory::CachedInput => {
+                max_usage.cached_input_tokens = u64::from(input_bound);
+            }
+            ort_ai::PriceCategory::CacheWrite => {
+                max_usage.cache_write_tokens = u64::from(input_bound);
+            }
+            ort_ai::PriceCategory::Reasoning => {
+                max_usage.reasoning_tokens = u64::from(output_bound);
+            }
+            _ => {}
+        }
+    }
+    let maximum_cost_micros =
+        estimate_cost(&entry, max_usage).map_err(|_| "AI_PRICE_UNAVAILABLE")?;
+    let request = NormalizedRequest {
+        operation,
+        model: entry.model.clone(),
+        system: system.into(),
+        input,
+        max_output_tokens: output_bound,
+    };
+    let reference = ProviderCredentialReference::new(
+        &channel,
+        &install.to_string(),
+        &profile.to_string(),
+        provider.as_str(),
+        &credential_id.to_string(),
+    )
+    .map_err(|_| "AI_CREDENTIAL_MISSING")?;
+    let provider_adapter = adapter(provider);
+    let built = OsProviderCredentialVault::new().use_secret(&reference, |secret| {
+        secret.expose_for(|bytes| {
+            let key = ApiKey::new(bytes)?;
+            provider_adapter.build_request(&request, &key)
+        })
+    });
+    let http_request = built
+        .map_err(|_| "AI_CREDENTIAL_MISSING")?
+        .map_err(|_| "AI_PROVIDER_INVALID")?;
+    let url = pinned_url(provider, &entry.model, &http_request).ok_or("AI_PROVIDER_INVALID")?;
+    let started = now_unix_ms().ok_or("STORAGE_UNAVAILABLE")?;
+    let preflight = AiAttemptPreflight {
+        operation_id,
+        attempt_id,
+        operation_type: operation,
+        provider,
+        credential_id,
+        requested_model: entry.model.clone(),
+        preset_version: format!("{preset:?}@direct-v1").to_lowercase(),
+        catalog_id: catalog.catalog_id,
+        catalog_effective_from: entry.effective_from.clone(),
+        pricing_components: entry.prices.clone(),
+        started_at_unix_ms: started,
+        estimated_input_tokens: u64::from(input_bound),
+        maximum_cost_micros,
+        currency: entry.currency.clone(),
+        retry_of: None,
+    };
+    state
+        .with_store(|store| store.reserve_ai_attempt(&preflight))
+        .map_err(|error| match error {
+            StorageError::InvalidData => "AI_CAP_REJECTED",
+            StorageError::RevisionConflict => "AI_BUSY",
+            _ => "STORAGE_UNAVAILABLE",
+        })?;
+    let fail = |status, category: &'static str| {
+        state
+            .with_store(|store| {
+                store.settle_ai_attempt(&AiAttemptSettlement {
+                    attempt_id,
+                    status,
+                    effective_model: None,
+                    usage: None,
+                    settled_cost_micros: None,
+                    usage_complete: false,
+                    error_category: Some(category.into()),
+                    ended_at_unix_ms: now_unix_ms().unwrap_or(started),
+                    keep_operation_active: false,
+                })
+            })
+            .is_ok()
+    };
+    if lease.signal.is_cancelled() {
+        let _ = state.with_store(|store| {
+            store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
+        });
+        return Err("AI_CANCELLED");
+    }
+    let client = match http_client() {
+        Ok(client) => client,
+        Err(()) => {
+            let _ = state.with_store(|store| {
+                store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
+            });
+            return Err("AI_PROVIDER_UNAVAILABLE");
+        }
+    };
+    let outgoing = match outbound(&client, url, &http_request) {
+        Ok(request) => request,
+        Err(()) => {
+            let _ = state.with_store(|store| {
+                store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
+            });
+            return Err("AI_PROVIDER_INVALID");
+        }
+    };
+    drop(http_request);
+    state
+        .with_store(|store| store.mark_ai_dispatching(attempt_id))
+        .map_err(|_| "STORAGE_UNAVAILABLE")?;
+    let response = tokio::select! { result = outgoing.send() => result,
+        () = lease.signal.wait() => { if !fail(AiTerminalStatus::Cancelled, "cancelled") { return Err("STORAGE_UNAVAILABLE"); } return Err("AI_CANCELLED"); }
+    };
+    let mut response = match response {
+        Ok(response) => response,
+        Err(_) => {
+            if !fail(AiTerminalStatus::OutcomeUnknown, "transient") {
+                return Err("STORAGE_UNAVAILABLE");
+            }
+            return Err("AI_PROVIDER_UNAVAILABLE");
+        }
+    };
+    if !response.status().is_success() {
+        if !fail(AiTerminalStatus::Failed, category(response.status())) {
+            return Err("STORAGE_UNAVAILABLE");
+        }
+        return Err("AI_PROVIDER_FAILED");
+    }
+    state
+        .with_store(|store| store.mark_ai_streaming(attempt_id))
+        .map_err(|_| "STORAGE_UNAVAILABLE")?;
+    let mut raw = Vec::new();
+    loop {
+        let next = tokio::select! { result = response.chunk() => result,
+            () = lease.signal.wait() => { if !fail(AiTerminalStatus::Cancelled, "cancelled") { return Err("STORAGE_UNAVAILABLE"); } return Err("AI_CANCELLED"); }
+        };
+        match next {
+            Ok(Some(chunk))
+                if raw
+                    .len()
+                    .checked_add(chunk.len())
+                    .is_some_and(|size| size <= MAX_STREAM_BYTES) =>
+            {
+                raw.extend_from_slice(&chunk);
+            }
+            Ok(None) => break,
+            Ok(Some(_)) => {
+                if !fail(AiTerminalStatus::Failed, "invalid_output") {
+                    return Err("STORAGE_UNAVAILABLE");
+                }
+                return Err("AI_OUTPUT_INVALID");
+            }
+            Err(_) => {
+                if !fail(AiTerminalStatus::OutcomeUnknown, "transient") {
+                    return Err("STORAGE_UNAVAILABLE");
+                }
+                return Err("AI_PROVIDER_UNAVAILABLE");
+            }
+        }
+    }
+    let events = match provider_adapter.parse_stream(&raw) {
+        Ok(events) => events,
+        Err(_) => {
+            if !fail(AiTerminalStatus::Failed, "invalid_output") {
+                return Err("STORAGE_UNAVAILABLE");
+            }
+            return Err("AI_OUTPUT_INVALID");
+        }
+    };
+    let output = SyntheticStreamState::from_events(events);
+    if output.failed
+        || output.effective_model.as_deref() != Some(entry.model.as_str())
+        || !(output.finished || provider == Provider::Gemini)
+        || output.text.len() > 512 * 1024
+    {
+        if !fail(AiTerminalStatus::Failed, "invalid_output") {
+            return Err("STORAGE_UNAVAILABLE");
+        }
+        return Err("AI_OUTPUT_INVALID");
+    }
+    let cost = output
+        .usage
+        .and_then(|usage| estimate_cost(&entry, usage).ok())
+        .filter(|cost| *cost <= maximum_cost_micros);
+    let validated = validate(&output.text);
+    let status = if validated.is_ok() {
+        AiTerminalStatus::Succeeded
+    } else {
+        AiTerminalStatus::Failed
+    };
+    state
+        .with_store(|store| {
+            store.settle_ai_attempt(&AiAttemptSettlement {
+                attempt_id,
+                status,
+                effective_model: output.effective_model,
+                usage: output.usage,
+                settled_cost_micros: cost,
+                usage_complete: cost.is_some(),
+                error_category: None,
+                ended_at_unix_ms: now_unix_ms().unwrap_or(started),
+                keep_operation_active: false,
+            })
+        })
+        .map_err(|_| "STORAGE_UNAVAILABLE")?;
+    validated.map_err(|()| "AI_OUTPUT_INVALID")
 }

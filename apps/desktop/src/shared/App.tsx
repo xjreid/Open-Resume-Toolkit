@@ -1,4 +1,7 @@
 import { SettingsWorkspace } from "./SettingsWorkspace";
+import { invoke } from "@tauri-apps/api/core";
+import { ApplicationOverlay } from "./ApplicationOverlay";
+import { TrackerWorkspace } from "./TrackerWorkspace";
 import { AiWorkspace } from "./AiWorkspace";
 import { AppShell, Brand, type WorkspaceDestination } from "./AppShell";
 import { duplicateEntryGroups } from "./duplicate-hints";
@@ -100,7 +103,7 @@ type HealthState =
   | { kind: "error"; message: string };
 
 export function App({ surface }: { surface: Surface }) {
-  if (surface === "overlay") return <OverlayStatus />;
+  if (surface === "overlay") return <ApplicationOverlay />;
   return <ResumeEditor />;
 }
 
@@ -123,13 +126,16 @@ function RedoIcon() {
 function ResumeEditor() {
   const [destination, setDestination] =
     useState<WorkspaceDestination>("resume");
+  const [overlayError, setOverlayError] = useState("");
   const [workflow, setWorkflow] = useState<"edit" | "view">("edit");
   const [health, setHealth] = useState<HealthState>({ kind: "checking" });
   const [editor, dispatch] = useReducer(editorReducer, initialEditorState);
   const [importActive, setImportActive] = useState(false);
   const [importWorking, setImportWorking] = useState(false);
+  const [trackerDirty, setTrackerDirty] = useState(false);
   const close = useCloseGuard(
     importWorking ? { ...editor, status: "exporting" } : editor,
+    trackerDirty,
   );
   const [confirmReload, setConfirmReload] = useState(false);
   const [documentStyle, setDocumentStyle] =
@@ -230,7 +236,8 @@ function ResumeEditor() {
   // An untouched placeholder has no user edits to save before backup/recovery.
   // Keep ordinary dirty semantics for save, publication, and quit; never waive
   // the backup guard after an edit (including undo) or for a stored draft.
-  const backupDirty = dirty && (editor.saved !== null || editor.editEpoch > 0);
+  const backupDirty =
+    (dirty && (editor.saved !== null || editor.editEpoch > 0)) || trackerDirty;
   const busy = editor.status !== "idle" || importActive;
   const mustReload = requiresReload(editor);
   const issues = useMemo(
@@ -627,16 +634,38 @@ function ResumeEditor() {
     <AppShell
       destination={destination}
       onNavigate={setDestination}
+      onOpenApplication={() => {
+        setOverlayError("");
+        void invoke<{ ok: boolean }>("show_application_overlay")
+          .then((response) => {
+            if (!response.ok)
+              setOverlayError("Application workspace could not be opened.");
+          })
+          .catch(() =>
+            setOverlayError("Application workspace could not be opened."),
+          );
+      }}
       navigationBlocked={busy || confirmReload || close.pending}
       status={<HealthBadge state={health} />}
     >
+      {overlayError && <p role="alert">{overlayError}</p>}
       <CloseDialog
         open={close.pending}
         busy={editor.status !== "idle" || importWorking}
         resolving={close.resolving}
-        canSave={!!document && dirty && !mustReload && issues.length === 0}
+        canSave={
+          !!document &&
+          dirty &&
+          !trackerDirty &&
+          !close.overlayDirty &&
+          !mustReload &&
+          issues.length === 0
+        }
         error={close.error}
         saveError={editor.errorCode ? friendlyError(editor.errorCode) : null}
+        otherUnsavedWork={trackerDirty || close.overlayDirty}
+        overlayUnsavedWork={close.overlayDirty}
+        overlayCheckFailed={close.overlayCheckFailed}
         onCancel={close.cancel}
         onSave={() => void save()}
         onDiscard={close.discard}
@@ -1231,6 +1260,14 @@ function ResumeEditor() {
           />
         </section>
       </div>
+      <div className="tracker-page" hidden={destination !== "tracker"}>
+        <TrackerWorkspace
+          key={profileGeneration}
+          active={destination === "tracker"}
+          publishedResume={editor.published?.document ?? null}
+          onDirtyChange={setTrackerDirty}
+        />
+      </div>
       <div className="settings-page" hidden={destination !== "settings"}>
         <SettingsWorkspace
           blocked={busy || confirmReload || close.pending}
@@ -1270,6 +1307,7 @@ function ResumeEditor() {
               enabled={
                 storageReady &&
                 !busy &&
+                !trackerDirty &&
                 !mustReload &&
                 !confirmReload &&
                 !close.pending
@@ -1278,6 +1316,7 @@ function ResumeEditor() {
                 if (
                   ioBusy.current ||
                   busy ||
+                  trackerDirty ||
                   mustReload ||
                   confirmReload ||
                   close.pending
@@ -3435,36 +3474,6 @@ function entryHasTopRowContent(entry: ResumeEntry): boolean {
       entry.fields.some(
         (field) => field.label !== PARAGRAPH_FIELD_LABEL && field.value.trim(),
       ),
-  );
-}
-
-function OverlayStatus() {
-  const [health, setHealth] = useState<HealthState>({ kind: "checking" });
-  useEffect(() => {
-    void requestHealth().then((result) =>
-      setHealth(
-        result.ok
-          ? { kind: "ready", health: result.value }
-          : { kind: "error", message: result.error.messageKey },
-      ),
-    );
-  }, []);
-
-  return (
-    <main className="shell shell--overlay">
-      <header className="masthead">
-        <Brand />
-      </header>
-      <section className="status-card">
-        <h2>Your resume workspace is in the main window</h2>
-        <HealthBadge state={health} />
-        <p className="description">
-          Build, review, and export your resume in the main window. This
-          companion window will hold application materials when application
-          workflows are available.
-        </p>
-      </section>
-    </main>
   );
 }
 

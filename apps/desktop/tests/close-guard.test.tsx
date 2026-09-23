@@ -8,6 +8,7 @@ const native = vi.hoisted(() => ({
   status: vi.fn(),
   resolve: vi.fn(),
   listen: vi.fn(),
+  reply: vi.fn(),
 }));
 vi.mock("../src/shared/command-client", () => ({
   requestCloseStatus: native.status,
@@ -16,12 +17,21 @@ vi.mock("../src/shared/command-client", () => ({
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
   getCurrentWebviewWindow: () => ({ listen: native.listen }),
 }));
+vi.mock("@tauri-apps/api/event", () => ({
+  emitTo: vi.fn(
+    async (_target: string, event: string, payload: { attempt?: string }) => {
+      if (event === "ort:overlay-close-probe")
+        native.reply({ payload: { attempt: payload.attempt, dirty: true } });
+    },
+  ),
+}));
 it("resolves Keep editing and recovers a failed quit response instead of remaining frozen", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   let pending: string | null = "attempt-1";
   let wake!: () => void;
-  native.listen.mockImplementation(async (_event, callback) => {
-    wake = callback;
+  native.listen.mockImplementation(async (event, callback) => {
+    if (event === "ort:close-requested") wake = callback;
+    if (event === "ort:overlay-close-reply") native.reply = callback;
     return () => {};
   });
   native.status.mockImplementation(async () => ({
@@ -34,7 +44,7 @@ it("resolves Keep editing and recovers a failed quit response instead of remaini
   });
   let close!: ReturnType<typeof useCloseGuard>;
   function Test() {
-    close = useCloseGuard({ ...initialEditorState, status: "saving" });
+    close = useCloseGuard(initialEditorState);
     return null;
   }
   const host = document.createElement("div");
@@ -42,6 +52,8 @@ it("resolves Keep editing and recovers a failed quit response instead of remaini
   try {
     await act(async () => root.render(<Test />));
     expect(close.pending).toBe(true);
+    expect(close.overlayDirty).toBe(true);
+    expect(native.resolve).not.toHaveBeenCalled();
     await act(async () => close.cancel());
     expect(close.pending).toBe(false);
     expect(close.resolving).toBe(false);

@@ -11,7 +11,9 @@ export function SettingsWorkspace({
   storage: ReactNode;
   blocked: boolean;
 }) {
-  const [section, setSection] = useState<"backup" | "storage">("backup");
+  const [section, setSection] = useState<"backup" | "storage" | "browser">(
+    "backup",
+  );
   return (
     <section className="workspace-data" aria-labelledby="workspace-data-title">
       <h2 id="workspace-data-title">Your local workspace</h2>
@@ -35,9 +37,30 @@ export function SettingsWorkspace({
         >
           Storage and deletion
         </button>
+        <button
+          type="button"
+          className="button--secondary"
+          aria-current={section === "browser" ? "page" : undefined}
+          disabled={blocked}
+          onClick={() => setSection("browser")}
+        >
+          Browser connections
+        </button>
       </nav>
       <div hidden={section !== "backup"}>{backup}</div>
       <div hidden={section !== "storage"}>{storage}</div>
+      <div hidden={section !== "browser"}>
+        <h3>Chrome and Edge</h3>
+        <p>
+          Browser capture is unavailable in this unsigned development preview.
+          Both browsers are disconnected; no native host is registered.
+        </p>
+        <p>
+          Paste selected text into the application overlay to continue working.
+          Browser connection setup requires a signed desktop and native host
+          with verified Keychain access.
+        </p>
+      </div>
     </section>
   );
 }

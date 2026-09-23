@@ -7,12 +7,14 @@ it("keeps the two-line application brand across every destination", () => {
     "resume",
     "import",
     "ai",
+    "tracker",
     "settings",
   ] as WorkspaceDestination[]) {
     const markup = renderToStaticMarkup(
       <AppShell
         destination={destination}
         onNavigate={() => {}}
+        onOpenApplication={() => {}}
         navigationBlocked={false}
         status={null}
       >
@@ -23,5 +25,6 @@ it("keeps the two-line application brand across every destination", () => {
       '<h1 aria-label="Open Resume Toolkit"><span>Open</span> <span>Resume Toolkit</span></h1>',
     );
     expect(markup.match(/<h1\b/g)).toHaveLength(1);
+    expect(markup).toContain("Application workspace");
   }
 });

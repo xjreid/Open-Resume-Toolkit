@@ -15,6 +15,7 @@ use tauri::{
 mod ai_keys;
 mod ai_request;
 mod ai_settings;
+mod application_materials;
 mod backup_export;
 mod close_guard;
 mod data_deletion;
@@ -22,6 +23,7 @@ mod import_review;
 mod menu;
 mod pdf_preview;
 mod text_export;
+mod tracker;
 use close_guard::CloseGuard;
 
 #[tauri::command]
@@ -261,6 +263,7 @@ fn load_storage_usage(
             drafts: usage.drafts,
             published_snapshots: usage.published_snapshots,
             settings: usage.settings,
+            tracker_entries: usage.tracker_entries,
             render_manifests: usage.render_manifests,
             diagnostic_events: usage.diagnostic_events,
             database_bytes: usage.database_bytes,
@@ -381,6 +384,20 @@ fn development_identity_allowed(identifier: &str) -> bool {
     identifier == "com.openresumetoolkit.dev"
 }
 
+#[tauri::command]
+fn show_application_overlay(window: WebviewWindow) -> CommandResponse<bool> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    let Some(overlay) = window.get_webview_window("overlay") else {
+        return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
+    };
+    if overlay.show().is_err() || overlay.unminimize().is_err() || overlay.set_focus().is_err() {
+        return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
+    }
+    CommandResponse::success(true)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// Starts the isolated development desktop application.
 ///
@@ -395,6 +412,7 @@ pub fn run() {
         .manage(pdf_preview::PdfState::default())
         .manage(pdf_preview::PortablePdfState::default())
         .manage(ai_request::AiRequestGate::default())
+        .manage(application_materials::DragFiles::default())
         .plugin(tauri_plugin_dialog::init())
         .menu(menu::editor_menu)
         .on_menu_event(|app, event| {
@@ -405,6 +423,7 @@ pub fn run() {
         .setup(|app| {
             #[cfg(target_os = "macos")]
             {
+                application_materials::DragFiles::sweep_stale();
                 let handle = app.handle().clone();
                 if !ort_macos_lifecycle::install(move || request_native_close(&handle)) {
                     return Err(
@@ -428,6 +447,26 @@ pub fn run() {
             ai_keys::rename_ai_key,
             ai_keys::set_ai_key_preset,
             ai_settings::load_ai_catalog,
+            application_materials::load_application_workspace,
+            application_materials::load_application_stage_one,
+            application_materials::save_application_stage_one,
+            application_materials::load_application_capture,
+            application_materials::resolve_application_capture,
+            application_materials::application_context,
+            application_materials::cancel_application_generation,
+            application_materials::start_application,
+            application_materials::regenerate_application_resume,
+            application_materials::generate_application_cover_letter,
+            application_materials::generate_application_answer,
+            application_materials::save_application_workspace,
+            application_materials::finish_application,
+            application_materials::preview_application_pdf,
+            application_materials::download_application_pdf,
+            application_materials::drag_application_pdf,
+            tracker::list_tracker_entries,
+            tracker::save_tracker_entry,
+            tracker::delete_tracker_entry,
+            tracker::preview_tracker_pdf,
             ai_request::test_ai_connection,
             ai_request::preview_ai_test,
             ai_request::cancel_ai_test,
@@ -476,6 +515,7 @@ pub fn run() {
             pdf_preview::export_resume_pdf,
             pdf_preview::release_resume_pdf,
             close_status,
+            show_application_overlay,
             resolve_close
         ])
         .build(tauri::generate_context!())
@@ -488,6 +528,16 @@ pub fn run() {
             } if label == "main" => {
                 api.prevent_close();
                 request_native_close(app);
+            }
+            RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::CloseRequested { api, .. },
+                ..
+            } if label == "overlay" => {
+                api.prevent_close();
+                if let Some(overlay) = app.get_webview_window("overlay") {
+                    let _ = overlay.hide();
+                }
             }
             RunEvent::ExitRequested { api, .. } if !app.state::<CloseGuard>().approved() => {
                 api.prevent_exit();
