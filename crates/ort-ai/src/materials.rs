@@ -1,5 +1,9 @@
-//! Versioned application-material responses. Provider text is untrusted until
-//! these validators resolve it against the exact published source and job text.
+//! Versioned application-material responses. Generated prose is user-reviewed;
+//! validation enforces response shape and document bounds, not factual truth.
+mod resume_draft;
+
+pub use resume_draft::{resume_context, resume_output_schema};
+
 use std::collections::HashSet;
 
 use ort_domain::{DocumentLimits, EntityId, ResumeDocument};
@@ -29,7 +33,146 @@ pub struct TailorResponse {
     pub resume: Option<ResumeDocument>,
     #[serde(default)]
     pub selected_sections: Option<Vec<SectionSelection>>,
+    #[serde(default)]
+    pub drafted_sections: Option<Vec<DraftedSection>>,
+    #[serde(default)]
+    pub role_info: Option<RoleInfo>,
+    #[serde(default)]
     pub alerts: Vec<AlertCandidate>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleInfo {
+    #[serde(default)]
+    pub company: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub location: String,
+}
+
+impl RoleInfo {
+    fn valid(&self) -> bool {
+        [&self.company, &self.title, &self.location]
+            .into_iter()
+            .all(|value| value.chars().count() <= 200)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DraftedSection {
+    pub section_id: EntityId,
+    pub entries: Vec<DraftedEntry>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DraftedEntry {
+    pub entry_id: EntityId,
+    #[serde(default)]
+    pub field_ids: Option<Vec<EntityId>>,
+    pub bullets: Vec<DraftedBullet>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DraftedBullet {
+    pub text: String,
+}
+
+fn materialize_draft(
+    source: &ResumeDocument,
+    selected: Vec<DraftedSection>,
+) -> Result<ResumeDocument, MaterialError> {
+    if selected.is_empty() || selected.len() > source.sections.len() {
+        return Err(MaterialError::Invalid);
+    }
+    let mut resume = source.clone();
+    let mut section_ids = HashSet::new();
+    let mut entry_ids = HashSet::new();
+    resume.sections = selected
+        .into_iter()
+        .enumerate()
+        .map(|(section_order, section)| {
+            if !section_ids.insert(section.section_id) {
+                return Err(MaterialError::Invalid);
+            }
+            let original = source
+                .sections
+                .iter()
+                .find(|item| item.id == section.section_id)
+                .ok_or(MaterialError::Invalid)?;
+            let mut output = original.clone();
+            output.entries = section
+                .entries
+                .into_iter()
+                .enumerate()
+                .map(|(entry_order, entry)| {
+                    if !entry_ids.insert(entry.entry_id) || entry.bullets.len() > 20 {
+                        return Err(MaterialError::Invalid);
+                    }
+                    let original_entry = source
+                        .sections
+                        .iter()
+                        .flat_map(|section| &section.entries)
+                        .find(|item| item.id == entry.entry_id)
+                        .ok_or(MaterialError::Invalid)?;
+                    let mut item = original_entry.clone();
+                    if let Some(field_ids) = entry.field_ids {
+                        if field_ids.len() > original_entry.fields.len() {
+                            return Err(MaterialError::Invalid);
+                        }
+                        let mut seen_fields = HashSet::new();
+                        item.fields = field_ids
+                            .into_iter()
+                            .enumerate()
+                            .map(|(field_order, id)| {
+                                if !seen_fields.insert(id) {
+                                    return Err(MaterialError::Invalid);
+                                }
+                                let mut field = original_entry
+                                    .fields
+                                    .iter()
+                                    .find(|field| field.id == id)
+                                    .ok_or(MaterialError::Invalid)?
+                                    .clone();
+                                field.order = u16::try_from(field_order)
+                                    .map_err(|_| MaterialError::Invalid)?;
+                                Ok(field)
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                    }
+                    item.bullets = entry
+                        .bullets
+                        .into_iter()
+                        .enumerate()
+                        .map(|(bullet_order, bullet)| {
+                            let text = bullet.text.trim();
+                            if text.is_empty() || text.chars().count() > 500 {
+                                return Err(MaterialError::Invalid);
+                            }
+                            Ok(ort_domain::Bullet {
+                                id: EntityId::new(),
+                                order: u16::try_from(bullet_order)
+                                    .map_err(|_| MaterialError::Invalid)?,
+                                text: text.to_owned(),
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    item.order = u16::try_from(entry_order).map_err(|_| MaterialError::Invalid)?;
+                    Ok(item)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            output.order = u16::try_from(section_order).map_err(|_| MaterialError::Invalid)?;
+            Ok(output)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    resume
+        .validate(DocumentLimits::default())
+        .map_err(|_| MaterialError::Invalid)?;
+    Ok(resume)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -181,6 +324,7 @@ pub struct QualificationAlert {
 #[serde(rename_all = "camelCase")]
 pub struct TailoredMaterial {
     pub resume: ResumeDocument,
+    pub role_info: Option<RoleInfo>,
     pub change_points: Vec<String>,
     pub alerts: Vec<QualificationAlert>,
     pub alerts_truncated: bool,
@@ -210,9 +354,8 @@ fn source_text(source: &ResumeDocument) -> String {
     facts.join(" ").to_lowercase()
 }
 
-/// Accepts a proposal only when every field and piece of prose is an exact
-/// published-source fact. Selection and ordering are the model's only powers;
-/// users may subsequently edit the workspace copy themselves.
+/// Accepts a structurally valid, user-reviewable draft while retaining the
+/// master resume's contact and entry identities.
 ///
 /// # Errors
 /// Returns an error for malformed output, an unsupported schema, or any
@@ -234,13 +377,36 @@ pub fn validate_tailoring(
     {
         return Err(MaterialError::Invalid);
     }
-    let proposed: TailorResponse = serde_json::from_str(raw).map_err(|_| MaterialError::Invalid)?;
-    if proposed.schema_version != MATERIALS_SCHEMA_VERSION {
+    let value: serde_json::Value = serde_json::from_str(raw).map_err(|_| MaterialError::Invalid)?;
+    if value
+        .get("schemaVersion")
+        .and_then(serde_json::Value::as_u64)
+        == Some(4)
+    {
+        return resume_draft::validate(source, source, job, value, published_revision);
+    }
+    let proposed: TailorResponse =
+        serde_json::from_value(value).map_err(|_| MaterialError::Invalid)?;
+    if !matches!(proposed.schema_version, MATERIALS_SCHEMA_VERSION | 2) {
         return Err(MaterialError::Version);
     }
-    let resume = match (proposed.resume, proposed.selected_sections) {
-        (Some(resume), None) => resume,
-        (None, Some(selection)) => materialize_selection(source, selection)?,
+    if proposed
+        .role_info
+        .as_ref()
+        .is_some_and(|info| !info.valid())
+    {
+        return Err(MaterialError::Invalid);
+    }
+    let role_info = proposed.role_info;
+    let rewritten = proposed.schema_version == 2;
+    let resume = match (
+        proposed.resume,
+        proposed.selected_sections,
+        proposed.drafted_sections,
+    ) {
+        (None, None, Some(draft)) if rewritten => materialize_draft(source, draft)?,
+        (Some(resume), None, None) if !rewritten => resume,
+        (None, Some(selection), None) if !rewritten => materialize_selection(source, selection)?,
         _ => return Err(MaterialError::Invalid),
     };
     resume
@@ -257,8 +423,14 @@ pub fn validate_tailoring(
     }
     let mut section_ids = HashSet::new();
     let mut removed_sections = 0;
-    let mut removed_entries = 0;
+    let source_entry_count: usize = source
+        .sections
+        .iter()
+        .map(|section| section.entries.len())
+        .sum();
+    let mut selected_entry_count = 0;
     let mut removed_bullets = 0;
+    let mut seen_entries = HashSet::new();
     for section in &resume.sections {
         if !section_ids.insert(section.id) {
             return Err(MaterialError::Invalid);
@@ -268,46 +440,73 @@ pub fn validate_tailoring(
             .iter()
             .find(|value| value.id == section.id)
             .ok_or(MaterialError::Invalid)?;
-        if section.heading != original.heading || section.entries.len() > original.entries.len() {
+        if section.heading != original.heading
+            || (!rewritten && section.entries.len() > original.entries.len())
+        {
             return Err(MaterialError::Invalid);
         }
-        removed_entries += original.entries.len() - section.entries.len();
+        selected_entry_count += section.entries.len();
         let mut entry_ids = HashSet::new();
         for entry in &section.entries {
-            if !entry_ids.insert(entry.id) {
+            if !entry_ids.insert(entry.id) || !seen_entries.insert(entry.id) {
                 return Err(MaterialError::Invalid);
             }
-            let old = original
-                .entries
+            let old = source
+                .sections
                 .iter()
+                .flat_map(|section| &section.entries)
                 .find(|value| value.id == entry.id)
                 .ok_or(MaterialError::Invalid)?;
+            if !rewritten && !original.entries.iter().any(|value| value.id == entry.id) {
+                return Err(MaterialError::Invalid);
+            }
             if entry.heading != old.heading
                 || entry.subheading != old.subheading
                 || entry.date_range != old.date_range
                 || entry.dates != old.dates
                 || entry.location != old.location
-                || entry.fields != old.fields
+                || (!rewritten && entry.fields != old.fields)
                 || entry.links != old.links
-                || entry.bullets.len() > old.bullets.len()
+                || (!rewritten && entry.bullets.len() > old.bullets.len())
             {
                 return Err(MaterialError::Invalid);
             }
-            removed_bullets += old.bullets.len() - entry.bullets.len();
-            let mut bullet_ids = HashSet::new();
-            for bullet in &entry.bullets {
-                if !bullet_ids.insert(bullet.id)
-                    || !old
-                        .bullets
-                        .iter()
-                        .any(|value| value.id == bullet.id && value.text == bullet.text)
-                {
-                    return Err(MaterialError::Invalid);
+            if rewritten {
+                let mut field_ids = HashSet::new();
+                for field in &entry.fields {
+                    let Some(source_field) = old.fields.iter().find(|value| value.id == field.id)
+                    else {
+                        return Err(MaterialError::Invalid);
+                    };
+                    if !field_ids.insert(field.id)
+                        || field.label != source_field.label
+                        || field.value != source_field.value
+                        || field.is_skill != source_field.is_skill
+                    {
+                        return Err(MaterialError::Invalid);
+                    }
+                }
+            }
+            if !rewritten {
+                removed_bullets += old.bullets.len() - entry.bullets.len();
+                let mut bullet_ids = HashSet::new();
+                for bullet in &entry.bullets {
+                    if !bullet_ids.insert(bullet.id)
+                        || !old
+                            .bullets
+                            .iter()
+                            .any(|value| value.id == bullet.id && value.text == bullet.text)
+                    {
+                        return Err(MaterialError::Invalid);
+                    }
                 }
             }
         }
     }
     removed_sections += source.sections.len() - resume.sections.len();
+    let removed_entries = source_entry_count
+        .checked_sub(selected_entry_count)
+        .ok_or(MaterialError::Invalid)?;
     let mut change_points = Vec::new();
     if removed_sections > 0 {
         change_points.push(format!(
@@ -324,14 +523,63 @@ pub fn validate_tailoring(
             "Condensed details by omitting {removed_bullets} bullet(s)."
         ));
     }
-    if change_points.is_empty() {
+    if rewritten {
+        change_points.push(
+            "Reworded selected master-resume details for this role; review every claim.".into(),
+        );
+    } else if change_points.is_empty() {
         change_points.push("Kept the published resume content.".into());
     }
-    let alerts_truncated = proposed.alerts.len() > 10;
+    let (alerts, alerts_truncated) =
+        validate_alerts(source, job, proposed.alerts, published_revision);
+    Ok(TailoredMaterial {
+        resume,
+        role_info,
+        change_points,
+        alerts,
+        alerts_truncated,
+    })
+}
+
+/// Applies a complete refinement to the current reviewed draft. The published
+/// resume remains the factual source; current IDs, contact, dates and links
+/// remain available even for sections/entries introduced by earlier tailoring.
+///
+/// # Errors
+/// Rejects malformed drafts, unknown source references, and document limits.
+pub fn validate_refinement(
+    source: &ResumeDocument,
+    current: &ResumeDocument,
+    job: &str,
+    raw: &str,
+    published_revision: i64,
+) -> Result<TailoredMaterial, MaterialError> {
+    source
+        .validate(DocumentLimits::default())
+        .map_err(|_| MaterialError::Invalid)?;
+    if published_revision < 1
+        || job.trim().is_empty()
+        || job.chars().count() > MAX_JOB_CHARS
+        || raw.len() > 512 * 1024
+    {
+        return Err(MaterialError::Invalid);
+    }
+    let value = serde_json::from_str(raw).map_err(|_| MaterialError::Invalid)?;
+    resume_draft::validate(source, current, job, value, published_revision)
+}
+
+#[allow(clippy::too_many_lines)]
+fn validate_alerts(
+    source: &ResumeDocument,
+    job: &str,
+    candidates: Vec<AlertCandidate>,
+    published_revision: i64,
+) -> (Vec<QualificationAlert>, bool) {
+    let alerts_truncated = candidates.len() > 10;
     let mut alerts = Vec::new();
     let mut seen = HashSet::new();
     let source_lc = source_text(source);
-    for candidate in proposed.alerts.into_iter().take(20) {
+    for candidate in candidates.into_iter().take(20) {
         let excerpt = candidate.job_excerpt.trim();
         let target = candidate.target.trim();
         if excerpt.is_empty()
@@ -428,12 +676,7 @@ pub fn validate_tailoring(
             break;
         }
     }
-    Ok(TailoredMaterial {
-        resume,
-        change_points,
-        alerts,
-        alerts_truncated,
-    })
+    (alerts, alerts_truncated)
 }
 
 fn mandatory_reason(text: &str) -> &'static str {
@@ -581,76 +824,35 @@ fn excluded_requirement(text: &str) -> bool {
     })
 }
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct EvidenceSelection {
-    pub schema_version: u16,
-    pub evidence_ids: Vec<EntityId>,
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeneratedProse {
+    schema_version: u16,
+    text: String,
 }
 
-fn selected_evidence(
-    raw: &str,
-    source: &ResumeDocument,
-    max: usize,
-) -> Result<Vec<String>, MaterialError> {
-    let response: EvidenceSelection =
-        serde_json::from_str(raw).map_err(|_| MaterialError::Invalid)?;
-    if response.schema_version != MATERIALS_SCHEMA_VERSION {
+fn validate_prose(raw: &str, max_characters: usize) -> Result<String, MaterialError> {
+    let proposed: GeneratedProse = serde_json::from_str(raw).map_err(|_| MaterialError::Invalid)?;
+    if proposed.schema_version != 2 {
         return Err(MaterialError::Version);
     }
-    if response.evidence_ids.is_empty() || response.evidence_ids.len() > max {
+    let text = proposed.text.trim();
+    if text.is_empty() || text.chars().count() > max_characters {
         return Err(MaterialError::Invalid);
     }
-    let mut seen = HashSet::new();
-    let mut selected = Vec::new();
-    for id in response.evidence_ids {
-        if !seen.insert(id) {
-            return Err(MaterialError::Invalid);
-        }
-        let text = source
-            .sections
-            .iter()
-            .flat_map(|section| &section.entries)
-            .find_map(|entry| {
-                entry
-                    .bullets
-                    .iter()
-                    .find(|bullet| bullet.id == id)
-                    .map(|bullet| bullet.text.as_str())
-                    .or_else(|| {
-                        entry
-                            .fields
-                            .iter()
-                            .find(|field| field.id == id)
-                            .map(|field| field.value.as_str())
-                    })
-            })
-            .ok_or(MaterialError::Invalid)?;
-        if text.trim().is_empty() || text.len() > 500 {
-            return Err(MaterialError::Invalid);
-        }
-        selected.push(text.trim().to_owned());
-    }
-    Ok(selected)
+    Ok(text.to_owned())
 }
 
-/// Builds a cover letter using only IDs that resolve to the published resume.
+/// Accepts a bounded, user-reviewable cover-letter draft.
 ///
 /// # Errors
-/// Returns an error for malformed selections or unsupported evidence IDs.
+/// Returns an error for malformed or oversized text.
 pub fn validate_cover_letter(
     raw: &str,
-    source: &ResumeDocument,
+    _source: &ResumeDocument,
     _job: &str,
 ) -> Result<String, MaterialError> {
-    let evidence = selected_evidence(raw, source, 5)?;
-    let name = source.contact.full_name.trim();
-    let signature = if name.is_empty() { "Applicant" } else { name };
-    Ok(format!(
-        "Dear Hiring Team,\n\nI am writing about the role described in your job posting. My published resume includes the following relevant experience:\n\n{}\n\nI would welcome the opportunity to discuss how this background relates to your requirements.\n\nSincerely,\n{}",
-        evidence.join("\n\n"),
-        signature
-    ))
+    validate_prose(raw, 12_000)
 }
 
 pub fn question_requires_personal_answer(question: &str) -> bool {
@@ -703,25 +905,22 @@ pub fn question_requires_personal_answer(question: &str) -> bool {
         .any(|text| phrase.contains(&format!(" {text} ")))
 }
 
-/// Builds an editable answer from verified published-resume evidence.
+/// Accepts a bounded, user-reviewable application answer.
 ///
 /// # Errors
 /// Returns an error for personal questions, malformed selections, unsupported
-/// evidence IDs, or answers exceeding the requested limit.
+/// or answers exceeding the requested limit.
 pub fn validate_answer(
     raw: &str,
-    source: &ResumeDocument,
+    _source: &ResumeDocument,
     question: &str,
     limit: Option<usize>,
 ) -> Result<String, MaterialError> {
     if question_requires_personal_answer(question) {
         return Err(MaterialError::PersonalQuestion);
     }
-    let evidence = selected_evidence(raw, source, 3)?;
-    let text = evidence.join(" ");
-    if text.chars().count() > MAX_ANSWER_CHARS
-        || limit.is_some_and(|limit| text.chars().count() > limit)
-    {
+    let text = validate_prose(raw, MAX_ANSWER_CHARS)?;
+    if limit.is_some_and(|limit| text.chars().count() > limit) {
         return Err(MaterialError::Invalid);
     }
     Ok(text)
@@ -816,6 +1015,68 @@ mod tests {
     }
 
     #[test]
+    fn drafted_bullets_can_be_reworded_without_evidence_ids() {
+        let source = source();
+        let section = &source.sections[0];
+        let entry = &section.entries[0];
+        let raw = json!({"schemaVersion":2,"draftedSections":[{"sectionId":section.id,
+            "entries":[{"entryId":entry.id,"fieldIds":[],"bullets":[
+                {"text":"Developed dependable engineering tools."},
+                {"text":"Applied Rust to build reliable tools."}
+            ]}]}],"roleInfo":{"company":"Acme","title":"Tools Engineer","location":"Remote"}})
+        .to_string();
+        let tailored = validate_tailoring(&source, "Engineering tools", &raw, 1).unwrap();
+        assert_eq!(tailored.resume.sections[0].entries[0].bullets.len(), 2);
+        assert!(tailored.resume.sections[0].entries[0].fields.is_empty());
+        assert_eq!(tailored.resume.sections[0].entries[0].heading, "Engineer");
+        assert_eq!(tailored.resume.contact, source.contact);
+        assert_eq!(tailored.role_info.unwrap().company, "Acme");
+
+        let invented_number = raw.replace(
+            "dependable engineering tools",
+            "dependable 50% faster tools",
+        );
+        assert!(validate_tailoring(&source, "Engineering tools", &invented_number, 1).is_ok());
+        let invented_id = raw.replace(&entry.id.to_string(), &EntityId::new().to_string());
+        assert_eq!(
+            validate_tailoring(&source, "Engineering tools", &invented_id, 1).unwrap_err(),
+            MaterialError::Invalid
+        );
+    }
+
+    #[test]
+    fn drafted_entries_can_move_sections_but_cannot_be_duplicated() {
+        let mut source = source();
+        source.sections.push(ResumeSection {
+            id: EntityId::new(),
+            order: 1,
+            heading: "Relevant Work".into(),
+            entries: Vec::new(),
+        });
+        let entry = &source.sections[0].entries[0];
+        let drafted_entry = json!({"entryId":entry.id,"bullets":[
+            {"text":"Built reliable tools."}
+        ]});
+        let raw = json!({"schemaVersion":2,"draftedSections":[
+            {"sectionId":source.sections[1].id,"entries":[drafted_entry]}
+        ],"alerts":[]})
+        .to_string();
+        let moved = validate_tailoring(&source, "Tools engineer", &raw, 1).unwrap();
+        assert_eq!(moved.resume.sections[0].heading, "Relevant Work");
+        assert_eq!(moved.resume.sections[0].entries[0].id, entry.id);
+
+        let duplicate = json!({"schemaVersion":2,"draftedSections":[
+            {"sectionId":source.sections[0].id,"entries":[drafted_entry]},
+            {"sectionId":source.sections[1].id,"entries":[drafted_entry]}
+        ],"alerts":[]})
+        .to_string();
+        assert_eq!(
+            validate_tailoring(&source, "Tools engineer", &duplicate, 1).unwrap_err(),
+            MaterialError::Invalid
+        );
+    }
+
+    #[test]
     fn required_alert_is_bounded_and_preferred_is_dropped() {
         let source = source();
         let alerts = vec![
@@ -874,7 +1135,7 @@ mod tests {
     }
 
     #[test]
-    fn personal_questions_and_unsupported_evidence_are_rejected() {
+    fn personal_questions_and_malformed_prose_are_rejected() {
         let source = source();
         assert!(question_requires_personal_answer(
             "Are you legally authorized to work here?"
@@ -892,13 +1153,17 @@ mod tests {
             validate_cover_letter(&wrong, &source, "Engineer required").unwrap_err(),
             MaterialError::Invalid
         );
-        let evidence = source.sections[0].entries[0].bullets[0].id;
-        let raw = json!({"schemaVersion":1,"evidenceIds":[evidence]}).to_string();
+        let raw = json!({"schemaVersion":2,"text":"Dear Hiring Team,\n\nI built reliable tools and would welcome the chance to apply that experience in this role.\n\nSincerely,\nAlex Rivera"}).to_string();
         let letter = validate_cover_letter(&raw, &source, "Engineer required").unwrap();
-        assert!(letter.contains("Built reliable tools"));
+        assert!(letter.contains("I built reliable tools"));
+        let answer = json!({"schemaVersion":2,"text":"I built reliable tools."}).to_string();
         assert_eq!(
-            validate_answer(&raw, &source, "Describe your work", Some(5)).unwrap_err(),
+            validate_answer(&answer, &source, "Describe your work", Some(5)).unwrap_err(),
             MaterialError::Invalid
+        );
+        assert_eq!(
+            validate_answer(&answer, &source, "Describe your work", None).unwrap(),
+            "I built reliable tools."
         );
     }
 

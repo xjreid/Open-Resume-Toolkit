@@ -466,6 +466,7 @@ pub fn run() {
             tracker::list_tracker_entries,
             tracker::save_tracker_entry,
             tracker::delete_tracker_entry,
+            tracker::open_tracker_link,
             tracker::preview_tracker_pdf,
             ai_request::test_ai_connection,
             ai_request::preview_ai_test,

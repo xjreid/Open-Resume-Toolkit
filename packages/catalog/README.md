@@ -13,13 +13,13 @@ Git conversion with Windows-style `core.autocrlf=true` so a platform checkout
 cannot silently invalidate the bundled signature.
 
 The current development catalog records the three Balanced fixtures used for
-the M3 adapter boundary. Economy and Quality remain structurally supported but
-are not advertised by this dated catalog until their release verification is
-refreshed. A provider model-list response may hide these entries; it cannot add
-an untrusted model.
+the M3 adapter boundary and a Gemini Economy entry for `gemini-3.5-flash-lite`.
+OpenAI and Anthropic Economy, and all Quality presets, remain unavailable. A
+provider model-list response may hide these entries; it cannot add an untrusted
+model.
 
-The `2026-09-15.1` baseline was checked against the official OpenAI model page,
-Anthropic model/pricing documentation, and Gemini model/pricing documentation.
+The `2026-09-23.1` catalog retains the September 15 Balanced entries and adds
+Gemini Economy using Google's September 23 model and standard pricing pages.
 It represents standard synchronous text-token prices only: provider batch,
 long-context, storage, tools, taxes, credits, promotions, and account-specific
 terms are not flattened into these rates. Its development signing private key

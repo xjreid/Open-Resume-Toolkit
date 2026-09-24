@@ -51,8 +51,18 @@ the installed application.
    retention checkboxes. Enter any known company, title, date, status, and
    source URL; blank tracking fields are allowed.
 2. Choose **Save to tracker and finish**. The overlay should reset to Stage 1.
-   In the main window, open **Application tracker**, find the entry, and reopen
-   any retained resume, cover letter, and approved answers.
+   In the main window, open **Application tracker**. Each application should
+   have one row, with Date applied first and Status second. The entire row
+   should be colored for its status.
+   Click a text value to edit it or open the Status menu directly; changes
+   should persist without a Save button. Enter a bare domain such as
+   `example.com/job/123` for Link or source. A single click should open the
+   link, while a double-click should edit its text. Plain source text should
+   also save without a URL scheme. Search should show only matching
+   rows, with the newest applied date first. Open the Content column to view
+   the final corrected resume, cover letter, and approved answers retained for
+   that application. These saved materials should have no edit controls.
+   Press Delete to review the confirmation dialog, then cancel it.
 3. Optionally repeat with **Finish without saving**. It should clear the
    temporary workspace without creating a tracker entry.
 

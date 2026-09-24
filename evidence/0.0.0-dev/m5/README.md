@@ -12,8 +12,8 @@ testing for a later milestone pass.
 ## Implemented in source
 
 - Encrypted tracker records with optimistic revisions, local list/edit/delete, and a single SQL transaction that saves selected materials and clears the temporary application workspace.
-- Manual tracker entries, search and status filtering, retained resume/cover-letter PDF reopening, editing and deliberate replacement/removal of retained materials, ordered answer copy/text export, selected row CSV export, and a Finish Application retention review. Save failure leaves the workspace intact. Unsaved tracker edits are guarded on entry switches and app quit.
-- Source URL review and shared desktop sanitization in the overlay and tracker; the URL is carried into a retained entry when available.
+- The tracker displays one application per row, with Date applied then Status at the left and the entire row colored by status. Metadata appears as plain text until focused and saves automatically; failed saves keep the local edit available for retry. Status opens directly. A source link opens on one click and becomes editable on double-click. Bare domains open directly; arbitrary source text can be saved and uses a web search when clicked. New entries use a popup, and deletion requires confirmation. The single Content column opens read-only final resume, cover letter, and approved answer snapshots. The Finish transaction takes the current corrected resume only, and later metadata edits cannot replace retained materials.
+- Stage 1 source URL review retains desktop sanitization; a reviewed URL is carried into a retained entry when available. Tracker entries also accept free-form source text.
 - Encrypted Stage 1 review drafts (job text, URL, and design) survive desktop restart with optimistic revisions. Continue waits for the latest draft save before it can start tailoring; Finish clears the draft in the same transaction as the temporary workspace.
 - Stage 1 can retain a captured selection up to 128 KiB for review even when it exceeds the 20,000-character tailoring input limit; the Continue action stays disabled until the user trims it.
 - A desktop-only capture intake function validates a future authenticated frame and retains one encrypted pending capture. The overlay presents an editable text/URL review with explicit replace/discard controls; acceptance updates the review workspace and removes the pending capture in one SQL transaction. A stale or invalid save preserves both values. The intake has no Tauri command or unsigned-preview transport caller. Resetting a reviewed question persists the cleared state immediately.
@@ -55,5 +55,22 @@ The user selected the unsigned-preview gate on September 23, 2026. Browser captu
 - The manual Stage 1 UI test now verifies that typing a job does not call AI, Continue saves the reviewed draft before invoking tailoring, and the result opens Resume. The full desktop suite passed 157 tests across 31 files; TypeScript and formatting checks passed.
 - Rust desktop material tests now include a valid structured resume with an unsupported PDF glyph; the preflight rejects it before persistence. The material suite passed 8 tests.
 - Desktop and Chrome/Edge extension builds, `cargo check -p ort-desktop -p ort-native-host`, `cargo fmt --all -- --check`, `pnpm format:check`, and `git diff --check` passed after the final UI changes.
+- After the tracker spreadsheet and link changes, the desktop suite passed 164 tests across 33 files. The focused Rust source-text test, desktop web build, Rust check, formatting, source security check, and ad-hoc macOS preview build passed. The installed preview was replaced after a backup; its signature and byte-for-byte match with the built bundle were verified. The installed app was not launched or tested.
 
 These checks do not establish browser-to-desktop operation. The bridge remains disabled until the signed identity and IPC requirements are implemented and verified.
+
+## Plan-first resume tailoring update
+
+- Resume response schema v4 requires three distinct tailoring priorities before
+  the complete template content. Each priority connects the job need, published
+  evidence, and an editorial action. The overlay displays them as Tailoring notes.
+- Initial tailoring prompts require a comprehensive relevance pass and removal
+  of redundant or irrelevant information. Refinement priorities stay within the
+  correction's scope. Job metadata and mandatory qualification alerts remain;
+  alert validation uses the full published source.
+- Automated checks: 32 AI library tests, 10 desktop material tests (including PDF
+  rendering), and 2 overlay tests passed. AI Clippy with warnings denied passed.
+  The prompt-bound regression also passed after the final wording change.
+- These checks verify response handling, metadata preservation, alerts, and
+  rendering; they do not measure real provider-generated editorial quality.
+  No paid generation or live installed-application testing was performed.

@@ -1,7 +1,7 @@
 import { SettingsWorkspace } from "./SettingsWorkspace";
 import { invoke } from "@tauri-apps/api/core";
 import { ApplicationOverlay } from "./ApplicationOverlay";
-import { TrackerWorkspace } from "./TrackerWorkspace";
+import { TrackerWorkspace } from "./TrackerTableWorkspace";
 import { AiWorkspace } from "./AiWorkspace";
 import { AppShell, Brand, type WorkspaceDestination } from "./AppShell";
 import { duplicateEntryGroups } from "./duplicate-hints";
@@ -1264,7 +1264,6 @@ function ResumeEditor() {
         <TrackerWorkspace
           key={profileGeneration}
           active={destination === "tracker"}
-          publishedResume={editor.published?.document ?? null}
           onDirtyChange={setTrackerDirty}
         />
       </div>

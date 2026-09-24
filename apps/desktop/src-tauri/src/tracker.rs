@@ -96,7 +96,6 @@ fn validate(entry: &TrackerEntry) -> Result<(), StorageError> {
         || entry.custom_status.chars().count() > 80
         || (entry.status != "other" && !entry.custom_status.is_empty())
         || entry.source_url.len() > 4096
-        || !valid_url(&entry.source_url)
         || entry
             .cover_letter
             .as_ref()
@@ -122,6 +121,111 @@ fn validate(entry: &TrackerEntry) -> Result<(), StorageError> {
         return Err(StorageError::InvalidData);
     }
     Ok(())
+}
+
+fn same_retained_content(before: &TrackerEntry, after: &TrackerEntry) -> bool {
+    let old = serde_json::to_value((
+        &before.resume,
+        &before.cover_letter,
+        &before.cover_contact,
+        &before.answers,
+        before.style,
+    ));
+    let new = serde_json::to_value((
+        &after.resume,
+        &after.cover_letter,
+        &after.cover_contact,
+        &after.answers,
+        after.style,
+    ));
+    matches!((old, new), (Ok(old), Ok(new)) if old == new)
+}
+
+#[cfg(test)]
+mod content_tests {
+    use super::*;
+
+    fn entry() -> TrackerEntry {
+        TrackerEntry {
+            company: "Company".into(),
+            title: String::new(),
+            location: String::new(),
+            date_applied: String::new(),
+            status: "applied".into(),
+            custom_status: String::new(),
+            source_url: String::new(),
+            resume: Some(ResumeDocument::empty("Final resume")),
+            cover_letter: Some("Final letter".into()),
+            cover_contact: None,
+            answers: vec![ApprovedAnswer {
+                question: "Why?".into(),
+                answer: "Because.".into(),
+            }],
+            style: DocumentStyle::Technical,
+        }
+    }
+
+    #[test]
+    fn metadata_can_change_without_changing_retained_content() {
+        let original = entry();
+        let mut edited = original.clone();
+        edited.company = "New name".into();
+        assert!(same_retained_content(&original, &edited));
+        edited.resume = Some(ResumeDocument::empty("Earlier draft"));
+        assert!(!same_retained_content(&original, &edited));
+        edited.resume = original.resume.clone();
+        edited.cover_letter = Some("Changed letter".into());
+        assert!(!same_retained_content(&original, &edited));
+        assert!(has_retained_content(&original));
+    }
+
+    #[test]
+    fn tracker_accepts_source_text_without_a_url_scheme() {
+        let mut record = entry();
+        record.source_url = "linkedin.com/jobs/123".into();
+        assert!(validate(&record).is_ok());
+        record.source_url = "Job board reference 123".into();
+        assert!(validate(&record).is_ok());
+    }
+
+    #[test]
+    fn finish_retains_only_the_current_corrected_resume() {
+        let workspace = application_materials::ApplicationWorkspace {
+            schema_version: 1,
+            published_revision: 1,
+            job_description: "Job".into(),
+            job_url: String::new(),
+            role_info: Default::default(),
+            resume: ResumeDocument::empty("Final corrected resume"),
+            change_points: Vec::new(),
+            alerts: Vec::new(),
+            alerts_truncated: false,
+            dismissed_alert_ids: Vec::new(),
+            ignore_all_alerts: false,
+            cover_letter: Some("Final letter".into()),
+            question: String::new(),
+            answer: String::new(),
+            approved_answers: Vec::new(),
+            style: DocumentStyle::Technical,
+        };
+        let selection = FinishSelection {
+            entry: entry(),
+            retain_resume: true,
+            retain_cover_letter: true,
+            retain_answers: false,
+        };
+        let retained = selected_snapshot(selection, &workspace).unwrap();
+        assert_eq!(retained.resume.unwrap().title, "Final corrected resume");
+        assert_eq!(retained.cover_letter.as_deref(), Some("Final letter"));
+        assert!(retained.answers.is_empty());
+    }
+}
+
+fn has_retained_content(entry: &TrackerEntry) -> bool {
+    entry.resume.is_some()
+        || entry.cover_letter.is_some()
+        || entry.cover_contact.is_some()
+        || !entry.answers.is_empty()
 }
 
 fn decode(record: TrackerRecord) -> Result<TrackerRecord, StorageError> {
@@ -171,14 +275,30 @@ pub fn save_tracker_entry(
         return tracker_failure(&error);
     }
     let id = id.unwrap_or_else(|| Uuid::now_v7().to_string());
-    let value = match serde_json::to_value(entry) {
+    let value = match serde_json::to_value(&entry) {
         Ok(value) => value,
         Err(_) => return tracker_failure(&StorageError::InvalidData),
     };
-    match window
-        .state::<DesktopState>()
-        .with_store(|store| store.tracker_save(&id, expected_revision, &value))
-    {
+    match window.state::<DesktopState>().with_store(|store| {
+        if let Some(revision) = expected_revision {
+            let current = store
+                .tracker_list()?
+                .into_iter()
+                .find(|record| record.id == id)
+                .ok_or(StorageError::NotFound)?;
+            if current.revision != revision {
+                return Err(StorageError::RevisionConflict);
+            }
+            let existing: TrackerEntry =
+                serde_json::from_value(current.value).map_err(|_| StorageError::InvalidData)?;
+            if !same_retained_content(&existing, &entry) {
+                return Err(StorageError::InvalidData);
+            }
+        } else if has_retained_content(&entry) {
+            return Err(StorageError::InvalidData);
+        }
+        store.tracker_save(&id, expected_revision, &value)
+    }) {
         Ok(record) => CommandResponse::success(record),
         Err(error) => tracker_failure(&error),
     }
@@ -199,6 +319,39 @@ pub fn delete_tracker_entry(
     {
         Ok(()) => CommandResponse::success(true),
         Err(error) => tracker_failure(&error),
+    }
+}
+
+#[tauri::command]
+pub fn open_tracker_link(window: WebviewWindow, target: String) -> CommandResponse<bool> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    let Ok(url) = url::Url::parse(&target) else {
+        return CommandResponse::failure("LINK_INVALID", "errors.linkInvalid", false);
+    };
+    if target.len() > 16_384
+        || !matches!(url.scheme(), "http" | "https")
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return CommandResponse::failure("LINK_INVALID", "errors.linkInvalid", false);
+    }
+    #[cfg(target_os = "macos")]
+    let opened = std::process::Command::new("/usr/bin/open")
+        .arg(&target)
+        .spawn();
+    #[cfg(target_os = "windows")]
+    let opened = std::process::Command::new("rundll32")
+        .arg("url.dll,FileProtocolHandler")
+        .arg(&target)
+        .spawn();
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let opened = std::process::Command::new("xdg-open").arg(&target).spawn();
+    match opened {
+        Ok(_) => CommandResponse::success(true),
+        Err(_) => CommandResponse::failure("LINK_OPEN_FAILED", "errors.linkOpenFailed", true),
     }
 }
 
@@ -240,6 +393,7 @@ pub fn preview_tracker_pdf(
                 published_revision: 1,
                 job_description: "Retained application".into(),
                 job_url: String::new(),
+                role_info: Default::default(),
                 resume,
                 change_points: Vec::new(),
                 alerts: Vec::new(),
@@ -288,32 +442,10 @@ pub fn finish_with_selection(
             return Err(StorageError::RevisionConflict);
         }
         let selected = selection
-            .map(|mut selection| {
-                validate(&selection.entry)?;
-                selection.entry.resume = selection
-                    .retain_resume
-                    .then(|| current.workspace.resume.clone());
-                selection.entry.cover_letter = if selection.retain_cover_letter {
-                    current.workspace.cover_letter.clone()
-                } else {
-                    None
-                };
-                selection.entry.cover_contact = selection
-                    .entry
-                    .cover_letter
-                    .as_ref()
-                    .map(|_| current.workspace.resume.contact.clone());
-                selection.entry.answers = if selection.retain_answers {
-                    current.workspace.approved_answers.clone()
-                } else {
-                    Vec::new()
-                };
-                selection.entry.style = current.workspace.style;
-                if selection.entry.source_url.is_empty() {
-                    selection.entry.source_url = current.workspace.job_url.clone();
-                }
+            .map(|selection| {
+                let entry = selected_snapshot(selection, &current.workspace)?;
                 let value: Value =
-                    serde_json::to_value(selection.entry).map_err(|_| StorageError::InvalidData)?;
+                    serde_json::to_value(entry).map_err(|_| StorageError::InvalidData)?;
                 Ok((Uuid::now_v7().to_string(), value))
             })
             .transpose()?;
@@ -329,4 +461,33 @@ pub fn finish_with_selection(
         }
         Err(error) => tracker_failure(&error),
     }
+}
+
+fn selected_snapshot(
+    mut selection: FinishSelection,
+    workspace: &application_materials::ApplicationWorkspace,
+) -> Result<TrackerEntry, StorageError> {
+    validate(&selection.entry)?;
+    selection.entry.resume = selection.retain_resume.then(|| workspace.resume.clone());
+    selection.entry.cover_letter = if selection.retain_cover_letter {
+        workspace.cover_letter.clone()
+    } else {
+        None
+    };
+    selection.entry.cover_contact = selection
+        .entry
+        .cover_letter
+        .as_ref()
+        .map(|_| workspace.resume.contact.clone());
+    selection.entry.answers = if selection.retain_answers {
+        workspace.approved_answers.clone()
+    } else {
+        Vec::new()
+    };
+    selection.entry.style = workspace.style;
+    if selection.entry.source_url.is_empty() {
+        selection.entry.source_url = workspace.job_url.clone();
+    }
+    validate(&selection.entry)?;
+    Ok(selection.entry)
 }

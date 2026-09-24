@@ -50,6 +50,11 @@ afterEach(() => {
 it("saves a typed Stage 1 job before starting tailoring", async () => {
   const calls: string[] = [];
   const resume = createResumeDocument();
+  const priorities = [
+    "Lead with the published Rust tooling work for the engineering role.",
+    "Give the documented reporting work a concise supporting bullet.",
+    "Remove repetitive skill mentions while retaining relevant evidence.",
+  ];
   vi.mocked(invoke).mockImplementation(async (name, args) => {
     const input = args as Record<string, unknown> | undefined;
     calls.push(name);
@@ -77,7 +82,7 @@ it("saves a typed Stage 1 job before starting tailoring", async () => {
             jobDescription: input?.jobDescription,
             jobUrl: "",
             resume,
-            changePoints: [],
+            changePoints: priorities,
             alerts: [],
             alertsTruncated: false,
             dismissedAlertIds: [],
@@ -125,6 +130,12 @@ it("saves a typed Stage 1 job before starting tailoring", async () => {
       style: "technical",
     });
     expect(host.textContent).toContain("Tailored resume");
+    const notes = host.querySelector('ul[aria-label="Tailoring notes"]');
+    expect(
+      Array.from(notes?.querySelectorAll("li") ?? []).map(
+        (item) => item.textContent,
+      ),
+    ).toEqual(priorities);
   } finally {
     await act(async () => root.unmount());
     host.remove();

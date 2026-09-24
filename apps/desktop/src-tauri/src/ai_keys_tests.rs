@@ -95,6 +95,17 @@ fn presets_are_saved_per_key_without_switching_primary_and_unavailable_models_ar
         .unwrap_err(),
         "AI_PRESET_UNAVAILABLE"
     );
+    let gemini = add(&store, &vault, "gemini").keys[2].credential_id;
+    let result = set_key_preset(
+        &store,
+        &SetAiKeyPresetRequest {
+            credential_id: gemini,
+            preset: "economy".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(result.primary_credential_id, Some(primary));
+    assert_eq!(result.keys[2].preset, "economy");
 }
 #[test]
 fn renamed_keys_keep_identity_and_primary_and_accept_default_reset() {

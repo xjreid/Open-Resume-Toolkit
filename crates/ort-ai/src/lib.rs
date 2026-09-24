@@ -18,10 +18,10 @@ pub const ENABLED: bool = true;
 pub const MAX_STREAM_BYTES: usize = 2 * 1_024 * 1_024;
 pub const MAX_OUTPUT_TOKENS: u32 = 6_000;
 pub const BUILTIN_CATALOG_SIGNATURE: &str =
-    "avhdxt50Whqyy4VLxQookQGs6z0BYoEm6dqQCYj9X2ZJsVkfwIKmYghntYLktzEVLYPnryaHs+VmRGJLzOpDAA==";
+    "d/oXmTBDjPacQmQHXERk3bw5eko5mOPfkgpABylLVZCJJ2t62SBDkd+Jc9xJvsOyq/UnrXEUtxWmDTOuoA7hBw==";
 pub const BUILTIN_CATALOG_PUBLIC_KEY: [u8; 32] = [
-    0x88, 0x5b, 0x5c, 0x48, 0x56, 0x72, 0xf2, 0x53, 0x79, 0x77, 0x5b, 0xc2, 0x97, 0x5b, 0x8c, 0x5e,
-    0x22, 0x24, 0x97, 0xf5, 0x48, 0xcf, 0xee, 0x5d, 0x09, 0x71, 0x50, 0xc1, 0xc5, 0x6d, 0x86, 0xbd,
+    0xfa, 0x6f, 0x6a, 0x11, 0xf7, 0x4d, 0x1a, 0x75, 0xad, 0x18, 0x3a, 0xc4, 0x21, 0x18, 0x2f, 0xed,
+    0x97, 0x64, 0x99, 0xb8, 0xbd, 0xc1, 0x54, 0xa6, 0xd4, 0x19, 0xe6, 0xfc, 0x70, 0x9d, 0xe7, 0x65,
 ];
 pub const BUILTIN_CATALOG_BYTES: &[u8] = include_bytes!("../../../packages/catalog/direct-v1.json");
 
@@ -386,7 +386,20 @@ impl ProviderAdapter for OpenAiAdapter {
     }
     fn build_request(&self, r: &NormalizedRequest, key: &ApiKey) -> Result<HttpRequest, AiError> {
         request_ok(r)?;
-        Ok(HttpRequest { url: "https://api.openai.com/v1/responses".into(), headers: BTreeMap::from([("authorization".into(), format!("Bearer {}", key.text()?)), ("content-type".into(), "application/json".into())]), body: serde_json::to_vec(&json!({"model":r.model,"instructions":r.system,"input":encoded(&r.input)?,"max_output_tokens":r.max_output_tokens,"stream":true,"store":false,"tools":[],"tool_choice":"none","text":{"format":{"type":"json_object"}}})).map_err(|_| AiError::InvalidResponse)? })
+        let format = if matches!(
+            r.operation,
+            OperationType::TailorResume | OperationType::RefineResume
+        ) {
+            json!({
+                "type": "json_schema",
+                "name": "resume_draft",
+                "strict": true,
+                "schema": materials::resume_output_schema(),
+            })
+        } else {
+            json!({"type": "json_object"})
+        };
+        Ok(HttpRequest { url: "https://api.openai.com/v1/responses".into(), headers: BTreeMap::from([("authorization".into(), format!("Bearer {}", key.text()?)), ("content-type".into(), "application/json".into())]), body: serde_json::to_vec(&json!({"model":r.model,"instructions":r.system,"input":encoded(&r.input)?,"max_output_tokens":r.max_output_tokens,"stream":true,"store":false,"tools":[],"tool_choice":"none","text":{"format":format}})).map_err(|_| AiError::InvalidResponse)? })
     }
     fn parse_stream(&self, bytes: &[u8]) -> Result<Vec<StreamEvent>, AiError> {
         parse_sse(bytes, |v| match v.get("type").and_then(Value::as_str) {

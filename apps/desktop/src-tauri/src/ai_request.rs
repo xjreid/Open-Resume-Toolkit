@@ -193,10 +193,14 @@ fn pinned_url(provider: Provider, requested_model: &str, request: &HttpRequest) 
 }
 
 fn http_client() -> Result<Client, ()> {
+    http_client_with_timeout(Duration::from_secs(60))
+}
+
+fn http_client_with_timeout(timeout: Duration) -> Result<Client, ()> {
     Client::builder()
         .https_only(true)
         .redirect(Policy::none())
-        .timeout(Duration::from_secs(60))
+        .timeout(timeout)
         .build()
         .map_err(|_| ())
 }
@@ -1068,7 +1072,7 @@ mod tests {
 
     #[test]
     fn bundled_balanced_test_has_a_nonzero_conservative_reservation() {
-        let catalog = builtin_catalog("2026-09-15T00:00:00Z", None).unwrap();
+        let catalog = builtin_catalog("2026-09-23T00:00:00Z", None).unwrap();
         assert_eq!(test_output_limit(Provider::Gemini), 512);
         assert_eq!(test_output_limit(Provider::OpenAi), 64);
         for provider in [Provider::OpenAi, Provider::Anthropic, Provider::Gemini] {
@@ -1189,9 +1193,29 @@ pub(crate) async fn execute_material<T>(
         return Err("AI_INPUT_INVALID");
     }
     // A byte is an upper bound on text token count for these request bytes.
-    let input_bound =
-        u32::try_from(input_bytes.len() + system.len() + 2_048).map_err(|_| "AI_INPUT_INVALID")?;
-    let output_bound = 6_000_u32;
+    // OpenAI includes the strict output schema in the request for resume drafts,
+    // so reserve for it too instead of understating a capped attempt.
+    let schema_bytes = if provider == Provider::OpenAi
+        && matches!(
+            operation,
+            OperationType::TailorResume | OperationType::RefineResume
+        ) {
+        serde_json::to_vec(&ort_ai::materials::resume_output_schema())
+            .map_err(|_| "AI_INPUT_INVALID")?
+            .len()
+    } else {
+        0
+    };
+    let input_bound = u32::try_from(
+        input_bytes
+            .len()
+            .checked_add(system.len())
+            .and_then(|value| value.checked_add(schema_bytes))
+            .and_then(|value| value.checked_add(2_048))
+            .ok_or("AI_INPUT_INVALID")?,
+    )
+    .map_err(|_| "AI_INPUT_INVALID")?;
+    let output_bound = entry.max_output_tokens.min(ort_ai::MAX_OUTPUT_TOKENS);
     if input_bound > entry.max_input_tokens {
         return Err("AI_INPUT_TOO_LARGE");
     }
@@ -1290,7 +1314,7 @@ pub(crate) async fn execute_material<T>(
         });
         return Err("AI_CANCELLED");
     }
-    let client = match http_client() {
+    let client = match http_client_with_timeout(Duration::from_secs(120)) {
         Ok(client) => client,
         Err(()) => {
             let _ = state.with_store(|store| {
@@ -1325,10 +1349,11 @@ pub(crate) async fn execute_material<T>(
         }
     };
     if !response.status().is_success() {
+        let code = provider_failure(response.status()).0;
         if !fail(AiTerminalStatus::Failed, category(response.status())) {
             return Err("STORAGE_UNAVAILABLE");
         }
-        return Err("AI_PROVIDER_FAILED");
+        return Err(code);
     }
     state
         .with_store(|store| store.mark_ai_streaming(attempt_id))
@@ -1401,7 +1426,7 @@ pub(crate) async fn execute_material<T>(
                 usage: output.usage,
                 settled_cost_micros: cost,
                 usage_complete: cost.is_some(),
-                error_category: None,
+                error_category: validated.is_err().then(|| "invalid_output".into()),
                 ended_at_unix_ms: now_unix_ms().unwrap_or(started),
                 keep_operation_active: false,
             })

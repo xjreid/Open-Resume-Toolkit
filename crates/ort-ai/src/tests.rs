@@ -49,6 +49,47 @@ fn credentials_and_transport_debug_are_redacted() {
 }
 
 #[test]
+fn openai_resume_requests_use_the_strict_resume_draft_schema() {
+    let key = ApiKey::new(b"SYNTHETIC_SECRET_VALUE").expect("key");
+    for operation in [OperationType::TailorResume, OperationType::RefineResume] {
+        let mut normalized = request();
+        normalized.operation = operation;
+        let built = OpenAiAdapter
+            .build_request(&normalized, &key)
+            .expect("request");
+        let body: Value = serde_json::from_slice(&built.body).expect("json body");
+        let format = body.pointer("/text/format").expect("format");
+        assert_eq!(format["type"], "json_schema");
+        assert_eq!(format["name"], "resume_draft");
+        assert_eq!(format["strict"], true);
+        assert_eq!(format["schema"], materials::resume_output_schema());
+        // Structured outputs follow schema property order. The plan must be
+        // generated before the resume even when maps are sorted by serde.
+        let wire = std::str::from_utf8(&built.body).unwrap();
+        assert!(
+            wire.find("\"tailoringPlan\":{").unwrap()
+                < wire.find("\"templateSections\":{").unwrap()
+        );
+    }
+}
+
+#[test]
+fn openai_non_resume_requests_keep_json_object_format() {
+    let key = ApiKey::new(b"SYNTHETIC_SECRET_VALUE").expect("key");
+    let mut normalized = request();
+    normalized.operation = OperationType::CoverLetter;
+    let built = OpenAiAdapter
+        .build_request(&normalized, &key)
+        .expect("request");
+    let body: Value = serde_json::from_slice(&built.body).expect("json body");
+    assert_eq!(
+        body.pointer("/text/format/type"),
+        Some(&json!("json_object"))
+    );
+    assert!(body.pointer("/text/format/schema").is_none());
+}
+
+#[test]
 fn provider_fixtures_normalize_text_and_usage() {
     let openai=br#"data: {"type":"response.output_text.delta","delta":"ok"}
 data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":2,"input_tokens_details":{"cached_tokens":3}}}}
@@ -146,10 +187,10 @@ fn gemini_credential_test_limits_thinking_and_reads_visible_parts() {
     assert!(
         events
             .iter()
-            .any(|event| matches!(event, StreamEvent::Text(text) if text == "{\"ok\":true}"))
+            .any(|event| matches!(event, StreamEvent::Text(content) if content == "{\"ok\":true}"))
     );
     assert!(!events.iter().any(
-        |event| matches!(event, StreamEvent::Text(text) if text.contains("hidden reasoning"))
+        |event| matches!(event, StreamEvent::Text(content) if content.contains("hidden reasoning"))
     ));
     assert!(events.iter().any(|event| matches!(event, StreamEvent::Usage(usage) if usage.output_tokens == 0 && usage.reasoning_tokens == 12)));
 }
@@ -280,9 +321,44 @@ fn signed_catalog_rejects_missing_duplicate_or_zero_pricing_components() {
 
 #[test]
 fn bundled_catalog_has_a_valid_independent_signature() {
-    let catalog = builtin_catalog("2026-09-15T12:00:00Z", None).expect("bundled catalog");
-    assert_eq!(catalog.catalog_id, "2026-09-15.1");
-    assert_eq!(catalog.entries.len(), 3);
+    let catalog = builtin_catalog("2026-09-23T12:00:00Z", None).expect("bundled catalog");
+    assert_eq!(catalog.catalog_id, "2026-09-23.1");
+    assert_eq!(catalog.entries.len(), 4);
+    let economy = catalog
+        .resolve(
+            Provider::Gemini,
+            Preset::Economy,
+            OperationType::CredentialTest,
+        )
+        .expect("Gemini Economy entry");
+    assert_eq!(economy.model, "gemini-3.5-flash-lite");
+    assert_eq!(
+        economy
+            .prices
+            .iter()
+            .find(|price| price.category == PriceCategory::Input)
+            .unwrap()
+            .micros_per_million,
+        300_000
+    );
+    assert!(
+        catalog
+            .resolve(
+                Provider::OpenAi,
+                Preset::Economy,
+                OperationType::CredentialTest
+            )
+            .is_err()
+    );
+    assert!(
+        catalog
+            .resolve(
+                Provider::Anthropic,
+                Preset::Economy,
+                OperationType::CredentialTest
+            )
+            .is_err()
+    );
 }
 
 #[test]

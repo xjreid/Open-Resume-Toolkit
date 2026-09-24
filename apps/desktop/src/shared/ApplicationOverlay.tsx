@@ -11,7 +11,7 @@ import {
   TrackerFields,
   emptyTrackerEntry,
   type TrackerEntry,
-} from "./TrackerWorkspace";
+} from "./TrackerFields";
 
 type Tab = "resume" | "cover" | "answers";
 type MaterialKind = "resume" | "cover_letter";
@@ -28,6 +28,7 @@ type Workspace = {
   publishedRevision: number;
   jobDescription: string;
   jobUrl: string;
+  roleInfo: { company: string; title: string; location: string };
   resume: ResumeDocument;
   changePoints: string[];
   alerts: Alert[];
@@ -79,7 +80,17 @@ const errors: Record<string, string> = {
   AI_DISABLED: "Set up a Direct AI key in the main window before continuing.",
   AI_CAP_REJECTED: "This request would exceed your AI spending cap.",
   AI_OUTPUT_INVALID:
-    "The provider result could not be verified. Your current work is safe; try again or edit it yourself.",
+    "The provider returned incomplete or unusable material, so nothing was saved. Try again or shorten the job description.",
+  AI_AUTHENTICATION_FAILED:
+    "The provider rejected the active API key. Check the key and its permissions in My Keys.",
+  AI_RATE_LIMITED:
+    "The provider rate-limited this request. Check its usage limits before retrying.",
+  AI_PROVIDER_SERVICE_UNAVAILABLE:
+    "The provider is temporarily unavailable. Try again later.",
+  AI_PROVIDER_TEMPORARY:
+    "The provider returned a temporary server error. Try again later.",
+  AI_PROVIDER_FAILED:
+    "The provider rejected the request. Check the active key, model, and Monitoring for the attempt category.",
   AI_BUSY: "Another AI request is in progress.",
   AI_CANCELLED: "The request was cancelled.",
   AI_INPUT_TOO_LARGE:
@@ -557,6 +568,9 @@ export function ApplicationOverlay() {
             onClick={() => {
               setTracking({
                 ...emptyTrackerEntry(),
+                company: draft?.roleInfo?.company ?? "",
+                title: draft?.roleInfo?.title ?? "",
+                location: draft?.roleInfo?.location ?? "",
                 sourceUrl: draft?.jobUrl ?? "",
               });
               setFinishing(true);
@@ -724,11 +738,67 @@ export function ApplicationOverlay() {
                   <section className="application-panel">
                     <p className="application-kicker">Stage 2 · Resume</p>
                     <h1>Tailored resume</h1>
-                    <ul>
-                      {draft.changePoints.map((point, index) => (
-                        <li key={index}>{point}</li>
-                      ))}
-                    </ul>
+                    <div className="application-row">
+                      <label>
+                        Company from job description
+                        <input
+                          maxLength={200}
+                          value={draft.roleInfo?.company ?? ""}
+                          onChange={(event) =>
+                            update((current) => ({
+                              ...current,
+                              roleInfo: {
+                                ...current.roleInfo,
+                                company: event.target.value,
+                              },
+                            }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        Role title
+                        <input
+                          maxLength={200}
+                          value={draft.roleInfo?.title ?? ""}
+                          onChange={(event) =>
+                            update((current) => ({
+                              ...current,
+                              roleInfo: {
+                                ...current.roleInfo,
+                                title: event.target.value,
+                              },
+                            }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        Location
+                        <input
+                          maxLength={200}
+                          value={draft.roleInfo?.location ?? ""}
+                          onChange={(event) =>
+                            update((current) => ({
+                              ...current,
+                              roleInfo: {
+                                ...current.roleInfo,
+                                location: event.target.value,
+                              },
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                    <p className="application-note">Review these details before saving them to the tracker.</p>
+                    {draft.changePoints.length > 0 && (
+                      <div>
+                        <h3>Tailoring notes</h3>
+                        <ul aria-label="Tailoring notes">
+                          {draft.changePoints.map((point, index) => (
+                            <li key={index}>{point}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <p aria-live="polite" className="application-note">
                       {draft.alerts.length === 0
                         ? "No validated Required Qualification Alerts."
@@ -940,6 +1010,9 @@ export function ApplicationOverlay() {
                     </button>
                     {draft.coverLetter !== null && (
                       <>
+                        <p className="application-note">
+                          Review the letter against your published resume before using it.
+                        </p>
                         <div className="application-file">
                           <strong>cover-letter.pdf</strong>
                           <div className="application-row">
@@ -1058,6 +1131,9 @@ export function ApplicationOverlay() {
                     </button>
                     {draft.answer && (
                       <>
+                        <p className="application-note">
+                          Review the answer against your published resume before using it.
+                        </p>
                         <label>
                           Review and edit answer
                           <textarea
