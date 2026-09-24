@@ -20,6 +20,7 @@ drift and resolve it before relying on either description.
 | [AI keys and spending](ai-keys-and-spending.md) | Adding, naming, organizing, activating, pausing, testing, removing, models, per-key limits, and the general limit. |
 | [AI data and monitoring](ai-data-and-monitoring.md) | Data selection, graph behavior, export, activity clearing, retention, removed-key data deletion, and accounting boundaries. |
 | [Resume workspace](resume-workspace.md) | Resume creation, Edit and View modes, sections and entries, autosave, styles, publication, and PDF/DOCX export. |
+| [Application overlay](application-overlay.md) | Capture, fixed rail, external view/edit popups, autosave, PDF/DOCX downloads, and native file drag. |
 | [AI resume tailoring](resume-tailoring.md) | Editorial freedom, the seven template regions, factual grounding, refinement, and response validation. |
 | [Shared application behavior](shared-application-behavior.md) | Main navigation, encrypted storage, import, backup/recovery, destructive operations, and common failure rules. |
 | [Maintenance and troubleshooting map](maintenance-and-troubleshooting.md) | How to update this reference and where to find the corresponding UI, native commands, storage logic, and tests. |

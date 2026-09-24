@@ -27,18 +27,37 @@ export function verifyConfiguration(config, capabilities) {
     [
       { label: "main", url: "index.html" },
       { label: "overlay", url: "overlay.html" },
+      { label: "application-popup", url: "overlay.html?popup=1" },
     ],
   );
   for (const window of config.app.windows) {
     assert.equal(window.devtools, undefined);
     assert.equal(window.additionalBrowserArgs, undefined);
   }
-  assert.equal(capabilities.length, 2);
-  for (const [index, capability] of capabilities.entries()) {
-    const label = ["main", "overlay"][index];
-    assert.equal(capability.identifier, label);
-    assert.deepEqual(capability.windows, [label]);
-    assert.deepEqual(capability.permissions, ["core:default"]);
+  assert.deepEqual(
+    capabilities.map(({ identifier, windows, permissions }) => ({
+      identifier,
+      windows,
+      permissions,
+    })),
+    [
+      {
+        identifier: "main",
+        windows: ["main"],
+        permissions: ["core:default", "core:event:allow-emit-to"],
+      },
+      {
+        identifier: "overlay",
+        windows: ["overlay", "application-popup"],
+        permissions: [
+          "core:default",
+          "core:event:allow-emit-to",
+          "core:window:allow-start-dragging",
+        ],
+      },
+    ],
+  );
+  for (const capability of capabilities) {
     assert.equal(capability.remote, undefined);
     assert.equal(capability.webviews, undefined);
     assert.notEqual(capability.local, false);

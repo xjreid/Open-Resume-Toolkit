@@ -540,14 +540,20 @@ pub fn set_ai_key_preset(
     gate: State<'_, AiRequestGate>,
     request: SetAiKeyPresetRequest,
 ) -> CommandResponse<AiKeyRegistry> {
-    if window.label() != "main" {
+    if !matches!(window.label(), "main" | "overlay") {
         return window_not_authorized();
     }
-    let Some(_lease) = gate.begin(Uuid::now_v7()) else {
+    let lease = if window.label() == "overlay" {
+        gate.begin_overlay(Uuid::now_v7())
+    } else {
+        gate.begin(Uuid::now_v7())
+    };
+    let Some(_lease) = lease else {
         return CommandResponse::failure("AI_BUSY", "errors.aiBusy", true);
     };
     response(state.with_store(|store| Ok(set_key_preset(store, &request))))
 }
+
 fn rename_key(
     store: &EncryptedStore,
     request: &RenameAiKeyRequest,

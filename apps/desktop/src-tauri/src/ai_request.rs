@@ -72,6 +72,10 @@ impl Drop for AiRequestLease<'_> {
     }
 }
 impl AiRequestGate {
+    pub(crate) fn is_busy(&self) -> bool {
+        self.0.lock().is_ok_and(|current| current.is_some())
+    }
+
     pub(crate) fn begin(&self, id: Uuid) -> Option<AiRequestLease<'_>> {
         self.begin_owned(id, false)
     }

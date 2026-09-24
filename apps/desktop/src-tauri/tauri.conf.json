@@ -27,13 +27,24 @@
         "label": "overlay",
         "title": "Open Resume Toolkit Overlay Dev",
         "url": "overlay.html",
-        "width": 680,
-        "height": 680,
-        "minWidth": 420,
-        "minHeight": 480,
+        "width": 360,
+        "height": 760,
+        "visible": false,
         "alwaysOnTop": true,
-        "center": true,
-        "resizable": true
+        "decorations": false,
+        "resizable": false
+      },
+      {
+        "label": "application-popup",
+        "title": "Open Resume Toolkit Application Details",
+        "url": "overlay.html?popup=1",
+        "width": 520,
+        "height": 420,
+        "visible": false,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "decorations": false,
+        "skipTaskbar": true
       }
     ],
     "security": {

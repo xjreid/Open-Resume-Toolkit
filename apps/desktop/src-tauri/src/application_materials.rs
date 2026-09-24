@@ -4,6 +4,7 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 use ort_ai::materials::{self, MAX_JOB_CHARS, MAX_QUESTION_CHARS, QualificationAlert, RoleInfo};
 use ort_ai::{OperationType, Preset, Provider};
+use ort_documents::render_docx_with_style;
 use ort_domain::{
     Bullet, CommandResponse, DocumentLimits, DocumentStyle, EntityId, NamedField, ResumeDocument,
     ResumeEntry, ResumeSection,
@@ -12,7 +13,7 @@ use ort_platform::{ExportDestination, ExportFileType};
 use ort_storage::StorageError;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{Manager, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
@@ -63,7 +64,87 @@ const ANSWER_SYSTEM: &str = r#"Write a direct, genuine answer to reviewedQuestio
 
 #[derive(Default)]
 pub struct DragFiles {
-    session: Mutex<Option<tempfile::TempDir>>,
+    session: Arc<Mutex<DragSession>>,
+}
+
+#[derive(Default)]
+struct DragSession {
+    directory: Option<tempfile::TempDir>,
+    active_drags: usize,
+    clear_pending: bool,
+}
+
+struct DragFileLease {
+    session: Arc<Mutex<DragSession>>,
+}
+
+impl Drop for DragFileLease {
+    fn drop(&mut self) {
+        let mut session = self
+            .session
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        session.active_drags = session.active_drags.saturating_sub(1);
+        if session.active_drags == 0 && session.clear_pending {
+            session.directory = None;
+            session.clear_pending = false;
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct ApplicationExportState {
+    prepared: Mutex<Vec<PreparedApplicationExports>>,
+}
+
+#[derive(Clone)]
+struct PreparedApplicationExports {
+    revision: i64,
+    kind: MaterialKind,
+    pdf: Vec<u8>,
+    docx: Vec<u8>,
+}
+
+impl ApplicationExportState {
+    pub(crate) fn clear(&self) {
+        self.prepared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
+    }
+
+    fn replace(&self, exports: PreparedApplicationExports) -> bool {
+        let mut prepared = self
+            .prepared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if prepared
+            .iter()
+            .any(|current| current.kind == exports.kind && current.revision > exports.revision)
+        {
+            return false;
+        }
+        prepared.retain(|current| current.kind != exports.kind);
+        prepared.push(exports);
+        true
+    }
+
+    fn bytes(
+        &self,
+        revision: i64,
+        kind: MaterialKind,
+        format: ApplicationExportFormat,
+    ) -> Option<Vec<u8>> {
+        self.prepared
+            .lock()
+            .ok()?
+            .iter()
+            .find(|prepared| prepared.revision == revision && prepared.kind == kind)
+            .map(|prepared| match format {
+                ApplicationExportFormat::Pdf => prepared.pdf.clone(),
+                ApplicationExportFormat::Docx => prepared.docx.clone(),
+            })
+    }
 }
 
 impl DragFiles {
@@ -114,14 +195,24 @@ impl DragFiles {
     }
 
     pub(crate) fn clear(&self) {
-        *self
+        let mut session = self
             .session
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if session.active_drags == 0 {
+            session.directory = None;
+            session.clear_pending = false;
+        } else {
+            session.clear_pending = true;
+        }
     }
 
     #[cfg(target_os = "macos")]
-    fn materialize(&self, bytes: &[u8], name: &str) -> std::io::Result<std::path::PathBuf> {
+    fn materialize(
+        &self,
+        bytes: &[u8],
+        name: &str,
+    ) -> std::io::Result<(std::path::PathBuf, DragFileLease)> {
         use std::io::Write;
         use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 
@@ -129,10 +220,14 @@ impl DragFiles {
             .session
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if guard.is_none() {
-            *guard = Some(tempfile::Builder::new().prefix("ort-drag-").tempdir()?);
+        if guard.directory.is_none() {
+            guard.directory = Some(tempfile::Builder::new().prefix("ort-drag-").tempdir()?);
         }
-        let root = guard.as_ref().expect("drag session was created").path();
+        let root = guard
+            .directory
+            .as_ref()
+            .expect("drag session was created")
+            .path();
         let folder = root.join(uuid::Uuid::now_v7().to_string());
         std::fs::DirBuilder::new().mode(0o700).create(&folder)?;
         let path = folder.join(name);
@@ -143,7 +238,13 @@ impl DragFiles {
             .open(&path)?;
         file.write_all(bytes)?;
         file.sync_all()?;
-        Ok(path)
+        guard.active_drags += 1;
+        Ok((
+            path,
+            DragFileLease {
+                session: Arc::clone(&self.session),
+            },
+        ))
     }
 }
 
@@ -177,7 +278,7 @@ pub struct ApplicationWorkspace {
     pub style: DocumentStyle,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedWorkspace {
     pub revision: i64,
@@ -333,6 +434,22 @@ pub fn load_application_capture(
     }
 }
 
+/// A stable UI seam for requesting a browser capture. The unsigned development
+/// native host has no authenticated desktop transport and must fail closed.
+#[tauri::command]
+pub fn request_application_capture(
+    window: WebviewWindow,
+    target: Option<String>,
+) -> CommandResponse<bool> {
+    if window.label() != "overlay" {
+        return window_not_authorized();
+    }
+    if !matches!(target.as_deref().unwrap_or("job"), "job" | "question") {
+        return error("CAPTURE_TARGET_INVALID");
+    }
+    error("BROWSER_CAPTURE_UNAVAILABLE")
+}
+
 #[tauri::command]
 pub fn resolve_application_capture(
     window: WebviewWindow,
@@ -462,6 +579,50 @@ pub fn save_application_stage_one(
 pub struct ApplicationContext {
     pub published_revision: Option<i64>,
     pub ai_label: String,
+    pub ai_ready: bool,
+    pub ai_busy: bool,
+    pub selected_key_ready: bool,
+    pub selected_key_id: Option<uuid::Uuid>,
+    pub preset: Option<String>,
+    pub preset_label: String,
+    pub preset_options: Vec<ApplicationPresetOption>,
+    pub browser_connected: bool,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationPresetOption {
+    pub preset: String,
+    pub label: String,
+    pub model: Option<String>,
+    pub available: bool,
+}
+
+fn provider_from_name(value: &str) -> Option<Provider> {
+    match value {
+        "openai" => Some(Provider::OpenAi),
+        "anthropic" => Some(Provider::Anthropic),
+        "gemini" => Some(Provider::Gemini),
+        _ => None,
+    }
+}
+
+fn preset_from_name(value: &str) -> Option<Preset> {
+    match value {
+        "economy" => Some(Preset::Economy),
+        "balanced" => Some(Preset::Balanced),
+        "quality" => Some(Preset::Quality),
+        _ => None,
+    }
+}
+
+fn preset_display(value: &str) -> &'static str {
+    match value {
+        "economy" => "Economy",
+        "balanced" => "Balanced",
+        "quality" => "Quality",
+        _ => "Preset",
+    }
 }
 
 #[tauri::command]
@@ -472,40 +633,76 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
     match window.state::<DesktopState>().with_store(|store| {
         let published_revision = store.load_latest_published()?.map(|item| item.revision);
         let connection = crate::ai_keys::request_connection(store, None)?;
-        let ai_label = if connection.mode == "direct_api" {
-            let provider_name = connection.provider.unwrap_or_else(|| "Direct AI".into());
-            let provider = match provider_name.as_str() {
-                "openai" => Some(Provider::OpenAi),
-                "anthropic" => Some(Provider::Anthropic),
-                "gemini" => Some(Provider::Gemini),
-                _ => None,
-            };
-            let preset = match connection.preset.as_deref() {
-                Some("economy") => Some(Preset::Economy),
-                Some("balanced") => Some(Preset::Balanced),
-                Some("quality") => Some(Preset::Quality),
-                _ => None,
-            };
-            let model = provider
-                .zip(preset)
-                .and_then(|(provider, preset)| {
-                    ort_ai::builtin_catalog(&jiff::Timestamp::now().to_string(), None)
-                        .ok()
-                        .and_then(|catalog| {
-                            catalog
-                                .resolve(provider, preset, OperationType::TailorResume)
-                                .ok()
-                                .map(|entry| entry.model.clone())
-                        })
-                })
-                .unwrap_or_else(|| "model unavailable".into());
-            format!("{provider_name} · {model}")
+        let ai_ready = connection.mode == "direct_api";
+        let provider_name = connection
+            .provider
+            .clone()
+            .unwrap_or_else(|| "Direct AI".into());
+        let provider = provider_from_name(&provider_name);
+        let catalog = ort_ai::builtin_catalog(&jiff::Timestamp::now().to_string(), None).ok();
+        let preset_options = ["economy", "balanced", "quality"]
+            .into_iter()
+            .map(|preset_name| {
+                let model = provider
+                    .zip(catalog.as_ref())
+                    .and_then(|(provider, catalog)| {
+                        catalog
+                            .resolve(
+                                provider,
+                                preset_from_name(preset_name)?,
+                                OperationType::TailorResume,
+                            )
+                            .ok()
+                            .map(|entry| entry.model.clone())
+                    });
+                ApplicationPresetOption {
+                    preset: preset_name.into(),
+                    label: format!(
+                        "{}: {}",
+                        preset_display(preset_name),
+                        model.as_deref().unwrap_or("model unavailable")
+                    ),
+                    available: model.is_some(),
+                    model,
+                }
+            })
+            .collect::<Vec<_>>();
+        let selected_model = connection.preset.as_deref().and_then(|preset| {
+            preset_options
+                .iter()
+                .find(|option| option.preset == preset)
+                .and_then(|option| option.model.clone())
+        });
+        let preset_label = connection.preset.as_deref().map_or_else(
+            || "AI not configured".into(),
+            |preset| {
+                format!(
+                    "{}: {}",
+                    preset_display(preset),
+                    selected_model.as_deref().unwrap_or("model unavailable")
+                )
+            },
+        );
+        let ai_label = if ai_ready {
+            format!(
+                "{provider_name} · {}",
+                selected_model.unwrap_or_else(|| "model unavailable".into())
+            )
         } else {
             "AI not configured".into()
         };
         Ok(ApplicationContext {
             published_revision,
             ai_label,
+            ai_ready,
+            ai_busy: window.state::<ai_request::AiRequestGate>().is_busy(),
+            selected_key_ready: ai_ready,
+            selected_key_id: connection.credential_id,
+            preset: connection.preset,
+            preset_label,
+            preset_options,
+            // The current unsigned native host intentionally rejects every bridge request.
+            browser_connected: false,
         })
     }) {
         Ok(value) => CommandResponse::success(value),
@@ -948,11 +1145,249 @@ pub fn finish_application(
     crate::tracker::finish_with_selection(&window, expected_revision, selection)
 }
 
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MaterialKind {
     Resume,
     CoverLetter,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ApplicationExportFormat {
+    Pdf,
+    Docx,
+}
+
+impl ApplicationExportFormat {
+    fn file_type(self) -> ExportFileType {
+        match self {
+            Self::Pdf => ExportFileType::Pdf,
+            Self::Docx => ExportFileType::Docx,
+        }
+    }
+
+    fn filename(self, kind: MaterialKind) -> &'static str {
+        match (kind, self) {
+            (MaterialKind::Resume, Self::Pdf) => "tailored-resume.pdf",
+            (MaterialKind::Resume, Self::Docx) => "tailored-resume.docx",
+            (MaterialKind::CoverLetter, Self::Pdf) => "cover-letter.pdf",
+            (MaterialKind::CoverLetter, Self::Docx) => "cover-letter.docx",
+        }
+    }
+
+    fn dialog(self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            Self::Pdf => (
+                "Export unencrypted application PDF — choose a new filename",
+                "PDF document",
+                "pdf",
+            ),
+            Self::Docx => (
+                "Export unencrypted application DOCX — choose a new filename",
+                "Word document",
+                "docx",
+            ),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreparedApplicationExport {
+    pub revision: i64,
+    pub pdf_ready: bool,
+    pub docx_ready: bool,
+}
+
+fn render_application_exports(
+    state: &DesktopState,
+    expected_revision: i64,
+    kind: MaterialKind,
+) -> Result<PreparedApplicationExports, StorageError> {
+    let (document, style) = state.with_store(|store| {
+        let current = load(store)?.ok_or(StorageError::NotFound)?;
+        if current.revision != expected_revision {
+            return Err(StorageError::RevisionConflict);
+        }
+        Ok((
+            document_for(&current.workspace, kind)?,
+            current.workspace.style,
+        ))
+    })?;
+    let pdf = ort_render::render_pdf_with_style(&document, style)
+        .map_err(|_| StorageError::InvalidData)?
+        .bytes;
+    let docx = render_docx_with_style(&document, style).map_err(|_| StorageError::InvalidData)?;
+    Ok(PreparedApplicationExports {
+        revision: expected_revision,
+        kind,
+        pdf,
+        docx,
+    })
+}
+
+#[tauri::command]
+pub fn prepare_application_exports(
+    window: WebviewWindow,
+    expected_revision: i64,
+    kind: MaterialKind,
+) -> CommandResponse<PreparedApplicationExport> {
+    if window.label() != "overlay" {
+        return window_not_authorized();
+    }
+    let prepared = match render_application_exports(
+        &window.state::<DesktopState>(),
+        expected_revision,
+        kind,
+    ) {
+        Ok(value) => value,
+        Err(StorageError::InvalidData) => return error("EXPORT_PREPARE_FAILED"),
+        Err(problem) => return storage_failure(&problem),
+    };
+    let still_current = window.state::<DesktopState>().with_store(|store| {
+        Ok(
+            load(store)?.is_some_and(|saved| saved.revision == expected_revision)
+                && window.state::<ApplicationExportState>().replace(prepared),
+        )
+    });
+    match still_current {
+        Ok(true) => {}
+        Ok(_) => return storage_failure(&StorageError::RevisionConflict),
+        Err(problem) => return storage_failure(&problem),
+    }
+    CommandResponse::success(PreparedApplicationExport {
+        revision: expected_revision,
+        pdf_ready: true,
+        docx_ready: true,
+    })
+}
+
+fn prepared_application_export_bytes(
+    window: &WebviewWindow,
+    expected_revision: i64,
+    kind: MaterialKind,
+    format: ApplicationExportFormat,
+) -> Result<Vec<u8>, CommandResponse<bool>> {
+    let revision_matches = window.state::<DesktopState>().with_store(|store| {
+        Ok(load(store)?.is_some_and(|saved| saved.revision == expected_revision))
+    });
+    match revision_matches {
+        Ok(true) => window
+            .state::<ApplicationExportState>()
+            .bytes(expected_revision, kind, format)
+            .ok_or_else(|| error("EXPORT_NOT_PREPARED")),
+        Ok(false) => Err(storage_failure(&StorageError::RevisionConflict)),
+        Err(problem) => Err(storage_failure(&problem)),
+    }
+}
+
+#[tauri::command]
+pub async fn download_application_export(
+    window: WebviewWindow,
+    expected_revision: i64,
+    kind: MaterialKind,
+    format: ApplicationExportFormat,
+) -> CommandResponse<bool> {
+    if window.label() != "overlay" {
+        return window_not_authorized();
+    }
+    let bytes = match prepared_application_export_bytes(&window, expected_revision, kind, format) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let Some(lease) = window.state::<crate::text_export::ExportState>().begin() else {
+        return error("EXPORT_BUSY");
+    };
+    let (title, filter, extension) = format.dialog();
+    let filename = format.filename(kind);
+    match tauri::async_runtime::spawn_blocking(move || {
+        let _lease = lease;
+        let path = window
+            .dialog()
+            .file()
+            .set_parent(&window)
+            .set_title(title)
+            .set_file_name(filename)
+            .add_filter(filter, &[extension])
+            .blocking_save_file();
+        let Some(path) = path else {
+            return error("EXPORT_CANCELLED");
+        };
+        let Some(path) = path.as_path() else {
+            return error("EXPORT_INVALID_DESTINATION");
+        };
+        match ExportDestination::for_native_dialog(path, format.file_type())
+            .and_then(|destination| destination.write(&bytes))
+        {
+            Ok(_) => CommandResponse::success(true),
+            Err(_) => error("EXPORT_FAILED"),
+        }
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(_) => error("EXPORT_FAILED"),
+    }
+}
+
+#[tauri::command]
+pub async fn drag_application_export(
+    window: WebviewWindow,
+    expected_revision: i64,
+    kind: MaterialKind,
+    format: ApplicationExportFormat,
+) -> CommandResponse<bool> {
+    if window.label() != "overlay" {
+        return window_not_authorized();
+    }
+    let bytes = match prepared_application_export_bytes(&window, expected_revision, kind, format) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = bytes;
+        return error("DRAG_UNAVAILABLE");
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let drag_files = window.state::<DragFiles>();
+        let (path, drag_lease) = match drag_files.materialize(&bytes, format.filename(kind)) {
+            Ok(path) => path,
+            Err(_) => return error("DRAG_UNAVAILABLE"),
+        };
+        let native_window = window.clone();
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        let app = window.app_handle().clone();
+        if app
+            .run_on_main_thread(move || {
+                let drag_lease = Mutex::new(Some(drag_lease));
+                let outcome = drag::start_drag(
+                    &native_window,
+                    drag::DragItem::Files(vec![path]),
+                    drag::Image::Raw(include_bytes!("../icons/32x32.png").to_vec()),
+                    move |_result, _position| {
+                        drop(
+                            drag_lease
+                                .lock()
+                                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                                .take(),
+                        );
+                    },
+                    drag::Options::default(),
+                );
+                let _ = sender.send(outcome.is_ok());
+            })
+            .is_err()
+        {
+            return error("DRAG_UNAVAILABLE");
+        }
+        match tauri::async_runtime::spawn_blocking(move || receiver.recv()).await {
+            Ok(Ok(true)) => CommandResponse::success(true),
+            _ => error("DRAG_UNAVAILABLE"),
+        }
+    }
 }
 
 pub(crate) fn document_for(
@@ -1156,10 +1591,8 @@ pub async fn drag_application_pdf(
             MaterialKind::Resume => "tailored-resume.pdf",
             MaterialKind::CoverLetter => "cover-letter.pdf",
         };
-        let path = match window
-            .state::<DragFiles>()
-            .materialize(&artifact.bytes, name)
-        {
+        let drag_files = window.state::<DragFiles>();
+        let (path, drag_lease) = match drag_files.materialize(&artifact.bytes, name) {
             Ok(path) => path,
             Err(_) => return error("DRAG_UNAVAILABLE"),
         };
@@ -1168,11 +1601,19 @@ pub async fn drag_application_pdf(
         let app = window.app_handle().clone();
         if app
             .run_on_main_thread(move || {
+                let drag_lease = Mutex::new(Some(drag_lease));
                 let outcome = drag::start_drag(
                     &native_window,
                     drag::DragItem::Files(vec![path]),
                     drag::Image::Raw(include_bytes!("../icons/32x32.png").to_vec()),
-                    |_result, _position| {},
+                    move |_result, _position| {
+                        drop(
+                            drag_lease
+                                .lock()
+                                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                                .take(),
+                        );
+                    },
                     drag::Options::default(),
                 );
                 let _ = sender.send(outcome.is_ok());
@@ -1213,11 +1654,11 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn drag_pdf_is_private_and_removed_on_finish_cleanup() {
+    fn drag_files_are_private_and_finish_cleanup_waits_for_active_drag() {
         use std::os::unix::fs::PermissionsExt;
 
         let files = DragFiles::default();
-        let pdf = files
+        let (pdf, _drag_lease) = files
             .materialize(b"%PDF-1.7\nfixture", "tailored-resume.pdf")
             .unwrap();
         assert_eq!(std::fs::read(&pdf).unwrap(), b"%PDF-1.7\nfixture");
@@ -1235,6 +1676,8 @@ mod tests {
         );
         let session = pdf.parent().unwrap().parent().unwrap().to_path_buf();
         files.clear();
+        assert!(session.exists());
+        drop(_drag_lease);
         assert!(!session.exists());
     }
 
@@ -1264,6 +1707,98 @@ mod tests {
             approved_answers: vec![],
             style: DocumentStyle::Technical,
         }
+    }
+
+    #[test]
+    fn prepared_exports_are_scoped_to_the_exact_workspace_revision_and_material() {
+        let exports = ApplicationExportState::default();
+        assert!(exports.replace(PreparedApplicationExports {
+            revision: 9,
+            kind: MaterialKind::Resume,
+            pdf: b"pdf".to_vec(),
+            docx: b"docx".to_vec(),
+        }));
+        assert_eq!(
+            exports.bytes(9, MaterialKind::Resume, ApplicationExportFormat::Pdf),
+            Some(b"pdf".to_vec())
+        );
+        assert_eq!(
+            exports.bytes(9, MaterialKind::Resume, ApplicationExportFormat::Docx),
+            Some(b"docx".to_vec())
+        );
+        assert!(
+            exports
+                .bytes(8, MaterialKind::Resume, ApplicationExportFormat::Pdf)
+                .is_none()
+        );
+        assert!(
+            exports
+                .bytes(9, MaterialKind::CoverLetter, ApplicationExportFormat::Pdf)
+                .is_none()
+        );
+        assert!(exports.replace(PreparedApplicationExports {
+            revision: 9,
+            kind: MaterialKind::CoverLetter,
+            pdf: b"cover-pdf".to_vec(),
+            docx: b"cover-docx".to_vec(),
+        }));
+        assert_eq!(
+            exports.bytes(9, MaterialKind::Resume, ApplicationExportFormat::Pdf),
+            Some(b"pdf".to_vec())
+        );
+        assert_eq!(
+            exports.bytes(9, MaterialKind::CoverLetter, ApplicationExportFormat::Docx),
+            Some(b"cover-docx".to_vec())
+        );
+        assert!(!exports.replace(PreparedApplicationExports {
+            revision: 8,
+            kind: MaterialKind::Resume,
+            pdf: b"stale".to_vec(),
+            docx: b"stale".to_vec(),
+        }));
+        assert_eq!(
+            exports.bytes(9, MaterialKind::Resume, ApplicationExportFormat::Pdf),
+            Some(b"pdf".to_vec())
+        );
+    }
+
+    #[test]
+    fn prepared_pdf_and_docx_follow_the_saved_content_and_style() {
+        let temp = TempDir::new().unwrap();
+        let store = ort_storage::EncryptedStore::open_or_initialize(
+            temp.path(),
+            "exports",
+            &MemoryDatabaseKeyVault::new(),
+        )
+        .unwrap();
+        let mut current = workspace();
+        current.resume.contact.full_name = "Alex Rivera".into();
+        let first = save(&store, None, &current).unwrap();
+        let state = DesktopState {
+            storage: Mutex::new(crate::DesktopStorage::Ready(store)),
+            reviews: Arc::new(crate::import_review::ReviewState::default()),
+        };
+        let original =
+            render_application_exports(&state, first.revision, MaterialKind::Resume).unwrap();
+        assert!(original.pdf.starts_with(b"%PDF-"));
+        assert!(original.docx.starts_with(b"PK\x03\x04"));
+        current.resume.contact.full_name = "Alex Morgan".into();
+        current.style = DocumentStyle::Modern;
+        let edited = state
+            .with_store(|store| save(store, Some(first.revision), &current))
+            .unwrap();
+        assert!(matches!(
+            render_application_exports(&state, first.revision, MaterialKind::Resume),
+            Err(StorageError::RevisionConflict)
+        ));
+        let updated =
+            render_application_exports(&state, edited.revision, MaterialKind::Resume).unwrap();
+        assert_ne!(original.pdf, updated.pdf);
+        assert_ne!(original.docx, updated.docx);
+        let cover =
+            render_application_exports(&state, edited.revision, MaterialKind::CoverLetter).unwrap();
+        assert!(cover.pdf.starts_with(b"%PDF-"));
+        assert!(cover.docx.starts_with(b"PK\x03\x04"));
     }
 
     #[test]

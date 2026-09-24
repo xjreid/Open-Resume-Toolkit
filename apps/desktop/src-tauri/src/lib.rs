@@ -7,9 +7,11 @@ use ort_domain::{
 };
 use ort_storage::{EncryptedStore, StorageError, VersionedResume};
 use ort_vault::OsDatabaseKeyVault;
+use serde::Deserialize;
 use std::sync::Mutex;
 use tauri::{
-    AppHandle, Emitter, EventTarget, Manager, RunEvent, State, WebviewWindow, WindowEvent,
+    AppHandle, Emitter, EventTarget, Manager, PhysicalPosition, PhysicalSize, RunEvent, State,
+    WebviewWindow, WindowEvent,
 };
 
 mod ai_keys;
@@ -392,9 +394,125 @@ fn show_application_overlay(window: WebviewWindow) -> CommandResponse<bool> {
     let Some(overlay) = window.get_webview_window("overlay") else {
         return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
     };
+    if position_overlay(&overlay).is_err() {
+        return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
+    }
     if overlay.show().is_err() || overlay.unminimize().is_err() || overlay.set_focus().is_err() {
         return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
     }
+    CommandResponse::success(true)
+}
+
+const OVERLAY_LOGICAL_WIDTH: f64 = 360.0;
+const OVERLAY_LOGICAL_HEIGHT: f64 = 760.0;
+const POPUP_GAP_PHYSICAL: i32 = 12;
+
+fn position_overlay(overlay: &WebviewWindow) -> tauri::Result<()> {
+    let scale = overlay.scale_factor()?;
+    let Some(monitor) = overlay.current_monitor()?.or(overlay.primary_monitor()?) else {
+        return Ok(());
+    };
+    let work = monitor.work_area();
+    let width = (OVERLAY_LOGICAL_WIDTH * scale).round() as u32;
+    let desired_height = (OVERLAY_LOGICAL_HEIGHT * scale).round() as u32;
+    let height = desired_height.min(work.size.height);
+    let x = work.position.x;
+    let y = work.position.y + (i64::from(work.size.height) - i64::from(height)).max(0) as i32 / 2;
+    overlay.set_size(PhysicalSize::new(width.min(work.size.width), height))?;
+    overlay.set_position(PhysicalPosition::new(x, y))
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum ApplicationPopupKind {
+    Job,
+    Url,
+    ResumeView,
+    ResumeEdit,
+    Cover,
+}
+
+impl ApplicationPopupKind {
+    fn logical_size(self) -> (f64, f64) {
+        match self {
+            Self::ResumeView | Self::ResumeEdit => (850.0, 760.0),
+            Self::Job | Self::Url | Self::Cover => (520.0, 420.0),
+        }
+    }
+}
+
+fn hide_application_popup_for(app: &AppHandle) {
+    if let Some(popup) = app.get_webview_window("application-popup") {
+        let _ = popup.hide();
+    }
+}
+
+#[tauri::command]
+fn show_application_popup(
+    window: WebviewWindow,
+    kind: ApplicationPopupKind,
+) -> CommandResponse<bool> {
+    if window.label() != "overlay" {
+        return window_not_authorized();
+    }
+    let Some(popup) = window.get_webview_window("application-popup") else {
+        return CommandResponse::failure("POPUP_UNAVAILABLE", "errors.overlayUnavailable", true);
+    };
+    let Ok(overlay_position) = window.outer_position() else {
+        return CommandResponse::failure("POPUP_UNAVAILABLE", "errors.overlayUnavailable", true);
+    };
+    let Ok(overlay_size) = window.outer_size() else {
+        return CommandResponse::failure("POPUP_UNAVAILABLE", "errors.overlayUnavailable", true);
+    };
+    let Ok(scale) = window.scale_factor() else {
+        return CommandResponse::failure("POPUP_UNAVAILABLE", "errors.overlayUnavailable", true);
+    };
+    let Ok(Some(monitor)) = window
+        .current_monitor()
+        .or_else(|_| window.primary_monitor())
+    else {
+        return CommandResponse::failure("POPUP_UNAVAILABLE", "errors.overlayUnavailable", true);
+    };
+    let work = monitor.work_area();
+    let (logical_width, logical_height) = kind.logical_size();
+    let width = ((logical_width * scale).round() as u32).min(work.size.width);
+    let height = ((logical_height * scale).round() as u32).min(work.size.height);
+    let right = overlay_position
+        .x
+        .saturating_add(overlay_size.width as i32)
+        .saturating_add(POPUP_GAP_PHYSICAL);
+    let left = overlay_position
+        .x
+        .saturating_sub(width as i32)
+        .saturating_sub(POPUP_GAP_PHYSICAL);
+    let work_right = work.position.x.saturating_add(work.size.width as i32);
+    let preferred_x = if right.saturating_add(width as i32) <= work_right {
+        right
+    } else {
+        left
+    };
+    let x = preferred_x.clamp(work.position.x, work_right.saturating_sub(width as i32));
+    let work_bottom = work.position.y.saturating_add(work.size.height as i32);
+    let y = overlay_position
+        .y
+        .clamp(work.position.y, work_bottom.saturating_sub(height as i32));
+    if popup.set_size(PhysicalSize::new(width, height)).is_err()
+        || popup.set_position(PhysicalPosition::new(x, y)).is_err()
+        || popup.show().is_err()
+        || popup.unminimize().is_err()
+        || popup.set_focus().is_err()
+    {
+        return CommandResponse::failure("POPUP_UNAVAILABLE", "errors.overlayUnavailable", true);
+    }
+    CommandResponse::success(true)
+}
+
+#[tauri::command]
+fn hide_application_popup(window: WebviewWindow) -> CommandResponse<bool> {
+    if !matches!(window.label(), "overlay" | "application-popup") {
+        return window_not_authorized();
+    }
+    hide_application_popup_for(&window.app_handle());
     CommandResponse::success(true)
 }
 
@@ -413,6 +531,7 @@ pub fn run() {
         .manage(pdf_preview::PortablePdfState::default())
         .manage(ai_request::AiRequestGate::default())
         .manage(application_materials::DragFiles::default())
+        .manage(application_materials::ApplicationExportState::default())
         .plugin(tauri_plugin_dialog::init())
         .menu(menu::editor_menu)
         .on_menu_event(|app, event| {
@@ -451,6 +570,7 @@ pub fn run() {
             application_materials::load_application_stage_one,
             application_materials::save_application_stage_one,
             application_materials::load_application_capture,
+            application_materials::request_application_capture,
             application_materials::resolve_application_capture,
             application_materials::application_context,
             application_materials::cancel_application_generation,
@@ -461,6 +581,9 @@ pub fn run() {
             application_materials::save_application_workspace,
             application_materials::finish_application,
             application_materials::preview_application_pdf,
+            application_materials::prepare_application_exports,
+            application_materials::download_application_export,
+            application_materials::drag_application_export,
             application_materials::download_application_pdf,
             application_materials::drag_application_pdf,
             tracker::list_tracker_entries,
@@ -517,6 +640,8 @@ pub fn run() {
             pdf_preview::release_resume_pdf,
             close_status,
             show_application_overlay,
+            show_application_popup,
+            hide_application_popup,
             resolve_close
         ])
         .build(tauri::generate_context!())
@@ -536,9 +661,25 @@ pub fn run() {
                 ..
             } if label == "overlay" => {
                 api.prevent_close();
+                hide_application_popup_for(app);
                 if let Some(overlay) = app.get_webview_window("overlay") {
                     let _ = overlay.hide();
                 }
+            }
+            RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::CloseRequested { api, .. },
+                ..
+            } if label == "application-popup" => {
+                api.prevent_close();
+                hide_application_popup_for(app);
+            }
+            RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::Focused(false),
+                ..
+            } if label == "application-popup" => {
+                hide_application_popup_for(app);
             }
             RunEvent::ExitRequested { api, .. } if !app.state::<CloseGuard>().approved() => {
                 api.prevent_exit();

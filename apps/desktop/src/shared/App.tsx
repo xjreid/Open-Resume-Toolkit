@@ -2050,11 +2050,12 @@ function LinksEditor({
   );
 }
 
-function ResumeCanvas({
+export function ResumeCanvas({
   document,
   style,
   contactDivider,
   onContactDividerChange,
+  showContactDivider = true,
   disabled,
   canAddEntry,
   onChange,
@@ -2063,6 +2064,7 @@ function ResumeCanvas({
   style: DocumentStyle;
   contactDivider: ContactDivider;
   onContactDividerChange: (divider: ContactDivider) => void;
+  showContactDivider?: boolean;
   disabled: boolean;
   canAddEntry: boolean;
   onChange: (update: (current: ResumeDocument) => ResumeDocument) => void;
@@ -2117,6 +2119,7 @@ function ResumeCanvas({
           divider={contactDivider}
           disabled={disabled}
           onDividerChange={onContactDividerChange}
+          showDivider={showContactDivider}
           onChange={(contact) =>
             onChange((current) => ({ ...current, contact }))
           }
@@ -2183,12 +2186,14 @@ function ContactInformationEditor({
   disabled,
   onChange,
   onDividerChange,
+  showDivider = true,
 }: {
   contact: ResumeDocument["contact"];
   divider: ContactDivider;
   disabled: boolean;
   onChange: (contact: ResumeDocument["contact"]) => void;
   onDividerChange: (divider: ContactDivider) => void;
+  showDivider?: boolean;
 }) {
   const initialItems = [
     contact.email,
@@ -2430,7 +2435,7 @@ function ContactInformationEditor({
       >
         + Add contact information
       </button>
-      <label className="contact-divider-control">
+      {showDivider ? <label className="contact-divider-control">
         Contact divider
         <select
           value={divider}
@@ -2449,7 +2454,7 @@ function ContactInformationEditor({
           <option value="bar">Bar |</option>
           <option value="dash">Dash -</option>
         </select>
-      </label>
+      </label> : null}
     </section>
   );
 }

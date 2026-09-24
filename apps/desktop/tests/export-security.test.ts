@@ -12,7 +12,7 @@ describe("native-only export authority", () => {
           ? [
               "core:default",
               "core:event:allow-emit-to",
-              "core:window:allow-set-size",
+              "core:window:allow-start-dragging",
             ]
           : ["core:default", "core:event:allow-emit-to"],
       );

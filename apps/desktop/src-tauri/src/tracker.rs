@@ -457,6 +457,9 @@ pub fn finish_with_selection(
     match result {
         Ok(()) => {
             window.state::<application_materials::DragFiles>().clear();
+            window
+                .state::<application_materials::ApplicationExportState>()
+                .clear();
             CommandResponse::success(true)
         }
         Err(error) => tracker_failure(&error),
