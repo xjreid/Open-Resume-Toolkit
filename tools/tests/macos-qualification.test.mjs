@@ -14,6 +14,7 @@ const config = read("tauri.conf.json");
 const capabilities = [
   read("capabilities/main.json"),
   read("capabilities/overlay.json"),
+  read("capabilities/application-popup.json"),
 ];
 
 test("designated requirement comparison ignores executable location and stream order", () => {
@@ -31,7 +32,7 @@ test("designated requirement comparison ignores executable location and stream o
   assert.throws(() => designatedRequirement(`${requirement}\n${requirement}`));
 });
 
-test("M0 policy rejects remote windows, CSP weakening and broader capabilities", () => {
+test("desktop policy rejects remote windows, CSP weakening and broader capabilities", () => {
   verifyConfiguration(config, capabilities);
   for (const mutate of [
     (value) => {
@@ -66,6 +67,12 @@ test("M0 policy rejects remote windows, CSP weakening and broader capabilities",
     },
     (value) => {
       value[0].remote = { urls: ["https://example.invalid"] };
+    },
+    (value) => {
+      value[2].permissions.push("shell:allow-execute");
+    },
+    (value) => {
+      value[2].windows = ["*"];
     },
   ]) {
     const changed = structuredClone(capabilities);

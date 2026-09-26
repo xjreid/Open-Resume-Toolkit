@@ -725,7 +725,9 @@ export function TrackerWorkspace({
                         <button
                           type="button"
                           className="button--secondary"
-                          onClick={() => void openContent(record, "cover_letter")}
+                          onClick={() =>
+                            void openContent(record, "cover_letter")
+                          }
                         >
                           Cover letter
                         </button>
@@ -742,7 +744,9 @@ export function TrackerWorkspace({
                       {!value.resume &&
                         !value.coverLetter &&
                         !value.answers.length && (
-                          <span className="tracker-empty">No saved content</span>
+                          <span className="tracker-empty">
+                            No saved content
+                          </span>
                         )}
                     </div>
                   </td>

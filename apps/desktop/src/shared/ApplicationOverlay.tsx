@@ -684,7 +684,9 @@ export function ApplicationOverlay() {
                 onClick={() =>
                   void navigator.clipboard
                     .writeText(draft?.coverLetter ?? "")
-                    .catch(() => setNotice("The cover letter could not be copied."))
+                    .catch(() =>
+                      setNotice("The cover letter could not be copied."),
+                    )
                 }
               >
                 Copy

@@ -12,7 +12,11 @@ export function verifyConfiguration(config, capabilities) {
   assert.equal(config.build.beforeBuildCommand, "pnpm build:web");
   assert.equal(config.app.withGlobalTauri, false);
   assert.equal(config.app.security.csp, productionCsp);
-  assert.deepEqual(config.app.security.capabilities, ["main", "overlay"]);
+  assert.deepEqual(config.app.security.capabilities, [
+    "main",
+    "overlay",
+    "application-popup",
+  ]);
   assert.equal(
     config.app.security.dangerousDisableAssetCspModification,
     undefined,
@@ -48,12 +52,21 @@ export function verifyConfiguration(config, capabilities) {
       },
       {
         identifier: "overlay",
-        windows: ["overlay", "application-popup"],
+        windows: ["overlay"],
         permissions: [
           "core:default",
           "core:event:allow-emit-to",
-          "core:window:allow-start-dragging",
+          "core:window:allow-outer-position",
+          "core:window:allow-outer-size",
+          "core:window:allow-scale-factor",
+          "core:window:allow-available-monitors",
+          "core:window:allow-set-position",
         ],
+      },
+      {
+        identifier: "application-popup",
+        windows: ["application-popup"],
+        permissions: ["core:default", "core:event:allow-emit-to"],
       },
     ],
   );

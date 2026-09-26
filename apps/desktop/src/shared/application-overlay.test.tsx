@@ -204,7 +204,11 @@ it("uses one cover editor and copies the current cover letter", async () => {
 
 it("refines an answer and saves only its final version on reset", async () => {
   vi.useFakeTimers();
-  let current = { ...workspace(), question: "Why this role?", answer: "First answer" };
+  let current = {
+    ...workspace(),
+    question: "Why this role?",
+    answer: "First answer",
+  };
   let revision = 1;
   vi.mocked(invoke).mockImplementation(async (name, args) => {
     const input = args as Record<string, unknown>;
@@ -229,12 +233,14 @@ it("refines an answer and saves only its final version on reset", async () => {
   await act(async () => button("Answers").click());
   expect(host.textContent).not.toContain("Application answers");
   expect(host.textContent).not.toContain("Character limit");
-  const instructions = [...host.querySelectorAll("textarea")].find(
-    (item) => item.parentElement?.textContent?.includes("Refinement instructions"),
+  const instructions = [...host.querySelectorAll("textarea")].find((item) =>
+    item.parentElement?.textContent?.includes("Refinement instructions"),
   )!;
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!
-      .set!.call(instructions, "Make it concise");
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )!.set!.call(instructions, "Make it concise");
     instructions.dispatchEvent(new Event("input", { bubbles: true }));
   });
   await act(async () => button("Refine answer").click());
@@ -243,7 +249,9 @@ it("refines an answer and saves only its final version on reset", async () => {
     instruction: "Make it concise",
   });
   await act(async () => button("Reset question").click());
-  expect(host.querySelector('[role="dialog"][aria-label="Reset question"]')).toBeNull();
+  expect(
+    host.querySelector('[role="dialog"][aria-label="Reset question"]'),
+  ).toBeNull();
   await act(async () => vi.advanceTimersByTimeAsync(180));
   expect(current.approvedAnswers).toEqual([
     { question: "Why this role?", answer: "Final answer" },
@@ -254,7 +262,11 @@ it("refines an answer and saves only its final version on reset", async () => {
 });
 
 it("finishes directly and saves the final answer with tracker details", async () => {
-  let current = { ...workspace(), question: "Why us?", answer: "Final response" };
+  let current = {
+    ...workspace(),
+    question: "Why us?",
+    answer: "Final response",
+  };
   let revision = 1;
   vi.mocked(invoke).mockImplementation(async (name, args) => {
     const input = args as Record<string, unknown>;
@@ -307,18 +319,26 @@ it("edits tracker details before finishing and saves all materials", async () =>
   });
   const { host, button } = await mount();
   expect(
-    host.querySelector(".application-finish-actions")?.querySelectorAll("button"),
+    host
+      .querySelector(".application-finish-actions")
+      ?.querySelectorAll("button"),
   ).toHaveLength(3);
   await act(async () => button("Edit tracker details").click());
-  const dialog = host.querySelector('[role="dialog"][aria-label="Edit tracker details"]')!;
+  const dialog = host.querySelector(
+    '[role="dialog"][aria-label="Edit tracker details"]',
+  )!;
   expect(dialog.textContent).toContain("Date applied");
   expect(dialog.textContent).toContain("Link or source");
   expect(dialog.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-  const company = dialog.querySelector<HTMLInputElement>('input[maxlength="200"]')!;
+  const company = dialog.querySelector<HTMLInputElement>(
+    'input[maxlength="200"]',
+  )!;
   expect(company.value).toBe("Example");
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!
-      .set!.call(company, "Edited Company");
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(company, "Edited Company");
     company.dispatchEvent(new Event("input", { bubbles: true }));
   });
   await act(async () => button("Finish").click());
@@ -343,7 +363,10 @@ it("confirms discarding the application without a tracker entry", async () => {
   const { host, button } = await mount();
   await act(async () => button("End application without saving").click());
   expect(host.querySelector('[role="dialog"]')).toBeTruthy();
-  expect(invoke).not.toHaveBeenCalledWith("finish_application", expect.anything());
+  expect(invoke).not.toHaveBeenCalledWith(
+    "finish_application",
+    expect.anything(),
+  );
   await act(async () => button("Back").click());
   expect(host.querySelector('[role="dialog"]')).toBeNull();
   await act(async () => button("End application without saving").click());

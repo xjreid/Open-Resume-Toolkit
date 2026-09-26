@@ -1,6 +1,8 @@
 //! Tracker commands and validated retained application snapshots.
+#![allow(clippy::needless_pass_by_value)] // Tauri command parameters are owned by the IPC adapter.
 
 use base64::{Engine, engine::general_purpose::STANDARD};
+use ort_ai::materials::RoleInfo;
 use ort_domain::{CommandResponse, ContactDetails, DocumentLimits, DocumentStyle, ResumeDocument};
 use ort_storage::{StorageError, tracker::TrackerRecord};
 use serde::{Deserialize, Serialize};
@@ -192,7 +194,7 @@ mod content_tests {
             published_revision: 1,
             job_description: "Job".into(),
             job_url: String::new(),
-            role_info: Default::default(),
+            role_info: RoleInfo::default(),
             resume: ResumeDocument::empty("Final corrected resume"),
             change_points: Vec::new(),
             alerts: Vec::new(),
@@ -281,9 +283,8 @@ pub fn save_tracker_entry(
         return tracker_failure(&error);
     }
     let id = id.unwrap_or_else(|| Uuid::now_v7().to_string());
-    let value = match serde_json::to_value(&entry) {
-        Ok(value) => value,
-        Err(_) => return tracker_failure(&StorageError::InvalidData),
+    let Ok(value) = serde_json::to_value(&entry) else {
+        return tracker_failure(&StorageError::InvalidData);
     };
     match window.state::<DesktopState>().with_store(|store| {
         if let Some(revision) = expected_revision {
@@ -399,7 +400,7 @@ pub fn preview_tracker_pdf(
                 published_revision: 1,
                 job_description: "Retained application".into(),
                 job_url: String::new(),
-                role_info: Default::default(),
+                role_info: RoleInfo::default(),
                 resume,
                 change_points: Vec::new(),
                 alerts: Vec::new(),
@@ -478,7 +479,10 @@ fn selected_snapshot(
 ) -> Result<TrackerEntry, StorageError> {
     validate(&selection.entry)?;
     selection.entry.resume = Some(workspace.resume.clone());
-    selection.entry.cover_letter = workspace.cover_letter.clone();
+    selection
+        .entry
+        .cover_letter
+        .clone_from(&workspace.cover_letter);
     selection.entry.cover_contact = selection
         .entry
         .cover_letter
@@ -489,7 +493,7 @@ fn selected_snapshot(
     selection.entry.answers = final_workspace.approved_answers;
     selection.entry.style = workspace.style;
     if selection.entry.source_url.is_empty() {
-        selection.entry.source_url = workspace.job_url.clone();
+        selection.entry.source_url.clone_from(&workspace.job_url);
     }
     validate(&selection.entry)?;
     Ok(selection.entry)

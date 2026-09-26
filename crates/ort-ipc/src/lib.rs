@@ -141,7 +141,7 @@ pub fn validate_capture(bytes: &[u8], now_ms: i64) -> Result<CaptureEnvelope, Br
 /// # Errors
 /// Rejects an origin absent from the compiled channel allowlist.
 pub fn validate_origin(origin: &str, allowed: &[&str]) -> Result<(), BridgeError> {
-    if allowed.iter().any(|item| *item == origin) {
+    if allowed.contains(&origin) {
         Ok(())
     } else {
         Err(BridgeError::WrongOrigin)

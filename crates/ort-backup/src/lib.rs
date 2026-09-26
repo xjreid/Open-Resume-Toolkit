@@ -975,6 +975,10 @@ const fn is_zero(value: &u16) -> bool {
     *value == 0
 }
 
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if requires a shared-reference predicate"
+)]
 const fn is_zero_u32(value: &u32) -> bool {
     *value == 0
 }

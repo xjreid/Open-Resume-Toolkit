@@ -387,6 +387,7 @@ fn development_identity_allowed(identifier: &str) -> bool {
 }
 
 #[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri passes the window by value.
 fn application_overlay_visibility(window: WebviewWindow) -> CommandResponse<bool> {
     if window.label() != "main" {
         return window_not_authorized();
@@ -407,6 +408,7 @@ fn application_overlay_visibility(window: WebviewWindow) -> CommandResponse<bool
 }
 
 #[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri passes the window by value.
 fn toggle_application_overlay(window: WebviewWindow) -> CommandResponse<bool> {
     if window.label() != "main" {
         return window_not_authorized();
@@ -441,6 +443,7 @@ fn toggle_application_overlay(window: WebviewWindow) -> CommandResponse<bool> {
 }
 
 #[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri passes command arguments by value.
 fn retry_storage(window: WebviewWindow, state: State<'_, DesktopState>) -> CommandResponse<bool> {
     if window.label() != "main" {
         return window_not_authorized();
@@ -460,17 +463,39 @@ const OVERLAY_LOGICAL_WIDTH: f64 = 360.0;
 const OVERLAY_LOGICAL_HEIGHT: f64 = 760.0;
 const POPUP_GAP_PHYSICAL: i32 = 12;
 
+fn physical_dimension(logical: f64, scale: f64) -> u32 {
+    let scaled = (logical * scale).round();
+    if !scaled.is_finite() || scaled < 1.0 {
+        return 1;
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the rounded dimension is finite, positive, and clamped to u32"
+    )]
+    let bounded = scaled.min(f64::from(u32::MAX)) as u32;
+    bounded
+}
+
+fn signed_dimension(value: u32) -> i32 {
+    i32::try_from(value).unwrap_or(i32::MAX)
+}
+
 fn position_overlay(overlay: &WebviewWindow) -> tauri::Result<()> {
     let scale = overlay.scale_factor()?;
     let Some(monitor) = overlay.current_monitor()?.or(overlay.primary_monitor()?) else {
         return Ok(());
     };
     let work = monitor.work_area();
-    let width = (OVERLAY_LOGICAL_WIDTH * scale).round() as u32;
-    let desired_height = (OVERLAY_LOGICAL_HEIGHT * scale).round() as u32;
+    let width = physical_dimension(OVERLAY_LOGICAL_WIDTH, scale);
+    let desired_height = physical_dimension(OVERLAY_LOGICAL_HEIGHT, scale);
     let height = desired_height.min(work.size.height);
     let x = work.position.x;
-    let y = work.position.y + (i64::from(work.size.height) - i64::from(height)).max(0) as i32 / 2;
+    let vertical_margin = i64::from(work.size.height) - i64::from(height);
+    let y = work
+        .position
+        .y
+        .saturating_add(i32::try_from(vertical_margin.max(0)).unwrap_or(i32::MAX) / 2);
     overlay.set_size(PhysicalSize::new(width.min(work.size.width), height))?;
     overlay.set_position(PhysicalPosition::new(x, y))
 }
@@ -501,6 +526,7 @@ fn hide_application_popup_for(app: &AppHandle) {
 }
 
 #[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri passes command arguments by value.
 fn show_application_popup(
     window: WebviewWindow,
     kind: ApplicationPopupKind,
@@ -528,27 +554,37 @@ fn show_application_popup(
     };
     let work = monitor.work_area();
     let (logical_width, logical_height) = kind.logical_size();
-    let width = ((logical_width * scale).round() as u32).min(work.size.width);
-    let height = ((logical_height * scale).round() as u32).min(work.size.height);
+    let width = physical_dimension(logical_width, scale).min(work.size.width);
+    let height = physical_dimension(logical_height, scale).min(work.size.height);
     let right = overlay_position
         .x
-        .saturating_add(overlay_size.width as i32)
+        .saturating_add(signed_dimension(overlay_size.width))
         .saturating_add(POPUP_GAP_PHYSICAL);
     let left = overlay_position
         .x
-        .saturating_sub(width as i32)
+        .saturating_sub(signed_dimension(width))
         .saturating_sub(POPUP_GAP_PHYSICAL);
-    let work_right = work.position.x.saturating_add(work.size.width as i32);
-    let preferred_x = if right.saturating_add(width as i32) <= work_right {
+    let work_right = work
+        .position
+        .x
+        .saturating_add(signed_dimension(work.size.width));
+    let preferred_x = if right.saturating_add(signed_dimension(width)) <= work_right {
         right
     } else {
         left
     };
-    let x = preferred_x.clamp(work.position.x, work_right.saturating_sub(width as i32));
-    let work_bottom = work.position.y.saturating_add(work.size.height as i32);
-    let y = overlay_position
+    let x = preferred_x.clamp(
+        work.position.x,
+        work_right.saturating_sub(signed_dimension(width)),
+    );
+    let work_bottom = work
+        .position
         .y
-        .clamp(work.position.y, work_bottom.saturating_sub(height as i32));
+        .saturating_add(signed_dimension(work.size.height));
+    let y = overlay_position.y.clamp(
+        work.position.y,
+        work_bottom.saturating_sub(signed_dimension(height)),
+    );
     if popup.set_size(PhysicalSize::new(width, height)).is_err()
         || popup.set_position(PhysicalPosition::new(x, y)).is_err()
         || popup.show().is_err()
@@ -561,11 +597,12 @@ fn show_application_popup(
 }
 
 #[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri passes the window by value.
 fn hide_application_popup(window: WebviewWindow) -> CommandResponse<bool> {
     if !matches!(window.label(), "overlay" | "application-popup") {
         return window_not_authorized();
     }
-    hide_application_popup_for(&window.app_handle());
+    hide_application_popup_for(window.app_handle());
     CommandResponse::success(true)
 }
 
@@ -724,15 +761,15 @@ pub fn run() {
                 event: WindowEvent::Focused(false),
                 ..
             } if label == "overlay" => {
-                if let Some(overlay) = app.get_webview_window("overlay") {
-                    if overlay.is_minimized().unwrap_or(false) {
-                        hide_application_popup_for(app);
-                        let _ = app.emit_to(
-                            EventTarget::webview_window("main"),
-                            "ort:overlay-visibility",
-                            false,
-                        );
-                    }
+                if let Some(overlay) = app.get_webview_window("overlay")
+                    && overlay.is_minimized().unwrap_or(false)
+                {
+                    hide_application_popup_for(app);
+                    let _ = app.emit_to(
+                        EventTarget::webview_window("main"),
+                        "ort:overlay-visibility",
+                        false,
+                    );
                 }
             }
             RunEvent::WindowEvent {

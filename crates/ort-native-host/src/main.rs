@@ -11,9 +11,10 @@ use serde_json::json;
 fn main() {
     let result = process(&mut io::stdin().lock());
     let code = match result {
-        Ok(()) => "BRIDGE_UNAVAILABLE",
         Err(BridgeError::Incompatible) => "PROTOCOL_INCOMPATIBLE",
-        Err(BridgeError::WrongOrigin | BridgeError::Authentication) => "BRIDGE_UNAVAILABLE",
+        Ok(()) | Err(BridgeError::WrongOrigin | BridgeError::Authentication) => {
+            "BRIDGE_UNAVAILABLE"
+        }
         Err(BridgeError::Oversized) => "CAPTURE_TOO_LARGE",
         Err(BridgeError::Expired | BridgeError::Replay) => "CAPTURE_EXPIRED",
         Err(_) => "CAPTURE_INVALID",
@@ -91,7 +92,10 @@ mod tests {
             process_with_origin(&mut frame, ORIGIN, &[ORIGIN]),
             Err(BridgeError::Unavailable)
         );
-        assert_eq!(frame.position() as usize, frame.get_ref().len());
+        assert_eq!(
+            usize::try_from(frame.position()).unwrap(),
+            frame.get_ref().len()
+        );
     }
 
     #[test]
