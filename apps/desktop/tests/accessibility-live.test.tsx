@@ -26,6 +26,7 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
   getCurrentWebviewWindow: () => ({ listen: native.listen }),
 }));
 vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => {}),
   emitTo: vi.fn(
     async (_target: string, event: string, payload: { attempt?: string }) => {
       if (event === "ort:overlay-close-probe")
@@ -229,6 +230,51 @@ afterEach(async () => {
 });
 
 describe("M2 live editor accessibility", () => {
+  it("retries unavailable storage and toggles overlay visibility", async () => {
+    const original = native.invoke.getMockImplementation()!;
+    let storageReady = false;
+    let overlayVisible = false;
+    native.invoke.mockImplementation(
+      async (command: string, ...args: unknown[]) => {
+        if (command === "health")
+          return {
+            ...readyHealth,
+            value: {
+              ...readyHealth.value,
+              storageStatus: storageReady ? "ready" : "unavailable",
+            },
+          };
+        if (command === "retry_storage") {
+          storageReady = true;
+          return { ok: true, value: true };
+        }
+        if (command === "application_overlay_visibility")
+          return { ok: true, value: overlayVisible };
+        if (command === "toggle_application_overlay") {
+          overlayVisible = !overlayVisible;
+          return { ok: true, value: overlayVisible };
+        }
+        return original(command, ...args);
+      },
+    );
+    const container = await render(<App surface="main" />);
+    await act(async () =>
+      buttonNamed(container, "Storage unavailable · Retry").click(),
+    );
+    await settle();
+    expect(container.textContent).toContain("Encrypted storage ready");
+    const overlay = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Show overlay"]',
+    )!;
+    expect(overlay).not.toBeNull();
+    await act(async () => overlay.click());
+    expect(overlay.getAttribute("aria-pressed")).toBe("true");
+    expect(overlay.getAttribute("aria-label")).toBe("Hide overlay");
+    await act(async () => overlay.click());
+    expect(overlay.getAttribute("aria-pressed")).toBe("false");
+    expect(native.invoke).toHaveBeenCalledWith("retry_storage");
+  });
+
   it("allows backup validation and confirmed restore before creating a first draft", async () => {
     const original = native.invoke.getMockImplementation()!;
     let finishRestore!: (result: unknown) => void;
@@ -378,7 +424,7 @@ describe("M2 live editor accessibility", () => {
 
   it("keeps import and settings workspaces navigable and accessible", async () => {
     const container = await render(<App surface="main" />);
-    await act(async () => buttonNamed(container, "Import resume").click());
+    await act(async () => buttonNamed(container, "Import").click());
     expect(container.querySelector<HTMLElement>(".import-page")?.hidden).toBe(
       false,
     );

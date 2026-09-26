@@ -5,11 +5,20 @@ import type { Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AiWorkspace } from "../src/shared/AiWorkspace";
 
-const native = vi.hoisted(() => ({ invoke: vi.fn() }));
+const native = vi.hoisted(() => ({
+  invoke: vi.fn(),
+  presetListeners: new Set<() => void>(),
+}));
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: native.invoke,
   Channel: class<T> {
     onmessage: (event: T) => void = () => {};
+  },
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: async (_event: string, handler: () => void) => {
+    native.presetListeners.add(handler);
+    return () => native.presetListeners.delete(handler);
   },
 }));
 
@@ -115,6 +124,7 @@ beforeEach(async () => {
   vi.stubGlobal("MouseEvent", dom.window.MouseEvent);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   native.invoke.mockReset();
+  native.presetListeners.clear();
   native.invoke.mockImplementation((command: string) => {
     if (command === "load_ai_catalog") return Promise.resolve(catalog);
     if (command === "load_ai_connection") return Promise.resolve(connection);
@@ -168,6 +178,30 @@ afterEach(async () => {
   await act(async () => root.unmount());
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+it("refreshes the model preset after the overlay changes it", async () => {
+  const previous = native.invoke.getMockImplementation()!;
+  native.invoke.mockImplementation((command: string, args?: unknown) =>
+    command === "load_ai_connection"
+      ? Promise.resolve({
+          ...connection,
+          value: {
+            ...connection.value,
+            keys: connection.value.keys.map((key) =>
+              key.credentialId === "fixture-id"
+                ? { ...key, preset: "economy" }
+                : key,
+            ),
+          },
+        })
+      : previous(command, args),
+  );
+  await act(async () => native.presetListeners.forEach((wake) => wake()));
+  const select = [...document.querySelectorAll("select")].find((item) =>
+    item.closest("label")?.textContent?.includes("Model preset for"),
+  );
+  expect(select?.value).toBe("economy");
 });
 
 async function click(label: string) {

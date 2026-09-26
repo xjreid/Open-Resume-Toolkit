@@ -10,15 +10,17 @@
   font-size: 13px;
 }
 .application-shell .application-header {
+  position: relative;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   gap: 9px;
-  padding: 17px 12px;
+  padding: 36px 12px 12px;
   min-height: 86px;
   background: #fff;
   border-bottom: 1px solid #dbe2e9;
   flex-shrink: 0;
+  touch-action: none;
 }
 .application-shell .application-drag-handle {
   display: flex;
@@ -62,6 +64,24 @@
   border-radius: 4px;
   background: #fff8ee;
   font-size: 10px;
+}
+.application-shell .application-key-status .application-stop {
+  min-height: 22px;
+  margin-left: auto;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: #b32635;
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+}
+.application-shell
+  .application-key-status
+  .application-stop:hover:not(:disabled) {
+  background: transparent;
+  color: #9d1726;
+  text-decoration: underline;
 }
 .application-dot {
   width: 6px;
@@ -207,20 +227,47 @@
 .application-shell .application-role {
   margin-bottom: 16px;
 }
+.application-shell .application-role-details {
+  margin-bottom: 12px;
+}
 .application-shell .application-role h1 {
   font-size: 20px;
   margin-bottom: 5px;
   overflow-wrap: anywhere;
 }
-.application-shell .application-role > p:not(.application-kicker) {
-  margin: 0 0 14px;
+.application-shell .application-role-details > p {
+  margin: 0;
   color: #738196;
   line-height: 1.4;
 }
-.application-shell .application-role > button {
+.application-shell .application-finish-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px 40px;
+  gap: 6px;
+}
+.application-shell .application-finish-actions > button {
+  min-width: 0;
+  min-height: 40px;
+  margin-top: 0;
+}
+.application-shell .application-finish-primary {
   width: 100%;
-  margin-top: 8px;
   justify-content: space-between;
+}
+.application-shell .application-finish-square {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+.application-shell .application-finish-discard,
+.application-shell .application-confirm-discard {
+  border-color: #d89494;
+  background: #fff1f1;
+  color: #b52e37;
+}
+.application-shell .application-finish-discard:hover:not(:disabled),
+.application-shell .application-confirm-discard:hover:not(:disabled) {
+  background: #ffe3e3;
 }
 .application-shell .application-tabs {
   display: grid;
@@ -370,9 +417,6 @@
   font-size: 11px;
   padding: 10px;
 }
-.application-shell .application-reset {
-  margin-top: 12px;
-}
 .application-shell .application-answer-list {
   margin-top: 24px;
 }
@@ -399,6 +443,10 @@
   display: grid;
   gap: 5px;
   margin: 12px 0;
+}
+.application-shell .application-dialog .tracker-fields {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
 }
 .application-shell .application-dialog input:not([type="checkbox"]),
 .application-shell .application-dialog textarea {

@@ -2,10 +2,14 @@
 
 The application workspace opens as a fixed 360 × 760 logical-pixel rail at the
 left edge of the monitor work area, vertically centered. Its height is clamped
-on smaller displays. Drag the header to move it; the rail cannot be resized.
+on smaller displays. Drag the header to move it within the monitor work area;
+the rail cannot be resized.
 The model preset selector uses the active key's signed catalog choices and the
-same preset-setting command as My Keys. The header shows request activity and
-lets the user cancel overlay generation.
+same preset-setting command as My Keys. Preset changes refresh in both windows.
+The header shows request activity and a red Stop text control while a request
+is running. The native red window control requests an app quit and shows the
+existing confirmation for unsaved work. Opening the overlay leaves the main
+window visible; the native yellow control minimizes only the overlay.
 
 ## Capture and tailor
 
@@ -26,8 +30,9 @@ the request. No live API request is sent just by capturing or editing text.
 
 ## Review, edit, export
 
-Stage 2 shows the company/role, Finish Application, and Resume, Cover letter,
-and Answers tabs. The resume tab contains tailoring notes and qualification
+Stage 2 shows the company and role above Finish Application when either is
+available; otherwise Finish Application appears first. Resume, Cover letter,
+and Answers tabs follow. The resume tab contains tailoring notes and qualification
 alerts, a style selector, PDF/Word format selection, Download and Drag me,
 View/Edit controls, and an AI refinement input.
 
@@ -52,5 +57,9 @@ Native file drag currently supports macOS; other platforms return an explicit
 unavailable error and can use Download. Drag files are private temporary files,
 retained through an active drag and cleared when finishing. Cover letters use
 the same export controls and an editable text popup. Answers retain generation,
-editing, copying, and approved-answer collection. Finish retains the existing
-tracker and material-selection workflow.
+editing, copying, and saved-answer collection. A generated answer can be refined
+with instructions and is retained once when Reset question, a new browser
+question capture, or Finish Application ends that question. Finish Application
+saves the current resume, cover letter, and final answers to the tracker with
+found role details and today's date. The pencil opens editable tracker details;
+the red X confirms discarding the application without a tracker entry.

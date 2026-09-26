@@ -711,38 +711,40 @@ export function TrackerWorkspace({
                     )}
                   </td>
                   <td className="tracker-content-cell">
-                    {value.resume && (
-                      <button
-                        type="button"
-                        className="button--secondary"
-                        onClick={() => void openContent(record, "resume")}
-                      >
-                        Final resume
-                      </button>
-                    )}
-                    {value.coverLetter && (
-                      <button
-                        type="button"
-                        className="button--secondary"
-                        onClick={() => void openContent(record, "cover_letter")}
-                      >
-                        Cover letter
-                      </button>
-                    )}
-                    {value.answers.length > 0 && (
-                      <button
-                        type="button"
-                        className="button--secondary"
-                        onClick={() => void openContent(record, "answers")}
-                      >
-                        Answers ({value.answers.length})
-                      </button>
-                    )}
-                    {!value.resume &&
-                      !value.coverLetter &&
-                      !value.answers.length && (
-                        <span className="tracker-empty">No saved content</span>
+                    <div className="tracker-content-items">
+                      {value.resume && (
+                        <button
+                          type="button"
+                          className="button--secondary"
+                          onClick={() => void openContent(record, "resume")}
+                        >
+                          Final resume
+                        </button>
                       )}
+                      {value.coverLetter && (
+                        <button
+                          type="button"
+                          className="button--secondary"
+                          onClick={() => void openContent(record, "cover_letter")}
+                        >
+                          Cover letter
+                        </button>
+                      )}
+                      {value.answers.length > 0 && (
+                        <button
+                          type="button"
+                          className="button--secondary"
+                          onClick={() => void openContent(record, "answers")}
+                        >
+                          Answers ({value.answers.length})
+                        </button>
+                      )}
+                      {!value.resume &&
+                        !value.coverLetter &&
+                        !value.answers.length && (
+                          <span className="tracker-empty">No saved content</span>
+                        )}
+                    </div>
                   </td>
                   <td className="tracker-delete-cell">
                     <button

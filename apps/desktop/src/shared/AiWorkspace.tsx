@@ -1,4 +1,5 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import {
   useEffect,
   useRef,
@@ -181,6 +182,7 @@ function testFailureMessage(code: string) {
 export function AiWorkspace({ blocked }: { blocked: boolean }) {
   const [page, setPage] = useState<"general" | "data">("general");
   const [registry, setRegistry] = useState<KeyRegistry | null>(null);
+  const keyRefreshGeneration = useRef(0);
   const [keysUnavailable, setKeysUnavailable] = useState(false);
   const primaryKey =
     registry?.keys.find(
@@ -262,8 +264,10 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     setTestOutput("");
   }
   async function refreshKeys() {
+    const generation = ++keyRefreshGeneration.current;
     try {
       const response = await invoke<Response>("load_ai_connection");
+      if (generation !== keyRefreshGeneration.current) return;
       if (response.ok) applyRegistry(response.value);
       else {
         setRegistry(null);
@@ -273,6 +277,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
         );
       }
     } catch {
+      if (generation !== keyRefreshGeneration.current) return;
       setRegistry(null);
       setKeysUnavailable(true);
       setNotice("Saved keys are unavailable. Reload before sending a request.");
@@ -280,6 +285,24 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   }
   useEffect(() => {
     void refreshKeys();
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    const wake = () => {
+      if (active) void refreshKeys();
+    };
+    window.addEventListener("focus", wake);
+    void listen("ort:ai-preset-changed", wake)
+      .then((stop) => {
+        if (active) unlisten = stop;
+        else stop();
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+      keyRefreshGeneration.current += 1;
+      window.removeEventListener("focus", wake);
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {

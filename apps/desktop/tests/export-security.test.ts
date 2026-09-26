@@ -12,7 +12,11 @@ describe("native-only export authority", () => {
           ? [
               "core:default",
               "core:event:allow-emit-to",
-              "core:window:allow-start-dragging",
+              "core:window:allow-outer-position",
+              "core:window:allow-outer-size",
+              "core:window:allow-scale-factor",
+              "core:window:allow-available-monitors",
+              "core:window:allow-set-position",
             ]
           : ["core:default", "core:event:allow-emit-to"],
       );

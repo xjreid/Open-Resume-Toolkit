@@ -2,16 +2,19 @@
 
 ## Main workspace navigation
 
-The desktop navigation contains Master resume, Import resume, AI & monitoring,
-and Settings. Switching destinations does not discard the owning workspace's
+The desktop navigation contains Master resume, AI & monitoring, Application
+tracker, and Settings. Master resume has Edit, View, and Import subsections.
+The right-side Overlay icon shows or hides the separate application window.
+Switching destinations does not discard the owning workspace's
 in-memory state. Navigation is temporarily disabled while a blocking native
 operation or confirmation is active.
 The top-left brand always reads **Open Resume Toolkit**, with Open on the first
 line and Resume Toolkit on the second; it does not change with the destination.
 
-The storage-health badge reflects typed native health state. Features that
-require encrypted storage remain disabled or fail closed when storage is not
-ready.
+The storage-health badge reflects typed native health state. When storage is
+unavailable, the badge retries opening it, including the operating-system
+keychain prompt. Features that require encrypted storage remain disabled or
+fail closed until it is ready.
 
 ## Local storage and external files
 

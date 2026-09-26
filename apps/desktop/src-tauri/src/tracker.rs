@@ -36,9 +36,6 @@ pub struct TrackerEntry {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FinishSelection {
     pub entry: TrackerEntry,
-    pub retain_resume: bool,
-    pub retain_cover_letter: bool,
-    pub retain_answers: bool,
 }
 
 pub(crate) fn valid_url(value: &str) -> bool {
@@ -189,8 +186,8 @@ mod content_tests {
     }
 
     #[test]
-    fn finish_retains_only_the_current_corrected_resume() {
-        let workspace = application_materials::ApplicationWorkspace {
+    fn finish_retains_all_current_materials() {
+        let mut workspace = application_materials::ApplicationWorkspace {
             schema_version: 1,
             published_revision: 1,
             job_description: "Job".into(),
@@ -208,16 +205,25 @@ mod content_tests {
             approved_answers: Vec::new(),
             style: DocumentStyle::Technical,
         };
-        let selection = FinishSelection {
-            entry: entry(),
-            retain_resume: true,
-            retain_cover_letter: true,
-            retain_answers: false,
-        };
+        let selection = FinishSelection { entry: entry() };
         let retained = selected_snapshot(selection, &workspace).unwrap();
         assert_eq!(retained.resume.unwrap().title, "Final corrected resume");
         assert_eq!(retained.cover_letter.as_deref(), Some("Final letter"));
         assert!(retained.answers.is_empty());
+        workspace.question = "Why this role?".into();
+        workspace.answer = "Final reviewed answer".into();
+        workspace.approved_answers.push(ApprovedAnswer {
+            question: "Earlier question?".into(),
+            answer: "Earlier final answer".into(),
+        });
+        let retained = selected_snapshot(FinishSelection { entry: entry() }, &workspace).unwrap();
+        assert_eq!(retained.resume.unwrap().title, "Final corrected resume");
+        assert_eq!(retained.cover_letter.as_deref(), Some("Final letter"));
+        assert_eq!(retained.answers.len(), 2);
+        assert_eq!(retained.answers[0].answer, "Earlier final answer");
+        assert_eq!(retained.answers[1].question, "Why this role?");
+        assert_eq!(retained.answers[1].answer, "Final reviewed answer");
+        assert_eq!(workspace.answer, "Final reviewed answer");
     }
 }
 
@@ -471,22 +477,16 @@ fn selected_snapshot(
     workspace: &application_materials::ApplicationWorkspace,
 ) -> Result<TrackerEntry, StorageError> {
     validate(&selection.entry)?;
-    selection.entry.resume = selection.retain_resume.then(|| workspace.resume.clone());
-    selection.entry.cover_letter = if selection.retain_cover_letter {
-        workspace.cover_letter.clone()
-    } else {
-        None
-    };
+    selection.entry.resume = Some(workspace.resume.clone());
+    selection.entry.cover_letter = workspace.cover_letter.clone();
     selection.entry.cover_contact = selection
         .entry
         .cover_letter
         .as_ref()
         .map(|_| workspace.resume.contact.clone());
-    selection.entry.answers = if selection.retain_answers {
-        workspace.approved_answers.clone()
-    } else {
-        Vec::new()
-    };
+    let mut final_workspace = workspace.clone();
+    application_materials::retain_current_answer(&mut final_workspace)?;
+    selection.entry.answers = final_workspace.approved_answers;
     selection.entry.style = workspace.style;
     if selection.entry.source_url.is_empty() {
         selection.entry.source_url = workspace.job_url.clone();

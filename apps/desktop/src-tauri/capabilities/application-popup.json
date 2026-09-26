@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "application-popup",
+  "description": "Core and event permissions for the application details popup.",
+  "windows": ["application-popup"],
+  "permissions": ["core:default", "core:event:allow-emit-to"]
+}

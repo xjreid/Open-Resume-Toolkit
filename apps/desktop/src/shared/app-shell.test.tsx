@@ -15,6 +15,7 @@ it("keeps the two-line application brand across every destination", () => {
         destination={destination}
         onNavigate={() => {}}
         onOpenApplication={() => {}}
+        overlayVisible={false}
         navigationBlocked={false}
         status={null}
       >
@@ -25,6 +26,8 @@ it("keeps the two-line application brand across every destination", () => {
       '<h1 aria-label="Open Resume Toolkit"><span>Open</span> <span>Resume Toolkit</span></h1>',
     );
     expect(markup.match(/<h1\b/g)).toHaveLength(1);
-    expect(markup).toContain("Application workspace");
+    expect(markup).toContain('aria-label="Show overlay"');
+    expect(markup).toContain('aria-pressed="false"');
+    expect(markup).not.toContain("Import resume");
   }
 });

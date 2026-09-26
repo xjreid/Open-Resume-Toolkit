@@ -8,16 +8,27 @@ import { createResumeDocument } from "./resume-editor";
 import { ApplicationOverlay } from "./ApplicationOverlay";
 import type { UseApplicationPopupOptions } from "./application-popup";
 
-const { listeners, popup } = vi.hoisted(() => ({
+const { listeners, popup, dragWindow } = vi.hoisted(() => ({
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
+  dragWindow: { setPosition: vi.fn(async (_position: unknown) => {}) },
   popup: {
     options: null as UseApplicationPopupOptions | null,
     open: vi.fn(),
-    close: vi.fn(),
+    close: vi.fn(async () => {}),
   },
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ emitTo: vi.fn() }));
+vi.mock("@tauri-apps/api/window", () => ({
+  availableMonitors: async () => [
+    {
+      workArea: {
+        position: { x: 0, y: 0 },
+        size: { width: 1000, height: 800 },
+      },
+    },
+  ],
+}));
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
   getCurrentWebviewWindow: () => ({
     listen: (name: string, handler: (event: { payload: unknown }) => void) => {
@@ -25,6 +36,10 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
       return Promise.resolve(() => listeners.delete(name));
     },
     startDragging: () => Promise.resolve(),
+    outerPosition: async () => ({ x: 100, y: 100 }),
+    outerSize: async () => ({ width: 360, height: 700 }),
+    scaleFactor: async () => 1,
+    setPosition: dragWindow.setPosition,
   }),
 }));
 vi.mock("./application-popup", () => ({
@@ -109,6 +124,236 @@ afterEach(async () => {
   popup.options = null;
 });
 
+it("clamps header dragging before moving the native window", async () => {
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context") return reply(context);
+    if (name.startsWith("load_application_")) return reply(null);
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host } = await mount();
+  const header = host.querySelector<HTMLElement>(".application-header")!;
+  header.setPointerCapture = vi.fn();
+  header.hasPointerCapture = vi.fn(() => true);
+  const pointer = (type: string, screenX: number, screenY: number) => {
+    const event = new Event(type, { bubbles: true });
+    Object.assign(event, {
+      pointerId: 1,
+      button: 0,
+      screenX,
+      screenY,
+      clientX: 10,
+      clientY: 10,
+    });
+    header.dispatchEvent(event);
+  };
+  await act(async () => pointer("pointerdown", 100, 100));
+  await act(async () => pointer("pointermove", 2000, 2000));
+  const position = dragWindow.setPosition.mock.lastCall?.[0];
+  expect(position).toMatchObject({ x: 640, y: 100 });
+});
+
+it("refreshes its model preset when the main app changes it", async () => {
+  let current = context;
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context") return reply(current);
+    if (name.startsWith("load_application_")) return reply(null);
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host } = await mount();
+  current = { ...context, preset: "economy" };
+  await act(async () =>
+    listeners.get("ort:ai-preset-changed")?.({ payload: null }),
+  );
+  expect(
+    host.querySelector<HTMLSelectElement>('[aria-label="AI model preset"]')
+      ?.value,
+  ).toBe("economy");
+});
+
+it("uses one cover editor and copies the current cover letter", async () => {
+  const current = { ...workspace(), coverLetter: "Updated cover letter" };
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({ revision: 1, workspace: current });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports") return reply({});
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const writeText = vi.fn(async () => {});
+  const prior = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText },
+  });
+  try {
+    const { host, button } = await mount();
+    await act(async () => button("Cover letter").click());
+    expect(host.textContent).not.toContain(
+      "A letter grounded in your experience and this role.",
+    );
+    await act(async () => button("View and edit").click());
+    expect(popup.open).toHaveBeenCalledWith("cover");
+    await act(async () => button("Copy").click());
+    expect(writeText).toHaveBeenCalledWith("Updated cover letter");
+  } finally {
+    if (prior) Object.defineProperty(navigator, "clipboard", prior);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
+});
+
+it("refines an answer and saves only its final version on reset", async () => {
+  vi.useFakeTimers();
+  let current = { ...workspace(), question: "Why this role?", answer: "First answer" };
+  let revision = 1;
+  vi.mocked(invoke).mockImplementation(async (name, args) => {
+    const input = args as Record<string, unknown>;
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({ revision, workspace: current });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports") return reply({});
+    if (name === "refine_application_answer") {
+      current = { ...current, answer: "Final answer" };
+      revision += 1;
+      return reply({ revision, workspace: current });
+    }
+    if (name === "save_application_workspace") {
+      current = input.workspace as typeof current;
+      revision += 1;
+      return reply({ revision, workspace: current });
+    }
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  await act(async () => button("Answers").click());
+  expect(host.textContent).not.toContain("Application answers");
+  expect(host.textContent).not.toContain("Character limit");
+  const instructions = [...host.querySelectorAll("textarea")].find(
+    (item) => item.parentElement?.textContent?.includes("Refinement instructions"),
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!
+      .set!.call(instructions, "Make it concise");
+    instructions.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => button("Refine answer").click());
+  expect(invoke).toHaveBeenCalledWith("refine_application_answer", {
+    expectedRevision: 1,
+    instruction: "Make it concise",
+  });
+  await act(async () => button("Reset question").click());
+  expect(host.querySelector('[role="dialog"][aria-label="Reset question"]')).toBeNull();
+  await act(async () => vi.advanceTimersByTimeAsync(180));
+  expect(current.approvedAnswers).toEqual([
+    { question: "Why this role?", answer: "Final answer" },
+  ]);
+  expect(current.question).toBe("");
+  expect(current.answer).toBe("");
+  expect(button("Generate answer")).toBeTruthy();
+});
+
+it("finishes directly and saves the final answer with tracker details", async () => {
+  let current = { ...workspace(), question: "Why us?", answer: "Final response" };
+  let revision = 1;
+  vi.mocked(invoke).mockImplementation(async (name, args) => {
+    const input = args as Record<string, unknown>;
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({ revision, workspace: current });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports") return reply({});
+    if (name === "save_application_workspace") {
+      current = input.workspace as typeof current;
+      revision += 1;
+      return reply({ revision, workspace: current });
+    }
+    if (name === "finish_application") return reply(true);
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  await act(async () => button("Finish Application").click());
+  expect(current.approvedAnswers).toEqual([
+    { question: "Why us?", answer: "Final response" },
+  ]);
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(invoke).toHaveBeenCalledWith("finish_application", {
+    expectedRevision: 2,
+    selection: {
+      entry: expect.objectContaining({
+        company: "Example",
+        title: "Engineer",
+        status: "applied",
+        dateApplied: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      }),
+    },
+  });
+});
+
+it("edits tracker details before finishing and saves all materials", async () => {
+  const current = {
+    ...workspace(),
+    coverLetter: "Final cover letter",
+    approvedAnswers: [{ question: "Why?", answer: "Because." }],
+  };
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({ revision: 1, workspace: current });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports") return reply({});
+    if (name === "finish_application") return reply(true);
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  expect(
+    host.querySelector(".application-finish-actions")?.querySelectorAll("button"),
+  ).toHaveLength(3);
+  await act(async () => button("Edit tracker details").click());
+  const dialog = host.querySelector('[role="dialog"][aria-label="Edit tracker details"]')!;
+  expect(dialog.textContent).toContain("Date applied");
+  expect(dialog.textContent).toContain("Link or source");
+  expect(dialog.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+  const company = dialog.querySelector<HTMLInputElement>('input[maxlength="200"]')!;
+  expect(company.value).toBe("Example");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!
+      .set!.call(company, "Edited Company");
+    company.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => button("Finish").click());
+  expect(invoke).toHaveBeenCalledWith("finish_application", {
+    expectedRevision: 1,
+    selection: {
+      entry: expect.objectContaining({ company: "Edited Company" }),
+    },
+  });
+});
+
+it("confirms discarding the application without a tracker entry", async () => {
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({ revision: 1, workspace: workspace() });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports") return reply({});
+    if (name === "finish_application") return reply(true);
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  await act(async () => button("End application without saving").click());
+  expect(host.querySelector('[role="dialog"]')).toBeTruthy();
+  expect(invoke).not.toHaveBeenCalledWith("finish_application", expect.anything());
+  await act(async () => button("Back").click());
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  await act(async () => button("End application without saving").click());
+  await act(async () => button("End without saving").click());
+  expect(invoke).toHaveBeenCalledWith("finish_application", {
+    expectedRevision: 1,
+    selection: null,
+  });
+});
+
 it("keeps Stage 1 compact and saves popup job edits before tailoring", async () => {
   const calls: string[] = [];
   vi.mocked(invoke).mockImplementation(async (name, args) => {
@@ -126,6 +371,8 @@ it("keeps Stage 1 compact and saves popup job edits before tailoring", async () 
   });
   const { host, button } = await mount();
   expect(host.querySelector("textarea")).toBeNull();
+  expect(host.textContent).not.toContain("Capture the opportunity");
+  expect(host.textContent).not.toContain("Ready for your next role");
   expect(host.textContent).not.toContain("Resume style");
   expect(button("Capture").disabled).toBe(true);
   expect(button("Tailor").disabled).toBe(true);
@@ -144,9 +391,29 @@ it("keeps Stage 1 compact and saves popup job edits before tailoring", async () 
     style: "technical",
   });
   expect(host.textContent).toContain("Example");
+  expect(host.textContent).not.toContain("02 / Your application");
   expect(
     host.querySelector('ul[aria-label="Tailoring notes"]')?.textContent,
   ).toContain("documented Rust");
+});
+
+it("places Finish Application directly below the header when no role was found", async () => {
+  const draft = workspace();
+  draft.roleInfo = { company: "", title: "", location: "" };
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({ revision: 1, workspace: draft });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports") return reply({});
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  expect(button("Finish Application")).toBeTruthy();
+  expect(
+    host.querySelector(".application-role")?.firstElementChild?.className,
+  ).toBe("application-finish-actions");
+  expect(host.textContent).not.toContain("Your next opportunity");
 });
 
 it("requires an active key even when a job exists and routes connected capture + presets", async () => {
@@ -278,7 +545,7 @@ it("autosaves without losing newer typing and only exports the latest prepared r
   });
 });
 
-it("shows working/cancel in the persistent header and retains dirty edits after save failure", async () => {
+it("shows working/stop in the persistent header and retains dirty edits after save failure", async () => {
   vi.useFakeTimers();
   vi.mocked(invoke).mockImplementation(async (name) => {
     if (name === "application_context")
@@ -292,7 +559,7 @@ it("shows working/cancel in the persistent header and retains dirty edits after 
   });
   const { host, button } = await mount();
   expect(host.querySelector("header")?.textContent).toContain("Working");
-  await act(async () => button("Cancel").click());
+  await act(async () => button("Stop").click());
   expect(invoke).toHaveBeenCalledWith("cancel_application_generation", {});
   await act(async () =>
     popup.options?.onResumeChange({

@@ -3175,14 +3175,57 @@ select:hover {
 
 .workspace-shortcuts {
   position: static;
-  margin: 0 auto 0 16px;
+  margin: 0 0 0 16px;
   order: 1;
 }
 .masthead--workspace .brand-lockup {
   order: 0;
 }
 .masthead--workspace > .badge {
+  order: 3;
+}
+.masthead--workspace > .overlay-toggle {
   order: 2;
+  margin-left: auto;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 7px;
+  border: 1px solid #c7d0db;
+  border-radius: 8px;
+  color: #405065;
+  background: #fff;
+  cursor: pointer;
+}
+.masthead--workspace > .overlay-toggle svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.masthead--workspace > .overlay-toggle--active {
+  color: #102a4c;
+  background: #e5edf6;
+  border-color: #9fb3c9;
+}
+.masthead--workspace > .badge:not(.overlay-toggle) {
+  margin-left: 0;
+}
+.masthead--workspace > button.badge--error {
+  cursor: pointer;
+}
+.masthead--workspace > .overlay-toggle:hover:not(:disabled) {
+  color: #102a4c;
+  background: #edf2f7;
+}
+.masthead--workspace > button.badge--error:hover:not(:disabled) {
+  color: #7a2525;
+  background: #fff0f0;
 }
 .workspace-shortcuts button[aria-current] {
   background: var(--mist);
@@ -3720,7 +3763,7 @@ select:hover {
     padding: 12px 14px;
   }
   .workspace-shortcuts {
-    order: 3;
+    order: 4;
     width: 100%;
     margin: 0;
     padding: 0;
@@ -3893,6 +3936,9 @@ select:hover {
   top: 68px;
   z-index: 12;
   min-height: 54px;
+}
+.workflow-steps[hidden] {
+  display: none;
 }
 .workflow-style {
   display: flex;
@@ -5573,13 +5619,13 @@ ul.resume-document__body {
 .tracker-table input:focus,
 .tracker-table select:focus {
   border-color: #9db3c9;
-  background: #fff;
+  background: transparent;
 }
 .tracker-status-cell select:hover,
 .tracker-status-cell select:focus,
 .tracker-status-cell input:hover,
 .tracker-status-cell input:focus {
-  background: var(--tracker-status-bg, #e8eef3);
+  background: transparent;
   border-color: var(--tracker-status-ink, #344e67);
 }
 .tracker-table input[type="date"]::-webkit-calendar-picker-indicator {
@@ -5618,6 +5664,9 @@ ul.resume-document__body {
   gap: 8px;
 }
 .tracker-content-cell {
+  vertical-align: top;
+}
+.tracker-content-items {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;

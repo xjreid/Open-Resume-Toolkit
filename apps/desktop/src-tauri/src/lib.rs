@@ -355,7 +355,7 @@ fn storage_failure<T: serde::Serialize>(error: &StorageError) -> CommandResponse
     }
 }
 
-fn initialize_storage(app: &tauri::App) -> DesktopStorage {
+fn initialize_storage(app: &AppHandle) -> DesktopStorage {
     // This composition root only implements the development channel. Reject a
     // packaging override before resolving paths or accessing any vault item.
     if !development_identity_allowed(&app.config().identifier) {
@@ -387,20 +387,73 @@ fn development_identity_allowed(identifier: &str) -> bool {
 }
 
 #[tauri::command]
-fn show_application_overlay(window: WebviewWindow) -> CommandResponse<bool> {
+fn application_overlay_visibility(window: WebviewWindow) -> CommandResponse<bool> {
     if window.label() != "main" {
         return window_not_authorized();
     }
     let Some(overlay) = window.get_webview_window("overlay") else {
         return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
     };
+    match overlay.is_visible().and_then(|visible| {
+        overlay
+            .is_minimized()
+            .map(|minimized| visible && !minimized)
+    }) {
+        Ok(visible) => CommandResponse::success(visible),
+        Err(_) => {
+            CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true)
+        }
+    }
+}
+
+#[tauri::command]
+fn toggle_application_overlay(window: WebviewWindow) -> CommandResponse<bool> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    let Some(overlay) = window.get_webview_window("overlay") else {
+        return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
+    };
+    if overlay.is_visible().unwrap_or(false) && !overlay.is_minimized().unwrap_or(false) {
+        hide_application_popup_for(window.app_handle());
+        if overlay.hide().is_err() {
+            return CommandResponse::failure(
+                "OVERLAY_UNAVAILABLE",
+                "errors.overlayUnavailable",
+                true,
+            );
+        }
+        let _ = window.emit("ort:overlay-visibility", false);
+        return CommandResponse::success(false);
+    }
     if position_overlay(&overlay).is_err() {
         return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
     }
-    if overlay.show().is_err() || overlay.unminimize().is_err() || overlay.set_focus().is_err() {
+    if overlay.show().is_err() || overlay.unminimize().is_err() {
         return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
     }
+    if overlay.set_focus().is_err() {
+        let _ = overlay.hide();
+        return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
+    }
+    let _ = window.emit("ort:overlay-visibility", true);
     CommandResponse::success(true)
+}
+
+#[tauri::command]
+fn retry_storage(window: WebviewWindow, state: State<'_, DesktopState>) -> CommandResponse<bool> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    let Ok(mut storage) = state.storage.lock() else {
+        return storage_unavailable();
+    };
+    if matches!(*storage, DesktopStorage::Ready(_)) {
+        return CommandResponse::success(true);
+    }
+    *storage = initialize_storage(window.app_handle());
+    let ready = matches!(*storage, DesktopStorage::Ready(_));
+    CommandResponse::success(ready)
 }
 
 const OVERLAY_LOGICAL_WIDTH: f64 = 360.0;
@@ -551,7 +604,7 @@ pub fn run() {
                 }
             }
             app.manage(DesktopState {
-                storage: Mutex::new(initialize_storage(app)),
+                storage: Mutex::new(initialize_storage(app.handle())),
                 reviews: std::sync::Arc::default(),
             });
             import_review::ReviewState::start_expiry(&app.state::<DesktopState>().reviews)?;
@@ -578,6 +631,7 @@ pub fn run() {
             application_materials::regenerate_application_resume,
             application_materials::generate_application_cover_letter,
             application_materials::generate_application_answer,
+            application_materials::refine_application_answer,
             application_materials::save_application_workspace,
             application_materials::finish_application,
             application_materials::preview_application_pdf,
@@ -639,7 +693,9 @@ pub fn run() {
             pdf_preview::export_resume_pdf,
             pdf_preview::release_resume_pdf,
             close_status,
-            show_application_overlay,
+            application_overlay_visibility,
+            toggle_application_overlay,
+            retry_storage,
             show_application_popup,
             hide_application_popup,
             resolve_close
@@ -661,9 +717,37 @@ pub fn run() {
                 ..
             } if label == "overlay" => {
                 api.prevent_close();
-                hide_application_popup_for(app);
+                request_native_close(app);
+            }
+            RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::Focused(false),
+                ..
+            } if label == "overlay" => {
                 if let Some(overlay) = app.get_webview_window("overlay") {
-                    let _ = overlay.hide();
+                    if overlay.is_minimized().unwrap_or(false) {
+                        hide_application_popup_for(app);
+                        let _ = app.emit_to(
+                            EventTarget::webview_window("main"),
+                            "ort:overlay-visibility",
+                            false,
+                        );
+                    }
+                }
+            }
+            RunEvent::WindowEvent {
+                label,
+                event: WindowEvent::Focused(true),
+                ..
+            } if label == "main" => {
+                if let Some(overlay) = app.get_webview_window("overlay") {
+                    let visible = overlay.is_visible().unwrap_or(false)
+                        && !overlay.is_minimized().unwrap_or(false);
+                    let _ = app.emit_to(
+                        EventTarget::webview_window("main"),
+                        "ort:overlay-visibility",
+                        visible,
+                    );
                 }
             }
             RunEvent::WindowEvent {

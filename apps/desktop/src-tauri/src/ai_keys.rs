@@ -7,7 +7,7 @@ use ort_vault::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tauri::{State, WebviewWindow};
+use tauri::{Emitter, EventTarget, State, WebviewWindow};
 use uuid::Uuid;
 
 use crate::{DesktopState, ai_request::AiRequestGate, storage_unavailable, window_not_authorized};
@@ -551,7 +551,20 @@ pub fn set_ai_key_preset(
     let Some(_lease) = lease else {
         return CommandResponse::failure("AI_BUSY", "errors.aiBusy", true);
     };
-    response(state.with_store(|store| Ok(set_key_preset(store, &request))))
+    let result = response(state.with_store(|store| Ok(set_key_preset(store, &request))));
+    if matches!(&result, CommandResponse::Success { .. }) {
+        let _ = window.emit_to(
+            EventTarget::webview_window("main"),
+            "ort:ai-preset-changed",
+            (),
+        );
+        let _ = window.emit_to(
+            EventTarget::webview_window("overlay"),
+            "ort:ai-preset-changed",
+            (),
+        );
+    }
+    result
 }
 
 fn rename_key(

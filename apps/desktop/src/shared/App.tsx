@@ -1,5 +1,6 @@
 import { SettingsWorkspace } from "./SettingsWorkspace";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { ApplicationOverlay } from "./ApplicationOverlay";
 import { TrackerWorkspace } from "./TrackerTableWorkspace";
 import { AiWorkspace } from "./AiWorkspace";
@@ -127,6 +128,7 @@ function ResumeEditor() {
   const [destination, setDestination] =
     useState<WorkspaceDestination>("resume");
   const [overlayError, setOverlayError] = useState("");
+  const [overlayVisible, setOverlayVisible] = useState(false);
   const [workflow, setWorkflow] = useState<"edit" | "view">("edit");
   const [health, setHealth] = useState<HealthState>({ kind: "checking" });
   const [editor, dispatch] = useReducer(editorReducer, initialEditorState);
@@ -294,6 +296,28 @@ function ResumeEditor() {
       loadGeneration.current += 1;
     };
   }, [loadWorkspace]);
+  useEffect(() => {
+    const window = getCurrentWebviewWindow();
+    let active = true;
+    void window
+      .listen<boolean>("ort:overlay-visibility", (event) => {
+        if (active) setOverlayVisible(event.payload);
+      })
+      .then((unlisten) => {
+        if (!active) unlisten();
+        else stop = unlisten;
+      });
+    let stop: (() => void) | undefined;
+    void invoke<{ ok: boolean; value?: boolean }>(
+      "application_overlay_visibility",
+    ).then((response) => {
+      if (active && response.ok) setOverlayVisible(!!response.value);
+    });
+    return () => {
+      active = false;
+      stop?.();
+    };
+  }, []);
 
   function changeDocument(update: (current: ResumeDocument) => ResumeDocument) {
     dispatch({ type: "edit", update });
@@ -636,17 +660,27 @@ function ResumeEditor() {
       onNavigate={setDestination}
       onOpenApplication={() => {
         setOverlayError("");
-        void invoke<{ ok: boolean }>("show_application_overlay")
+        void invoke<{ ok: boolean; value?: boolean }>(
+          "toggle_application_overlay",
+        )
           .then((response) => {
-            if (!response.ok)
-              setOverlayError("Application workspace could not be opened.");
+            if (!response.ok) setOverlayError("Overlay could not be changed.");
+            else setOverlayVisible(!!response.value);
           })
-          .catch(() =>
-            setOverlayError("Application workspace could not be opened."),
-          );
+          .catch(() => setOverlayError("Overlay could not be changed."));
       }}
+      overlayVisible={overlayVisible}
       navigationBlocked={busy || confirmReload || close.pending}
-      status={<HealthBadge state={health} />}
+      status={
+        <HealthBadge
+          state={health}
+          onRetry={() => {
+            void invoke<{ ok: boolean }>("retry_storage")
+              .then(() => void loadWorkspace())
+              .catch(() => void loadWorkspace());
+          }}
+        />
+      }
     >
       {overlayError && <p role="alert">{overlayError}</p>}
       <CloseDialog
@@ -679,6 +713,83 @@ function ResumeEditor() {
           </button>
         </p>
       ) : null}
+      <nav
+        className="workflow-steps"
+        aria-label="Master resume mode"
+        hidden={destination !== "resume" && destination !== "import"}
+      >
+        {(
+          [
+            ["edit", "Edit"],
+            ["view", "View"],
+          ] as const
+        ).map(([step, label]) => (
+          <button
+            key={step}
+            type="button"
+            className="button--secondary"
+            aria-current={
+              destination === "resume" && workflow === step ? "step" : undefined
+            }
+            onClick={() => {
+              setDestination("resume");
+              setWorkflow(step);
+              if (step === "edit") setExportSource("saved_draft");
+              if (step !== "edit") setFocusedPart(null);
+            }}
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="button--secondary"
+          aria-current={destination === "import" ? "step" : undefined}
+          onClick={() => setDestination("import")}
+        >
+          Import
+        </button>
+        {destination !== "import" && document && !showStart && (
+          <label className="workflow-style">
+            Resume style
+            <select
+              value={documentStyle}
+              disabled={busy || close.pending}
+              onChange={(event) => {
+                const selected = SELECTABLE_DOCUMENT_STYLES.find(
+                  (style) => style === event.target.value,
+                );
+                if (selected) setDocumentStyle(selected);
+              }}
+            >
+              {SELECTABLE_DOCUMENT_STYLES.map((style) => (
+                <option key={style} value={style}>
+                  {DOCUMENT_STYLE_LABELS[style]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {destination !== "import" && document && !showStart && (
+          <button
+            type="button"
+            className="workflow-publish"
+            onClick={() => void publish()}
+            disabled={
+              !storageReady ||
+              revision === null ||
+              dirty ||
+              busy ||
+              confirmReload ||
+              close.pending ||
+              mustReload ||
+              alreadyPublished
+            }
+          >
+            Publish
+          </button>
+        )}
+      </nav>
       <div className="resume-page" hidden={destination !== "resume"}>
         {showStart ? (
           <ResumeStart
@@ -701,66 +812,6 @@ function ResumeEditor() {
           />
         ) : null}
 
-        <div hidden={showStart || !document}>
-          <nav className="workflow-steps" aria-label="Resume mode">
-            {(
-              [
-                ["edit", "Edit"],
-                ["view", "View"],
-              ] as const
-            ).map(([step, label]) => (
-              <button
-                key={step}
-                type="button"
-                className="button--secondary"
-                aria-current={workflow === step ? "step" : undefined}
-                onClick={() => {
-                  setWorkflow(step);
-                  if (step === "edit") setExportSource("saved_draft");
-                  if (step !== "edit") setFocusedPart(null);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-            <label className="workflow-style">
-              Resume style
-              <select
-                value={documentStyle}
-                disabled={busy || close.pending}
-                onChange={(event) => {
-                  const selected = SELECTABLE_DOCUMENT_STYLES.find(
-                    (style) => style === event.target.value,
-                  );
-                  if (selected) setDocumentStyle(selected);
-                }}
-              >
-                {SELECTABLE_DOCUMENT_STYLES.map((style) => (
-                  <option key={style} value={style}>
-                    {DOCUMENT_STYLE_LABELS[style]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              className="workflow-publish"
-              onClick={() => void publish()}
-              disabled={
-                !storageReady ||
-                revision === null ||
-                dirty ||
-                busy ||
-                confirmReload ||
-                close.pending ||
-                mustReload ||
-                alreadyPublished
-              }
-            >
-              Publish
-            </button>
-          </nav>
-        </div>
         {confirmReload ? (
           <section className="notice" aria-label="Confirm reload">
             <p>
@@ -1230,12 +1281,9 @@ function ResumeEditor() {
       </div>
       <div className="import-page" hidden={destination !== "import"}>
         <section className="workspace-data" aria-labelledby="import-page-title">
-          <p className="eyebrow">Separate workspace</p>
+          <p className="eyebrow">Master resume</p>
           <h2 id="import-page-title">Import a resume</h2>
-          <p>
-            Bring in an existing document here, then return to the resume
-            workspace to edit it directly on the page.
-          </p>
+          <p>Bring in an existing document, then edit it in Master resume.</p>
           <DocumentImport
             disabled={
               !storageReady ||
@@ -2435,26 +2483,28 @@ function ContactInformationEditor({
       >
         + Add contact information
       </button>
-      {showDivider ? <label className="contact-divider-control">
-        Contact divider
-        <select
-          value={divider}
-          disabled={disabled}
-          onChange={(event) =>
-            onDividerChange(
-              event.target.value === "bar"
-                ? "bar"
-                : event.target.value === "dash"
-                  ? "dash"
-                  : "dot",
-            )
-          }
-        >
-          <option value="dot">Dot •</option>
-          <option value="bar">Bar |</option>
-          <option value="dash">Dash -</option>
-        </select>
-      </label> : null}
+      {showDivider ? (
+        <label className="contact-divider-control">
+          Contact divider
+          <select
+            value={divider}
+            disabled={disabled}
+            onChange={(event) =>
+              onDividerChange(
+                event.target.value === "bar"
+                  ? "bar"
+                  : event.target.value === "dash"
+                    ? "dash"
+                    : "dot",
+              )
+            }
+          >
+            <option value="dot">Dot •</option>
+            <option value="bar">Bar |</option>
+            <option value="dash">Dash -</option>
+          </select>
+        </label>
+      ) : null}
     </section>
   );
 }
@@ -3481,7 +3531,13 @@ function entryHasTopRowContent(entry: ResumeEntry): boolean {
   );
 }
 
-function HealthBadge({ state }: { state: HealthState }) {
+function HealthBadge({
+  state,
+  onRetry,
+}: {
+  state: HealthState;
+  onRetry: () => void;
+}) {
   if (state.kind === "checking") {
     return (
       <p className="badge badge--pending" role="status">
@@ -3491,19 +3547,33 @@ function HealthBadge({ state }: { state: HealthState }) {
   }
   if (state.kind === "error") {
     return (
-      <p className="badge badge--error" role="alert" title={state.message}>
-        Unavailable
-      </p>
+      <button
+        type="button"
+        className="badge badge--error"
+        onClick={onRetry}
+        title="Retry encrypted storage"
+      >
+        Storage unavailable · Retry
+      </button>
     );
   }
   const ready = state.health.storageStatus === "ready";
-  return (
+  return ready ? (
     <p
       className={`badge ${ready ? "badge--ready" : "badge--error"}`}
       role="status"
     >
       {ready ? "Encrypted storage ready" : "Storage unavailable"}
     </p>
+  ) : (
+    <button
+      type="button"
+      className="badge badge--error"
+      onClick={onRetry}
+      title="Retry encrypted storage"
+    >
+      Storage unavailable · Retry
+    </button>
   );
 }
 

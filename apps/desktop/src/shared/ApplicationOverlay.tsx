@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { availableMonitors } from "@tauri-apps/api/window";
+import { PhysicalPosition } from "@tauri-apps/api/dpi";
 import { useEffect, useRef, useState } from "react";
 import type { ResumeDocument } from "@ort/contracts/resume";
 import logo from "../assets/open-frame-icon.svg";
@@ -11,6 +13,7 @@ import {
 } from "./document-styles";
 import "./application-overlay.css";
 import { sanitizeCaptureUrl } from "./capture-url";
+import { clampOverlayPosition } from "./overlay-drag";
 import {
   TrackerFields,
   emptyTrackerEntry,
@@ -46,6 +49,24 @@ type Workspace = {
   style: "technical" | "professional" | "modern" | "plain";
 };
 type Saved = { revision: number; workspace: Workspace };
+type FinishMode = "edit" | "discard" | null;
+
+function trackerEntryFor(workspace: Workspace): TrackerEntry {
+  const now = new Date();
+  const dateApplied = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+  return {
+    ...emptyTrackerEntry(),
+    company: workspace.roleInfo.company,
+    title: workspace.roleInfo.title,
+    location: workspace.roleInfo.location,
+    dateApplied,
+    sourceUrl: workspace.jobUrl,
+  };
+}
 type StageOne = {
   jobDescription: string;
   jobUrl: string;
@@ -105,6 +126,8 @@ const errors: Record<string, string> = {
     "The provider is temporarily unavailable. Try again later.",
   AI_PROVIDER_TEMPORARY:
     "The provider returned a temporary server error. Try again later.",
+  ANSWER_LIMIT_REACHED:
+    "This workspace already has 30 saved answers. Finish this application to start another.",
   AI_PROVIDER_FAILED:
     "The provider rejected the request. Check the active key, model, and Monitoring for the attempt category.",
   AI_BUSY: "Another AI request is in progress.",
@@ -158,6 +181,20 @@ export function ApplicationOverlay() {
     useState<SavedPendingCapture | null>(null);
   const [captureText, setCaptureText] = useState("");
   const [captureUrl, setCaptureUrl] = useState("");
+  const headerDrag = useRef<{
+    pointerId: number;
+    startScreenX: number;
+    startScreenY: number;
+    startX: number;
+    startY: number;
+    pointerOffsetX: number;
+    pointerOffsetY: number;
+    scale: number;
+    size: { width: number; height: number };
+    monitors: Awaited<ReturnType<typeof availableMonitors>>;
+    pending: { x: number; y: number } | null;
+    moving: boolean;
+  } | null>(null);
   const [stageOneStatus, setStageOneStatus] = useState<
     "saved" | "saving" | "error"
   >("saved");
@@ -175,7 +212,7 @@ export function ApplicationOverlay() {
   const [instruction, setInstruction] = useState("");
   const [coverInstruction, setCoverInstruction] = useState("");
   const [question, setQuestion] = useState("");
-  const [limit, setLimit] = useState("");
+  const [answerInstruction, setAnswerInstruction] = useState("");
   const [format, setFormat] = useState<"pdf" | "docx">("pdf");
   const [prepared, setPrepared] = useState<string | null>(null);
   const [exportError, setExportError] = useState("");
@@ -187,12 +224,8 @@ export function ApplicationOverlay() {
   const draftRef = useRef<Workspace | null>(null);
   const workspacePending = useRef<Workspace | null>(null);
   const workspaceFlush = useRef<Promise<void> | null>(null);
-  const [finishing, setFinishing] = useState(false);
+  const [finishMode, setFinishMode] = useState<FinishMode>(null);
   const [tracking, setTracking] = useState<TrackerEntry>(emptyTrackerEntry);
-  const [retainResume, setRetainResume] = useState(true);
-  const [retainCover, setRetainCover] = useState(true);
-  const [retainAnswers, setRetainAnswers] = useState(true);
-  const [resetting, setResetting] = useState(false);
   const dirty =
     !!saved &&
     !!draft &&
@@ -239,9 +272,8 @@ export function ApplicationOverlay() {
         style !== (savedReview?.style ?? "technical"))) ||
     !!instruction.trim() ||
     !!coverInstruction.trim() ||
-    !!limit.trim() ||
-    finishing ||
-    resetting ||
+    !!answerInstruction.trim() ||
+    finishMode !== null ||
     (pendingCapture !== null &&
       (captureText !== pendingCapture.capture.payload.text ||
         captureUrl !== pendingCapture.capture.payload.url));
@@ -331,14 +363,16 @@ export function ApplicationOverlay() {
     };
     window.addEventListener("focus", refreshContext);
     const timer = window.setInterval(refreshContext, 2000);
-    const subscription = getCurrentWebviewWindow()
-      .listen("ort:browser-capture", refreshContext)
-      .catch(() => () => {});
+    const overlayWindow = getCurrentWebviewWindow();
+    const subscriptions = Promise.all([
+      overlayWindow.listen("ort:browser-capture", refreshContext),
+      overlayWindow.listen("ort:ai-preset-changed", refreshContext),
+    ]).catch(() => []);
     return () => {
       active = false;
       window.removeEventListener("focus", refreshContext);
       window.clearInterval(timer);
-      void subscription.then((unlisten) => unlisten());
+      void subscriptions.then((unlisten) => unlisten.forEach((stop) => stop()));
     };
   }, []);
 
@@ -529,25 +563,52 @@ export function ApplicationOverlay() {
   }
   function generateAnswer() {
     if (!saved || dirty || !question.trim()) return;
-    const parsed = limit.trim() ? Number(limit) : null;
-    if (
-      parsed !== null &&
-      (!Number.isInteger(parsed) || parsed < 1 || parsed > 4000)
-    ) {
-      setNotice("Enter a character limit from 1 to 4000.");
-      return;
-    }
     void run(
       async () =>
         apply(
           await command<Saved>("generate_application_answer", {
             expectedRevision: saved.revision,
             question: question.trim(),
-            limit: parsed,
           }),
         ),
       true,
     );
+  }
+  function refineAnswer() {
+    if (!saved || dirty || !draft?.answer || !answerInstruction.trim()) return;
+    void run(async () => {
+      apply(
+        await command<Saved>("refine_application_answer", {
+          expectedRevision: saved.revision,
+          instruction: answerInstruction.trim(),
+        }),
+      );
+      setAnswerInstruction("");
+    }, true);
+  }
+  function finalizeAnswer(): boolean {
+    const current = draftRef.current;
+    if (!current) return false;
+    if (current.answer.trim() && current.approvedAnswers.length >= 30) {
+      setNotice("Save at most 30 application answers in one workspace.");
+      return false;
+    }
+    if (current.question || current.answer) {
+      update((workspace) => ({
+        ...workspace,
+        approvedAnswers: workspace.answer.trim()
+          ? [
+              ...workspace.approvedAnswers,
+              { question: workspace.question, answer: workspace.answer },
+            ]
+          : workspace.approvedAnswers,
+        question: "",
+        answer: "",
+      }));
+    }
+    setQuestion("");
+    setAnswerInstruction("");
+    return true;
   }
   function download(kind: MaterialKind) {
     if (!saved || !exportReady) return;
@@ -607,26 +668,48 @@ export function ApplicationOverlay() {
           </button>
         </div>
         <div className="application-button-pair">
-          <button
-            type="button"
-            className="application-secondary"
-            onClick={() =>
-              popup.open(kind === "resume" ? "resume-view" : "cover")
-            }
-          >
-            <OverlayIcon name="view" />
-            View
-          </button>
-          <button
-            type="button"
-            className="application-secondary"
-            onClick={() =>
-              popup.open(kind === "resume" ? "resume-edit" : "cover")
-            }
-          >
-            <OverlayIcon name="edit" />
-            Edit
-          </button>
+          {kind === "cover_letter" ? (
+            <>
+              <button
+                type="button"
+                className="application-secondary"
+                onClick={() => popup.open("cover")}
+              >
+                <OverlayIcon name="edit" />
+                View and edit
+              </button>
+              <button
+                type="button"
+                className="application-secondary"
+                onClick={() =>
+                  void navigator.clipboard
+                    .writeText(draft?.coverLetter ?? "")
+                    .catch(() => setNotice("The cover letter could not be copied."))
+                }
+              >
+                Copy
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="application-secondary"
+                onClick={() => popup.open("resume-view")}
+              >
+                <OverlayIcon name="view" />
+                View
+              </button>
+              <button
+                type="button"
+                className="application-secondary"
+                onClick={() => popup.open("resume-edit")}
+              >
+                <OverlayIcon name="edit" />
+                Edit
+              </button>
+            </>
+          )}
         </div>
         <p className="application-note application-export-status" role="status">
           {exportError ||
@@ -649,24 +732,34 @@ export function ApplicationOverlay() {
     );
   }
 
-  function finish(selection: boolean) {
-    if (!saved || dirty) return;
+  function finish(mode: "automatic" | "edited" | "discard") {
+    if (!savedRef.current || busy || aiWorking) return;
     void run(async () => {
+      await popup.close();
+      if (mode !== "discard" && !finalizeAnswer()) return;
+      if (mode === "discard") {
+        // Stop queued draft writes, then let any in-flight write settle before
+        // deleting the workspace. A failed write does not block discard.
+        workspacePending.current = null;
+        await workspaceFlush.current?.catch(() => {});
+      } else {
+        await flushWorkspace();
+      }
+      const current = savedRef.current;
+      if (!current) return;
+      const entry =
+        mode === "automatic"
+          ? trackerEntryFor(draftRef.current ?? current.workspace)
+          : mode === "edited"
+            ? tracking
+            : null;
       await command<boolean>("finish_application", {
-        expectedRevision: saved.revision,
-        selection: selection
-          ? {
-              entry: tracking,
-              retainResume,
-              retainCoverLetter: retainCover,
-              retainAnswers,
-            }
-          : null,
+        expectedRevision: current.revision,
+        selection: entry ? { entry } : null,
       });
       setSaved(null);
       setDraft(null);
-
-      setFinishing(false);
+      setFinishMode(null);
       stageOneRevision.current = null;
       stageOneSaved.current = null;
       stageOnePending.current = null;
@@ -675,7 +768,6 @@ export function ApplicationOverlay() {
       setJobUrl("");
       setStyle("technical");
       setTracking(emptyTrackerEntry());
-      await popup.close();
       savedRef.current = null;
       draftRef.current = null;
       workspacePending.current = null;
@@ -728,20 +820,96 @@ export function ApplicationOverlay() {
     });
   }
 
+  async function flushHeaderDrag(drag: NonNullable<typeof headerDrag.current>) {
+    if (drag.moving) return;
+    drag.moving = true;
+    try {
+      while (headerDrag.current === drag && drag.pending) {
+        const next = drag.pending;
+        drag.pending = null;
+        await getCurrentWebviewWindow().setPosition(
+          new PhysicalPosition(next.x, next.y),
+        );
+      }
+    } catch (error) {
+      setNotice(message(error));
+    } finally {
+      drag.moving = false;
+    }
+  }
+
   return (
     <main className="application-shell" inert={closePending}>
       <header
         className="application-header"
         title="Drag header to move overlay"
-        onMouseDown={(event) => {
+        onPointerDown={(event) => {
           if (
-            event.button === 0 &&
-            !(event.target as Element).closest("button, select, input")
-          ) {
-            void getCurrentWebviewWindow()
-              .startDragging()
-              .catch((error: unknown) => setNotice(message(error)));
+            event.button !== 0 ||
+            (event.target as Element).closest("button, select, input")
+          )
+            return;
+          const pointerId = event.pointerId;
+          const screenX = event.screenX;
+          const screenY = event.screenY;
+          const clientX = event.clientX;
+          const clientY = event.clientY;
+          const header = event.currentTarget;
+          header.setPointerCapture(pointerId);
+          const overlayWindow = getCurrentWebviewWindow();
+          void Promise.all([
+            overlayWindow.outerPosition(),
+            overlayWindow.outerSize(),
+            overlayWindow.scaleFactor(),
+            availableMonitors(),
+          ])
+            .then(([position, size, scale, monitors]) => {
+              if (!header.hasPointerCapture(pointerId)) return;
+              headerDrag.current = {
+                pointerId,
+                startScreenX: screenX,
+                startScreenY: screenY,
+                startX: position.x,
+                startY: position.y,
+                pointerOffsetX: clientX * scale,
+                pointerOffsetY: clientY * scale,
+                scale,
+                size,
+                monitors,
+                pending: null,
+                moving: false,
+              };
+            })
+            .catch((error: unknown) => setNotice(message(error)));
+        }}
+        onPointerMove={(event) => {
+          const drag = headerDrag.current;
+          if (!drag || drag.pointerId !== event.pointerId) return;
+          const x =
+            drag.startX + (event.screenX - drag.startScreenX) * drag.scale;
+          const y =
+            drag.startY + (event.screenY - drag.startScreenY) * drag.scale;
+          drag.pending = clampOverlayPosition(
+            { x, y },
+            drag.size,
+            { x: x + drag.pointerOffsetX, y: y + drag.pointerOffsetY },
+            drag.monitors,
+          );
+          void flushHeaderDrag(drag);
+        }}
+        onPointerUp={(event) => {
+          if (headerDrag.current?.pointerId === event.pointerId)
+            headerDrag.current = null;
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
           }
+        }}
+        onPointerCancel={(event) => {
+          if (headerDrag.current?.pointerId === event.pointerId)
+            headerDrag.current = null;
+        }}
+        onLostPointerCapture={() => {
+          headerDrag.current = null;
         }}
       >
         <div className="application-drag-handle">
@@ -790,13 +958,14 @@ export function ApplicationOverlay() {
             {aiWorking && (
               <button
                 type="button"
+                className="application-stop"
                 onClick={() =>
                   void command<boolean>("cancel_application_generation").catch(
                     (error: unknown) => setNotice(message(error)),
                   )
                 }
               >
-                Cancel
+                Stop
               </button>
             )}
           </div>
@@ -834,11 +1003,6 @@ export function ApplicationOverlay() {
         >
           {!saved ? (
             <section className="application-stage-one">
-              <p className="application-kicker">01 / Capture the opportunity</p>
-              <h1>Ready for your next role.</h1>
-              <p className="application-intro">
-                Capture a job from your browser, or add the details below.
-              </p>
               <div className="application-button-pair application-capture-actions">
                 <button
                   type="button"
@@ -927,29 +1091,53 @@ export function ApplicationOverlay() {
             draft && (
               <>
                 <section className="application-role">
-                  <p className="application-kicker">02 / Your application</p>
-                  <h1>{draft.roleInfo?.company || "Your next opportunity"}</h1>
-                  {draft.roleInfo?.title && <p>{draft.roleInfo.title}</p>}
-                  <button
-                    type="button"
-                    className="application-secondary"
-                    onClick={() =>
-                      void run(async () => {
-                        await popup.close();
-                        setTracking({
-                          ...emptyTrackerEntry(),
-                          company: draft.roleInfo?.company ?? "",
-                          title: draft.roleInfo?.title ?? "",
-                          location: draft.roleInfo?.location ?? "",
-                          sourceUrl: draft.jobUrl,
-                        });
-                        setFinishing(true);
-                      })
-                    }
-                  >
-                    Finish Application
-                    <OverlayIcon name="check" />
-                  </button>
+                  {(draft.roleInfo?.company || draft.roleInfo?.title) && (
+                    <div className="application-role-details">
+                      {draft.roleInfo.company && (
+                        <h1>{draft.roleInfo.company}</h1>
+                      )}
+                      {draft.roleInfo.title && <p>{draft.roleInfo.title}</p>}
+                    </div>
+                  )}
+                  <div className="application-finish-actions">
+                    <button
+                      type="button"
+                      className="application-secondary application-finish-primary"
+                      disabled={busy || aiWorking}
+                      onClick={() => finish("automatic")}
+                    >
+                      Finish Application
+                      <OverlayIcon name="check" />
+                    </button>
+                    <button
+                      type="button"
+                      className="application-secondary application-finish-square"
+                      aria-label="Edit tracker details"
+                      title="Edit tracker details"
+                      disabled={busy || aiWorking}
+                      onClick={() =>
+                        void run(async () => {
+                          await popup.close();
+                          const current = draftRef.current;
+                          if (!current) return;
+                          setTracking(trackerEntryFor(current));
+                          setFinishMode("edit");
+                        })
+                      }
+                    >
+                      <OverlayIcon name="edit" />
+                    </button>
+                    <button
+                      type="button"
+                      className="application-finish-square application-finish-discard"
+                      aria-label="End application without saving"
+                      title="End application without saving"
+                      disabled={busy || aiWorking}
+                      onClick={() => setFinishMode("discard")}
+                    >
+                      <OverlayIcon name="close" />
+                    </button>
+                  </div>
                 </section>
                 <nav
                   className="application-tabs"
@@ -1155,10 +1343,6 @@ export function ApplicationOverlay() {
                 )}
                 {tab === "cover" && (
                   <section className="application-panel">
-                    <h2>Cover letter</h2>
-                    <p className="application-note">
-                      A letter grounded in your experience and this role.
-                    </p>
                     <label>
                       Instructions (optional)
                       <textarea
@@ -1185,19 +1369,17 @@ export function ApplicationOverlay() {
                 )}
                 {tab === "answers" && (
                   <section className="application-panel">
-                    <h2>Application answers</h2>
                     <label>
                       Question
                       <textarea
                         value={question}
+                        readOnly={!!draft.answer}
                         onChange={(event) => {
                           const next = event.target.value;
                           setQuestion(next);
                           update((current) => ({
                             ...current,
                             question: next,
-                            answer:
-                              next === current.question ? current.answer : "",
                           }));
                         }}
                         rows={4}
@@ -1205,28 +1387,41 @@ export function ApplicationOverlay() {
                         placeholder="Paste an application question"
                       />
                     </label>
-                    <label>
-                      Character limit (optional)
-                      <input
-                        type="number"
-                        min="1"
-                        max="4000"
-                        value={limit}
-                        onChange={(event) => setLimit(event.target.value)}
-                      />
-                    </label>
+                    {!!draft.answer && (
+                      <label>
+                        Refinement instructions
+                        <textarea
+                          value={answerInstruction}
+                          onChange={(event) =>
+                            setAnswerInstruction(event.target.value)
+                          }
+                          rows={3}
+                          maxLength={2000}
+                          placeholder="What would you like to change?"
+                        />
+                      </label>
+                    )}
                     <button
                       type="button"
-                      onClick={generateAnswer}
+                      onClick={draft.answer ? refineAnswer : generateAnswer}
                       disabled={
                         dirty ||
                         aiWorking ||
                         !context?.aiReady ||
-                        !question.trim()
+                        !question.trim() ||
+                        (draft.answer
+                          ? !answerInstruction.trim()
+                          : draft.approvedAnswers.length >= 30)
                       }
                     >
-                      Generate answer
+                      {draft.answer ? "Refine answer" : "Generate answer"}
                     </button>
+                    {!draft.answer && draft.approvedAnswers.length >= 30 && (
+                      <p className="application-note" role="status">
+                        This workspace already has 30 saved answers. Finish this
+                        application to start another.
+                      </p>
+                    )}
                     {draft.answer && (
                       <>
                         <label>
@@ -1259,35 +1454,14 @@ export function ApplicationOverlay() {
                           </button>
                           <button
                             type="button"
-                            disabled={dirty}
-                            onClick={() => {
-                              setQuestion("");
-                              update((current) => ({
-                                ...current,
-                                approvedAnswers: [
-                                  ...current.approvedAnswers,
-                                  {
-                                    question: current.question,
-                                    answer: current.answer,
-                                  },
-                                ],
-                                question: "",
-                                answer: "",
-                              }));
-                            }}
+                            disabled={dirty || aiWorking || busy}
+                            onClick={finalizeAnswer}
                           >
-                            Keep answer
+                            Reset question
                           </button>
                         </div>
                       </>
                     )}
-                    <button
-                      type="button"
-                      className="application-secondary application-reset"
-                      onClick={() => setResetting(true)}
-                    >
-                      Reset question
-                    </button>
                     {draft.approvedAnswers.length > 0 && (
                       <div className="application-answer-list">
                         <h3>Saved answers · {draft.approvedAnswers.length}</h3>
@@ -1321,7 +1495,7 @@ export function ApplicationOverlay() {
           )}
         </fieldset>
       </div>
-      {pendingCapture && !finishing && !resetting && (
+      {pendingCapture && !finishMode && (
         <div className="application-dialog-backdrop">
           <section
             role="dialog"
@@ -1333,7 +1507,7 @@ export function ApplicationOverlay() {
             <p>
               {pendingCapture.capture.payload.target === "job"
                 ? "Accepting this capture replaces the current reviewed job text and source URL."
-                : "Accepting this capture replaces the current question and its unretained answer."}
+                : "Accepting this capture saves the current answer and replaces the question."}
             </p>
             {pendingCapture.capture.payload.title && (
               <p>{pendingCapture.capture.payload.title}</p>
@@ -1408,131 +1582,65 @@ export function ApplicationOverlay() {
           </section>
         </div>
       )}
-      {resetting && (
+      {finishMode === "edit" && saved && (
         <div className="application-dialog-backdrop">
           <section
             role="dialog"
             aria-modal="true"
-            aria-label="Reset question"
+            aria-label="Edit tracker details"
             className="application-dialog"
           >
-            <h2>Reset current question?</h2>
-            <p>
-              The current unretained answer will be cleared. Approved answers
-              stay in the answer set.
-            </p>
+            <h2>Tracker details</h2>
+            <TrackerFields entry={tracking} onChange={setTracking} />
             <div className="application-row">
               <button
                 type="button"
-                disabled={busy || dirty || !saved || !draft}
-                onClick={() =>
-                  void run(async () => {
-                    if (!saved || !draft) return;
-                    apply(
-                      await command<Saved>("save_application_workspace", {
-                        expectedRevision: saved.revision,
-                        workspace: { ...draft, question: "", answer: "" },
-                      }),
-                    );
-                    setQuestion("");
-                    setResetting(false);
-                  })
-                }
+                disabled={busy || aiWorking}
+                onClick={() => finish("edited")}
               >
-                Reset question
+                Finish
               </button>
               <button
                 type="button"
                 className="application-secondary"
-                onClick={() => setResetting(false)}
+                disabled={busy}
+                onClick={() => setFinishMode(null)}
               >
-                Keep it
+                Back
               </button>
             </div>
           </section>
         </div>
       )}
-      {finishing && saved && (
+      {finishMode === "discard" && saved && (
         <div className="application-dialog-backdrop">
           <section
             role="dialog"
             aria-modal="true"
-            aria-label="Finish application"
+            aria-label="End application without saving"
             className="application-dialog"
           >
-            <h2>Finish Application</h2>
-            <h3>Selected application</h3>
-            <ul>
-              <li>
-                Tailored resume: {draft?.resume.title || "Untitled resume"}
-              </li>
-              <li>Cover letter: {draft?.coverLetter ? "reviewed" : "none"}</li>
-              <li>Approved answers: {draft?.approvedAnswers.length ?? 0}</li>
-            </ul>
+            <h2>End application without saving?</h2>
             <p>
-              Finishing clears the current workspace, including its job text,
-              alerts, unretained answer, and generated drag files. Download any
-              files you want to keep first.
+              This will discard the current application and its materials
+              without adding them to the tracker.
             </p>
-            <p>
-              Save selected materials to your local tracker, or finish without
-              retaining an entry.
-            </p>
-            {dirty && (
-              <p role="status">
-                Return to the workspace and save your edits before finishing.
-              </p>
-            )}
-            <TrackerFields entry={tracking} onChange={setTracking} />
-            <div className="tracker-retention">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={retainResume}
-                  onChange={(event) => setRetainResume(event.target.checked)}
-                />{" "}
-                Retain selected resume snapshot
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={retainCover}
-                  disabled={!draft?.coverLetter}
-                  onChange={(event) => setRetainCover(event.target.checked)}
-                />{" "}
-                Retain reviewed cover letter
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={retainAnswers}
-                  disabled={!draft?.approvedAnswers.length}
-                  onChange={(event) => setRetainAnswers(event.target.checked)}
-                />{" "}
-                Retain approved answers ({draft?.approvedAnswers.length ?? 0})
-              </label>
-            </div>
             <div className="application-row">
               <button
                 type="button"
-                disabled={busy || dirty}
-                onClick={() => finish(true)}
-              >
-                Save to tracker and finish
-              </button>
-              <button
-                type="button"
-                disabled={busy || dirty}
-                onClick={() => finish(false)}
-              >
-                Finish without saving
-              </button>
-              <button
-                type="button"
                 className="application-secondary"
-                onClick={() => setFinishing(false)}
+                disabled={busy}
+                onClick={() => setFinishMode(null)}
               >
-                Continue working
+                Back
+              </button>
+              <button
+                type="button"
+                className="application-confirm-discard"
+                disabled={busy}
+                onClick={() => finish("discard")}
+              >
+                End without saving
               </button>
             </div>
           </section>
@@ -1582,6 +1690,7 @@ function OverlayIcon({
     | "capture"
     | "arrow"
     | "check"
+    | "close"
     | "waiting";
 }) {
   const paths = {
@@ -1622,6 +1731,7 @@ function OverlayIcon({
     ),
     arrow: <path d="M4 12h16m-6-6 6 6-6 6" />,
     check: <path d="m5 12 4 4L19 6" />,
+    close: <path d="M5 5 19 19M19 5 5 19" />,
     waiting: (
       <>
         <circle cx="12" cy="12" r="9" />
