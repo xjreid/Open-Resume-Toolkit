@@ -300,7 +300,7 @@ impl SyntheticStreamState {
         }
         state
     }
-    fn valid(&self, provider: Provider, requested_model: &str) -> bool {
+    fn valid(&self, requested_model: &str) -> bool {
         let json_ok = serde_json::from_str::<Value>(&self.text)
             .ok()
             .and_then(|value| value.get("ok").and_then(Value::as_bool))
@@ -308,7 +308,7 @@ impl SyntheticStreamState {
         !self.failed
             && self.effective_model.as_deref() == Some(requested_model)
             && json_ok
-            && (self.finished || provider == Provider::Gemini)
+            && self.finished
     }
 }
 
@@ -913,7 +913,7 @@ pub async fn test_ai_connection(
         );
     };
     let synthetic = SyntheticStreamState::from_events(events);
-    let valid = synthetic.valid(provider, &entry.model);
+    let valid = synthetic.valid(&entry.model);
     let usage = synthetic.usage;
     let effective_model = synthetic.effective_model;
     if !valid {
@@ -1116,27 +1116,41 @@ data: {"type":"response.output_text.delta","delta":"{\"ok\":true}"}
 data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":3}}}
 "#;
         let parsed = SyntheticStreamState::from_events(OpenAiAdapter.parse_stream(raw).unwrap());
-        assert!(parsed.valid(Provider::OpenAi, "fixture-model"));
+        assert!(parsed.valid("fixture-model"));
         assert_eq!(parsed.usage.unwrap().output_tokens, 3);
-        assert!(!parsed.valid(Provider::OpenAi, "other-model"));
+        assert!(!parsed.valid("other-model"));
         let incomplete = SyntheticStreamState::from_events(vec![
             StreamEvent::Model("fixture-model".into()),
             StreamEvent::Text("{\"ok\":true}".into()),
         ]);
-        assert!(!incomplete.valid(Provider::OpenAi, "fixture-model"));
+        assert!(!incomplete.valid("fixture-model"));
         let failed = SyntheticStreamState::from_events(vec![
             StreamEvent::Model("fixture-model".into()),
             StreamEvent::Text("{\"ok\":true}".into()),
             StreamEvent::ProviderFailure,
             StreamEvent::Finished,
         ]);
-        assert!(!failed.valid(Provider::OpenAi, "fixture-model"));
+        assert!(!failed.valid("fixture-model"));
 
         let gemini = br#"data: {"candidates":[{"content":{"parts":[{"text":"{\"ok\":true}"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":20,"candidatesTokenCount":6,"thoughtsTokenCount":17},"modelVersion":"gemini-3.6-flash"}
 "#;
         let parsed = SyntheticStreamState::from_events(GeminiAdapter.parse_stream(gemini).unwrap());
-        assert!(parsed.valid(Provider::Gemini, "gemini-3.6-flash"));
+        assert!(parsed.valid("gemini-3.6-flash"));
         assert_eq!(parsed.usage.unwrap().reasoning_tokens, 17);
+        let incomplete = std::str::from_utf8(gemini)
+            .unwrap()
+            .replace(",\"finishReason\":\"STOP\"", "");
+        let parsed = SyntheticStreamState::from_events(
+            GeminiAdapter.parse_stream(incomplete.as_bytes()).unwrap(),
+        );
+        assert!(!parsed.valid("gemini-3.6-flash"));
+        let blocked = std::str::from_utf8(gemini)
+            .unwrap()
+            .replace("STOP", "SAFETY");
+        let parsed = SyntheticStreamState::from_events(
+            GeminiAdapter.parse_stream(blocked.as_bytes()).unwrap(),
+        );
+        assert!(!parsed.valid("gemini-3.6-flash"));
     }
 }
 
@@ -1403,7 +1417,7 @@ pub(crate) async fn execute_material<T>(
     let output = SyntheticStreamState::from_events(events);
     if output.failed
         || output.effective_model.as_deref() != Some(entry.model.as_str())
-        || !(output.finished || provider == Provider::Gemini)
+        || !output.finished
         || output.text.len() > 512 * 1024
     {
         if !fail(AiTerminalStatus::Failed, "invalid_output") {

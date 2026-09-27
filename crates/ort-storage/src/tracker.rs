@@ -394,7 +394,12 @@ mod tests {
             EncryptedStore::open_or_initialize(&root.path().join("source"), "test", &vault)
                 .unwrap();
         let id = Uuid::now_v7().to_string();
-        let value = json!({"company":"Synthetic","resume":{"title":"Retained synthetic"}});
+        let value = json!({
+            "company":"Synthetic", "title":"Engineer", "location":"Remote",
+            "dateApplied":"2026-09-27", "status":"applied", "customStatus":"",
+            "sourceUrl":"Job board", "resume":ort_domain::ResumeDocument::empty("Retained synthetic"),
+            "coverLetter":null, "answers":[], "style":"technical"
+        });
         source.tracker_save(&id, None, &value).unwrap();
         let pending = json!({"requestId":"synthetic","text":"Private pending selection"});
         source

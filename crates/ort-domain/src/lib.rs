@@ -18,6 +18,8 @@ pub use resume_dates::{CalendarDate, DateEnd, ResumeDate};
 mod resume_commands;
 mod storage_usage;
 mod text_export;
+mod tracker;
+pub use tracker::{ApprovedAnswer, TrackerEntry, TrackerValidationError, validate_tracker_entry};
 
 pub use document_style::{DocumentStyle, StyledExportPayload, StyledExportRequest};
 

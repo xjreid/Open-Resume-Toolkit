@@ -3957,6 +3957,7 @@ dependencies = [
 name = "ort-domain"
 version = "0.0.0-dev"
 dependencies = [
+ "jiff",
  "schemars 1.2.2",
  "serde",
  "serde_json",

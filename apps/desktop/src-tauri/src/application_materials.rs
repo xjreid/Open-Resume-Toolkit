@@ -75,10 +75,12 @@ struct DragSession {
     clear_pending: bool,
 }
 
+#[cfg(target_os = "macos")]
 struct DragFileLease {
     session: Arc<Mutex<DragSession>>,
 }
 
+#[cfg(target_os = "macos")]
 impl Drop for DragFileLease {
     fn drop(&mut self) {
         let mut session = self
@@ -249,12 +251,7 @@ impl DragFiles {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ApprovedAnswer {
-    pub question: String,
-    pub answer: String,
-}
+pub use ort_domain::ApprovedAnswer;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -1426,7 +1423,7 @@ pub async fn drag_application_export(
     #[cfg(not(target_os = "macos"))]
     {
         let _ = bytes;
-        return error("DRAG_UNAVAILABLE");
+        error("DRAG_UNAVAILABLE")
     }
     #[cfg(target_os = "macos")]
     {
@@ -1643,7 +1640,7 @@ pub async fn drag_application_pdf(
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (window, expected_revision, kind);
-        return error("DRAG_UNAVAILABLE");
+        error("DRAG_UNAVAILABLE")
     }
     #[cfg(target_os = "macos")]
     {

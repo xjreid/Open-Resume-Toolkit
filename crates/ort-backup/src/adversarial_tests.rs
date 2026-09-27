@@ -197,7 +197,11 @@ fn authenticated_hostile_payloads_share_the_public_invalid_backup_error() {
         let mut nonce = [0x74; NONCE_LEN];
         nonce[..8].copy_from_slice(&u64::try_from(index).unwrap().to_be_bytes());
         let mut container = build_header(
-            valid.manifest.format_minor,
+            if name == "legacy tracker" {
+                4
+            } else {
+                valid.manifest.format_minor
+            },
             WRITER_MEMORY_KIB,
             WRITER_ITERATIONS,
             WRITER_LANES,
@@ -278,6 +282,47 @@ fn hostile_payloads(payload: &Value) -> Vec<(&'static str, Vec<u8>)> {
             }
             changed["manifest"]["inventory"]["settings"] =
                 json!(changed["profile"]["settings"].as_object().unwrap().len());
+        }
+        cases.push((name, changed));
+    }
+
+    let valid_tracker = json!({
+        "company":"Synthetic", "title":"Engineer", "location":"Remote",
+        "dateApplied":"2026-09-27", "status":"applied", "customStatus":"",
+        "sourceUrl":"Job board", "resume":ResumeDocument::empty("Retained resume"),
+        "coverLetter":null, "answers":[], "style":"technical"
+    });
+    let mut invalid_date = valid_tracker.clone();
+    invalid_date["dateApplied"] = json!("2026-02-30");
+    let mut invalid_resume = valid_tracker.clone();
+    invalid_resume["resume"]["title"] = json!("");
+    let mut invalid_answer = valid_tracker.clone();
+    invalid_answer["answers"] = json!([{"question":"Why?", "answer":""}]);
+    let mut invalid_contact = valid_tracker.clone();
+    invalid_contact["coverContact"] =
+        json!({"fullName":"Applicant","email":"","phone":"","location":"","links":[]});
+    for (name, value) in [
+        ("unknown tracker fields", json!({"unexpected":true})),
+        ("invalid tracker date", invalid_date),
+        ("invalid tracker resume", invalid_resume),
+        ("invalid tracker answer", invalid_answer),
+        ("orphan cover contact", invalid_contact),
+        ("legacy tracker", valid_tracker),
+    ] {
+        let mut changed = payload.clone();
+        changed["profile"]["trackerEntries"] = json!([{
+            "id":"018bd20e-8d6e-7a0b-8000-000000000001", "revision":1, "value":value
+        }]);
+        let profile: PortableProfileV1 =
+            serde_json::from_value(changed["profile"].clone()).unwrap();
+        changed["manifest"]["profileSha256"] = json!(hex::encode(Sha256::digest(
+            serde_json::to_vec(&profile).unwrap()
+        )));
+        changed["manifest"]["inventory"] =
+            serde_json::to_value(inventory_for(&profile).unwrap()).unwrap();
+        if name == "legacy tracker" {
+            changed["manifest"]["formatMinor"] = json!(4);
+            changed["manifest"]["databaseSchema"] = json!(DATABASE_SCHEMA_V1_3);
         }
         cases.push((name, changed));
     }

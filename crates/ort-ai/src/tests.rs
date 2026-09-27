@@ -100,7 +100,7 @@ data: {"type":"content_block_delta","delta":{"text":"ok"}}
 data: {"type":"message_delta","usage":{"output_tokens":2}}
 data: {"type":"message_stop"}
 "#;
-    let gemini = br#"data: {"candidates":[{"content":{"parts":[{"text":"ok"}]}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":2,"thoughtsTokenCount":1}}
+    let gemini = br#"data: {"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":2,"thoughtsTokenCount":1}}
 "#;
     for result in [
         OpenAiAdapter.parse_stream(openai),
@@ -133,7 +133,11 @@ data: {"type":"message_stop"}
     let gemini_events = GeminiAdapter.parse_stream(gemini).unwrap();
     assert!(matches!(
         gemini_events.as_slice(),
-        [StreamEvent::Text(_), StreamEvent::Usage(_)]
+        [
+            StreamEvent::Text(_),
+            StreamEvent::Usage(_),
+            StreamEvent::Finished
+        ]
     ));
     let openai_usage = OpenAiAdapter
         .parse_stream(openai)
@@ -573,4 +577,43 @@ fn cancellation_and_crash_recovery_are_explicit() {
     ledger.cancel(operation).expect("cancel");
     assert_eq!(ledger.recover_interrupted(20), Ok(1));
     assert!(ledger.summary(0, 30).expect("summary").partial);
+}
+
+#[test]
+fn gemini_requires_successful_candidate_completion() {
+    for reason in [
+        None,
+        Some("MAX_TOKENS"),
+        Some("SAFETY"),
+        Some("RECITATION"),
+        Some("OTHER"),
+        Some("STOP"),
+    ] {
+        let mut value = json!({"candidates":[{"content":{"parts":[{"text":"{\"ok\":true}"}]}}],
+            "modelVersion":"gemini-3.6-flash", "usageMetadata":{"promptTokenCount":20,"candidatesTokenCount":6}});
+        if let Some(reason) = reason {
+            value["candidates"][0]["finishReason"] = json!(reason);
+        }
+        // Even a generic sentinel must not make an incomplete candidate successful.
+        let stream = format!("data: {value}\ndata: [DONE]\n");
+        let events = GeminiAdapter.parse_stream(stream.as_bytes()).unwrap();
+        assert_eq!(
+            events.contains(&StreamEvent::ProviderFailure),
+            reason != Some("STOP")
+        );
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, StreamEvent::Usage(_)))
+        );
+    }
+    for value in [
+        json!({"error":{"message":"failed"}}),
+        json!({"promptFeedback":{"blockReason":"SAFETY"}}),
+    ] {
+        let events = GeminiAdapter
+            .parse_stream(format!("data: {value}\n").as_bytes())
+            .unwrap();
+        assert!(events.contains(&StreamEvent::ProviderFailure));
+    }
 }

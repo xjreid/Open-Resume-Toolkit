@@ -515,7 +515,8 @@ impl ProviderAdapter for GeminiAdapter {
         Ok(HttpRequest { url: format!("https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?alt=sse", r.model), headers: BTreeMap::from([("x-goog-api-key".into(), key.text()?.into()), ("content-type".into(), "application/json".into())]), body: serde_json::to_vec(&json!({"systemInstruction":{"parts":[{"text":r.system}]},"contents":[{"role":"user","parts":[{"text":encoded(&r.input)?}]}],"generationConfig":generation_config})).map_err(|_| AiError::InvalidResponse)? })
     }
     fn parse_stream(&self, bytes: &[u8]) -> Result<Vec<StreamEvent>, AiError> {
-        parse_sse(bytes, |v| {
+        let mut completed = false;
+        let mut events = parse_sse(bytes, |v| {
             let mut events = Vec::new();
             if let Some(parts) = v
                 .pointer("/candidates/0/content/parts")
@@ -539,7 +540,15 @@ impl ProviderAdapter for GeminiAdapter {
             if let Some(model) = v.get("modelVersion").and_then(Value::as_str) {
                 events.push(StreamEvent::Model(model.into()));
             }
-            if v.pointer("/promptFeedback/blockReason").is_some() {
+            if let Some(reason) = v.pointer("/candidates/0/finishReason") {
+                if reason.as_str() == Some("STOP") {
+                    completed = true;
+                    events.push(StreamEvent::Finished);
+                } else {
+                    events.push(StreamEvent::ProviderFailure);
+                }
+            }
+            if v.get("error").is_some() || v.pointer("/promptFeedback/blockReason").is_some() {
                 events.push(StreamEvent::ProviderFailure);
             }
             if events.is_empty() {
@@ -547,7 +556,12 @@ impl ProviderAdapter for GeminiAdapter {
             } else {
                 Some(Ok(events))
             }
-        })
+        })?;
+        // EOF or a generic SSE sentinel is not a successful candidate completion.
+        if !completed {
+            events.push(StreamEvent::ProviderFailure);
+        }
+        Ok(events)
     }
 }
 fn parse_sse(

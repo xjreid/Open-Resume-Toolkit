@@ -86,3 +86,8 @@ The output limit follows the trusted catalog, up to the existing application
 maximum. OpenAI input-cost reservations include the output schema. No automatic
 paid retry or additional model call is added. Cover letters and question answers
 keep their existing prose response contract.
+
+Gemini responses require an explicit successful candidate completion (`STOP`).
+Missing completion, token-limit termination, safety blocking, and other failure
+reasons are rejected even when the accumulated text is valid JSON. EOF alone
+does not confirm a successful result. The same rule applies to key tests.

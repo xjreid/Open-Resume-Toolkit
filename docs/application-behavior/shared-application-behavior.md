@@ -43,6 +43,9 @@ change prevents stale review content from silently overwriting the draft.
 - Backup writes a passphrase-protected portable archive through a native Save
   dialog. ORT cannot recover a forgotten passphrase.
 - Validation authenticates and inventories a selected backup before restore.
+  Tracker records must also satisfy the same metadata and retained-material
+  validation as the desktop tracker. Malformed snapshots and tracker records
+  in older backup formats are rejected before restore.
 - Restore stages a fresh encrypted replacement profile and activates it safely
   on restart rather than merging it into the current profile.
 - The former profile can be retained as an encrypted local safety copy.

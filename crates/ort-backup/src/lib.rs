@@ -604,6 +604,7 @@ fn validate_payload(
                 attempt.catalog_effective_from.is_empty() || attempt.pricing_components.is_empty()
             }))
         || (header.format_minor == 0 && !payload.profile.render_manifests.is_empty())
+        || (header.format_minor < 5 && !payload.profile.tracker_entries.is_empty())
     {
         return Err(BackupError::InvalidBackup);
     }
@@ -695,6 +696,9 @@ fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
         {
             return Err(BackupError::InvalidContent);
         }
+        let snapshot: ort_domain::TrackerEntry =
+            serde_json::from_slice(&bytes).map_err(|_| BackupError::InvalidContent)?;
+        ort_domain::validate_tracker_entry(&snapshot).map_err(|_| BackupError::InvalidContent)?;
     }
     validate_render_manifests(&profile.render_manifests)?;
     validate_ai_activity(&profile.ai_operations, &profile.ai_attempts)?;
