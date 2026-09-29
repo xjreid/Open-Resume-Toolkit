@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo } from "@tauri-apps/api/event";
-import { createResumeDocument } from "./resume-editor";
+import { createResumeDocument, createSection } from "./resume-editor";
 import { ApplicationPopup } from "./ApplicationPopup";
 import {
   useApplicationPopup,
@@ -41,6 +41,63 @@ afterEach(() => {
   listeners.clear();
   vi.clearAllMocks();
   document.body.replaceChildren();
+});
+
+it("sends overlay section edits through the resume change channel", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const resume = {
+    ...createResumeDocument(),
+    sections: [{ ...createSection(0), heading: "Education" }],
+  };
+  await act(async () => root.render(<ApplicationPopup />));
+  await act(async () =>
+    listeners.get("ort:application-popup-snapshot")?.({
+      payload: {
+        session: "sections",
+        generation: 1,
+        revision: 1,
+        acknowledgedEditSequence: 0,
+        kind: "resume-edit",
+        job: "",
+        jobUrl: "",
+        resume,
+        style: "technical",
+        coverLetter: null,
+        disabled: false,
+      },
+    }),
+  );
+  expect(
+    host.querySelector(
+      ".application-popup__resume-layout .application-popup__navigator",
+    ),
+  ).not.toBeNull();
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>(".section-add-control button")!
+      .click(),
+  );
+  expect(emitTo).toHaveBeenCalledWith(
+    "overlay",
+    "ort:application-popup-change",
+    {
+      session: "sections",
+      sequence: 1,
+      change: {
+        field: "resume",
+        value: {
+          ...resume,
+          sections: [
+            resume.sections[0],
+            expect.objectContaining({ heading: "Custom Section", order: 1 }),
+          ],
+        },
+      },
+    },
+  );
+  await act(async () => root.unmount());
 });
 
 it("reports a job edit with the active snapshot session and sequence", async () => {

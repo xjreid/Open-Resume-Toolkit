@@ -10,6 +10,7 @@ import type {
   ApplicationPopupUpdate,
 } from "./application-popup";
 import { documentUsage } from "./resume-validation";
+import { PopupSectionNavigator } from "./PopupSectionNavigator";
 import "./application-popup.css";
 
 type PopupState = ApplicationPopupSnapshot | null;
@@ -197,7 +198,10 @@ export function ApplicationPopup() {
     ? documentUsage(snapshot.resume).entries < DOCUMENT_LIMITS.entries
     : false;
   return (
-    <main className="application-popup" aria-label={title(snapshot.kind)}>
+    <main
+      className={`application-popup${snapshot.kind === "resume-edit" ? " application-popup--resume-edit" : ""}`}
+      aria-label={title(snapshot.kind)}
+    >
       <header className="application-popup__header">
         <h1>{title(snapshot.kind)}</h1>
         <button
@@ -252,18 +256,25 @@ export function ApplicationPopup() {
           />
         )}
         {snapshot.kind === "resume-edit" && snapshot.resume && (
-          <ResumeCanvas
-            document={snapshot.resume}
-            style={snapshot.style}
-            contactDivider="dot"
-            onContactDividerChange={() => undefined}
-            showContactDivider={false}
-            disabled={snapshot.disabled}
-            canAddEntry={canAddEntry}
-            onChange={(update) =>
-              sendChange({ field: "resume", value: update(snapshot.resume!) })
-            }
-          />
+          <div className="application-popup__resume-layout">
+            <ResumeCanvas
+              document={snapshot.resume}
+              style={snapshot.style}
+              contactDivider="dot"
+              onContactDividerChange={() => undefined}
+              showContactDivider={false}
+              disabled={snapshot.disabled}
+              canAddEntry={canAddEntry}
+              onChange={(update) =>
+                sendChange({ field: "resume", value: update(snapshot.resume!) })
+              }
+            />
+            <PopupSectionNavigator
+              document={snapshot.resume}
+              disabled={snapshot.disabled}
+              onChange={(value) => sendChange({ field: "resume", value })}
+            />
+          </div>
         )}
         {snapshot.kind === "cover" && (
           <label className="application-popup__field">

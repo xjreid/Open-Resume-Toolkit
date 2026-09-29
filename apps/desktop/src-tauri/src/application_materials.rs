@@ -132,6 +132,31 @@ impl ApplicationExportState {
         true
     }
 
+    fn promote_unchanged(&self, previous_revision: i64, revision: i64, kind: MaterialKind) {
+        let mut prepared = self
+            .prepared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(mut next) = prepared
+            .iter()
+            .find(|item| item.revision == previous_revision && item.kind == kind)
+            .cloned()
+        else {
+            return;
+        };
+        next.revision = revision;
+        prepared.retain(|item| item.kind != kind);
+        prepared.push(next);
+    }
+
+    fn is_prepared(&self, revision: i64, kind: MaterialKind) -> bool {
+        self.prepared
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .any(|item| item.revision == revision && item.kind == kind)
+    }
+
     fn bytes(
         &self,
         revision: i64,
@@ -1175,9 +1200,9 @@ pub fn save_application_workspace(
     if prior.revision != expected_revision {
         return storage_failure(&StorageError::RevisionConflict);
     }
-    if (workspace.resume != prior.workspace.resume || workspace.style != prior.workspace.style)
-        && let Err(code) = preflight_pdf(&workspace, MaterialKind::Resume)
-    {
+    let resume_pdf_unchanged = workspace.style == prior.workspace.style
+        && printable_resume_unchanged(&prior.workspace.resume, &workspace.resume);
+    if !resume_pdf_unchanged && let Err(code) = preflight_pdf(&workspace, MaterialKind::Resume) {
         return error(code);
     }
     if (workspace.cover_letter != prior.workspace.cover_letter
@@ -1206,9 +1231,31 @@ pub fn save_application_workspace(
         }
         save(store, Some(expected_revision), &workspace)
     }) {
-        Ok(saved) => CommandResponse::success(saved),
+        Ok(saved) => {
+            if resume_pdf_unchanged {
+                window.state::<ApplicationExportState>().promote_unchanged(
+                    prior.revision,
+                    saved.revision,
+                    MaterialKind::Resume,
+                );
+            }
+            CommandResponse::success(saved)
+        }
         Err(problem) => storage_failure(&problem),
     }
+}
+
+// Empty sections are useful while editing but contribute nothing to either
+// exported format. Adding one should not force a PDF rerender or invalidate an
+// already prepared download of the same printable content.
+fn printable_resume_unchanged(before: &ResumeDocument, after: &ResumeDocument) -> bool {
+    let mut before = before.clone();
+    let mut after = after.clone();
+    before
+        .sections
+        .retain(|section| !section.entries.is_empty());
+    after.sections.retain(|section| !section.entries.is_empty());
+    before == after
 }
 
 #[tauri::command]
@@ -1310,6 +1357,25 @@ pub fn prepare_application_exports(
 ) -> CommandResponse<PreparedApplicationExport> {
     if window.label() != "overlay" {
         return window_not_authorized();
+    }
+    if window
+        .state::<ApplicationExportState>()
+        .is_prepared(expected_revision, kind)
+    {
+        let current = window.state::<DesktopState>().with_store(|store| {
+            Ok(load(store)?.is_some_and(|saved| saved.revision == expected_revision))
+        });
+        match current {
+            Ok(true) => {
+                return CommandResponse::success(PreparedApplicationExport {
+                    revision: expected_revision,
+                    pdf_ready: true,
+                    docx_ready: true,
+                });
+            }
+            Ok(false) => return storage_failure(&StorageError::RevisionConflict),
+            Err(problem) => return storage_failure(&problem),
+        }
     }
     let prepared = match render_application_exports(
         &window.state::<DesktopState>(),
@@ -1512,6 +1578,9 @@ pub(crate) fn document_for(
 
 fn preflight_pdf(workspace: &ApplicationWorkspace, kind: MaterialKind) -> Result<(), &'static str> {
     let document = document_for(workspace, kind).map_err(|_| "PDF_UNAVAILABLE")?;
+    document
+        .validate(DocumentLimits::default())
+        .map_err(|_| "RESUME_INVALID")?;
     ort_render::render_pdf_with_style(&document, workspace.style)
         .map(|_| ())
         .map_err(|_| "PDF_UNAVAILABLE")
@@ -1851,6 +1920,78 @@ mod tests {
     }
 
     #[test]
+    fn a_blank_section_preserves_printable_resume_and_prepared_downloads() {
+        let mut prior = ResumeDocument::empty("Resume");
+        prior.contact.full_name = "Alex Rivera".into();
+        prior.sections.push(ResumeSection {
+            id: EntityId::new(),
+            order: 0,
+            heading: "Experience".into(),
+            entries: vec![ResumeEntry {
+                id: EntityId::new(),
+                order: 0,
+                heading: "Engineer".into(),
+                subheading: String::new(),
+                date_range: String::new(),
+                dates: None,
+                location: String::new(),
+                fields: vec![],
+                bullets: vec![],
+                links: vec![],
+            }],
+        });
+        let mut edited = prior.clone();
+        edited.sections.push(ResumeSection {
+            id: EntityId::new(),
+            order: 1,
+            heading: "Custom Section".into(),
+            entries: vec![],
+        });
+        edited.validate(DocumentLimits::default()).unwrap();
+        assert!(printable_resume_unchanged(&prior, &edited));
+        assert_eq!(
+            ort_render::render_pdf_with_style(&prior, DocumentStyle::Technical)
+                .unwrap()
+                .bytes,
+            ort_render::render_pdf_with_style(&edited, DocumentStyle::Technical)
+                .unwrap()
+                .bytes
+        );
+        let temp = TempDir::new().unwrap();
+        let store = ort_storage::EncryptedStore::open_or_initialize(
+            temp.path(),
+            "blank-section",
+            &MemoryDatabaseKeyVault::new(),
+        )
+        .unwrap();
+        let mut current = workspace();
+        current.resume = prior.clone();
+        let saved = save(&store, None, &current).unwrap();
+        current.resume = edited.clone();
+        let saved = save(&store, Some(saved.revision), &current).unwrap();
+        assert_eq!(saved.workspace.resume, edited);
+
+        let exports = ApplicationExportState::default();
+        assert!(exports.replace(PreparedApplicationExports {
+            revision: 7,
+            kind: MaterialKind::Resume,
+            pdf: b"existing pdf".to_vec(),
+            docx: b"existing docx".to_vec(),
+        }));
+        exports.promote_unchanged(7, 8, MaterialKind::Resume);
+        assert!(exports.is_prepared(8, MaterialKind::Resume));
+        assert_eq!(
+            exports.bytes(8, MaterialKind::Resume, ApplicationExportFormat::Pdf),
+            Some(b"existing pdf".to_vec())
+        );
+        assert!(!exports.is_prepared(7, MaterialKind::Resume));
+
+        edited.sections[1].entries = prior.sections[0].entries.clone();
+        edited.sections[1].entries[0].id = EntityId::new();
+        assert!(!printable_resume_unchanged(&prior, &edited));
+    }
+
+    #[test]
     fn prepared_pdf_and_docx_follow_the_saved_content_and_style() {
         let temp = TempDir::new().unwrap();
         let store = ort_storage::EncryptedStore::open_or_initialize(
@@ -2146,6 +2287,53 @@ mod tests {
             preflight_pdf(&workspace, MaterialKind::Resume),
             Err("PDF_UNAVAILABLE")
         );
+    }
+
+    #[test]
+    fn new_item_in_v2_resume_requires_an_empty_dates_array() {
+        let mut workspace = workspace();
+        workspace.resume.contact.full_name = "Alex Rivera".into();
+        workspace.resume.sections.push(ResumeSection {
+            id: EntityId::new(),
+            order: 0,
+            heading: "Experience".into(),
+            entries: vec![],
+        });
+        workspace.resume = workspace.resume.upgraded_v2().unwrap();
+        workspace.resume.sections[0].entries.push(ResumeEntry {
+            id: EntityId::new(),
+            order: 0,
+            heading: String::new(),
+            subheading: String::new(),
+            date_range: String::new(),
+            dates: None,
+            location: String::new(),
+            fields: vec![],
+            bullets: vec![],
+            links: vec![],
+        });
+        assert_eq!(
+            preflight_pdf(&workspace, MaterialKind::Resume),
+            Err("RESUME_INVALID")
+        );
+        workspace.resume.sections[0].entries[0].dates = Some(vec![]);
+        preflight_pdf(&workspace, MaterialKind::Resume).unwrap();
+        let temp = TempDir::new().unwrap();
+        let store = ort_storage::EncryptedStore::open_or_initialize(
+            temp.path(),
+            "v2-new-item",
+            &MemoryDatabaseKeyVault::new(),
+        )
+        .unwrap();
+        let saved = save(&store, None, &workspace).unwrap();
+        let state = DesktopState {
+            storage: Mutex::new(crate::DesktopStorage::Ready(store)),
+            reviews: Arc::new(crate::import_review::ReviewState::default()),
+        };
+        let exports =
+            render_application_exports(&state, saved.revision, MaterialKind::Resume).unwrap();
+        assert!(exports.pdf.starts_with(b"%PDF-"));
+        assert!(exports.docx.starts_with(b"PK\x03\x04"));
     }
 
     #[test]

@@ -513,7 +513,8 @@ enum ApplicationPopupKind {
 impl ApplicationPopupKind {
     fn logical_size(self) -> (f64, f64) {
         match self {
-            Self::ResumeView | Self::ResumeEdit => (850.0, 760.0),
+            Self::ResumeView => (850.0, 760.0),
+            Self::ResumeEdit => (1051.0, 760.0),
             Self::Job | Self::Url | Self::Cover => (520.0, 420.0),
         }
     }

@@ -39,6 +39,44 @@
 .application-popup__body {
   padding: 16px;
 }
+.application-popup--resume-edit .application-popup__body {
+  padding-left: 17px;
+  padding-right: 0;
+}
+.application-popup__resume-layout {
+  display: grid;
+  grid-template-columns: 816px 218px;
+  gap: 0;
+  align-items: start;
+  min-width: 1034px;
+  overflow: visible;
+}
+.application-popup__resume-layout > .resume-canvas {
+  grid-column: 1;
+  grid-row: 1;
+  width: 816px;
+  margin: 14px 0 0;
+}
+.application-popup .application-popup__navigator {
+  grid-column: 2;
+  grid-row: 1;
+  position: sticky;
+  top: 86px;
+  height: calc(100vh - 86px);
+  margin-top: 14px;
+  overflow: auto;
+  padding: 0;
+  border-left: 1px solid #cbd5e1;
+  border-right: 0;
+  background: #f8fafc;
+}
+.application-popup .application-popup__navigator > div {
+  display: block;
+  padding: 12px;
+}
+.application-popup__navigator .section-trash-confirmation button {
+  width: auto;
+}
 .application-popup__field {
   display: grid;
   gap: 8px;

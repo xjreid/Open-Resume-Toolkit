@@ -312,12 +312,13 @@ fn paragraphs(
             }
         }
         if !entries.is_empty() {
-            push_paragraph(
-                &mut out,
-                "section",
-                inline_runs(&section.heading, true, false),
-                vec![],
-            );
+            let mut heading_runs = inline_runs(&section.heading, true, false);
+            if style == DocumentStyle::Technical {
+                for run in &mut heading_runs {
+                    run.bold = false;
+                }
+            }
+            push_paragraph(&mut out, "section", heading_runs, vec![]);
             out.extend(entries);
         }
     }

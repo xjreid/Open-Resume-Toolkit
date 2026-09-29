@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  createEntry,
   createEntityId,
   createResumeDocument,
   normalizeDocument,
 } from "./resume-editor";
 
 describe("resume editor model", () => {
+  it("creates entries with dates for version 2 resumes", () => {
+    expect(createEntry(0).dates).toBeUndefined();
+    expect(createEntry(0, 2).dates).toEqual([]);
+  });
   it("creates UUIDv7 identifiers using cryptographic randomness", () => {
     vi.stubGlobal("crypto", {
       getRandomValues: (bytes: Uint8Array) => bytes.fill(0xab),

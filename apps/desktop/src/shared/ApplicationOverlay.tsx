@@ -148,6 +148,8 @@ const errors: Record<string, string> = {
     "The updated file is still being prepared. Try again in a moment.",
   PDF_UNAVAILABLE:
     "This material could not be rendered as a PDF. Review its length and characters.",
+  RESUME_INVALID:
+    "This resume edit could not be saved because an item has invalid structure. Review the new item and try again.",
   EXPORT_CANCELLED: "Download cancelled.",
   DRAG_UNAVAILABLE:
     "File drag is unavailable. Use Download and select the saved file on the application site.",

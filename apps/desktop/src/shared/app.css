@@ -4436,9 +4436,12 @@ body.is-section-sorting * {
 .resume-document--technical .resume-document__section > h3 {
   font-size: 15px;
   font-variant: small-caps;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 0.025em;
-  text-transform: none;
+  text-transform: uppercase;
+}
+.resume-document--technical .resume-document__section > h3 .reading-edit-target {
+  font-weight: inherit;
 }
 .resume-canvas--modern .resume-canvas__section > h3,
 .resume-document--modern .resume-document__section > h3 {

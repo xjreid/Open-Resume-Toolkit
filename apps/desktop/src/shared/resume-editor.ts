@@ -32,13 +32,17 @@ export function createSection(order: number): ResumeSection {
   };
 }
 
-export function createEntry(order: number): ResumeEntry {
+export function createEntry(
+  order: number,
+  schemaVersion: ResumeDocument["schemaVersion"] = 1,
+): ResumeEntry {
   return {
     id: createEntityId(),
     order,
     heading: "",
     subheading: "",
     dateRange: "",
+    ...(schemaVersion === 2 ? { dates: [] } : {}),
     location: "",
     fields: [],
     bullets: [],

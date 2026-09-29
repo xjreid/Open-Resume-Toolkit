@@ -45,7 +45,7 @@
   } else if p.kind == "contact" {
     align(center, block(inset: (top: 3pt, bottom: 3pt), above: 0pt, below: 9pt, rich(p.runs)))
   } else if p.kind == "section" {
-    block(sticky: true, above: 15.75pt, below: 3.75pt, { text(size: 11.25pt, weight: "semibold", tracking: .025em, fill: accent, heading(level: 2, outlined: true, rich(p.runs))); v(1.5pt); line(length: 100%, stroke: .75pt + accent) })
+    block(sticky: true, above: 15.75pt, below: 3.75pt, { text(size: 11.25pt, weight: "regular", tracking: .025em, fill: accent, heading(level: 2, outlined: true, upper(rich(p.runs)))); v(1.5pt); line(length: 100%, stroke: .75pt + accent) })
   } else if p.kind == "entry" {
     block(sticky: p.sticky, inset: (top: row-inset, bottom: row-inset), above: 3pt, below: if p.entry_end { 10.5pt } else { 0pt },
       pad(left: content-inset, grid(columns: (1fr, .28fr), align: (left, right), column-gutter: 10.5pt,

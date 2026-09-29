@@ -128,17 +128,33 @@ pub fn render_docx_with_style(
             }
         }
         if !entries.0.is_empty() {
-            rich_paragraph(
-                &mut body,
-                &mut relationships,
-                &mut next_link,
-                "Heading1",
-                &section.heading,
-                false,
-                true,
-                false,
-                false,
-            )?;
+            if style == DocumentStyle::Technical {
+                let mut heading = spans(&section.heading.to_uppercase(), false, false)?;
+                for span in &mut heading {
+                    span.bold = false;
+                }
+                paragraph_with_spans(
+                    &mut body,
+                    &mut relationships,
+                    &mut next_link,
+                    "Heading1",
+                    false,
+                    &heading,
+                    false,
+                )?;
+            } else {
+                rich_paragraph(
+                    &mut body,
+                    &mut relationships,
+                    &mut next_link,
+                    "Heading1",
+                    &section.heading,
+                    false,
+                    true,
+                    false,
+                    false,
+                )?;
+            }
             body.push(&entries.0)?;
         }
     }

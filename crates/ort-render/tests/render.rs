@@ -137,6 +137,24 @@ fn styles_are_deterministic_distinct_and_do_not_change_source_identity() {
 }
 
 #[test]
+fn an_empty_new_section_does_not_break_technical_pdf_rendering() {
+    use ort_domain::{DocumentStyle, EntityId, ResumeSection};
+    use ort_render::render_pdf_with_style;
+
+    let original = support::fixture("standard");
+    let before = render_pdf_with_style(&original, DocumentStyle::Technical).unwrap();
+    let mut edited = original;
+    edited.sections.push(ResumeSection {
+        id: EntityId::new(),
+        order: 1,
+        heading: "Custom Section".into(),
+        entries: vec![],
+    });
+    let after = render_pdf_with_style(&edited, DocumentStyle::Technical).unwrap();
+    assert_eq!(before.bytes, after.bytes);
+}
+
+#[test]
 fn every_style_rejects_overflow_missing_glyphs_and_external_links() {
     use ort_domain::DocumentStyle;
     for style in [

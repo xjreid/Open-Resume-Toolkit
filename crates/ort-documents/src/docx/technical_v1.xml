@@ -51,7 +51,7 @@
       </w:pBdr>
     </w:pPr>
     <w:rPr>
-      <w:b />
+      <w:b w:val="0" />
       <w:color w:val="000000" />
       <w:sz w:val="22" />
       <w:szCs w:val="22" />

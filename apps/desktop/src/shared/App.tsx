@@ -2212,7 +2212,10 @@ export function ResumeCanvas({
                         ...candidate,
                         entries: [
                           ...candidate.entries,
-                          createEntry(candidate.entries.length),
+                          createEntry(
+                            candidate.entries.length,
+                            current.schemaVersion,
+                          ),
                         ],
                       }
                     : candidate,

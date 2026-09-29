@@ -185,6 +185,11 @@ fn bundled_styles_preserve_all_content_relationships_and_package_constraints() {
         let document = support::fixture(kind);
         let original = render_docx(&document).unwrap();
         let original_parts = parts(&original);
+        let mut technical_document = document.clone();
+        for section in &mut technical_document.sections {
+            section.heading = section.heading.to_uppercase();
+        }
+        let technical_parts = parts(&render_docx(&technical_document).unwrap());
         let mut presentations = std::collections::BTreeSet::new();
         for style in [
             DocumentStyle::Plain,
@@ -225,7 +230,11 @@ fn bundled_styles_preserve_all_content_relationships_and_package_constraints() {
                     }
                     assert_eq!(
                         words(&styled_parts[name]),
-                        words(content),
+                        words(if style == DocumentStyle::Technical {
+                            &technical_parts[name]
+                        } else {
+                            content
+                        }),
                         "{kind}: content"
                     );
                 } else if name == "word/numbering.xml" && style != DocumentStyle::Plain {
