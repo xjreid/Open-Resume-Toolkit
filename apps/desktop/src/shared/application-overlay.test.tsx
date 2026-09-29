@@ -233,6 +233,12 @@ it("refines an answer and saves only its final version on reset", async () => {
   await act(async () => button("Answers").click());
   expect(host.textContent).not.toContain("Application answers");
   expect(host.textContent).not.toContain("Character limit");
+  expect(host.querySelector(".application-question-title")?.textContent).toBe(
+    "Why this role?",
+  );
+  expect(
+    host.querySelector('textarea[placeholder="Paste an application question"]'),
+  ).toBeNull();
   const instructions = [...host.querySelectorAll("textarea")].find((item) =>
     item.parentElement?.textContent?.includes("Refinement instructions"),
   )!;
@@ -259,6 +265,10 @@ it("refines an answer and saves only its final version on reset", async () => {
   expect(current.question).toBe("");
   expect(current.answer).toBe("");
   expect(button("Generate answer")).toBeTruthy();
+  expect(host.querySelector(".application-question-title")).toBeNull();
+  expect(
+    host.querySelector('textarea[placeholder="Paste an application question"]'),
+  ).toBeTruthy();
 });
 
 it("finishes directly and saves the final answer with tracker details", async () => {

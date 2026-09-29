@@ -556,7 +556,12 @@ fn show_application_popup(
     let work = monitor.work_area();
     let (logical_width, logical_height) = kind.logical_size();
     let width = physical_dimension(logical_width, scale).min(work.size.width);
-    let height = physical_dimension(logical_height, scale).min(work.size.height);
+    let desired_height = if matches!(kind, ApplicationPopupKind::Cover) {
+        overlay_size.height
+    } else {
+        physical_dimension(logical_height, scale)
+    };
+    let height = desired_height.min(work.size.height);
     let right = overlay_position
         .x
         .saturating_add(signed_dimension(overlay_size.width))

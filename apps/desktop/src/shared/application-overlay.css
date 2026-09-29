@@ -420,6 +420,13 @@
 .application-shell .application-answer-list {
   margin-top: 24px;
 }
+.application-shell .application-question-title {
+  margin: 0 0 16px;
+  font-size: 17px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .application-shell .application-answer-list details {
   border-top: 1px solid #dce3e9;
   padding: 12px 0;

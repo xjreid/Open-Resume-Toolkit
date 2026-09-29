@@ -1373,24 +1373,29 @@ export function ApplicationOverlay() {
                 )}
                 {tab === "answers" && (
                   <section className="application-panel">
-                    <label>
-                      Question
-                      <textarea
-                        value={question}
-                        readOnly={!!draft.answer}
-                        onChange={(event) => {
-                          const next = event.target.value;
-                          setQuestion(next);
-                          update((current) => ({
-                            ...current,
-                            question: next,
-                          }));
-                        }}
-                        rows={4}
-                        maxLength={2000}
-                        placeholder="Paste an application question"
-                      />
-                    </label>
+                    {draft.answer ? (
+                      <h3 className="application-question-title">
+                        {draft.question}
+                      </h3>
+                    ) : (
+                      <label>
+                        Question
+                        <textarea
+                          value={question}
+                          onChange={(event) => {
+                            const next = event.target.value;
+                            setQuestion(next);
+                            update((current) => ({
+                              ...current,
+                              question: next,
+                            }));
+                          }}
+                          rows={4}
+                          maxLength={2000}
+                          placeholder="Paste an application question"
+                        />
+                      </label>
+                    )}
                     {!!draft.answer && (
                       <label>
                         Refinement instructions
