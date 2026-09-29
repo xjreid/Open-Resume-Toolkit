@@ -78,8 +78,10 @@ def expected_paragraphs(source, style):
             def paired(left, right, paragraph_style):
                 if not left and not right:
                     return
-                spacer = " " if style != "plain" and not left and right else ""
-                add(spacer + left + ("\t" + right if right else ""), paragraph_style)
+                # Inputs are already normalized. Preserve the renderer's line-box
+                # spacer and semantic tab in metadata-only header rows.
+                spacer = " " if not left and right else ""
+                paragraphs.append((spacer + left + ("\t" + right if right else ""), paragraph_style, False))
 
             paired(title, right_rows.pop(0) if right_rows else "", "Heading2")
             paired(normalized(entry["subheading"]), right_rows.pop(0) if right_rows else "", "Normal")
@@ -94,7 +96,10 @@ def expected_paragraphs(source, style):
             for value in entry["links"]:
                 add(link(value))
         if len(paragraphs) > begin:
-            paragraphs.insert(begin, (normalized(section["heading"]), "Heading1", False))
+            heading = normalized(section["heading"])
+            if style == "technical":
+                heading = heading.upper()
+            paragraphs.insert(begin, (heading, "Heading1", False))
     return paragraphs, links
 
 
@@ -185,7 +190,11 @@ def verify(data, source, style="plain"):
             assert bullet.get(W + "val") == "1"
         actual.append((text, paragraph_style.get(W + "val") if paragraph_style is not None else "Normal", bullet is not None))
     expected, links = expected_paragraphs(source, style)
-    assert actual == expected, "semantic text, heading, list and ordering parity"
+    if actual != expected:
+        index = next((i for i, pair in enumerate(zip(actual, expected)) if pair[0] != pair[1]), min(len(actual), len(expected)))
+        got = actual[index] if index < len(actual) else None
+        wanted = expected[index] if index < len(expected) else None
+        raise AssertionError(f"semantic text, heading, list and ordering parity: {style} paragraph {index + 1}: expected {wanted!r}, got {got!r}; paragraph counts {len(expected)}/{len(actual)}")
     rels = xml["word/_rels/document.xml.rels"]
     assert rels.tag == REL + "Relationships" and len(rels) == len(links) + 2
     assert all(node.tag == REL + "Relationship" for node in rels)
@@ -239,6 +248,7 @@ def rejection_checks(data, source, style="plain"):
         {"word/document.xml": original["word/document.xml"].replace(b"<w:body>", b"<w:body><w:object/>")},
         {"word/document.xml": original["word/document.xml"].replace(b"Software Engineer", b"Changed content")},
         {"word/document.xml": original["word/document.xml"].replace(b'val="Heading1"', b'val="Normal"')},
+        {"word/document.xml": original["word/document.xml"].replace(b"<w:r><w:tab/></w:r>", b"", 1)},
         {"word/_rels/document.xml.rels": original["word/_rels/document.xml.rels"].replace(b"/hyperlink", b"/attachedTemplate")},
         {"word/_rels/document.xml.rels": original["word/_rels/document.xml.rels"].replace(b"https://example.org/project", b"file:///private/secret")},
         {"word/styles.xml": original["word/styles.xml"].replace(b"\n", b"\r\n")},
@@ -278,7 +288,10 @@ def main():
         source = json.loads((root / (name + ".json")).read_text(encoding="utf-8"))
         text = (root / (name + ".txt")).read_bytes()
         assert source["schemaVersion"] == (2 if schema_v2 else 1)
-        verify(data, source, style)
+        try:
+            verify(data, source, style)
+        except AssertionError as error:
+            raise AssertionError(f"{name}.docx: {error}") from error
         verify_text(text, source)
         digest = hashlib.sha256(data).hexdigest()
         if style == "plain" and not schema_v2:
@@ -288,7 +301,7 @@ def main():
         text_digest = hashlib.sha256(text).hexdigest()
         assert schema_v2 or text_digest == text_goldens[name], f"{name}: reviewed plain-text golden changed"
     rejection_checks((root / "standard.docx").read_bytes(), json.loads((root / "standard.json").read_text(encoding="utf-8")), style)
-    print(f"{style}: Eight DOCX/text fixtures: {'golden SHA-256' if style == 'plain' and not schema_v2 else 'bundled style audit (golden/native qualification pending)'}, exact text, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; {8 if schema_v2 else 7} negative controls rejected.")
+    print(f"{style}: Eight DOCX/text fixtures: {'golden SHA-256' if style == 'plain' and not schema_v2 else 'bundled style audit (golden/native qualification pending)'}, exact text, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; {9 if schema_v2 else 8} negative controls rejected.")
 
 
 if __name__ == "__main__":

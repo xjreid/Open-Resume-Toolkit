@@ -384,16 +384,23 @@
   padding: 12px;
   font-size: 11px;
   margin: 12px 0;
+  border: 1px solid #e1e6ec;
+  border-radius: 10px;
 }
 .application-shell .application-alerts h2 {
   font-size: 12px;
 }
-.application-shell .application-alerts button {
-  min-height: 30px;
-  font-size: 10px;
+.application-shell .application-alert-list {
+  margin: 10px 0 0;
+  padding-left: 17px;
+  display: grid;
+  gap: 7px;
 }
 .application-shell .application-alert {
-  padding: 10px 0;
+  color: #233d5c;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 .application-shell .application-notice {
   position: relative;

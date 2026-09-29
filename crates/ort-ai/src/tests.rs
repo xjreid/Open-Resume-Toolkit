@@ -74,6 +74,142 @@ fn openai_resume_requests_use_the_strict_resume_draft_schema() {
 }
 
 #[test]
+fn gemini_requests_match_the_published_rest_generation_contract() {
+    // Independently downloaded API discovery schemas; do not derive the
+    // accepted values from the adapter or its expected-payload assertions.
+    let discovery: Value = serde_json::from_str(include_str!(
+        "fixtures/gemini-v1beta-generation-config.json"
+    ))
+    .unwrap();
+    let schemas = &discovery["schemas"];
+    let key = ApiKey::new(b"SYNTHETIC_SECRET_VALUE").unwrap();
+    for model in ["gemini-3.6-flash", "gemini-3.5-flash-lite"] {
+        for operation in [
+            OperationType::TailorResume,
+            OperationType::RefineResume,
+            OperationType::CredentialTest,
+            OperationType::CoverLetter,
+            OperationType::AnswerQuestion,
+        ] {
+            let mut normalized = request();
+            normalized.model = model.into();
+            normalized.operation = operation;
+            let built = GeminiAdapter.build_request(&normalized, &key).unwrap();
+            let body: Value = serde_json::from_slice(&built.body).unwrap();
+            assert_discovery_contract(
+                &body["generationConfig"],
+                &schemas["GenerationConfig"],
+                schemas,
+                &format!("{model}/{operation:?}/generationConfig"),
+            );
+        }
+    }
+}
+
+fn assert_discovery_contract(value: &Value, schema: &Value, schemas: &Value, path: &str) {
+    if let Some(reference) = schema["$ref"].as_str() {
+        let referenced = &schemas[reference];
+        assert!(
+            !referenced.is_null(),
+            "missing discovery schema {reference}"
+        );
+        assert_discovery_contract(value, referenced, schemas, path);
+        return;
+    }
+    if let Some(allowed) = schema["enum"].as_array() {
+        assert!(
+            allowed.contains(value),
+            "{path}: invalid REST enum {value}; expected {allowed:?}"
+        );
+    }
+    match schema["type"].as_str().unwrap() {
+        "any" => (),
+        "object" => {
+            for (name, field) in value.as_object().expect("REST object") {
+                let property = &schema["properties"][name];
+                assert!(!property.is_null(), "{path}: unknown REST field {name}");
+                assert_discovery_contract(field, property, schemas, &format!("{path}/{name}"));
+            }
+        }
+        "array" => {
+            for item in value.as_array().expect("REST array") {
+                assert_discovery_contract(item, &schema["items"], schemas, path);
+            }
+        }
+        "string" => assert!(value.is_string(), "{path}: expected string"),
+        "integer" => assert!(value.is_i64() || value.is_u64(), "{path}: expected integer"),
+        "number" => assert!(value.is_number(), "{path}: expected number"),
+        "boolean" => assert!(value.is_boolean(), "{path}: expected boolean"),
+        other => panic!("unhandled discovery type {other} at {path}"),
+    }
+}
+
+#[test]
+fn gemini_36_resume_requests_use_body_only_schema_and_low_thinking() {
+    let key = ApiKey::new(b"SYNTHETIC_SECRET_VALUE").unwrap();
+    let catalog = builtin_catalog("2026-09-29T00:00:00Z", None).unwrap();
+    for operation in [OperationType::TailorResume, OperationType::RefineResume] {
+        let entry = catalog
+            .resolve(Provider::Gemini, Preset::Balanced, operation)
+            .unwrap();
+        assert_eq!(entry.model, "gemini-3.6-flash");
+        let mut normalized = request();
+        normalized.operation = operation;
+        normalized.model = entry.model.clone();
+        normalized.max_output_tokens = entry.max_output_tokens;
+        let built = GeminiAdapter.build_request(&normalized, &key).unwrap();
+        assert_eq!(
+            built.url,
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse"
+        );
+        let body: Value = serde_json::from_slice(&built.body).unwrap();
+        let config = &body["generationConfig"];
+        assert_eq!(config["maxOutputTokens"], 6000);
+        assert_eq!(config["thinkingConfig"]["thinkingLevel"], "LOW");
+        assert_eq!(
+            config["responseFormat"]["text"]["mimeType"],
+            "APPLICATION_JSON"
+        );
+        assert_eq!(
+            config["responseFormat"]["text"]["schema"],
+            materials::gemini_resume_output_schema()
+        );
+        assert!(config.get("responseMimeType").is_none());
+        let schema = config["responseFormat"]["text"]["schema"].to_string();
+        for field in [
+            "title", "role", "details", "date", "location", "extra", "heading",
+        ] {
+            let properties = &config["responseFormat"]["text"]["schema"]["properties"]["templateSections"]
+                ["items"]["properties"];
+            assert!(properties.get(field).is_none());
+            assert!(
+                properties["entries"]["items"]["properties"]
+                    .get(field)
+                    .is_none()
+            );
+        }
+        assert!(!schema.contains("minLength"));
+        assert!(!schema.contains("maxLength"));
+        let wire = std::str::from_utf8(&built.body).unwrap();
+        assert!(
+            wire.find("\"tailoringPlan\":{").unwrap()
+                < wire.find("\"templateSections\":{").unwrap()
+        );
+    }
+    let mut other = request();
+    other.operation = OperationType::CoverLetter;
+    other.model = "gemini-3.6-flash".into();
+    let built = GeminiAdapter.build_request(&other, &key).unwrap();
+    let body: Value = serde_json::from_slice(&built.body).unwrap();
+    assert_eq!(
+        body["generationConfig"]["responseMimeType"],
+        "application/json"
+    );
+    assert!(body["generationConfig"].get("responseFormat").is_none());
+    assert!(body["generationConfig"].get("thinkingConfig").is_none());
+}
+
+#[test]
 fn openai_non_resume_requests_keep_json_object_format() {
     let key = ApiKey::new(b"SYNTHETIC_SECRET_VALUE").expect("key");
     let mut normalized = request();
@@ -182,7 +318,7 @@ fn gemini_credential_test_limits_thinking_and_reads_visible_parts() {
     assert_eq!(body["generationConfig"]["maxOutputTokens"], 512);
     assert_eq!(
         body["generationConfig"]["thinkingConfig"]["thinkingLevel"],
-        "low"
+        "LOW"
     );
 
     let response = br#"data: {"candidates":[{"content":{"parts":[{"thought":true,"text":"hidden reasoning"},{"text":"{\"ok\":true}"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":20,"thoughtsTokenCount":12},"modelVersion":"gemini-3.6-flash"}

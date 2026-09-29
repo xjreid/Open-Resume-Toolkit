@@ -27,6 +27,7 @@ type Alert = {
   kind: "not_found" | "confirmed_mismatch";
   category: string;
   requirement: string;
+  target?: string;
   jobExcerpt: string;
   resumeEvidence: { fieldId: string; value: string } | null;
 };
@@ -50,6 +51,30 @@ type Workspace = {
 };
 type Saved = { revision: number; workspace: Workspace };
 type FinishMode = "edit" | "discard" | null;
+
+function qualificationPoint(alert: Alert): string {
+  const text = (alert.target?.trim() || alert.requirement)
+    .replace(/\s+/g, " ")
+    .replace(/^(?:missing|need|requires?)\s+/i, "")
+    .replace(/[.;:]+$/, "")
+    .trim();
+  const detail = text.length > 100 ? `${text.slice(0, 97).trimEnd()}…` : text;
+  if (alert.kind === "confirmed_mismatch") {
+    return alert.category === "graduation_date" && /^20\d{2}$/.test(detail)
+      ? `Need graduation in ${detail}`
+      : `Requirement mismatch: ${detail}`;
+  }
+  if (alert.category === "experience_duration") return `Need ${detail}`;
+  if (
+    alert.category === "named_skill_or_technology" &&
+    /^[cr]$/i.test(detail)
+  ) {
+    return `Missing ${detail.toUpperCase()} language`;
+  }
+  if (alert.category === "language_proficiency")
+    return `Missing ${detail}${/\b(?:proficiency|fluency|fluent|proficient)\b/i.test(detail) ? "" : " proficiency"}`;
+  return `Missing ${detail}`;
+}
 
 function trackerEntryFor(workspace: Workspace): TrackerEntry {
   const now = new Date();
@@ -117,7 +142,13 @@ const errors: Record<string, string> = {
   AI_DISABLED: "Set up a Direct AI key in the main window before continuing.",
   AI_CAP_REJECTED: "This request would exceed your AI spending cap.",
   AI_OUTPUT_INVALID:
-    "The provider returned incomplete or unusable material, so nothing was saved. Try again or shorten the job description.",
+    "The provider returned a blocked, incomplete, or unreadable response. Nothing was saved.",
+  AI_OUTPUT_INCOMPLETE:
+    "The provider did not finish generating the material. Nothing was saved.",
+  AI_MODEL_MISMATCH:
+    "The provider returned a different model than the one selected. Nothing was saved.",
+  AI_MATERIAL_INVALID:
+    "The provider response did not match the required material format. Nothing was saved.",
   AI_AUTHENTICATION_FAILED:
     "The provider rejected the active API key. Check the key and its permissions in My Keys.",
   AI_RATE_LIMITED:
@@ -126,6 +157,10 @@ const errors: Record<string, string> = {
     "The provider is temporarily unavailable. Try again later.",
   AI_PROVIDER_TEMPORARY:
     "The provider returned a temporary server error. Try again later.",
+  AI_PROVIDER_BAD_REQUEST:
+    "The provider rejected the request parameters or API key (HTTP 400). Nothing was saved.",
+  AI_MODEL_UNAVAILABLE:
+    "The selected model is unavailable to this API key (HTTP 404). Nothing was saved.",
   ANSWER_LIMIT_REACHED:
     "This workspace already has 30 saved answers. Finish this application to start another.",
   AI_PROVIDER_FAILED:
@@ -1192,106 +1227,28 @@ export function ApplicationOverlay() {
                         </p>
                       )}
                     </div>
-                    {(draft.alerts.length > 0 || draft.alertsTruncated) && (
-                      <div className="application-alerts">
+                    {draft.alerts.length > 0 && (
+                      <section
+                        className="application-alerts"
+                        aria-label="Qualification alerts"
+                      >
+                        <h2>Qualification gaps</h2>
+                        <p className="application-note">
+                          Based on your published resume.
+                        </p>
+                        <ul className="application-alert-list">
+                          {draft.alerts.map((alert) => (
+                            <li key={alert.id} className="application-alert">
+                              {qualificationPoint(alert)}
+                            </li>
+                          ))}
+                        </ul>
                         {draft.alertsTruncated && (
-                          <p>
-                            More alert candidates were returned than this
-                            workspace can show. Review the job description
-                            directly for any remaining required qualifications.
+                          <p className="application-note">
+                            Showing up to 10 qualification gaps.
                           </p>
                         )}
-                        <div className="application-row">
-                          <h2>Required Qualification Alerts</h2>
-                          <button
-                            type="button"
-                            className="application-secondary"
-                            onClick={() =>
-                              update((current) => ({
-                                ...current,
-                                ignoreAllAlerts: !current.ignoreAllAlerts,
-                              }))
-                            }
-                          >
-                            {draft.ignoreAllAlerts
-                              ? "Show alerts"
-                              : "Ignore all"}
-                          </button>
-                        </div>
-                        {!draft.ignoreAllAlerts &&
-                          draft.alerts
-                            .filter(
-                              (alert) =>
-                                !draft.dismissedAlertIds.includes(alert.id),
-                            )
-                            .map((alert) => (
-                              <article
-                                key={alert.id}
-                                className="application-alert"
-                              >
-                                <strong>{alert.requirement}</strong>
-                                <p>
-                                  {alert.kind === "not_found"
-                                    ? "Not found in your published resume"
-                                    : "Confirmed mismatch"}
-                                </p>
-                                <blockquote>{alert.jobExcerpt}</blockquote>
-                                {alert.resumeEvidence && (
-                                  <p>
-                                    Resume evidence:{" "}
-                                    {alert.resumeEvidence.value}
-                                  </p>
-                                )}
-                                <button
-                                  type="button"
-                                  className="application-secondary"
-                                  onClick={() =>
-                                    update((current) => ({
-                                      ...current,
-                                      dismissedAlertIds: [
-                                        ...current.dismissedAlertIds,
-                                        alert.id,
-                                      ],
-                                    }))
-                                  }
-                                >
-                                  Dismiss
-                                </button>
-                              </article>
-                            ))}
-                        {!draft.ignoreAllAlerts &&
-                          draft.dismissedAlertIds.length > 0 && (
-                            <div>
-                              <h3>Dismissed alerts</h3>
-                              {draft.alerts
-                                .filter((alert) =>
-                                  draft.dismissedAlertIds.includes(alert.id),
-                                )
-                                .map((alert) => (
-                                  <button
-                                    key={alert.id}
-                                    type="button"
-                                    className="application-secondary"
-                                    onClick={() =>
-                                      update((current) => ({
-                                        ...current,
-                                        dismissedAlertIds:
-                                          current.dismissedAlertIds.filter(
-                                            (id) => id !== alert.id,
-                                          ),
-                                      }))
-                                    }
-                                  >
-                                    Reopen {alert.requirement}
-                                  </button>
-                                ))}
-                            </div>
-                          )}
-                        <p>
-                          Advisory only. These alerts do not prevent editing or
-                          export.
-                        </p>
-                      </div>
+                      </section>
                     )}
 
                     <label>

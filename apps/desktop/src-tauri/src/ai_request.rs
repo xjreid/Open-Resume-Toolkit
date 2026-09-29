@@ -240,7 +240,9 @@ fn category(status: reqwest::StatusCode) -> &'static str {
 
 fn provider_failure(status: reqwest::StatusCode) -> (&'static str, bool) {
     match status.as_u16() {
+        400 => ("AI_PROVIDER_BAD_REQUEST", false),
         401 | 403 => ("AI_AUTHENTICATION_FAILED", false),
+        404 => ("AI_MODEL_UNAVAILABLE", false),
         429 => ("AI_RATE_LIMITED", true),
         503 => ("AI_PROVIDER_SERVICE_UNAVAILABLE", true),
         500..=599 => ("AI_PROVIDER_TEMPORARY", true),
@@ -299,6 +301,17 @@ impl SyntheticStreamState {
             }
         }
         state
+    }
+    fn material_error(&self, requested_model: &str) -> Option<&'static str> {
+        if self.failed || self.text.len() > 512 * 1024 {
+            Some("AI_OUTPUT_INVALID")
+        } else if !self.finished {
+            Some("AI_OUTPUT_INCOMPLETE")
+        } else if self.effective_model.as_deref() != Some(requested_model) {
+            Some("AI_MODEL_MISMATCH")
+        } else {
+            None
+        }
     }
     fn valid(&self, requested_model: &str) -> bool {
         let json_ok = serde_json::from_str::<Value>(&self.text)
@@ -1001,10 +1014,188 @@ pub async fn test_ai_connection(
     })
 }
 
+fn material_schema_bytes(
+    provider: Provider,
+    operation: OperationType,
+) -> Result<usize, &'static str> {
+    if !matches!(
+        operation,
+        OperationType::TailorResume | OperationType::RefineResume
+    ) {
+        return Ok(0);
+    }
+    let schema = match provider {
+        Provider::OpenAi => ort_ai::materials::resume_output_schema(),
+        Provider::Gemini => ort_ai::materials::gemini_resume_output_schema(),
+        Provider::Anthropic => return Ok(0),
+    };
+    serde_json::to_vec(&schema)
+        .map(|bytes| bytes.len())
+        .map_err(|_| "AI_INPUT_INVALID")
+}
+
 #[cfg(test)]
 #[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn material_failures_distinguish_completion_model_and_format() {
+        let mut output = SyntheticStreamState::default();
+        assert_eq!(
+            output.material_error("gemini-3.6-flash"),
+            Some("AI_OUTPUT_INCOMPLETE")
+        );
+        output.finished = true;
+        assert_eq!(
+            output.material_error("gemini-3.6-flash"),
+            Some("AI_MODEL_MISMATCH")
+        );
+        output.effective_model = Some("gemini-3.6-flash".into());
+        assert_eq!(output.material_error("gemini-3.6-flash"), None);
+        output.failed = true;
+        assert_eq!(
+            output.material_error("gemini-3.6-flash"),
+            Some("AI_OUTPUT_INVALID")
+        );
+    }
+
+    #[test]
+    fn material_cap_reservations_include_both_provider_schemas() {
+        for provider in [Provider::OpenAi, Provider::Gemini] {
+            for operation in [OperationType::TailorResume, OperationType::RefineResume] {
+                let bytes = material_schema_bytes(provider, operation).unwrap();
+                assert!(bytes > 1000);
+                let key = ApiKey::new(b"SYNTHETIC_SECRET_VALUE").unwrap();
+                let request = NormalizedRequest {
+                    operation,
+                    model: "gemini-3.6-flash".into(),
+                    system: "JSON".into(),
+                    input: json!({}),
+                    max_output_tokens: 6000,
+                };
+                let built = adapter(provider).build_request(&request, &key).unwrap();
+                let body: Value = serde_json::from_slice(&built.body).unwrap();
+                let schema = match provider {
+                    Provider::OpenAi => &body["text"]["format"]["schema"],
+                    Provider::Gemini => {
+                        &body["generationConfig"]["responseFormat"]["text"]["schema"]
+                    }
+                    Provider::Anthropic => unreachable!(),
+                };
+                assert_eq!(bytes, serde_json::to_vec(schema).unwrap().len());
+            }
+            assert_eq!(
+                material_schema_bytes(provider, OperationType::CoverLetter).unwrap(),
+                0
+            );
+        }
+    }
+
+    fn resume_stream_fixture(provider: Provider, text: &str, split: usize) -> String {
+        use std::fmt::Write;
+        let (first, last) = text.split_at(split);
+        let values = match provider {
+            Provider::OpenAi => vec![
+                json!({"type":"response.created","response":{"model":"fixture-model"}}),
+                json!({"type":"response.output_text.delta","delta":first}),
+                json!({"type":"response.output_text.delta","delta":last}),
+                json!({"type":"response.completed","response":{"usage":{"input_tokens":20,"output_tokens":100}}}),
+            ],
+            Provider::Anthropic => vec![
+                json!({"type":"message_start","message":{"model":"fixture-model","usage":{"input_tokens":20,"output_tokens":0}}}),
+                json!({"type":"content_block_delta","delta":{"text":first}}),
+                json!({"type":"content_block_delta","delta":{"text":last}}),
+                json!({"type":"message_delta","usage":{"output_tokens":100}}),
+                json!({"type":"message_stop"}),
+            ],
+            Provider::Gemini => vec![
+                json!({"modelVersion":"gemini-3.6-flash","candidates":[{"content":{"parts":[{"thought":true,"text":"private reasoning"},{"text":first}]}}]}),
+                json!({"modelVersion":"gemini-3.6-flash","candidates":[{"content":{"parts":[{"text":last}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":20,"candidatesTokenCount":100,"thoughtsTokenCount":10}}),
+            ],
+        };
+        values.iter().fold(String::new(), |mut raw, value| {
+            write!(raw, "data: {value}\n\n").unwrap();
+            raw
+        })
+    }
+
+    #[test]
+    fn all_provider_streams_apply_header_free_resume_consistently() {
+        use ort_domain::{
+            Bullet, EntityId, NamedField, ResumeDocument, ResumeEntry, ResumeSection,
+        };
+        let mut source = ResumeDocument::empty("Master");
+        source.contact.full_name = "Alex Rivera".into();
+        let section_id = EntityId::new();
+        let entry_id = EntityId::new();
+        source.sections.push(ResumeSection {
+            id: section_id,
+            order: 0,
+            heading: "Experience".into(),
+            entries: vec![ResumeEntry {
+                id: entry_id,
+                order: 0,
+                heading: "North Co".into(),
+                subheading: "Engineer".into(),
+                date_range: "2021 - 2024".into(),
+                dates: None,
+                location: "Boston".into(),
+                fields: vec![NamedField {
+                    id: EntityId::new(),
+                    order: 0,
+                    label: "Technologies".into(),
+                    value: "Rust, SQL".into(),
+                    is_skill: true,
+                }],
+                bullets: vec![Bullet {
+                    id: EntityId::new(),
+                    order: 0,
+                    text: "Built Rust tools for support teams.".into(),
+                }],
+                links: vec![],
+            }],
+        });
+        let text = json!({"schemaVersion":5,"tailoringPlan":["Emphasize Rust support tools for the tooling role."],"roleInfo":null,"alerts":[],
+            "templateSections":[{"sectionId":section_id,"entries":[{"entryId":entry_id,"sourceEntryIds":[entry_id],"mainInfo":{"format":"bullets","items":["Developed Rust tools for support teams."]}}]}]}).to_string();
+        let mut expected = None;
+        for provider in [Provider::OpenAi, Provider::Anthropic, Provider::Gemini] {
+            let model = if provider == Provider::Gemini {
+                "gemini-3.6-flash"
+            } else {
+                "fixture-model"
+            };
+            for split in [1, text.len() / 2, text.len() - 1] {
+                let raw = resume_stream_fixture(provider, &text, split);
+                let output = SyntheticStreamState::from_events(
+                    adapter(provider).parse_stream(raw.as_bytes()).unwrap(),
+                );
+                assert_eq!(output.material_error(model), None);
+                assert_eq!(output.text, text);
+                let material = ort_ai::materials::validate_template_tailoring(
+                    &source,
+                    "Rust tooling role",
+                    &output.text,
+                    1,
+                )
+                .unwrap();
+                assert_eq!(
+                    material.resume.sections[0].entries[0].fields,
+                    source.sections[0].entries[0].fields
+                );
+                assert_eq!(
+                    material.resume.sections[0].entries[0].date_range,
+                    "2021 - 2024"
+                );
+                let context = ort_ai::materials::resume_context(&material.resume);
+                if let Some(expected) = &expected {
+                    assert_eq!(&context, expected);
+                } else {
+                    expected = Some(context);
+                }
+            }
+        }
+    }
 
     #[test]
     fn provider_failures_preserve_retryable_server_status() {
@@ -1018,7 +1209,11 @@ mod tests {
         );
         assert_eq!(
             provider_failure(reqwest::StatusCode::BAD_REQUEST),
-            ("AI_PROVIDER_FAILED", false)
+            ("AI_PROVIDER_BAD_REQUEST", false)
+        );
+        assert_eq!(
+            provider_failure(reqwest::StatusCode::NOT_FOUND),
+            ("AI_MODEL_UNAVAILABLE", false)
         );
         assert_eq!(
             provider_failure(reqwest::StatusCode::UNAUTHORIZED),
@@ -1210,20 +1405,8 @@ pub(crate) async fn execute_material<T>(
     if input_bytes.len() > 100_000 || system.len() > 12_000 {
         return Err("AI_INPUT_INVALID");
     }
-    // A byte is an upper bound on text token count for these request bytes.
-    // OpenAI includes the strict output schema in the request for resume drafts,
-    // so reserve for it too instead of understating a capped attempt.
-    let schema_bytes = if provider == Provider::OpenAi
-        && matches!(
-            operation,
-            OperationType::TailorResume | OperationType::RefineResume
-        ) {
-        serde_json::to_vec(&ort_ai::materials::resume_output_schema())
-            .map_err(|_| "AI_INPUT_INVALID")?
-            .len()
-    } else {
-        0
-    };
+    // Include provider output schemas in the spending-cap reservation.
+    let schema_bytes = material_schema_bytes(provider, operation)?;
     let input_bound = u32::try_from(
         input_bytes
             .len()
@@ -1415,15 +1598,11 @@ pub(crate) async fn execute_material<T>(
         }
     };
     let output = SyntheticStreamState::from_events(events);
-    if output.failed
-        || output.effective_model.as_deref() != Some(entry.model.as_str())
-        || !output.finished
-        || output.text.len() > 512 * 1024
-    {
+    if let Some(code) = output.material_error(&entry.model) {
         if !fail(AiTerminalStatus::Failed, "invalid_output") {
             return Err("STORAGE_UNAVAILABLE");
         }
-        return Err("AI_OUTPUT_INVALID");
+        return Err(code);
     }
     let cost = output
         .usage
@@ -1450,5 +1629,5 @@ pub(crate) async fn execute_material<T>(
             })
         })
         .map_err(|_| "STORAGE_UNAVAILABLE")?;
-    validated.map_err(|()| "AI_OUTPUT_INVALID")
+    validated.map_err(|()| "AI_MATERIAL_INVALID")
 }

@@ -112,7 +112,7 @@ const expectedVisibleText = (source, documentStyle) => {
   for (const section of source.sections) {
     if (!section.entries.length) continue;
     add(
-      documentStyle === "modern"
+      documentStyle === "technical" || documentStyle === "modern"
         ? section.heading.toUpperCase()
         : section.heading,
     );

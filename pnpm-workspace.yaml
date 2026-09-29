@@ -1,3 +1,7 @@
 packages:
   - apps/*
   - packages/*
+
+# Patched WebSocket decompression handling (GHSA-3wwx-pv8p-q78v).
+overrides:
+  jsdom>undici: 8.10.2

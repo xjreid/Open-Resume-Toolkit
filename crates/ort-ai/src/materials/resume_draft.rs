@@ -1,4 +1,4 @@
-//! Editorial freedom within the existing seven-region resume template.
+//! Body-only editing and reordering within the existing resume template.
 //! Source references establish provenance, not proof of generated claims.
 use std::collections::HashSet;
 
@@ -25,22 +25,15 @@ struct TemplateResponse {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct TemplateSection {
-    section_id: Option<EntityId>,
-    heading: String,
+    section_id: EntityId,
     entries: Vec<TemplateEntry>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct TemplateEntry {
-    entry_id: Option<EntityId>,
+    entry_id: EntityId,
     source_entry_ids: Vec<EntityId>,
-    title: String,
-    role: String,
-    details: String,
-    date: String,
-    location: String,
-    extra: String,
     main_info: MainInfo,
 }
 
@@ -72,7 +65,29 @@ fn date_text(entry: &ResumeEntry) -> String {
         .join("\n")
 }
 
-/// Presents editable regions in the same vocabulary as the output contract.
+fn details_text(entry: &ResumeEntry) -> String {
+    entry
+        .fields
+        .iter()
+        .filter(|field| {
+            field.label != PARAGRAPH && !field.label.trim().eq_ignore_ascii_case("extra")
+        })
+        .map(|field| field.value.as_str())
+        .collect::<Vec<_>>()
+        .join(" | ")
+}
+
+fn extra_text(entry: &ResumeEntry) -> String {
+    entry
+        .fields
+        .iter()
+        .filter(|field| field.label.trim().eq_ignore_ascii_case("extra"))
+        .map(|field| field.value.as_str())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Presents protected headers and editable bodies in the output vocabulary.
 /// Keeps every source field and link available as evidence, including fields
 /// not currently visible in the template. Internal ordering/UUID metadata for
 /// bullets, dates, and links is not relevant to the model's editing task.
@@ -89,10 +104,10 @@ pub fn resume_context(document: &ResumeDocument) -> Value {
                     "entryId": entry.id,
                     "title": entry.heading,
                     "role": entry.subheading,
-                    "details": entry.fields.iter().filter(|field| field.label != PARAGRAPH && !field.label.trim().eq_ignore_ascii_case("extra")).map(|field| field.value.as_str()).collect::<Vec<_>>().join(" | "),
+                    "details": details_text(entry),
                     "date": date_text(entry),
                     "location": entry.location,
-                    "extra": entry.fields.iter().filter(|field| field.label.trim().eq_ignore_ascii_case("extra")).map(|field| field.value.as_str()).collect::<Vec<_>>().join("\n"),
+                    "extra": extra_text(entry),
                     "mainInfo": match paragraph.filter(|field| !field.value.trim().is_empty()) {
                         Some(field) => json!({"format":"paragraph","items":[field.value]}),
                         None => json!({"format":"bullets","items":entry.bullets.iter().map(|bullet| &bullet.text).collect::<Vec<_>>()})
@@ -129,37 +144,10 @@ fn field(fields: &mut Vec<NamedField>, label: &str, value: &str) -> Result<(), M
     Ok(())
 }
 
-// Models sometimes return null for a retained entry. Recover an unambiguous
-// unchanged identity so that doing so cannot silently drop its links or typed
-// dates. A genuinely derived summary/skills entry has a different identity.
-fn retained_id(
-    draft: &TemplateEntry,
-    source: &ResumeDocument,
-    baseline: &ResumeDocument,
-) -> Result<Option<EntityId>, MaterialError> {
-    if draft.entry_id.is_some() || (draft.title.trim().is_empty() && draft.role.trim().is_empty()) {
-        return Ok(draft.entry_id);
-    }
-    let candidates: HashSet<_> = entries(baseline)
-        .chain(entries(source))
-        .filter(|entry| {
-            entry.heading.trim() == draft.title.trim()
-                && entry.subheading.trim() == draft.role.trim()
-                && entry.location.trim() == draft.location.trim()
-                && date_text(entry).trim() == draft.date.trim()
-        })
-        .map(|entry| entry.id)
-        .collect();
-    if candidates.len() > 1 {
-        return Err(MaterialError::Invalid);
-    }
-    Ok(candidates.into_iter().next())
-}
-
 fn materialize_entry(
     draft: TemplateEntry,
     source: &ResumeDocument,
-    baseline: &ResumeDocument,
+    section: &ResumeSection,
     index: usize,
     used_entries: &mut HashSet<EntityId>,
 ) -> Result<ResumeEntry, MaterialError> {
@@ -169,29 +157,28 @@ fn materialize_entry(
             .source_entry_ids
             .iter()
             .any(|id| !anchors.insert(*id) || !entries(source).any(|entry| entry.id == *id))
+        || !used_entries.insert(draft.entry_id)
+        || (entries(source).any(|entry| entry.id == draft.entry_id)
+            && !anchors.contains(&draft.entry_id))
     {
         return Err(MaterialError::Invalid);
     }
-    let entry_id = retained_id(&draft, source, baseline)?;
-    let original = match entry_id {
-        Some(id) => {
-            if !used_entries.insert(id)
-                || (entries(source).any(|entry| entry.id == id) && !anchors.contains(&id))
-            {
-                return Err(MaterialError::Invalid);
-            }
-            Some(
-                entries(baseline)
-                    .chain(entries(source))
-                    .find(|entry| entry.id == id)
-                    .ok_or(MaterialError::Invalid)?,
-            )
-        }
-        None => None,
-    };
-    let mut fields = Vec::new();
-    field(&mut fields, "Details", &draft.details)?;
-    field(&mut fields, "Extra", &draft.extra)?;
+    let original = section
+        .entries
+        .iter()
+        .find(|entry| entry.id == draft.entry_id)
+        .ok_or(MaterialError::Invalid)?;
+    // Headers are read-only input. Never ask the model to reproduce them:
+    // copy original fields, dates, links, and identities locally.
+    let mut fields: Vec<_> = original
+        .fields
+        .iter()
+        .filter(|field| field.label != PARAGRAPH)
+        .cloned()
+        .collect();
+    for (index, field) in fields.iter_mut().enumerate() {
+        field.order = order(index)?;
+    }
     let mut bullets = Vec::new();
     if draft
         .main_info
@@ -215,31 +202,11 @@ fn materialize_entry(
             }
         }
     }
-    // Retain structured date identities/precision if the displayed date is
-    // unchanged. An intentional edit occupies the existing free-text date slot.
-    let unchanged_date = original.filter(|entry| date_text(entry) == draft.date.trim());
     let item = ResumeEntry {
-        id: entry_id.unwrap_or_default(),
         order: order(index)?,
-        heading: draft.title.trim().into(),
-        subheading: draft.role.trim().into(),
-        date_range: unchanged_date.map_or_else(
-            || draft.date.trim().into(),
-            |entry| entry.date_range.clone(),
-        ),
-        dates: if baseline.schema_version == 2 {
-            Some(
-                unchanged_date
-                    .and_then(|entry| entry.dates.clone())
-                    .unwrap_or_default(),
-            )
-        } else {
-            None
-        },
-        location: draft.location.trim().into(),
         fields,
         bullets,
-        links: original.map_or_else(Vec::new, |entry| entry.links.clone()),
+        ..original.clone()
     };
     if item.heading.is_empty()
         && item.subheading.is_empty()
@@ -260,7 +227,7 @@ pub(super) fn validate(
 ) -> Result<TailoredMaterial, MaterialError> {
     let proposed: TemplateResponse =
         serde_json::from_value(value).map_err(|_| MaterialError::Invalid)?;
-    if proposed.schema_version != 4 {
+    if proposed.schema_version != 5 {
         return Err(MaterialError::Version);
     }
     let change_points = validate_plan(proposed.tailoring_plan)?;
@@ -276,6 +243,7 @@ pub(super) fn validate(
             .is_some_and(|info| !info.valid())
         || proposed.template_sections.is_empty()
         || proposed.template_sections.len() > limits.sections
+        || proposed.template_sections.len() > baseline.sections.len()
     {
         return Err(MaterialError::Invalid);
     }
@@ -285,18 +253,19 @@ pub(super) fn validate(
     let mut used_entries = HashSet::new();
     let mut entry_count = 0;
     for (index, section) in proposed.template_sections.into_iter().enumerate() {
-        if let Some(id) = section.section_id
-            && (!used_sections.insert(id)
-                || !baseline
-                    .sections
-                    .iter()
-                    .chain(&source.sections)
-                    .any(|section| section.id == id))
-        {
+        if !used_sections.insert(section.section_id) {
+            return Err(MaterialError::Invalid);
+        }
+        let original = baseline
+            .sections
+            .iter()
+            .find(|value| value.id == section.section_id)
+            .ok_or(MaterialError::Invalid)?;
+        if section.entries.len() > original.entries.len() {
             return Err(MaterialError::Invalid);
         }
         entry_count += section.entries.len();
-        if section.entries.is_empty() || entry_count > limits.entries {
+        if entry_count > limits.entries {
             return Err(MaterialError::Invalid);
         }
         let entries = section
@@ -304,13 +273,13 @@ pub(super) fn validate(
             .into_iter()
             .enumerate()
             .map(|(index, entry)| {
-                materialize_entry(entry, source, baseline, index, &mut used_entries)
+                materialize_entry(entry, source, original, index, &mut used_entries)
             })
             .collect::<Result<Vec<_>, _>>()?;
         resume.sections.push(ResumeSection {
-            id: section.section_id.unwrap_or_default(),
+            id: section.section_id,
             order: order(index)?,
-            heading: section.heading.trim().into(),
+            heading: original.heading.clone(),
             entries,
         });
     }
@@ -329,7 +298,7 @@ pub(super) fn validate(
 }
 
 fn validate_plan(plan: Vec<String>) -> Result<Vec<String>, MaterialError> {
-    if plan.len() != 3 {
+    if !(1..=3).contains(&plan.len()) {
         return Err(MaterialError::Invalid);
     }
     let mut unique = HashSet::new();
@@ -367,14 +336,12 @@ fn object(properties: &Value) -> Value {
 #[must_use]
 pub fn resume_output_schema() -> Value {
     let text = json!({"type":"string"});
-    let id = json!({"type":["string","null"]});
+    let id = json!({"type":"string"});
     let entry = object(&json!({
         "entryId":id,"sourceEntryIds":{"type":"array","items":text},
-        "title":text,"role":text,"details":text,"date":text,"location":text,"extra":text,
         "mainInfo":object(&json!({"format":{"type":"string","enum":["bullets","paragraph"]},"items":{"type":"array","items":text}}))
     }));
-    let section =
-        object(&json!({"sectionId":id,"heading":text,"entries":{"type":"array","items":entry}}));
+    let section = object(&json!({"sectionId":id,"entries":{"type":"array","items":entry}}));
     let role = object(&json!({"company":text,"title":text,"location":text}));
     let evidence = object(&json!({"fieldId":text,"value":text}));
     let alert = object(&json!({
@@ -383,8 +350,34 @@ pub fn resume_output_schema() -> Value {
         "requirement":text,"target":text,"jobExcerpt":text,"resumeEvidence":{"anyOf":[evidence,{"type":"null"}]}
     }));
     object(
-        &json!({"schemaVersion":{"type":"integer","enum":[4]},"tailoringPlan":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"string","minLength":1,"maxLength":500}},"roleInfo":{"anyOf":[role,{"type":"null"}]},"templateSections":{"type":"array","items":section},"alerts":{"type":"array","items":alert}}),
+        &json!({"schemaVersion":{"type":"integer","enum":[5]},"tailoringPlan":{"type":"array","minItems":1,"maxItems":3,"items":{"type":"string","minLength":1,"maxLength":500}},"roleInfo":{"anyOf":[role,{"type":"null"}]},"templateSections":{"type":"array","items":section},"alerts":{"type":"array","maxItems":10,"items":alert}}),
     )
+}
+
+/// Gemini supports the shared JSON schema except string length constraints;
+/// keep those checks local and omit unsupported provider keywords.
+#[must_use]
+pub fn gemini_resume_output_schema() -> Value {
+    fn supported(value: &mut Value) {
+        match value {
+            Value::Object(object) => {
+                object.remove("minLength");
+                object.remove("maxLength");
+                for child in object.values_mut() {
+                    supported(child);
+                }
+            }
+            Value::Array(items) => {
+                for child in items {
+                    supported(child);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut schema = resume_output_schema();
+    supported(&mut schema);
+    schema
 }
 
 #[cfg(test)]
@@ -433,22 +426,22 @@ mod tests {
     }
 
     fn proposal(source: &ResumeDocument) -> Value {
-        let entry = &source.sections[0].entries[0];
-        json!({"schemaVersion":4,"tailoringPlan":[
-            "Emphasize the role's tooling needs by leading with the published Rust support-tool work.",
-            "Give SQL reporting its own specific bullet to make the reporting experience easier to find.",
-            "Group the supported Rust and SQL skills beside the title and omit repeated technology lists."
-        ],"roleInfo":null,"alerts":[],"templateSections":[{
-            "sectionId":source.sections[0].id,"heading":"Relevant Experience","entries":[{
-                "entryId":entry.id,"sourceEntryIds":[entry.id],"title":"North Co","role":"Engineer",
-                "details":"Rust | SQL","date":date_text(entry),"location":"Boston","extra":"Support tools",
-                "mainInfo":{"format":"bullets","items":["Built Rust tools for the support team.","Maintained SQL reports to support the team's work."]}
-            }]
-        }]})
+        let context = resume_context(source);
+        json!({"schemaVersion":5,"tailoringPlan":[
+            "Emphasize tooling needs by leading with the published Rust support-tool work.",
+            "Make the SQL reporting experience easier to find in a specific body bullet.",
+            "Keep the published experience context while condensing repeated body details."
+        ],"roleInfo":null,"alerts":[],"templateSections":context["sections"].as_array().unwrap().iter().map(|section| {
+            json!({"sectionId":section["sectionId"],
+                "entries":section["entries"].as_array().unwrap().iter().map(|entry| {
+                    json!({"entryId":entry["entryId"],"sourceEntryIds":[entry["entryId"]],
+                        "mainInfo":{"format":"bullets","items":["Built Rust tools for the support team.","Maintained SQL reports to support the team's work."]}})
+                }).collect::<Vec<_>>()})
+        }).collect::<Vec<_>>()})
     }
 
     #[test]
-    fn plan_is_required_bounded_and_contains_three_distinct_points() {
+    fn plan_is_required_bounded_and_contains_one_to_three_distinct_points() {
         let source = source();
         let valid = proposal(&source);
         let mut missing = valid.clone();
@@ -456,7 +449,6 @@ mod tests {
         assert!(validate_tailoring(&source, "Engineer", &missing.to_string(), 1).is_err());
         for invalid in [
             json!([]),
-            json!(["One", "Two"]),
             json!(["One", "Two", "Three", "Four"]),
             json!(["One", " ", "Three"]),
             json!(["One", " one ", "Three"]),
@@ -471,6 +463,18 @@ mod tests {
             assert!(validate_tailoring(&source, "Engineer", &draft.to_string(), 1).is_err());
             assert!(
                 validate_refinement(&source, &source, "Engineer", &draft.to_string(), 1).is_err()
+            );
+        }
+        for count in 1..=3 {
+            let mut draft = valid.clone();
+            draft["tailoringPlan"]
+                .as_array_mut()
+                .unwrap()
+                .truncate(count);
+            let result = validate_tailoring(&source, "Engineer", &draft.to_string(), 1).unwrap();
+            assert_eq!(result.change_points.len(), count);
+            assert!(
+                validate_refinement(&source, &source, "Engineer", &draft.to_string(), 1).is_ok()
             );
         }
         let mut padded = valid.clone();
@@ -495,7 +499,6 @@ mod tests {
         // Rust was intentionally omitted from this output, but it remains in
         // the full master and must not become a missing-qualification alert.
         let entry = &mut draft["templateSections"][0]["entries"][0];
-        entry["details"] = json!("SQL");
         entry["mainInfo"] =
             json!({"format":"bullets","items":["Maintained SQL reports for the support team."]});
         draft["alerts"] = json!([
@@ -526,7 +529,7 @@ mod tests {
     }
 
     #[test]
-    fn seven_regions_materialize_without_changing_template_or_identity() {
+    fn body_edit_preserves_protected_fields_and_identity() {
         let source = source();
         let result = validate_tailoring(
             &source,
@@ -538,14 +541,7 @@ mod tests {
         let entry = &result.resume.sections[0].entries[0];
         assert_eq!(entry.heading, "North Co");
         assert_eq!(entry.subheading, "Engineer");
-        assert_eq!(
-            entry
-                .fields
-                .iter()
-                .map(|field| (field.label.as_str(), field.value.as_str()))
-                .collect::<Vec<_>>(),
-            vec![("Details", "Rust | SQL"), ("Extra", "Support tools")]
-        );
+        assert_eq!(entry.fields, source.sections[0].entries[0].fields);
         assert_eq!(entry.date_range, "2021–2024");
         assert_eq!(entry.location, "Boston");
         assert_eq!(entry.bullets.len(), 2);
@@ -557,87 +553,241 @@ mod tests {
     }
 
     #[test]
-    fn derived_summary_and_regrouped_entries_fit_existing_template() {
+    fn new_sections_entries_and_renamed_headings_are_rejected() {
         let source = source();
-        let mut draft = proposal(&source);
-        let mut summary = draft["templateSections"][0].clone();
-        summary["sectionId"] = Value::Null;
-        summary["heading"] = json!("Profile");
-        let entry = &mut summary["entries"][0];
-        entry["entryId"] = Value::Null;
-        for slot in ["title", "role", "details", "date", "location", "extra"] {
-            entry[slot] = json!("");
+        for (target, key, value) in [
+            ("section", "sectionId", Value::Null),
+            ("section", "sectionId", json!(EntityId::new())),
+            ("section", "heading", json!("Profile")),
+            ("entry", "entryId", Value::Null),
+            ("entry", "entryId", json!(EntityId::new())),
+        ] {
+            let mut draft = proposal(&source);
+            let section = &mut draft["templateSections"][0];
+            if target == "section" {
+                section[key] = value;
+            } else {
+                section["entries"][0][key] = value;
+            }
+            assert!(validate_tailoring(&source, "Engineer", &draft.to_string(), 1).is_err());
+            assert!(
+                validate_refinement(&source, &source, "Engineer", &draft.to_string(), 1).is_err()
+            );
         }
-        entry["mainInfo"] = json!({"format":"paragraph","items":["Engineer with experience building Rust tools and maintaining SQL reports for support teams."]});
-        draft["templateSections"]
-            .as_array_mut()
-            .unwrap()
-            .insert(0, summary);
-        // A retained experience may move into a new section.
-        draft["templateSections"][1]["sectionId"] = Value::Null;
-        let result =
-            validate_tailoring(&source, "Support engineer", &draft.to_string(), 1).unwrap();
-        assert_eq!(result.resume.sections.len(), 2);
-        let summary = &result.resume.sections[0].entries[0];
-        assert!(summary.bullets.is_empty());
-        assert_eq!(summary.fields[0].label, PARAGRAPH);
-        assert!(summary.links.is_empty());
-        assert_ne!(summary.id, source.sections[0].entries[0].id);
-        assert_eq!(
-            result.resume.sections[1].entries[0].id,
-            source.sections[0].entries[0].id
-        );
     }
 
     #[test]
-    fn refinements_keep_current_only_ids_dates_contact_links_and_reviewed_text() {
-        let source = source().upgraded_v2().unwrap();
-        let mut first = proposal(&source);
-        first["templateSections"][0]["sectionId"] = Value::Null;
-        first["templateSections"][0]["entries"][0]["entryId"] = Value::Null;
-        first["templateSections"][0]["entries"][0]["title"] = json!("Tools and reporting");
-        first["templateSections"][0]["entries"][0]["role"] = json!("");
-        let mut current = validate_tailoring(&source, "Support engineer", &first.to_string(), 1)
+    fn multiple_details_and_extra_fields_keep_labels_flags_ids_and_whitespace() {
+        let mut source = source();
+        let entry = &mut source.sections[0].entries[0];
+        entry.heading = "  North Co  ".into();
+        entry.fields.extend([
+            NamedField {
+                id: EntityId::new(),
+                order: 1,
+                label: "Focus".into(),
+                value: "  Support tooling  ".into(),
+                is_skill: false,
+            },
+            NamedField {
+                id: EntityId::new(),
+                order: 2,
+                label: " Extra ".into(),
+                value: "Rust, SQL".into(),
+                is_skill: true,
+            },
+            NamedField {
+                id: EntityId::new(),
+                order: 3,
+                label: "EXTRA".into(),
+                value: "  Internal platform  ".into(),
+                is_skill: false,
+            },
+        ]);
+        let draft = proposal(&source);
+        let result = validate_tailoring(&source, "Engineer", &draft.to_string(), 1)
             .unwrap()
             .resume;
-        current.contact.phone = "555-0100".into();
-        let entry = &mut current.sections[0].entries[0];
-        entry.heading = "Reviewed title".into();
-        entry.bullets[0].text = "Reviewed, specific wording about Rust tools.".into();
-        entry.links = source.sections[0].entries[0].links.clone();
-        let context = resume_context(&current);
-        let mut next = proposal(&source);
-        next["templateSections"][0]["sectionId"] = json!(current.sections[0].id);
-        let next_entry = &mut next["templateSections"][0]["entries"][0];
-        next_entry["entryId"] = json!(current.sections[0].entries[0].id);
-        next_entry["title"] = context["sections"][0]["entries"][0]["title"].clone();
-        next_entry["mainInfo"] = context["sections"][0]["entries"][0]["mainInfo"].clone();
-        next_entry["extra"] = json!("Tools and reporting");
-        let result =
-            validate_refinement(&source, &current, "Support engineer", &next.to_string(), 1)
-                .unwrap()
-                .resume;
-        assert_eq!(result.sections[0].id, current.sections[0].id);
         assert_eq!(
-            result.sections[0].entries[0].id,
-            current.sections[0].entries[0].id
-        );
-        assert_eq!(result.sections[0].entries[0].heading, "Reviewed title");
-        assert_eq!(
-            result.sections[0].entries[0].bullets[0].text,
-            current.sections[0].entries[0].bullets[0].text
+            result.sections[0].entries[0].fields,
+            source.sections[0].entries[0].fields
         );
         assert_eq!(
-            result.sections[0].entries[0].links,
-            current.sections[0].entries[0].links
+            result.sections[0].entries[0].heading,
+            source.sections[0].entries[0].heading
         );
-        assert_eq!(result.contact, current.contact);
-        // Those IDs are valid only when refining that reviewed document.
-        assert!(validate_tailoring(&source, "Support engineer", &next.to_string(), 1).is_err());
+        let mut normalized = draft;
+        normalized["templateSections"][0]["entries"][0]["title"] = json!("North Co");
+        assert!(validate_tailoring(&source, "Engineer", &normalized.to_string(), 1).is_err());
     }
 
     #[test]
-    fn unchanged_structured_dates_keep_precision_and_edited_dates_do_not_duplicate() {
+    fn protected_regions_are_not_accepted_in_provider_output() {
+        let source = source();
+        for slot in ["title", "role", "details", "date", "location", "extra"] {
+            for changed in ["Changed", "", " "] {
+                let mut draft = proposal(&source);
+                draft["templateSections"][0]["entries"][0][slot] = json!(changed);
+                assert!(
+                    validate_tailoring(&source, "Engineer", &draft.to_string(), 1).is_err(),
+                    "{slot}"
+                );
+                assert!(
+                    validate_refinement(&source, &source, "Engineer", &draft.to_string(), 1)
+                        .is_err(),
+                    "{slot}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn refinements_keep_current_only_ids_and_user_reviewed_header_fields() {
+        let source = source().upgraded_v2().unwrap();
+        let mut current = source.clone();
+        current.sections[0].id = EntityId::new();
+        current.contact.phone = "555-0100".into();
+        let entry = &mut current.sections[0].entries[0];
+        entry.id = EntityId::new();
+        entry.heading = "Reviewed title".into();
+        entry.fields[0].value = "Reviewed skills".into();
+        entry.bullets[0].text = "Reviewed wording about Rust tools.".into();
+        entry.links[0].url = "https://example.com/reviewed".into();
+        let mut next = proposal(&current);
+        next["templateSections"][0]["entries"][0]["sourceEntryIds"] =
+            json!([source.sections[0].entries[0].id]);
+        next["templateSections"][0]["entries"][0]["mainInfo"] =
+            resume_context(&current)["sections"][0]["entries"][0]["mainInfo"].clone();
+        let result = validate_refinement(&source, &current, "Engineer", &next.to_string(), 1)
+            .unwrap()
+            .resume;
+        let mut expected = current.clone();
+        // Body bullet identities are regenerated; protected identities are retained.
+        for (actual, expected) in result.sections[0].entries[0]
+            .bullets
+            .iter()
+            .zip(&mut expected.sections[0].entries[0].bullets)
+        {
+            expected.id = actual.id;
+        }
+        assert_eq!(result, expected);
+        assert!(validate_tailoring(&source, "Engineer", &next.to_string(), 1).is_err());
+        // The published header cannot overwrite the user's reviewed header.
+        next["templateSections"][0]["entries"][0]["title"] =
+            json!(source.sections[0].entries[0].heading);
+        assert!(validate_refinement(&source, &current, "Engineer", &next.to_string(), 1).is_err());
+    }
+
+    #[test]
+    fn sections_and_entries_can_be_reordered_or_removed_but_not_transplanted() {
+        let mut document = source();
+        let second_entry = source().sections.remove(0).entries.remove(0);
+        document.sections[0].entries.push(ResumeEntry {
+            order: 1,
+            ..second_entry
+        });
+        let mut education = source().sections.remove(0);
+        education.order = 1;
+        education.heading = "Education".into();
+        document.sections.push(education);
+        let mut draft = proposal(&document);
+        draft["templateSections"].as_array_mut().unwrap().reverse();
+        draft["templateSections"][1]["entries"]
+            .as_array_mut()
+            .unwrap()
+            .reverse();
+        for result in [
+            validate_tailoring(&document, "Engineer", &draft.to_string(), 1).unwrap(),
+            validate_refinement(&document, &document, "Engineer", &draft.to_string(), 1).unwrap(),
+        ] {
+            assert_eq!(result.resume.sections[0].id, document.sections[1].id);
+            assert_eq!(
+                result.resume.sections[1].entries[0].id,
+                document.sections[0].entries[1].id
+            );
+            assert_eq!(result.resume.sections[0].order, 0);
+            assert_eq!(result.resume.sections[1].entries[0].order, 0);
+        }
+        let mut transplanted = draft.clone();
+        let moved = transplanted["templateSections"][1]["entries"][0].clone();
+        let previous = transplanted["templateSections"][0]["entries"][0].clone();
+        transplanted["templateSections"][0]["entries"][0] = moved;
+        transplanted["templateSections"][1]["entries"][0] = previous;
+        assert!(validate_tailoring(&document, "Engineer", &transplanted.to_string(), 1).is_err());
+        draft["templateSections"].as_array_mut().unwrap().remove(0);
+        draft["templateSections"][0]["entries"]
+            .as_array_mut()
+            .unwrap()
+            .remove(0);
+        for result in [
+            validate_tailoring(&document, "Engineer", &draft.to_string(), 1).unwrap(),
+            validate_refinement(&document, &document, "Engineer", &draft.to_string(), 1).unwrap(),
+        ] {
+            assert_eq!(result.resume.sections.len(), 1);
+            assert_eq!(result.resume.sections[0].entries.len(), 1);
+        }
+    }
+
+    #[test]
+    fn body_can_switch_between_paragraphs_and_bullets_without_altering_skills() {
+        let source = source();
+        let mut draft = proposal(&source);
+        draft["templateSections"][0]["entries"][0]["mainInfo"] =
+            json!({"format":"paragraph","items":["Built Rust tools.","Maintained SQL reports."]});
+        let paragraph = validate_tailoring(&source, "Engineer", &draft.to_string(), 1)
+            .unwrap()
+            .resume;
+        let entry = &paragraph.sections[0].entries[0];
+        assert_eq!(entry.fields[0], source.sections[0].entries[0].fields[0]);
+        assert_eq!(entry.fields[1].label, PARAGRAPH);
+        assert_eq!(
+            entry.fields[1].value,
+            "Built Rust tools.\n\nMaintained SQL reports."
+        );
+        assert!(entry.bullets.is_empty());
+        let bullets = validate_refinement(
+            &source,
+            &paragraph,
+            "Engineer",
+            &proposal(&paragraph).to_string(),
+            1,
+        )
+        .unwrap()
+        .resume;
+        assert_eq!(
+            bullets.sections[0].entries[0].fields,
+            source.sections[0].entries[0].fields
+        );
+        assert_eq!(bullets.sections[0].entries[0].bullets.len(), 2);
+    }
+
+    #[test]
+    fn overlay_contract_rejects_older_schemas_that_allow_header_field_removal() {
+        let source = source();
+        let draft = json!({"schemaVersion":2,"draftedSections":[{"sectionId":source.sections[0].id,
+            "entries":[{"entryId":source.sections[0].entries[0].id,"fieldIds":[],"bullets":[{"text":"Built tools."}]}]}],"alerts":[]});
+        assert!(
+            crate::materials::validate_template_tailoring(
+                &source,
+                "Engineer",
+                &draft.to_string(),
+                1
+            )
+            .is_err()
+        );
+        assert!(
+            crate::materials::validate_template_tailoring(
+                &source,
+                "Engineer",
+                &proposal(&source).to_string(),
+                1
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn structured_dates_keep_precision_and_reject_edits() {
         let mut source = source().upgraded_v2().unwrap();
         let entry = &mut source.sections[0].entries[0];
         entry.date_range.clear();
@@ -660,16 +810,12 @@ mod tests {
         );
         assert!(result.resume.sections[0].entries[0].date_range.is_empty());
         draft["templateSections"][0]["entries"][0]["date"] = json!("2021 – Present");
-        let result = validate_tailoring(&source, "Engineer", &draft.to_string(), 1).unwrap();
-        assert_eq!(
-            result.resume.sections[0].entries[0].date_range,
-            "2021 – Present"
-        );
-        assert_eq!(result.resume.sections[0].entries[0].dates, Some(vec![]));
+        assert!(validate_tailoring(&source, "Engineer", &draft.to_string(), 1).is_err());
+        assert!(validate_refinement(&source, &source, "Engineer", &draft.to_string(), 1).is_err());
     }
 
     #[test]
-    fn null_id_on_a_retained_refinement_recovers_reviewed_links_and_typed_dates() {
+    fn refinement_preserves_reviewed_links_and_typed_dates() {
         let source = source().upgraded_v2().unwrap();
         let mut current = source.clone();
         let entry = &mut current.sections[0].entries[0];
@@ -687,7 +833,6 @@ mod tests {
         }]);
         entry.links[0].url = "https://example.com/reviewed-work".into();
         let mut draft = proposal(&current);
-        draft["templateSections"][0]["entries"][0]["entryId"] = Value::Null;
         let result =
             validate_refinement(&source, &current, "Engineer", &draft.to_string(), 1).unwrap();
         let result_entry = &result.resume.sections[0].entries[0];
@@ -742,7 +887,7 @@ mod tests {
         missing_slot["templateSections"][0]["entries"][0]
             .as_object_mut()
             .unwrap()
-            .remove("role");
+            .remove("mainInfo");
         cases.push(missing_slot);
         for draft in cases {
             assert!(validate_tailoring(&source, "Engineer", &draft.to_string(), 1).is_err());
@@ -804,9 +949,9 @@ mod tests {
         check(&proposal(&source()), &resume_output_schema());
         let schema = resume_output_schema();
         let plan = &schema["properties"]["tailoringPlan"];
-        assert_eq!(plan["minItems"], 3);
+        assert_eq!(plan["minItems"], 1);
         assert_eq!(plan["maxItems"], 3);
         assert_eq!(plan["items"]["maxLength"], 500);
-        assert_eq!(schema["properties"]["schemaVersion"]["enum"], json!([4]));
+        assert_eq!(schema["properties"]["schemaVersion"]["enum"], json!([5]));
     }
 }

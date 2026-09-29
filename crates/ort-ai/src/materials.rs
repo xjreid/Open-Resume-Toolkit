@@ -2,7 +2,7 @@
 //! validation enforces response shape and document bounds, not factual truth.
 mod resume_draft;
 
-pub use resume_draft::{resume_context, resume_output_schema};
+pub use resume_draft::{gemini_resume_output_schema, resume_context, resume_output_schema};
 
 use std::collections::HashSet;
 
@@ -266,14 +266,14 @@ fn materialize_selection(
     Ok(resume)
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AlertKind {
     NotFound,
     ConfirmedMismatch,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AlertCategory {
     DegreeLevel,
@@ -311,6 +311,9 @@ pub struct QualificationAlert {
     pub kind: AlertKind,
     pub category: AlertCategory,
     pub requirement: String,
+    // Older saved workspaces did not retain the validated qualification target.
+    #[serde(default)]
+    pub target: String,
     pub job_excerpt: String,
     pub job_start: usize,
     pub job_end: usize,
@@ -338,6 +341,13 @@ fn source_text(source: &ResumeDocument) -> String {
         source.contact.phone.as_str(),
         source.contact.location.as_str(),
     ]);
+    facts.extend(
+        source
+            .contact
+            .links
+            .iter()
+            .flat_map(|link| [link.label.as_str(), link.url.as_str()]),
+    );
     for section in &source.sections {
         facts.push(&section.heading);
         for entry in &section.entries {
@@ -349,6 +359,12 @@ fn source_text(source: &ResumeDocument) -> String {
             ]);
             facts.extend(entry.fields.iter().map(|field| field.value.as_str()));
             facts.extend(entry.bullets.iter().map(|bullet| bullet.text.as_str()));
+            facts.extend(
+                entry
+                    .links
+                    .iter()
+                    .flat_map(|link| [link.label.as_str(), link.url.as_str()]),
+            );
         }
     }
     facts.join(" ").to_lowercase()
@@ -381,7 +397,7 @@ pub fn validate_tailoring(
     if value
         .get("schemaVersion")
         .and_then(serde_json::Value::as_u64)
-        == Some(4)
+        == Some(5)
     {
         return resume_draft::validate(source, source, job, value, published_revision);
     }
@@ -541,6 +557,20 @@ pub fn validate_tailoring(
     })
 }
 
+/// Validates the overlay's current body-only tailoring contract. Older response
+/// schemas are deliberately excluded so they cannot bypass its permissions.
+///
+/// # Errors
+/// Rejects malformed drafts, protected-field edits, and unsupported schemas.
+pub fn validate_template_tailoring(
+    source: &ResumeDocument,
+    job: &str,
+    raw: &str,
+    published_revision: i64,
+) -> Result<TailoredMaterial, MaterialError> {
+    validate_refinement(source, source, job, raw, published_revision)
+}
+
 /// Applies a complete refinement to the current reviewed draft. The published
 /// resume remains the factual source; current IDs, contact, dates and links
 /// remain available even for sections/entries introduced by earlier tailoring.
@@ -584,7 +614,7 @@ fn validate_alerts(
         let target = candidate.target.trim();
         if excerpt.is_empty()
             || excerpt.chars().count() > 500
-            || target.len() < 2
+            || !target.chars().any(char::is_alphanumeric)
             || target.len() > 100
             || candidate.requirement.is_empty()
             || candidate.requirement.chars().count() > 500
@@ -593,14 +623,12 @@ fn validate_alerts(
         }
         let excerpt_lc = excerpt.to_lowercase();
         let target_lc = target.to_lowercase();
-        let Some(job_start) = job.find(excerpt) else {
+        let Some((job_start, reason)) = required_job_excerpt(job, excerpt, &target_lc) else {
             continue;
         };
         let job_end = job_start + excerpt.len();
         if !contains_whole_phrase(&excerpt_lc, &target_lc)
             || !contains_whole_phrase(&candidate.requirement.to_lowercase(), &target_lc)
-            || !explicitly_required(&excerpt_lc)
-            || excluded_requirement(&excerpt_lc)
             || !category_matches(&candidate.category, &excerpt_lc, &target_lc, source)
         {
             continue;
@@ -664,10 +692,11 @@ fn validate_alerts(
             kind: candidate.kind,
             category: candidate.category,
             requirement: candidate.requirement,
+            target: target.to_owned(),
             job_excerpt: candidate.job_excerpt,
             job_start,
             job_end,
-            mandatory_reason: mandatory_reason(&excerpt_lc).to_owned(),
+            mandatory_reason: reason.to_owned(),
             resume_evidence: evidence,
             validation_version: MATERIALS_SCHEMA_VERSION,
             published_revision,
@@ -682,7 +711,7 @@ fn validate_alerts(
 fn mandatory_reason(text: &str) -> &'static str {
     if text.contains("required") {
         "explicit_required"
-    } else if text.contains("must have") || text.contains("must possess") {
+    } else if contains_whole_phrase(text, "must") {
         "must_have"
     } else if text.contains("minimum") {
         "minimum"
@@ -740,11 +769,22 @@ fn category_matches(
             ["portfolio", "work sample", "sample work"]
                 .iter()
                 .any(|word| excerpt.contains(word))
-                && source.contact.links.is_empty()
-                && source
-                    .sections
+                && !source
+                    .contact
+                    .links
                     .iter()
-                    .all(|section| section.entries.iter().all(|entry| entry.links.is_empty()))
+                    .chain(
+                        source
+                            .sections
+                            .iter()
+                            .flat_map(|section| &section.entries)
+                            .flat_map(|entry| &entry.links),
+                    )
+                    .any(|link| {
+                        ["portfolio", "work sample", "work samples", "sample work"]
+                            .iter()
+                            .any(|phrase| contains_whole_phrase(&link.label.to_lowercase(), phrase))
+                    })
         }
         AlertCategory::LanguageProficiency => {
             ["language", "fluent", "proficient", "fluency"]
@@ -764,29 +804,140 @@ fn explicitly_required(text: &str) -> bool {
         "required",
         "must have",
         "must possess",
+        "must be",
+        "must demonstrate",
+        "must hold",
+        "must know",
+        "must provide",
+        "must submit",
+        "must include",
         "minimum",
         "mandatory",
     ]
     .iter()
     .any(|term| contains_whole_phrase(text, term))
-        && ![
-            "not required",
-            "no requirement",
-            "not mandatory",
-            "no minimum",
+        && !optional_requirement(text)
+}
+
+fn optional_requirement(text: &str) -> bool {
+    [
+        "not required",
+        "no requirement",
+        "no requirements",
+        "not mandatory",
+        "no minimum",
+        "preferred",
+        "optional",
+        "nice to have",
+        "nice-to-have",
+        "bonus",
+        "desired",
+        "recommended",
+    ]
+    .iter()
+    .any(|term| contains_whole_phrase(text, term))
+}
+
+// Requirement bullets often inherit mandatory status from their heading.
+// Validate that context locally rather than relying on the model to add words
+// that were never present in the exact job excerpt.
+fn required_job_excerpt(job: &str, excerpt: &str, target: &str) -> Option<(usize, &'static str)> {
+    for (start, _) in job.match_indices(excerpt) {
+        let mut offset = 0;
+        for clause in excerpt.split_inclusive([';', '\n']) {
+            let text = clause.to_lowercase();
+            let clause_start = start + offset;
+            offset += clause.len();
+            if !contains_whole_phrase(&text, target)
+                || optional_requirement(&text)
+                || excluded_requirement(&text)
+            {
+                continue;
+            }
+            if explicitly_required(&text) {
+                return Some((start, mandatory_reason(&text)));
+            }
+            if clause
+                .split_once(':')
+                .is_some_and(|(heading, _)| requirement_heading(heading) == Some(true))
+                || under_required_heading(job, clause_start)
+            {
+                return Some((start, "required_heading"));
+            }
+        }
+    }
+    None
+}
+
+fn under_required_heading(job: &str, at: usize) -> bool {
+    // Only completed preceding lines can establish heading context.
+    let prefix = &job[..at];
+    let Some(end) = prefix.rfind('\n') else {
+        return false;
+    };
+    for line in prefix[..end].lines().rev().take(60) {
+        if let Some(required) = requirement_heading(line) {
+            return required;
+        }
+    }
+    false
+}
+
+fn requirement_heading(line: &str) -> Option<bool> {
+    let heading = line
+        .trim()
+        .trim_matches(['#', '*', '_', ':', ' '])
+        .to_lowercase();
+    if heading.len() > 100 || heading.is_empty() {
+        return None;
+    }
+    if [
+        "preferred qualifications",
+        "preferred skills",
+        "preferred experience",
+        "preferences",
+        "nice to have",
+        "nice-to-have",
+        "optional",
+        "desired qualifications",
+    ]
+    .contains(&heading.as_str())
+    {
+        return Some(false);
+    }
+    if !optional_requirement(&heading)
+        && (heading == "requirements"
+            || heading.ends_with(" requirements")
+            || [
+                "required qualifications",
+                "minimum qualifications",
+                "required skills",
+                "required experience",
+                "essential qualifications",
+                "must haves",
+                "must-haves",
+            ]
+            .contains(&heading.as_str()))
+    {
+        return Some(true);
+    }
+    if line.trim().ends_with(':')
+        || line.trim().starts_with('#')
+        || [
+            "qualifications",
+            "responsibilities",
+            "benefits",
+            "about us",
+            "about you",
+            "what we offer",
+            "what you'll do",
+            "job description",
         ]
-        .iter()
-        .any(|term| contains_whole_phrase(text, term))
-        && ![
-            "preferred",
-            "nice to have",
-            "nice-to-have",
-            "bonus",
-            "desired",
-            "recommended",
-        ]
-        .iter()
-        .any(|term| contains_whole_phrase(text, term))
+        .contains(&heading.as_str())
+    {
+        return Some(false);
+    }
+    None
 }
 
 fn excluded_requirement(text: &str) -> bool {
@@ -794,6 +945,13 @@ fn excluded_requirement(text: &str) -> bool {
         "citizen",
         "visa",
         "work authoriz",
+        "authorized to work",
+        "authorization to work",
+        "employment authorization",
+        "eligible to work",
+        "work eligibility",
+        "work permit",
+        "right to work",
         "sponsorship",
         "disabilit",
         "medical",
@@ -1077,6 +1235,146 @@ mod tests {
     }
 
     #[test]
+    fn required_alert_workflow_accepts_common_job_wording_and_one_letter_skills() {
+        let source = source();
+        for (job, excerpt, target) in [
+            (
+                "Required qualifications:\n- Python\n- SQL",
+                "Python",
+                "Python",
+            ),
+            ("Requirements\nPython\nSQL", "Python", "Python"),
+            ("Requirements: Python", "Requirements: Python", "Python"),
+            ("Required qualifications:\n- Go preferred\n- R", "R", "R"),
+            (
+                "Must be proficient in Python.",
+                "Must be proficient in Python.",
+                "Python",
+            ),
+            (
+                "Python is required; Go preferred.",
+                "Python is required; Go preferred.",
+                "Python",
+            ),
+            ("R required", "R required", "R"),
+            ("C required", "C required", "C"),
+        ] {
+            let candidate: AlertCandidate = serde_json::from_value(json!({
+                "kind":"not_found", "category":"named_skill_or_technology",
+                "requirement":target, "target":target, "jobExcerpt":excerpt,
+                "resumeEvidence":null
+            }))
+            .unwrap();
+            let (alerts, _) = validate_alerts(&source, job, vec![candidate], 1);
+            assert_eq!(alerts.len(), 1, "missing alert for {job:?}");
+            assert_eq!(&job[alerts[0].job_start..alerts[0].job_end], excerpt);
+        }
+    }
+
+    #[test]
+    fn repeated_excerpts_use_the_required_occurrence_and_keep_unicode_offsets() {
+        let source = source();
+        let job = "Équipe\nPreferred qualifications:\nPython\nRequired qualifications:\nPython";
+        let candidate: AlertCandidate = serde_json::from_value(json!({
+            "kind":"not_found", "category":"named_skill_or_technology",
+            "requirement":"Python", "target":"Python", "jobExcerpt":"Python", "resumeEvidence":null
+        }))
+        .unwrap();
+        let (alerts, _) = validate_alerts(&source, job, vec![candidate], 1);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].job_start, job.rfind("Python").unwrap());
+        assert_eq!(&job[alerts[0].job_start..alerts[0].job_end], "Python");
+        assert_eq!(alerts[0].mandatory_reason, "required_heading");
+    }
+
+    #[test]
+    fn requirement_context_does_not_turn_preferences_or_personal_requirements_into_alerts() {
+        let source = source();
+        for (job, excerpt, target) in [
+            ("Preferred qualifications:\nPython", "Python", "Python"),
+            (
+                "Required qualifications:\nPython preferred",
+                "Python preferred",
+                "Python",
+            ),
+            (
+                "Required qualifications:\nBenefits:\nPython",
+                "Python",
+                "Python",
+            ),
+            ("Requirements:\nQualifications\nPython", "Python", "Python"),
+            (
+                "Python is required; Go preferred",
+                "Python is required; Go preferred",
+                "Go",
+            ),
+            ("Python not required", "Python not required", "Python"),
+            ("No requirements:\nPython", "Python", "Python"),
+            (
+                "Must be authorized to work",
+                "Must be authorized to work",
+                "authorized to work",
+            ),
+            (
+                "Must be authorized to work; Python preferred",
+                "Must be authorized to work; Python preferred",
+                "Python",
+            ),
+            (
+                "Requirements:\nDriver license",
+                "Driver license",
+                "Driver license",
+            ),
+            ("Python required", "Python  required", "Python"),
+            ("Python required", "Python required", "Kotlin"),
+        ] {
+            let candidate: AlertCandidate = serde_json::from_value(json!({
+                "kind":"not_found", "category":"named_skill_or_technology",
+                "requirement":target, "target":target, "jobExcerpt":excerpt,
+                "resumeEvidence":null
+            }))
+            .unwrap();
+            assert!(
+                validate_alerts(&source, job, vec![candidate], 1)
+                    .0
+                    .is_empty(),
+                "invalid alert for {job:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn unrelated_contact_link_does_not_satisfy_a_required_portfolio() {
+        let mut source = source();
+        source.contact.links.push(ort_domain::Link {
+            id: Some(EntityId::new()),
+            order: Some(0),
+            label: "LinkedIn".into(),
+            url: "https://linkedin.com/in/alex".into(),
+        });
+        let candidate: AlertCandidate = serde_json::from_value(json!({
+            "kind":"not_found", "category":"portfolio_or_work_sample",
+            "requirement":"Portfolio", "target":"Portfolio",
+            "jobExcerpt":"Portfolio required", "resumeEvidence":null
+        }))
+        .unwrap();
+        let (alerts, _) = validate_alerts(&source, "Portfolio required", vec![candidate], 1);
+        assert_eq!(alerts.len(), 1);
+        source.contact.links[0].label = "Work samples".into();
+        let candidate: AlertCandidate = serde_json::from_value(json!({
+            "kind":"not_found", "category":"portfolio_or_work_sample",
+            "requirement":"Portfolio", "target":"Portfolio",
+            "jobExcerpt":"Portfolio required", "resumeEvidence":null
+        }))
+        .unwrap();
+        assert!(
+            validate_alerts(&source, "Portfolio required", vec![candidate], 1)
+                .0
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn required_alert_is_bounded_and_preferred_is_dropped() {
         let source = source();
         let alerts = vec![
@@ -1089,6 +1387,13 @@ mod tests {
         let result = validate_tailoring(&source, "Python required; Go preferred", &raw, 1).unwrap();
         assert_eq!(result.alerts.len(), 1);
         assert_eq!(result.alerts[0].requirement, "Python");
+        assert_eq!(result.alerts[0].target, "Python");
+        // Existing encrypted workspaces deserialize without a target; the UI
+        // can fall back to their requirement labels without a migration.
+        let mut legacy = serde_json::to_value(&result.alerts[0]).unwrap();
+        legacy.as_object_mut().unwrap().remove("target");
+        let old_alert: QualificationAlert = serde_json::from_value(legacy).unwrap();
+        assert!(old_alert.target.is_empty());
     }
 
     #[test]

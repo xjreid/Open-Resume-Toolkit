@@ -170,6 +170,10 @@ function testFailureMessage(code: string) {
       "The provider returned HTTP 503: its service is temporarily unavailable or overloaded. Wait before testing again. Monitoring keeps the unresolved reservation until usage can be verified.",
     AI_PROVIDER_TEMPORARY:
       "The provider returned a temporary server error. Wait before testing again and check Monitoring for unresolved exposure.",
+    AI_PROVIDER_BAD_REQUEST:
+      "The provider rejected the request parameters or API key (HTTP 400). Check the key and application version.",
+    AI_MODEL_UNAVAILABLE:
+      "The selected model is unavailable to this API key (HTTP 404). Check model access in the provider dashboard.",
     AI_PROVIDER_FAILED:
       "The provider rejected the request. Check that the selected model is available to this API key and review the provider dashboard. Monitoring keeps any unresolved exposure.",
   };

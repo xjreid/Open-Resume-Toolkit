@@ -36,6 +36,18 @@ and Answers tabs follow. The resume tab contains tailoring notes and qualificati
 alerts, a style selector, PDF/Word format selection, Download and Drag me,
 View/Edit controls, and an AI refinement input.
 
+The qualification alert panel is completely hidden when the alert list is empty,
+including when only the candidate-truncation flag is present.
+Validated alerts form a static list of brief points such as “Missing C language.”
+The panel has no hide, dismiss, or reopen controls and displays alerts even if an
+older workspace had hidden them. Job excerpts and resume evidence stay in the
+validated data rather than being quoted in the UI. Points use the validated
+qualification target, with requirement labels as a fallback for older workspaces.
+Existing alerts remain intact during resume refinement. Empty results
+do not certify that every job qualification is met. See the
+[qualification alerts audit](qualification-alerts-audit.md) for validation scope
+and current limitations.
+
 View uses the desktop's HTML/CSS `PublishedResume`. Edit uses its inline
 `ResumeCanvas`, including all existing structured entry fields. AI output already
 maps into this shared resume schema; no PDF is used as the editing surface.

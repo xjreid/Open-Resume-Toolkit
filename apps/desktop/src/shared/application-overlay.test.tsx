@@ -88,6 +88,145 @@ function workspace() {
 function reply(value: unknown) {
   return { ok: true, value };
 }
+
+const qualificationAlert = {
+  id: "qualification-python",
+  kind: "not_found" as const,
+  category: "named_skill_or_technology",
+  requirement: "Python",
+  jobExcerpt: "Python required",
+  resumeEvidence: null,
+};
+
+it.each([false, true])(
+  "removes the empty qualification alert panel (truncated: %s)",
+  async (alertsTruncated) => {
+    vi.mocked(invoke).mockImplementation(async (name) => {
+      if (name === "application_context") return reply(context);
+      if (name === "load_application_workspace")
+        return reply({
+          revision: 1,
+          workspace: { ...workspace(), alertsTruncated },
+        });
+      if (name.startsWith("load_application_")) return reply(null);
+      if (name === "prepare_application_exports") return reply({});
+      throw new Error(`Unexpected command: ${name}`);
+    });
+    const { host } = await mount();
+    expect(
+      host.querySelector('[aria-label="Qualification alerts"]'),
+    ).toBeNull();
+    expect(host.textContent).not.toContain("Qualification gaps");
+    expect(host.textContent).not.toContain(
+      "No required qualification alerts to show",
+    );
+    expect(host.textContent).not.toContain("Ignore all");
+  },
+);
+
+it("shows a static list even when saved alerts were previously hidden or dismissed", async () => {
+  const current = {
+    ...workspace(),
+    alerts: [qualificationAlert],
+    dismissedAlertIds: [qualificationAlert.id],
+    ignoreAllAlerts: true,
+  };
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({ revision: 1, workspace: current });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports") return reply({});
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host } = await mount();
+  const panel = host.querySelector('[aria-label="Qualification alerts"]')!;
+  expect(panel.querySelector(".application-alert")?.textContent).toBe(
+    "Missing Python",
+  );
+  expect(panel.querySelector("button")).toBeNull();
+  expect(panel.querySelector("blockquote")).toBeNull();
+  expect(panel.textContent).not.toContain("Python required");
+  expect(panel.textContent).not.toContain("Resume evidence");
+  expect(invoke).not.toHaveBeenCalledWith(
+    "save_application_workspace",
+    expect.anything(),
+  );
+});
+
+it.each([
+  [
+    {
+      ...qualificationAlert,
+      target: "C",
+      requirement: "Candidates must demonstrate C programming skills",
+    },
+    "Missing C language",
+  ],
+  [
+    {
+      ...qualificationAlert,
+      target: "Spanish",
+      category: "language_proficiency",
+    },
+    "Missing Spanish proficiency",
+  ],
+  [
+    {
+      ...qualificationAlert,
+      target: "10+ years experience",
+      category: "experience_duration",
+    },
+    "Need 10+ years experience",
+  ],
+  [
+    {
+      ...qualificationAlert,
+      target: "2027",
+      category: "graduation_date",
+      kind: "confirmed_mismatch",
+      resumeEvidence: { fieldId: "year", value: "2028" },
+    },
+    "Need graduation in 2027",
+  ],
+])("renders a brief qualification point %j", async (alert, expected) => {
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({
+        revision: 1,
+        workspace: { ...workspace(), alerts: [alert] },
+      });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports") return reply({});
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host } = await mount();
+  expect(host.querySelector(".application-alert")?.textContent).toBe(expected);
+});
+
+it("displays alerts immediately from a successful tailoring response", async () => {
+  const tailored = { ...workspace(), alerts: [qualificationAlert] };
+  vi.mocked(invoke).mockImplementation(async (name, args) => {
+    if (name === "application_context") return reply(context);
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "save_application_stage_one")
+      return reply({
+        revision: 1,
+        draft: (args as Record<string, unknown>).draft,
+      });
+    if (name === "start_application")
+      return reply({ revision: 1, workspace: tailored });
+    if (name === "prepare_application_exports") return reply({});
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  await act(async () => popup.options?.onJobChange("Python required"));
+  await act(async () => button("Tailor").click());
+  expect(host.querySelector(".application-alert")?.textContent).toContain(
+    "Python",
+  );
+});
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => {
@@ -428,6 +567,39 @@ it("keeps Stage 1 compact and saves popup job edits before tailoring", async () 
   expect(
     host.querySelector('ul[aria-label="Tailoring notes"]')?.textContent,
   ).toContain("documented Rust");
+});
+
+it.each([
+  ["AI_OUTPUT_INVALID", "blocked, incomplete, or unreadable response"],
+  ["AI_OUTPUT_INCOMPLETE", "did not finish generating"],
+  ["AI_MODEL_MISMATCH", "different model than the one selected"],
+  ["AI_MATERIAL_INVALID", "did not match the required material format"],
+  ["AI_PROVIDER_BAD_REQUEST", "request parameters or API key (HTTP 400)"],
+  ["AI_MODEL_UNAVAILABLE", "unavailable to this API key (HTTP 404)"],
+])("shows %s without saving or preparing exports", async (code, expected) => {
+  vi.mocked(invoke).mockImplementation(async (name, args) => {
+    if (name === "application_context") return reply(context);
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "save_application_stage_one")
+      return reply({
+        revision: 1,
+        draft: (args as Record<string, unknown>).draft,
+      });
+    if (name === "start_application")
+      return { ok: false, error: { code, messageKey: "errors.application" } };
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  await act(async () => popup.options?.onJobChange("Rust engineer required"));
+  await act(async () => button("Tailor").click());
+  expect(host.textContent).toContain(expected);
+  expect(host.textContent).toContain("Nothing was saved");
+  expect(host.textContent).not.toContain("shorten the job description");
+  expect(button("Tailor").disabled).toBe(false);
+  expect(invoke).not.toHaveBeenCalledWith(
+    "prepare_application_exports",
+    expect.anything(),
+  );
 });
 
 it("places Finish Application directly below the header when no role was found", async () => {

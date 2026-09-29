@@ -4440,7 +4440,10 @@ body.is-section-sorting * {
   letter-spacing: 0.025em;
   text-transform: uppercase;
 }
-.resume-document--technical .resume-document__section > h3 .reading-edit-target {
+.resume-document--technical
+  .resume-document__section
+  > h3
+  .reading-edit-target {
   font-weight: inherit;
 }
 .resume-canvas--modern .resume-canvas__section > h3,

@@ -1,0 +1,163 @@
+{
+  "source": "https://generativelanguage.googleapis.com/$discovery/rest?version=v1beta",
+  "retrievedOn": "2026-09-29",
+  "revision": "20260928",
+  "schemas": {
+    "GenerationConfig": {
+      "id": "GenerationConfig",
+      "properties": {
+        "maxOutputTokens": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "enableEnhancedCivicAnswers": {
+          "type": "boolean"
+        },
+        "frequencyPenalty": {
+          "type": "number",
+          "format": "float"
+        },
+        "enableAffectiveDialog": {
+          "type": "boolean"
+        },
+        "presencePenalty": {
+          "format": "float",
+          "type": "number"
+        },
+        "audioTranscriptionConfig": {
+          "$ref": "AudioTranscriptionConfig"
+        },
+        "responseJsonSchema": {
+          "type": "any"
+        },
+        "topK": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "topP": {
+          "type": "number",
+          "format": "float"
+        },
+        "responseFormat": {
+          "$ref": "ResponseFormatConfig"
+        },
+        "stopSequences": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "translationConfig": {
+          "$ref": "TranslationConfig"
+        },
+        "mediaResolution": {
+          "type": "string",
+          "enum": [
+            "MEDIA_RESOLUTION_UNSPECIFIED",
+            "MEDIA_RESOLUTION_LOW",
+            "MEDIA_RESOLUTION_MEDIUM",
+            "MEDIA_RESOLUTION_HIGH"
+          ]
+        },
+        "seed": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "thinkingConfig": {
+          "$ref": "ThinkingConfig"
+        },
+        "_responseJsonSchema": {
+          "type": "any",
+          "deprecated": true
+        },
+        "candidateCount": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "speechConfig": {
+          "$ref": "SpeechConfig"
+        },
+        "imageConfig": {
+          "$ref": "ImageConfig"
+        },
+        "temperature": {
+          "type": "number",
+          "format": "float"
+        },
+        "responseSchema": {
+          "deprecated": true,
+          "$ref": "Schema"
+        },
+        "responseModalities": {
+          "items": {
+            "type": "string",
+            "enum": ["MODALITY_UNSPECIFIED", "TEXT", "IMAGE", "AUDIO"]
+          },
+          "type": "array"
+        },
+        "logprobs": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "responseMimeType": {
+          "type": "string"
+        },
+        "responseLogprobs": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ResponseFormatConfig": {
+      "type": "object",
+      "properties": {
+        "audio": {
+          "$ref": "AudioResponseFormat"
+        },
+        "text": {
+          "$ref": "TextResponseFormat"
+        },
+        "image": {
+          "$ref": "ImageResponseFormat"
+        }
+      },
+      "id": "ResponseFormatConfig"
+    },
+    "TextResponseFormat": {
+      "type": "object",
+      "id": "TextResponseFormat",
+      "properties": {
+        "mimeType": {
+          "type": "string",
+          "enum": ["MIME_TYPE_UNSPECIFIED", "APPLICATION_JSON", "TEXT_PLAIN"]
+        },
+        "schema": {
+          "type": "any"
+        }
+      }
+    },
+    "ThinkingConfig": {
+      "properties": {
+        "thinkingLevel": {
+          "type": "string",
+          "enum": [
+            "THINKING_LEVEL_UNSPECIFIED",
+            "MINIMAL",
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ]
+        },
+        "includeThoughts": {
+          "type": "boolean"
+        },
+        "thinkingBudget": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "type": "object",
+      "id": "ThinkingConfig"
+    }
+  }
+}

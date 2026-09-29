@@ -509,8 +509,30 @@ impl ProviderAdapter for GeminiAdapter {
             "maxOutputTokens": r.max_output_tokens,
             "responseMimeType": "application/json"
         });
-        if r.operation == OperationType::CredentialTest && r.model.starts_with("gemini-3.") {
-            generation_config["thinkingConfig"] = json!({"thinkingLevel":"low"});
+        if matches!(
+            r.operation,
+            OperationType::TailorResume | OperationType::RefineResume
+        ) {
+            // Send the actual body-only contract, rather than unconstrained JSON.
+            generation_config
+                .as_object_mut()
+                .expect("generation config")
+                .remove("responseMimeType");
+            generation_config["responseFormat"] = json!({"text":{
+                // This REST field is a protobuf enum, unlike responseMimeType.
+                "mimeType":"APPLICATION_JSON",
+                "schema":materials::gemini_resume_output_schema()
+            }});
+        }
+        if r.model.starts_with("gemini-3.")
+            && matches!(
+                r.operation,
+                OperationType::CredentialTest
+                    | OperationType::TailorResume
+                    | OperationType::RefineResume
+            )
+        {
+            generation_config["thinkingConfig"] = json!({"thinkingLevel":"LOW"});
         }
         Ok(HttpRequest { url: format!("https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?alt=sse", r.model), headers: BTreeMap::from([("x-goog-api-key".into(), key.text()?.into()), ("content-type".into(), "application/json".into())]), body: serde_json::to_vec(&json!({"systemInstruction":{"parts":[{"text":r.system}]},"contents":[{"role":"user","parts":[{"text":encoded(&r.input)?}]}],"generationConfig":generation_config})).map_err(|_| AiError::InvalidResponse)? })
     }
