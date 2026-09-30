@@ -1,13 +1,16 @@
 # M5 implementation record
 
-Status: in progress. The ad-hoc-signed development application was updated in
-`/Applications`, but Codex did not launch or test it, per the user's instruction.
-The live Chrome/Edge browser connection was not tested.
+Status: development browser capture is implemented and tested in disposable
+profiles. The opt-in unsigned macOS BETA now uses a silent Chrome extension with
+all controls on the desktop overlay. Real native delivery into encrypted review
+passes. Installed GUI focus and store-installed testing remain manual steps.
+Signed production transport and Edge are still deferred.
 
-The user-run path for the unsigned desktop overlay is in
-[manual-overlay-walkthrough.md](manual-overlay-walkthrough.md). It starts with
-the installed development app, uses typed job and question text, and leaves browser connection
-testing for a later milestone pass.
+See [chrome-overlay-capture.md](chrome-overlay-capture.md) for the current workflow
+and checks, [chrome-development-bridge.md](chrome-development-bridge.md) for the
+development trust boundary, and
+[development testing](../../../packaging/extension/chrome/development-testing.md)
+for installed-app and Chrome setup. Earlier checks below are historical records.
 
 ## Implemented in source
 
@@ -16,7 +19,7 @@ testing for a later milestone pass.
 - Stage 1 source URL review retains desktop sanitization; a reviewed URL is carried into a retained entry when available. Tracker entries also accept free-form source text.
 - Encrypted Stage 1 review drafts (job text, URL, and design) survive desktop restart with optimistic revisions. Continue waits for the latest draft save before it can start tailoring; Finish clears the draft in the same transaction as the temporary workspace.
 - Stage 1 can retain a captured selection up to 128 KiB for review even when it exceeds the 20,000-character tailoring input limit; the Continue action stays disabled until the user trims it.
-- A desktop-only capture intake function validates a future authenticated frame and retains one encrypted pending capture. The overlay presents an editable text/URL review with explicit replace/discard controls; acceptance updates the review workspace and removes the pending capture in one SQL transaction. A stale or invalid save preserves both values. The intake has no Tauri command or unsigned-preview transport caller. Resetting a reviewed question persists the cleared state immediately.
+- A desktop-only capture intake function validates an authenticated frame and retains one encrypted pending capture. The overlay presents an editable text/URL review with explicit replace/discard controls; acceptance updates the review workspace and removes the pending capture in one SQL transaction. A stale or invalid save preserves both values. The intake has no Tauri command; the explicit development native transport calls it after capture-session authorization. Resetting a reviewed question persists the cleared state immediately.
 - Closing the overlay hides it so the active application workspace remains available. The main window's Application workspace control reopens and focuses that same overlay.
 - When the overlay regains focus, it refreshes pending captures and published-resume/AI context, so publication in the main window can enable Stage 1 without restarting the overlay.
 - The manual overlay supports typed/pasted job descriptions and questions without a browser extension. Resume and cover-letter PDF previews now keep their editors visible during edits, label the displayed PDF as the last saved version, refresh it after Save edits, and expand the overlay for side-by-side review. The header offers a compact-size control.
@@ -25,17 +28,17 @@ testing for a later milestone pass.
 - Quit now probes the live overlay for unsaved Stage 1/Stage 2 edits and local instructions before the main window decides whether to quit. The overlay becomes inert during the pending decision and resumes on cancel. A missing reply cannot trigger automatic quit; it requires an explicit discard choice. Only local cross-window event emission was added to the main/overlay Tauri capabilities.
 - Initial tailoring, resume regeneration, and cover-letter generation preflight the selected PDF locally before replacing the saved workspace. Saving user edits preflights any changed resume or cover-letter material. An unrenderable result leaves the previous saved version intact.
 - Additive database schema v5 and portable backup format v1.5 for tracker entries. Backup restore includes tracker records.
-- Selection-only Chrome/Edge extension source with bounded text/URL normalization and no persistent content. The unsigned development manifest remains permission-free and does not expose the capture popup.
-- Bounded native message framing, envelope/version/freshness validation, exact origin checks, HMAC transcript authentication helpers, and a bounded replay cache. The native host fails closed because no signed desktop/host Keychain sharing and authenticated IPC endpoint is configured.
-- Browser connections settings state accurately reports the development preview as disconnected.
+- Chrome 0.2.0 silently captures a two-corner rectangle only after overlay Capture. Desktop-created sessions authorize the destination and revoke late results on Cancel. Text/URL normalization is bounded; extension content is not persisted. Legacy development and Edge scaffolds remain capture-disabled.
+- Bounded native message framing, envelope/version/freshness validation, exact origin checks, HMAC transcript authentication helpers, and a bounded replay cache. Default production builds fail closed. The explicit macOS development feature uses a current-user authenticated socket, with a persistent native port for content-free commands and bounded capture delivery.
+- Development Browser connections settings enables/disables the local server. The overlay reports a live Chrome connection and controls Capture/Cancel.
 
 ## Remaining M5 work
 
-- Signed desktop/native-host identity and fixed Chrome/Edge extension IDs, followed by identity-scoped vault sharing, authenticated local IPC, and desktop capture delivery/review.
-- Install, repair, and connected/version status for both browsers. The native host currently returns a content-free unavailable response and does not forward captures.
-- Chrome capture-to-tracker walkthrough and Edge smoke check on a signed test package. These are unrun under the current no-live-installed-app constraint.
+- Signed desktop/native-host identity and fixed Chrome/Edge extension IDs, followed by identity-scoped vault sharing, authenticated local IPC, and production desktop capture delivery/review.
+- Install, repair, and connected/version status for both browsers. Default native builds remain unavailable; the development host delivers only overlay-authorized captures.
+- Chrome capture-to-tracker walkthrough and Edge smoke check on a signed test package. These production checks remain unrun.
 
-The user selected the unsigned-preview gate on September 23, 2026. Browser capture stays unavailable in that preview; this is a deliberate gate, not evidence that the signed browser bridge is complete.
+The September 23 unsigned-preview gate was superseded for local macOS development testing by the user-authorized September 29 exception. This does not qualify the signed production browser bridge.
 
 ## Automated checks
 
@@ -74,3 +77,6 @@ These checks do not establish browser-to-desktop operation. The bridge remains d
 - These checks verify response handling, metadata preservation, alerts, and
   rendering; they do not measure real provider-generated editorial quality.
   No paid generation or live installed-application testing was performed.
+
+- [`chrome-development-bridge.md`](chrome-development-bridge.md): explicit unsigned
+  macOS BETA transport and real Chrome delivery into encrypted desktop review.

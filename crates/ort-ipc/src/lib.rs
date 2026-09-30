@@ -10,6 +10,11 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use uuid::Uuid;
 
+#[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+pub mod development;
+
+pub mod capture_session;
+
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const MAX_ENVELOPE_BYTES: usize = 256 * 1024;
 pub const MAX_TEXT_BYTES: usize = 128 * 1024;
@@ -57,6 +62,65 @@ pub struct CapturePayload {
     pub target: String,
 }
 
+#[derive(Debug)]
+pub enum NativeRequest {
+    Status,
+    Poll(capture_session::PollRequest),
+    Event(capture_session::EventRequest),
+    Capture(Box<CaptureEnvelope>),
+}
+
+/// Validates a content-free capability probe or a bounded capture. Status
+/// messages cannot smuggle page content through unrecognized fields.
+/// # Errors
+/// Rejects malformed requests and incompatible protocol versions.
+pub fn validate_native_request(bytes: &[u8], now_ms: i64) -> Result<NativeRequest, BridgeError> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    struct StatusRequest {
+        protocol_version: u16,
+        kind: String,
+    }
+
+    if bytes.is_empty() || bytes.len() > MAX_ENVELOPE_BYTES {
+        return Err(BridgeError::Oversized);
+    }
+    let value: serde_json::Value =
+        serde_json::from_slice(bytes).map_err(|_| BridgeError::Malformed)?;
+    match value.get("kind").and_then(serde_json::Value::as_str) {
+        Some("bridge.poll") => {
+            let request: capture_session::PollRequest =
+                serde_json::from_slice(bytes).map_err(|_| BridgeError::Malformed)?;
+            if request.protocol_version != PROTOCOL_VERSION {
+                return Err(BridgeError::Incompatible);
+            }
+            return Ok(NativeRequest::Poll(request));
+        }
+        Some("capture.event") => {
+            let request: capture_session::EventRequest =
+                serde_json::from_slice(bytes).map_err(|_| BridgeError::Malformed)?;
+            if request.protocol_version != PROTOCOL_VERSION {
+                return Err(BridgeError::Incompatible);
+            }
+            return Ok(NativeRequest::Event(request));
+        }
+        _ => {}
+    }
+    if value.get("kind").and_then(serde_json::Value::as_str) == Some("bridge.status") {
+        let request: StatusRequest =
+            serde_json::from_slice(bytes).map_err(|_| BridgeError::Malformed)?;
+        if request.kind != "bridge.status" {
+            return Err(BridgeError::Malformed);
+        }
+        if request.protocol_version != PROTOCOL_VERSION {
+            return Err(BridgeError::Incompatible);
+        }
+        Ok(NativeRequest::Status)
+    } else {
+        validate_capture(bytes, now_ms).map(|capture| NativeRequest::Capture(Box::new(capture)))
+    }
+}
+
 /// Reads exactly one browser native-messaging frame with a pre-allocation cap.
 /// # Errors
 /// Rejects incomplete or oversized frames without allocating the stated size.
@@ -89,7 +153,8 @@ pub fn write_native_frame(output: &mut impl Write, bytes: &[u8]) -> Result<(), B
         .map_err(|_| BridgeError::Unavailable)?;
     output
         .write_all(bytes)
-        .map_err(|_| BridgeError::Unavailable)
+        .map_err(|_| BridgeError::Unavailable)?;
+    output.flush().map_err(|_| BridgeError::Unavailable)
 }
 
 /// Validates one extension message before any desktop launch or IPC activity.
@@ -258,5 +323,83 @@ mod tests {
             verify_authentication(&secret, b"nonce/changed", &tag),
             Err(BridgeError::Authentication)
         );
+    }
+
+    #[test]
+    fn capability_probe_is_strict_and_content_free() {
+        assert!(matches!(
+            validate_native_request(br#"{"protocolVersion":1,"kind":"bridge.status"}"#, 0),
+            Ok(NativeRequest::Status)
+        ));
+        assert!(matches!(
+            validate_native_request(br#"{"protocolVersion":2,"kind":"bridge.status"}"#, 0),
+            Err(BridgeError::Incompatible)
+        ));
+        assert!(matches!(
+            validate_native_request(
+                br#"{"protocolVersion":1,"kind":"bridge.status","payload":{"text":"unexpected"}}"#,
+                0
+            ),
+            Err(BridgeError::Malformed)
+        ));
+        assert!(matches!(
+            validate_native_request(b"[]", 0),
+            Err(BridgeError::Malformed)
+        ));
+    }
+
+    #[test]
+    fn chrome_package_fixture_matches_native_contract() {
+        let bytes = include_bytes!("../../../fixtures/ipc/chrome-capture.v1.json");
+        let now = "2026-09-29T12:00:00Z"
+            .parse::<Timestamp>()
+            .unwrap()
+            .as_millisecond();
+        let capture = validate_capture(bytes, now).unwrap();
+        assert_eq!(capture.payload.browser, "chrome");
+        assert_eq!(capture.payload.url, "https://example.test/job?jobId=42");
+        assert_eq!(
+            capture.payload.text,
+            "Synthetic job description\nRésumé experience required."
+        );
+        assert!(matches!(
+            validate_native_request(bytes, now),
+            Ok(NativeRequest::Capture(_))
+        ));
+    }
+
+    #[test]
+    fn capture_control_contract_rejects_content_and_unknown_authority() {
+        let client = Uuid::now_v7();
+        let session = Uuid::now_v7();
+        let poll = json!({"protocolVersion":1,"kind":"bridge.poll","clientId":client});
+        let event = json!({"protocolVersion":1,"kind":"capture.event","clientId":client,"sessionId":session,"phase":"selecting"});
+        for value in [&poll, &event] {
+            assert!(validate_native_request(&serde_json::to_vec(value).unwrap(), 0).is_ok());
+            let mut content = value.clone();
+            content["text"] = json!("Unexpected page content");
+            assert!(matches!(
+                validate_native_request(&serde_json::to_vec(&content).unwrap(), 0),
+                Err(BridgeError::Malformed)
+            ));
+            let mut version = value.clone();
+            version["protocolVersion"] = json!(2);
+            assert!(matches!(
+                validate_native_request(&serde_json::to_vec(&version).unwrap(), 0),
+                Err(BridgeError::Incompatible)
+            ));
+        }
+        for (field, value) in [
+            ("phase", json!("completed")),
+            ("code", json!("arbitrary page text")),
+            ("clientId", json!("not-a-uuid")),
+        ] {
+            let mut invalid = event.clone();
+            invalid[field] = value;
+            assert!(matches!(
+                validate_native_request(&serde_json::to_vec(&invalid).unwrap(), 0),
+                Err(BridgeError::Malformed)
+            ));
+        }
     }
 }

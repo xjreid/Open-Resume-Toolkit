@@ -188,35 +188,41 @@
   background: #fff;
   color: #3e536b;
 }
-.application-shell .application-capture-field {
-  margin-bottom: 14px;
-  padding: 20px;
-  border: 1px solid #dce3e9;
-  border-radius: 10px;
+/* The job fields stay compact while long captured content scrolls inside. */
+.application-shell .application-job-field {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  color: #283a51;
+  font-size: 13px;
+  font-weight: 650;
+}
+.application-shell .application-job-field textarea,
+.application-shell .application-job-field input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #b6c5d2;
+  border-radius: 8px;
   background: #fff;
+  color: #17243a;
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.5;
 }
-.application-shell .application-capture-field h2 {
-  font-size: 15px;
+.application-shell .application-job-field textarea {
+  height: 180px;
+  resize: none;
+  overflow-y: auto;
 }
-.application-shell .application-capture-field p {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  color: #8b97a5;
-  font-size: 12px;
-  margin: 10px 0 18px;
+.application-shell .application-job-field input {
+  overflow-x: auto;
 }
-.application-shell .application-capture-field p.is-complete {
-  color: #28765d;
-}
-.application-shell .application-capture-field p .application-icon {
-  width: 14px;
-  height: 14px;
-}
-.application-shell .application-capture-field button {
-  min-height: 33px;
-  min-width: 90px;
-  font-size: 11px;
+.application-shell .application-job-field textarea:focus,
+.application-shell .application-job-field input:focus {
+  outline: 2px solid #466387;
+  outline-offset: 2px;
 }
 .application-shell .application-local-status {
   text-align: center;

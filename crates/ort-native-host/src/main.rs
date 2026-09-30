@@ -1,42 +1,64 @@
-//! Bounded native-messaging entry point. It remains fail-closed until a signed
-//! desktop/host pair can share an identity-scoped vault secret and IPC endpoint.
+//! Bounded native-messaging entry point. Default builds require signed production
+//! transport. The opt-in macOS dev feature uses a separate temporary capability.
 
 use std::io;
 
 use ort_ipc::{
-    BridgeError, read_native_frame, validate_capture, validate_origin, write_native_frame,
+    BridgeError, read_native_frame, validate_native_request, validate_origin, write_native_frame,
 };
 use serde_json::json;
 
 fn main() {
-    let result = process(&mut io::stdin().lock());
-    let code = match result {
-        Err(BridgeError::Incompatible) => "PROTOCOL_INCOMPATIBLE",
-        Ok(()) | Err(BridgeError::WrongOrigin | BridgeError::Authentication) => {
-            "BRIDGE_UNAVAILABLE"
+    let mut input = io::stdin().lock();
+    let mut output = io::stdout().lock();
+    loop {
+        let result = process(&mut input);
+        let invalid_frame = matches!(
+            &result,
+            Err(BridgeError::Malformed | BridgeError::Oversized | BridgeError::WrongOrigin)
+        );
+        let response = result.unwrap_or_else(|problem| failure_response(&problem));
+        let Ok(bytes) = serde_json::to_vec(&response) else {
+            break;
+        };
+        if write_native_frame(&mut output, &bytes).is_err() {
+            break;
         }
-        Err(BridgeError::Oversized) => "CAPTURE_TOO_LARGE",
-        Err(BridgeError::Expired | BridgeError::Replay) => "CAPTURE_EXPIRED",
-        Err(_) => "CAPTURE_INVALID",
-    };
-    // No capture text, URL, local path, or system error is written to stdout.
-    let response = json!({"ok":false,"error":{"code":code,"messageKey":"errors.browserBridge","retryable":false},"value":null,"desktopVersion":"0.0.0-dev","hostVersion":"0.0.0-dev","protocolVersion":ort_ipc::PROTOCOL_VERSION});
-    if let Ok(bytes) = serde_json::to_vec(&response) {
-        let _ = write_native_frame(&mut io::stdout().lock(), &bytes);
+        if invalid_frame || !cfg!(all(feature = "dev-browser-bridge", target_os = "macos")) {
+            break;
+        }
     }
 }
 
-fn process(input: &mut impl io::Read) -> Result<(), BridgeError> {
+fn failure_response(problem: &BridgeError) -> serde_json::Value {
+    let code = match problem {
+        BridgeError::Incompatible => "PROTOCOL_INCOMPATIBLE",
+        BridgeError::WrongOrigin | BridgeError::Authentication | BridgeError::Unavailable => {
+            "BRIDGE_UNAVAILABLE"
+        }
+        BridgeError::Oversized => "CAPTURE_TOO_LARGE",
+        BridgeError::Expired | BridgeError::Replay => "CAPTURE_EXPIRED",
+        BridgeError::Malformed => "CAPTURE_INVALID",
+    };
+    json!({"ok":false,"error":{"code":code,"messageKey":"errors.browserBridge","retryable":false},"value":null,"desktopVersion":"0.0.0-dev","hostVersion":"0.0.0-dev","protocolVersion":ort_ipc::PROTOCOL_VERSION})
+}
+
+fn process(input: &mut impl io::Read) -> Result<serde_json::Value, BridgeError> {
     let origin = std::env::args().nth(1).ok_or(BridgeError::WrongOrigin)?;
-    let allowed: Vec<String> = [
+    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+    let ids = [
+        option_env!("ORT_CHROME_EXTENSION_ID"),
         option_env!("ORT_DEV_CHROME_EXTENSION_ID"),
         option_env!("ORT_DEV_EDGE_EXTENSION_ID"),
-    ]
-    .into_iter()
-    .flatten()
-    .filter(|id| id.len() == 32 && id.bytes().all(|byte| (b'a'..=b'p').contains(&byte)))
-    .map(|id| format!("chrome-extension://{id}/"))
-    .collect();
+    ];
+    #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+    let ids = [option_env!("ORT_DEV_CHROME_EXTENSION_ID")];
+    let allowed: Vec<String> = ids
+        .into_iter()
+        .flatten()
+        .filter(|id| id.len() == 32 && id.bytes().all(|byte| (b'a'..=b'p').contains(&byte)))
+        .map(|id| format!("chrome-extension://{id}/"))
+        .collect();
     process_with_origin(
         input,
         &origin,
@@ -48,13 +70,30 @@ fn process_with_origin(
     input: &mut impl io::Read,
     origin: &str,
     allowed: &[&str],
-) -> Result<(), BridgeError> {
+) -> Result<serde_json::Value, BridgeError> {
     validate_origin(origin, allowed)?;
     let bytes = read_native_frame(input)?;
     let now = jiff::Timestamp::now().as_millisecond();
-    let _capture = validate_capture(&bytes, now)?;
-    // The transport is deliberately absent until installation identity checks pass.
-    Err(BridgeError::Unavailable)
+    #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+    {
+        let _request = validate_native_request(&bytes, now)?;
+        ort_ipc::development::forward(&ort_ipc::development::default_root(), origin, &bytes)
+    }
+    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+    match validate_native_request(&bytes, now)? {
+        ort_ipc::NativeRequest::Status => Ok(json!({
+            "ok": false,
+            "error": {"code": "SIGNED_BRIDGE_REQUIRED", "retryable": false},
+            "value": {"ready": false},
+            "desktopVersion": "0.0.0-dev",
+            "hostVersion": "0.0.0-dev",
+            "protocolVersion": ort_ipc::PROTOCOL_VERSION
+        })),
+        // Transport is deliberately absent until installation identity checks pass.
+        ort_ipc::NativeRequest::Capture(_)
+        | ort_ipc::NativeRequest::Poll(_)
+        | ort_ipc::NativeRequest::Event(_) => Err(BridgeError::Unavailable),
+    }
 }
 
 #[cfg(test)]
@@ -86,6 +125,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
     fn unsigned_host_rejects_even_a_valid_capture_without_forwarding_it() {
         let mut frame = Cursor::new(framed_capture(ort_ipc::PROTOCOL_VERSION));
         assert_eq!(
@@ -119,6 +159,27 @@ mod tests {
         assert_eq!(
             process_with_origin(&mut oversized, ORIGIN, &[ORIGIN]),
             Err(BridgeError::Oversized)
+        );
+    }
+
+    #[test]
+    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+    fn reports_missing_signed_transport_without_claiming_readiness() {
+        let bytes = br#"{"protocolVersion":1,"kind":"bridge.status"}"#;
+        let mut frame = Vec::new();
+        write_native_frame(&mut frame, bytes).unwrap();
+        let status =
+            process_with_origin(&mut Cursor::new(frame.clone()), ORIGIN, &[ORIGIN]).unwrap();
+        assert_eq!(status["ok"], false);
+        assert_eq!(status["value"]["ready"], false);
+        assert_eq!(status["error"]["code"], "SIGNED_BRIDGE_REQUIRED");
+        assert_eq!(
+            process_with_origin(
+                &mut Cursor::new(frame),
+                "chrome-extension://wrong/",
+                &[ORIGIN]
+            ),
+            Err(BridgeError::WrongOrigin)
         );
     }
 }

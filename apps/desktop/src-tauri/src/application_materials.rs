@@ -144,6 +144,7 @@ struct PreparedApplicationExports {
     revision: i64,
     kind: MaterialKind,
     pdf: Vec<u8>,
+    receipt: ort_domain::PdfRenderReceipt,
     docx: Vec<u8>,
 }
 
@@ -194,6 +195,21 @@ impl ApplicationExportState {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .iter()
             .any(|item| item.revision == revision && item.kind == kind)
+    }
+
+    fn preview(&self, revision: i64, kind: MaterialKind) -> Option<ort_domain::PdfPreviewResponse> {
+        let prepared = self.prepared.lock().ok()?;
+        let export = prepared
+            .iter()
+            .find(|item| item.revision == revision && item.kind == kind)?;
+        Some(ort_domain::PdfPreviewResponse {
+            render_id: uuid::Uuid::now_v7().to_string(),
+            source: ort_domain::ExportSource::SavedDraft,
+            revision,
+            generated_at_unix_ms: u64::try_from(jiff::Timestamp::now().as_millisecond()).ok()?,
+            receipt: export.receipt.clone(),
+            pdf_base64: STANDARD.encode(&export.pdf),
+        })
     }
 
     fn bytes(
@@ -452,7 +468,8 @@ fn save_stage_one(
 
 /// Desktop destination for an already authenticated native-host frame. This
 /// function is intentionally not a Tauri command; renderer input cannot claim
-/// that it came from the browser bridge. The unsigned preview has no caller.
+/// that it came from the browser bridge. The opt-in dev transport calls it only
+/// after authenticating the frame.
 #[allow(dead_code)]
 pub(crate) fn accept_authenticated_capture(
     store: &ort_storage::EncryptedStore,
@@ -496,20 +513,32 @@ pub fn load_application_capture(
     }
 }
 
-/// A stable UI seam for requesting a browser capture. The unsigned development
-/// native host has no authenticated desktop transport and must fail closed.
+/// The overlay authorizes a bounded capture generation; Chrome receives it by
+/// authenticated heartbeat. A late result after cancellation cannot reach intake.
 #[tauri::command]
 pub fn request_application_capture(
     window: WebviewWindow,
     target: Option<String>,
-) -> CommandResponse<bool> {
+) -> CommandResponse<ort_ipc::capture_session::CaptureStatus> {
     if window.label() != "overlay" {
         return window_not_authorized();
     }
-    if !matches!(target.as_deref().unwrap_or("job"), "job" | "question") {
-        return error("CAPTURE_TARGET_INVALID");
+    let target = target.as_deref().unwrap_or("job");
+    let pending = window
+        .state::<DesktopState>()
+        .with_store(load_pending_capture);
+    match pending {
+        Ok(Some(_)) => return error("CAPTURE_PENDING"),
+        Err(problem) => return storage_failure(&problem),
+        Ok(None) => {}
     }
-    error("BROWSER_CAPTURE_UNAVAILABLE")
+    match window
+        .state::<crate::browser_bridge::BrowserBridgeState>()
+        .start(target)
+    {
+        Ok(status) => CommandResponse::success(status),
+        Err(code) => error(code),
+    }
 }
 
 #[tauri::command]
@@ -538,6 +567,46 @@ pub fn resolve_application_capture(
         Ok(()) => CommandResponse::success(true),
         Err(problem) => storage_failure(&problem),
     }
+}
+
+/// Apply the authenticated job payload and return the saved draft while holding
+/// the store lock. The pending capture is consumed atomically with the draft save.
+#[tauri::command]
+pub fn apply_application_job_capture(
+    window: WebviewWindow,
+    request_id: uuid::Uuid,
+    expected_revision: Option<i64>,
+) -> CommandResponse<SavedStageOneDraft> {
+    if window.label() != "overlay" {
+        return window_not_authorized();
+    }
+    match window
+        .state::<DesktopState>()
+        .with_store(|store| apply_pending_job_capture(store, request_id, expected_revision))
+    {
+        Ok(saved) => CommandResponse::success(saved),
+        Err(problem) => storage_failure(&problem),
+    }
+}
+
+fn apply_pending_job_capture(
+    store: &ort_storage::EncryptedStore,
+    request_id: uuid::Uuid,
+    expected_revision: Option<i64>,
+) -> Result<SavedStageOneDraft, StorageError> {
+    let pending = load_pending_capture(store)?.ok_or(StorageError::NotFound)?;
+    if pending.capture.payload.target != "job" {
+        return Err(StorageError::InvalidData);
+    }
+    resolve_pending_capture(
+        store,
+        request_id,
+        true,
+        expected_revision,
+        Some(&pending.capture.payload.text),
+        Some(&pending.capture.payload.url),
+    )?;
+    load_stage_one(store)?.ok_or(StorageError::NotFound)
 }
 
 fn resolve_pending_capture(
@@ -696,6 +765,9 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
     if window.label() != "overlay" {
         return window_not_authorized();
     }
+    let browser_connected = window
+        .state::<crate::browser_bridge::BrowserBridgeState>()
+        .connected();
     match window.state::<DesktopState>().with_store(|store| {
         let published_revision = store.load_latest_published()?.map(|item| item.revision);
         let connection = crate::ai_keys::request_connection(store, None)?;
@@ -767,8 +839,7 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
             preset: connection.preset,
             preset_label,
             preset_options,
-            // The current unsigned native host intentionally rejects every bridge request.
-            browser_connected: false,
+            browser_connected,
         })
     }) {
         Ok(value) => CommandResponse::success(value),
@@ -1379,13 +1450,13 @@ fn render_application_exports(
         ))
     })?;
     let pdf = ort_render::render_pdf_with_style(&document, style)
-        .map_err(|_| StorageError::InvalidData)?
-        .bytes;
+        .map_err(|_| StorageError::InvalidData)?;
     let docx = render_docx_with_style(&document, style).map_err(|_| StorageError::InvalidData)?;
     Ok(PreparedApplicationExports {
         revision: expected_revision,
         kind,
-        pdf,
+        pdf: pdf.bytes,
+        receipt: pdf.receipt,
         docx,
     })
 }
@@ -1634,41 +1705,42 @@ pub struct MaterialPdf {
     pub filename: String,
 }
 
+/// The popup displays the exact cached bytes used by Download, bound to the
+/// saved workspace revision. It cannot submit PDF bytes or a destination path.
 #[tauri::command]
 pub fn preview_application_pdf(
     window: WebviewWindow,
     expected_revision: i64,
     kind: MaterialKind,
-) -> CommandResponse<MaterialPdf> {
-    if window.label() != "overlay" {
+) -> CommandResponse<ort_domain::PdfPreviewResponse> {
+    if !matches!(window.label(), "overlay" | "application-popup") {
         return window_not_authorized();
     }
-    let state = window.state::<DesktopState>();
-    let prepared = state.with_store(|store| {
+    match prepared_application_pdf(
+        &window.state::<DesktopState>(),
+        &window.state::<ApplicationExportState>(),
+        expected_revision,
+        kind,
+    ) {
+        Ok(Some(preview)) => CommandResponse::success(preview),
+        Ok(None) => error("EXPORT_NOT_PREPARED"),
+        Err(problem) => storage_failure(&problem),
+    }
+}
+
+fn prepared_application_pdf(
+    state: &DesktopState,
+    exports: &ApplicationExportState,
+    expected_revision: i64,
+    kind: MaterialKind,
+) -> Result<Option<ort_domain::PdfPreviewResponse>, StorageError> {
+    state.with_store(|store| {
         let current = load(store)?.ok_or(StorageError::NotFound)?;
         if current.revision != expected_revision {
             return Err(StorageError::RevisionConflict);
         }
-        Ok((
-            document_for(&current.workspace, kind)?,
-            current.workspace.style,
-        ))
-    });
-    let (document, style) = match prepared {
-        Ok(value) => value,
-        Err(problem) => return storage_failure(&problem),
-    };
-    match ort_render::render_pdf_with_style(&document, style) {
-        Ok(artifact) => CommandResponse::success(MaterialPdf {
-            base64: STANDARD.encode(&artifact.bytes),
-            filename: match kind {
-                MaterialKind::Resume => "tailored-resume.pdf",
-                MaterialKind::CoverLetter => "cover-letter.pdf",
-            }
-            .into(),
-        }),
-        Err(_) => error("PDF_UNAVAILABLE"),
-    }
+        Ok(exports.preview(expected_revision, kind))
+    })
 }
 
 #[tauri::command]
@@ -1820,6 +1892,21 @@ mod tests {
     use ort_vault::testing::MemoryDatabaseKeyVault;
     use tempfile::TempDir;
 
+    fn test_pdf_receipt() -> ort_domain::PdfRenderReceipt {
+        ort_domain::PdfRenderReceipt {
+            document_sha256: "a".repeat(64),
+            document_schema_version: 1,
+            pdf_sha256: "b".repeat(64),
+            renderer_version: "test".into(),
+            template_id: "test".into(),
+            template_sha256: "c".repeat(64),
+            font_bundle_id: "test".into(),
+            font_bundle_sha256: "d".repeat(64),
+            page_count: 1,
+            byte_count: 3,
+        }
+    }
+
     fn browser_frame(target: &str, text: &str, now_ms: i64) -> Vec<u8> {
         serde_json::to_vec(&json!({
             "protocolVersion": ort_ipc::PROTOCOL_VERSION,
@@ -1914,6 +2001,7 @@ mod tests {
             revision: 9,
             kind: MaterialKind::Resume,
             pdf: b"pdf".to_vec(),
+            receipt: test_pdf_receipt(),
             docx: b"docx".to_vec(),
         }));
         assert_eq!(
@@ -1938,6 +2026,7 @@ mod tests {
             revision: 9,
             kind: MaterialKind::CoverLetter,
             pdf: b"cover-pdf".to_vec(),
+            receipt: test_pdf_receipt(),
             docx: b"cover-docx".to_vec(),
         }));
         assert_eq!(
@@ -1952,6 +2041,7 @@ mod tests {
             revision: 8,
             kind: MaterialKind::Resume,
             pdf: b"stale".to_vec(),
+            receipt: test_pdf_receipt(),
             docx: b"stale".to_vec(),
         }));
         assert_eq!(
@@ -2017,6 +2107,7 @@ mod tests {
             revision: 7,
             kind: MaterialKind::Resume,
             pdf: b"existing pdf".to_vec(),
+            receipt: test_pdf_receipt(),
             docx: b"existing docx".to_vec(),
         }));
         exports.promote_unchanged(7, 8, MaterialKind::Resume);
@@ -2069,6 +2160,109 @@ mod tests {
             render_application_exports(&state, edited.revision, MaterialKind::CoverLetter).unwrap();
         assert!(cover.pdf.starts_with(b"%PDF-"));
         assert!(cover.docx.starts_with(b"PK\x03\x04"));
+    }
+
+    fn write_cover_preview_qa(name: &str, preview: &ort_domain::PdfPreviewResponse) {
+        if let Some(directory) = std::env::var_os("ORT_COVER_PREVIEW_QA_DIRECTORY") {
+            let directory = std::path::PathBuf::from(directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            std::fs::write(
+                directory.join(format!("{name}.pdf")),
+                STANDARD.decode(&preview.pdf_base64).unwrap(),
+            )
+            .unwrap();
+            std::fs::write(
+                directory.join(format!("{name}.json")),
+                serde_json::to_vec(preview).unwrap(),
+            )
+            .unwrap();
+        }
+    }
+
+    #[test]
+    fn cover_pdf_preview_matches_download_and_rejects_stale_revisions() {
+        let temp = TempDir::new().unwrap();
+        let store = ort_storage::EncryptedStore::open_or_initialize(
+            temp.path(),
+            "cover-preview",
+            &MemoryDatabaseKeyVault::new(),
+        )
+        .unwrap();
+        let mut current = workspace();
+        current.resume.contact.full_name = "Alex Rivera".into();
+        current.cover_letter = Some("Dear Hiring Team,\n\nI am applying for the engineer position. My documented Rust experience aligns with this role.\n\nThank you for considering my application.\n\nAlex Rivera".into());
+        let saved = save(&store, None, &current).unwrap();
+        let state = DesktopState {
+            storage: Mutex::new(crate::DesktopStorage::Ready(store)),
+            reviews: Arc::new(crate::import_review::ReviewState::default()),
+        };
+        let exports = ApplicationExportState::default();
+        assert!(
+            prepared_application_pdf(&state, &exports, saved.revision, MaterialKind::CoverLetter)
+                .unwrap()
+                .is_none()
+        );
+        let prepared =
+            render_application_exports(&state, saved.revision, MaterialKind::CoverLetter).unwrap();
+        let receipt = prepared.receipt.clone();
+        assert!(exports.replace(prepared));
+        let preview =
+            prepared_application_pdf(&state, &exports, saved.revision, MaterialKind::CoverLetter)
+                .unwrap()
+                .unwrap();
+        assert_eq!(
+            STANDARD.decode(&preview.pdf_base64).unwrap(),
+            exports
+                .bytes(
+                    saved.revision,
+                    MaterialKind::CoverLetter,
+                    ApplicationExportFormat::Pdf
+                )
+                .unwrap()
+        );
+        assert_eq!(preview.receipt, receipt);
+        assert_eq!(preview.revision, saved.revision);
+        assert!(
+            prepared_application_pdf(&state, &exports, saved.revision, MaterialKind::Resume)
+                .unwrap()
+                .is_none()
+        );
+        write_cover_preview_qa("cover-preview", &preview);
+        current.cover_letter = Some("Edited cover letter".into());
+        let updated = state
+            .with_store(|store| save(store, Some(saved.revision), &current))
+            .unwrap();
+        assert!(matches!(
+            prepared_application_pdf(&state, &exports, saved.revision, MaterialKind::CoverLetter),
+            Err(StorageError::RevisionConflict)
+        ));
+        assert!(
+            prepared_application_pdf(
+                &state,
+                &exports,
+                updated.revision,
+                MaterialKind::CoverLetter
+            )
+            .unwrap()
+            .is_none()
+        );
+        let edited =
+            render_application_exports(&state, updated.revision, MaterialKind::CoverLetter)
+                .unwrap();
+        assert!(exports.replace(edited));
+        let edited_preview = prepared_application_pdf(
+            &state,
+            &exports,
+            updated.revision,
+            MaterialKind::CoverLetter,
+        )
+        .unwrap()
+        .unwrap();
+        assert_ne!(
+            edited_preview.receipt.pdf_sha256,
+            preview.receipt.pdf_sha256
+        );
+        write_cover_preview_qa("cover-preview-edited", &edited_preview);
     }
 
     #[test]
@@ -2379,6 +2573,353 @@ mod tests {
             load(&store).unwrap().unwrap().workspace.question,
             "Why this team?"
         );
+        assert!(load_pending_capture(&store).unwrap().is_none());
+    }
+
+    #[test]
+    fn automatic_job_capture_replaces_fields_and_preserves_conflicting_data() {
+        let temp = TempDir::new().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store =
+            ort_storage::EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+        let old = save_stage_one(
+            &store,
+            None,
+            &StageOneDraft {
+                job_description: "Old job".into(),
+                job_url: "https://example.test/old".into(),
+                style: DocumentStyle::Technical,
+            },
+        )
+        .unwrap();
+        let now = 1_800_000_000_000;
+        let id = accept_authenticated_capture(
+            &store,
+            &browser_frame("job", "New captured job", now),
+            now,
+        )
+        .unwrap();
+        assert!(matches!(
+            apply_pending_job_capture(&store, id, None),
+            Err(StorageError::RevisionConflict)
+        ));
+        assert_eq!(
+            load_stage_one(&store)
+                .unwrap()
+                .unwrap()
+                .draft
+                .job_description,
+            "Old job"
+        );
+        assert!(load_pending_capture(&store).unwrap().is_some());
+        assert!(matches!(
+            apply_pending_job_capture(&store, uuid::Uuid::now_v7(), Some(old.revision)),
+            Err(StorageError::RevisionConflict)
+        ));
+        let updated = apply_pending_job_capture(&store, id, Some(old.revision)).unwrap();
+        assert_eq!(updated.draft.job_description, "New captured job");
+        assert_eq!(updated.draft.job_url, "https://example.test/job");
+        assert!(updated.revision > old.revision);
+        assert!(load_pending_capture(&store).unwrap().is_none());
+        assert!(load(&store).unwrap().is_none());
+
+        let question =
+            accept_authenticated_capture(&store, &browser_frame("question", "Why?", now), now)
+                .unwrap();
+        assert!(matches!(
+            apply_pending_job_capture(&store, question, Some(updated.revision)),
+            Err(StorageError::InvalidData)
+        ));
+        assert!(load_pending_capture(&store).unwrap().is_some());
+        resolve_pending_capture(&store, question, false, None, None, None).unwrap();
+        save(&store, None, &workspace()).unwrap();
+        let job =
+            accept_authenticated_capture(&store, &browser_frame("job", "Later job", now), now)
+                .unwrap();
+        assert!(matches!(
+            apply_pending_job_capture(&store, job, Some(updated.revision)),
+            Err(StorageError::RevisionConflict)
+        ));
+        assert_eq!(
+            load_stage_one(&store)
+                .unwrap()
+                .unwrap()
+                .draft
+                .job_description,
+            "New captured job"
+        );
+        assert!(load_pending_capture(&store).unwrap().is_some());
+        assert!(load(&store).unwrap().is_some());
+    }
+
+    /// Run with the real Chrome binary and an exact-ID development native host.
+    /// All captures, database keys and browser state belong to a temporary QA profile.
+    #[test]
+    #[ignore = "launches real Chrome in a disposable profile; run explicitly"]
+    #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "real Chrome to encrypted review integration"
+    )]
+    fn development_chrome_native_roundtrip() {
+        use ort_ipc::capture_session::CaptureSession;
+        use std::sync::{Arc, Mutex};
+        use std::time::{Duration, Instant};
+        struct ChildGuard(std::process::Child);
+        impl Drop for ChildGuard {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let temp = tempfile::Builder::new()
+            .prefix("ort-chrome-intake-")
+            .tempdir_in("/private/tmp")
+            .unwrap();
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../..")
+            .canonicalize()
+            .unwrap();
+        let output = std::process::Command::new("node")
+            .arg(root.join("tools/dev-browser-bridge.mjs"))
+            .arg("id")
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        let id = String::from_utf8(output.stdout).unwrap();
+        let store = Arc::new(
+            ort_storage::EncryptedStore::open_or_initialize(
+                &temp.path().join("data"),
+                "chrome-qa",
+                &MemoryDatabaseKeyVault::new(),
+            )
+            .unwrap(),
+        );
+        let intake = store.clone();
+        let sessions = Arc::new(Mutex::new(CaptureSession::default()));
+        let authority = sessions.clone();
+        let socket = temp.path().join("socket");
+        let server =
+            ort_ipc::development::Server::start(&socket, id.trim(), move |request, bytes| {
+                let now = jiff::Timestamp::now().as_millisecond();
+                crate::browser_bridge::receive_development_request(
+                    &authority,
+                    request,
+                    bytes,
+                    now,
+                    true,
+                    |bytes| accept_authenticated_capture(&intake, bytes, now),
+                )
+            })
+            .unwrap();
+        let child = std::process::Command::new("node")
+            .arg(root.join("apps/extension/scripts/smoke-chrome.mjs"))
+            .arg("dev-bridge")
+            .env("ORT_DEV_QA_ROOT", temp.path())
+            .env("ORT_DEV_BRIDGE_DIRECTORY", &socket)
+            .env("ORT_DEV_QA_HOST", root.join("target/debug/ort-native-host"))
+            .spawn()
+            .unwrap();
+        let mut child = ChildGuard(child);
+        let now = || jiff::Timestamp::now().as_millisecond();
+        let wait = |name: &str| {
+            let start = Instant::now();
+            while !temp.path().join(name).exists() {
+                assert!(
+                    start.elapsed() < Duration::from_secs(30),
+                    "Chrome did not reach {name}"
+                );
+                std::thread::sleep(Duration::from_millis(25));
+            }
+        };
+        let signal = |name: &str| std::fs::write(temp.path().join(name), b"").unwrap();
+        let arm = |name: &str, target: &str| {
+            let start = Instant::now();
+            while !sessions.lock().unwrap().connected(now()) {
+                assert!(start.elapsed() < Duration::from_secs(10));
+                std::thread::sleep(Duration::from_millis(25));
+            }
+            let id = sessions
+                .lock()
+                .unwrap()
+                .start(target, now())
+                .unwrap()
+                .session_id
+                .unwrap();
+            signal(&format!("{name}-armed"));
+            id
+        };
+        let pending = || {
+            let start = Instant::now();
+            loop {
+                if let Some(pending) = load_pending_capture(&store).unwrap() {
+                    break pending.capture;
+                }
+                assert!(
+                    start.elapsed() < Duration::from_secs(5),
+                    "capture was not delivered"
+                );
+                std::thread::sleep(Duration::from_millis(25));
+            }
+        };
+        let phase = |value: &str| {
+            let start = Instant::now();
+            while sessions.lock().unwrap().status(now()).phase != value {
+                assert!(start.elapsed() < Duration::from_secs(5));
+                std::thread::sleep(Duration::from_millis(25));
+            }
+        };
+        wait("browser-ready");
+        let cancelled = arm("cancel", "job");
+        wait("cancel-selecting");
+        phase("selecting");
+        sessions.lock().unwrap().cancel(cancelled, now());
+        wait("cancelled");
+        assert!(
+            sessions
+                .lock()
+                .unwrap()
+                .authorize(cancelled, "job", now())
+                .is_err()
+        );
+        assert!(load_pending_capture(&store).unwrap().is_none());
+        let job_id = arm("job", "job");
+        wait("job-ready");
+        let job = pending();
+        assert_eq!(job.request_id, job_id);
+        assert_eq!(
+            job.payload.text,
+            "Synthetic job description\nRésumé experience required."
+        );
+        let origin = std::fs::read_to_string(temp.path().join("browser-ready")).unwrap();
+        assert_eq!(job.payload.url, format!("{origin}/job?jobId=42"));
+        assert_eq!(job.payload.title, "Synthetic job");
+        assert!(load_stage_one(&store).unwrap().is_none());
+        let applied = apply_pending_job_capture(&store, job.request_id, None).unwrap();
+        assert_eq!(applied.draft.job_url, job.payload.url);
+        assert!(load_pending_capture(&store).unwrap().is_none());
+        assert_eq!(
+            load_stage_one(&store)
+                .unwrap()
+                .unwrap()
+                .draft
+                .job_description,
+            job.payload.text
+        );
+        save(&store, None, &workspace()).unwrap();
+        signal("job-reviewed");
+        arm("question", "question");
+        wait("question-ready");
+        let question = pending();
+        assert_eq!(question.payload.target, "question");
+        assert_eq!(question.payload.text, "Why this team?");
+        assert!(load(&store).unwrap().unwrap().workspace.question.is_empty());
+        let revision = load(&store).unwrap().unwrap().revision;
+        resolve_pending_capture(
+            &store,
+            question.request_id,
+            true,
+            Some(revision),
+            Some(&question.payload.text),
+            Some(&question.payload.url),
+        )
+        .unwrap();
+        assert_eq!(
+            load(&store).unwrap().unwrap().workspace.question,
+            question.payload.text
+        );
+        signal("question-reviewed");
+        arm("partial", "question");
+        wait("partial-ready");
+        let partial = pending();
+        assert_eq!(partial.payload.text, "two");
+        resolve_pending_capture(&store, partial.request_id, false, None, None, None).unwrap();
+        signal("partial-reviewed");
+        for (name, target, expected) in [
+            (
+                "scrolled",
+                "job",
+                "Beginning of long job\nMiddle of long job\nEnd of long job",
+            ),
+            (
+                "pane",
+                "question",
+                "Beginning of panel job\nMiddle of panel job\nEnd of panel job",
+            ),
+        ] {
+            let request_id = arm(name, target);
+            wait(&format!("{name}-ready"));
+            let capture = pending();
+            assert_eq!(capture.request_id, request_id);
+            assert_eq!(capture.payload.target, target);
+            assert_eq!(capture.payload.text, expected);
+            assert_eq!(capture.payload.url, format!("{origin}/job?jobId=42"));
+            resolve_pending_capture(&store, request_id, false, None, None, None).unwrap();
+            signal(&format!("{name}-reviewed"));
+        }
+        arm("empty", "question");
+        wait("empty-picked");
+        phase("idle");
+        assert_eq!(
+            sessions.lock().unwrap().status(now()).error,
+            Some("EMPTY_SELECTION")
+        );
+        assert!(load_pending_capture(&store).unwrap().is_none());
+        arm("reload", "question");
+        wait("page-reloaded");
+        phase("idle");
+        assert_eq!(
+            sessions.lock().unwrap().status(now()).error,
+            Some("PAGE_CHANGED")
+        );
+        assert!(load_pending_capture(&store).unwrap().is_none());
+        sessions.lock().unwrap().disconnect(now());
+        drop(server);
+        assert!(!socket.join("session.json").exists());
+        assert!(!socket.join("bridge.sock").exists());
+        signal("disconnected");
+        let start = Instant::now();
+        loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                assert!(status.success());
+                break;
+            }
+            assert!(start.elapsed() < Duration::from_secs(20));
+            std::thread::sleep(Duration::from_millis(25));
+        }
+    }
+
+    #[test]
+    fn chrome_package_capture_reaches_desktop_review_contract() {
+        let temp = TempDir::new().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store =
+            ort_storage::EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+        let frame = include_bytes!("../../../../fixtures/ipc/chrome-capture.v1.json");
+        let capture: ort_ipc::CaptureEnvelope = serde_json::from_slice(frame).unwrap();
+        let now = capture
+            .sent_at
+            .parse::<jiff::Timestamp>()
+            .unwrap()
+            .as_millisecond();
+        let request_id = accept_authenticated_capture(&store, frame, now).unwrap();
+        assert_eq!(request_id, capture.request_id);
+        assert!(load_stage_one(&store).unwrap().is_none());
+        let pending = load_pending_capture(&store).unwrap().unwrap();
+        assert_eq!(pending.capture.payload.text, capture.payload.text);
+        assert_eq!(pending.capture.payload.url, capture.payload.url);
+        resolve_pending_capture(
+            &store,
+            request_id,
+            true,
+            None,
+            Some(&capture.payload.text),
+            Some(&capture.payload.url),
+        )
+        .unwrap();
+        let draft = load_stage_one(&store).unwrap().unwrap().draft;
+        assert_eq!(draft.job_description, capture.payload.text);
+        assert_eq!(draft.job_url, capture.payload.url);
         assert!(load_pending_capture(&store).unwrap().is_none());
     }
 

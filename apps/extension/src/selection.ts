@@ -1,7 +1,10 @@
 const TRACKING =
-  /^(utm_[a-z0-9_]+|gclid|fbclid|msclkid|mc_cid|mc_eid|token|access_token|auth|session|code)$/i;
+  /^(utm_[a-z0-9_]+|gclid|fbclid|msclkid|mc_cid|mc_eid|token|access_token|refresh_token|id_token|auth|authorization|session|sessionid|session_id|code|password|passwd|secret|api_key|apikey)$/i;
 
 export function normalizeSelection(value: string): string {
+  if (typeof value !== "string") throw new Error("Invalid selected text.");
+  if (/[\uD800-\uDFFF]/u.test(value))
+    throw new Error("Selected text contains unsupported Unicode.");
   const text = value.normalize("NFC").replace(/\r\n?/g, "\n").trim();
   if (!text) throw new Error("Select job text or a question first.");
   if (new TextEncoder().encode(text).length > 128 * 1024)
@@ -10,6 +13,7 @@ export function normalizeSelection(value: string): string {
 }
 
 export function sanitizeUrl(value: string): string {
+  if (typeof value !== "string") throw new Error("Invalid page URL.");
   const url = new URL(value);
   if (!new Set(["http:", "https:"]).has(url.protocol))
     throw new Error("This page URL cannot be captured.");

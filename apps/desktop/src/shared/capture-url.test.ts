@@ -9,6 +9,12 @@ it("removes credentials, fragments and tracking fields from a reviewed source UR
     ),
   ).toBe("https" + "://example.test/job?role=dev");
   expect(sanitizeCaptureUrl(" ")).toBe("");
+  expect(
+    sanitizeCaptureUrl(
+      "https" +
+        "://example.test/job?jobId=42&API_KEY=secret&SESSIONID=secret&refresh_token=secret&password=secret&ref=jobs",
+    ),
+  ).toBe("https" + "://example.test/job?jobId=42&ref=jobs");
   expect(() => sanitizeCaptureUrl("file:///tmp/job")).toThrow();
   expect(() =>
     sanitizeCaptureUrl(`https${"://"}example.test/?q=${"x".repeat(4096)}`),

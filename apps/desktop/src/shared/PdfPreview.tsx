@@ -951,11 +951,13 @@ export function PdfPreviewPanel({
 
 export function PdfCanvas({
   preview,
+  minimal = false,
   onPending,
   onReady,
   onError,
 }: {
   preview: PdfPreview;
+  minimal?: boolean;
   onPending?: () => void;
   onReady: () => void;
   onError: () => void;
@@ -1103,44 +1105,46 @@ export function PdfCanvas({
   }, [pdf, preview.receipt.pageCount, zoom, fitWidth]);
   return (
     <div>
-      <div className="move-controls" aria-label="PDF navigation">
-        <span>{preview.receipt.pageCount} page(s)</span>
-        {Array.from({ length: preview.receipt.pageCount }, (_, index) => (
-          <button
-            type="button"
-            key={index}
-            disabled={!pdf}
-            onClick={() =>
-              canvases.current[index]?.scrollIntoView({ block: "nearest" })
-            }
-          >
-            Go to page {index + 1}
-          </button>
-        ))}
-        <label>
-          PDF zoom{" "}
-          <select
-            value={zoom}
-            onChange={(e) => {
-              if (e.target.value === "fit") {
-                callbacks.current.onPending?.();
-                setZoom("fit");
-                return;
+      {!minimal && (
+        <div className="move-controls" aria-label="PDF navigation">
+          <span>{preview.receipt.pageCount} page(s)</span>
+          {Array.from({ length: preview.receipt.pageCount }, (_, index) => (
+            <button
+              type="button"
+              key={index}
+              disabled={!pdf}
+              onClick={() =>
+                canvases.current[index]?.scrollIntoView({ block: "nearest" })
               }
-              const value = Number(e.target.value);
-              if ([1, 1.5, 2].includes(value)) {
-                callbacks.current.onPending?.();
-                setZoom(value);
-              }
-            }}
-          >
-            <option value="fit">Fit width</option>
-            <option value={1}>100%</option>
-            <option value={1.5}>150%</option>
-            <option value={2}>200%</option>
-          </select>
-        </label>
-      </div>
+            >
+              Go to page {index + 1}
+            </button>
+          ))}
+          <label>
+            PDF zoom{" "}
+            <select
+              value={zoom}
+              onChange={(e) => {
+                if (e.target.value === "fit") {
+                  callbacks.current.onPending?.();
+                  setZoom("fit");
+                  return;
+                }
+                const value = Number(e.target.value);
+                if ([1, 1.5, 2].includes(value)) {
+                  callbacks.current.onPending?.();
+                  setZoom(value);
+                }
+              }}
+            >
+              <option value="fit">Fit width</option>
+              <option value={1}>100%</option>
+              <option value={1.5}>150%</option>
+              <option value={2}>200%</option>
+            </select>
+          </label>
+        </div>
+      )}
       <div
         ref={scrollRegion}
         className="pdf-canvas-scroll"
@@ -1150,9 +1154,11 @@ export function PdfCanvas({
       >
         {Array.from({ length: preview.receipt.pageCount }, (_, index) => (
           <figure className="pdf-page" key={index}>
-            <figcaption>
-              Page {index + 1} of {preview.receipt.pageCount}
-            </figcaption>
+            {!minimal && (
+              <figcaption>
+                Page {index + 1} of {preview.receipt.pageCount}
+              </figcaption>
+            )}
             <canvas
               ref={(element) => {
                 canvases.current[index] = element;

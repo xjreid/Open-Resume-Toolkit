@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
@@ -42,6 +42,56 @@ afterEach(() => {
   vi.clearAllMocks();
   document.body.replaceChildren();
 });
+
+it.each(["resume-view", "resume-edit", "cover-view", "cover"] as const)(
+  "keeps %s open on outside clicks and closes with its X",
+  async (kind) => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => root.render(<ApplicationPopup />));
+    await act(async () =>
+      listeners.get("ort:application-popup-snapshot")?.({
+        payload: {
+          session: "persistent-popup",
+          generation: 1,
+          revision: 1,
+          acknowledgedEditSequence: 0,
+          kind,
+          job: "",
+          jobUrl: "",
+          resume: createResumeDocument(),
+          style: "technical",
+          coverLetter: "Current letter",
+          disabled: false,
+        },
+      }),
+    );
+    await act(async () => {
+      document.body.click();
+      window.dispatchEvent(new Event("blur"));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(host.querySelector("main")).toBeTruthy();
+    expect(invoke).not.toHaveBeenCalledWith("hide_application_popup");
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>('[aria-label="Close popup"]')!
+        .click(),
+    );
+    expect(invoke).toHaveBeenCalledWith("hide_application_popup");
+    expect(emitTo).toHaveBeenCalledWith(
+      "overlay",
+      "ort:application-popup-close",
+      {
+        session: "persistent-popup",
+        sequence: 0,
+        change: undefined,
+      },
+    );
+    await act(async () => root.unmount());
+  },
+);
 
 it("sends overlay section edits through the resume change channel", async () => {
   const host = document.createElement("div");
@@ -266,6 +316,79 @@ function BridgeWithError({ onError }: { onError: (message: string) => void }) {
     </button>
   );
 }
+
+function CoverSwitchBridge({ onEdit }: { onEdit: (value: string) => void }) {
+  const [text, setText] = useState("Original letter");
+  const popup = useApplicationPopup({
+    job: "",
+    jobUrl: "",
+    resume: null,
+    style: "technical",
+    coverLetter: text,
+    disabled: false,
+    onJobChange: () => {},
+    onUrlChange: () => {},
+    onResumeChange: () => {},
+    onCoverChange: (value) => {
+      setText(value);
+      onEdit(value);
+    },
+    onError: (error) => {
+      throw new Error(error);
+    },
+  });
+  return (
+    <>
+      <button onClick={() => void popup.open("cover")}>Edit</button>
+      <button onClick={() => void popup.open("cover-view")}>View</button>
+    </>
+  );
+}
+
+it("switches Edit to View in the same popup after flushing pending text", async () => {
+  const onEdit = vi.fn();
+  vi.mocked(emitTo).mockImplementation(async (_target, event, payload) => {
+    if (event === "ort:application-popup-flush") {
+      listeners.get("ort:application-popup-flushed")?.({
+        payload: {
+          ...(payload as object),
+          sequence: 1,
+          change: { field: "coverLetter", value: "Latest typed letter" },
+        },
+      });
+    }
+  });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => root.render(<CoverSwitchBridge onEdit={onEdit} />));
+  await act(async () =>
+    host.querySelectorAll<HTMLButtonElement>("button")[0]!.click(),
+  );
+  await act(async () =>
+    host.querySelectorAll<HTMLButtonElement>("button")[1]!.click(),
+  );
+  expect(onEdit).toHaveBeenCalledWith("Latest typed letter");
+  expect(invoke).toHaveBeenLastCalledWith("show_application_popup", {
+    kind: "cover-view",
+  });
+  const snapshots = vi
+    .mocked(emitTo)
+    .mock.calls.filter(
+      ([, event]) => event === "ort:application-popup-snapshot",
+    );
+  expect(snapshots.at(-1)?.[2]).toMatchObject({
+    kind: "cover-view",
+    coverLetter: "Latest typed letter",
+  });
+  expect(snapshots.at(-1)?.[2]).toHaveProperty(
+    "session",
+    expect.not.stringMatching(
+      (snapshots[0]![2] as { session: string }).session,
+    ),
+  );
+  await act(async () => root.unmount());
+});
 
 it("closes with the final edit after pending typing emissions settle", async () => {
   const host = document.createElement("div");

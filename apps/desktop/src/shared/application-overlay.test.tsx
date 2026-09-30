@@ -52,6 +52,7 @@ vi.mock("./application-popup", () => ({
     };
   },
 }));
+const idleCapture = { phase: "idle", sessionId: null, error: null };
 const context = {
   publishedRevision: 1,
   aiLabel: "Balanced: Gemini test",
@@ -102,6 +103,7 @@ it.each([false, true])(
   "removes the empty qualification alert panel (truncated: %s)",
   async (alertsTruncated) => {
     vi.mocked(invoke).mockImplementation(async (name) => {
+      if (name === "application_capture_status") return reply(idleCapture);
       if (name === "application_context") return reply(context);
       if (name === "load_application_workspace")
         return reply({
@@ -132,6 +134,7 @@ it("shows a static list even when saved alerts were previously hidden or dismiss
     ignoreAllAlerts: true,
   };
   vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: current });
@@ -152,6 +155,290 @@ it("shows a static list even when saved alerts were previously hidden or dismiss
     "save_application_workspace",
     expect.anything(),
   );
+});
+
+it.each(["startup", "browser event"])(
+  "automatically replaces job fields from a %s capture without a dialog",
+  async (delivery) => {
+    vi.useFakeTimers();
+    const capture = {
+      revision: 1,
+      capture: {
+        requestId: "job-capture",
+        payload: {
+          target: "job",
+          text: "Captured description\n".repeat(60),
+          url: "https" + "://example.test/new-job",
+          title: "New job",
+        },
+      },
+    };
+    let pending: typeof capture | null =
+      delivery === "startup" ? capture : null;
+    let stageOne = {
+      revision: 4,
+      draft: {
+        jobDescription: "Previous description",
+        jobUrl: "https" + "://example.test/old-job",
+        style: "technical",
+      },
+    };
+    vi.mocked(invoke).mockImplementation(async (name, args) => {
+      if (name === "application_context") return reply(context);
+      if (name === "application_capture_status") return reply(idleCapture);
+      if (name === "load_application_workspace") return reply(null);
+      if (name === "load_application_stage_one") return reply(stageOne);
+      if (name === "load_application_capture") return reply(pending);
+      if (name === "apply_application_job_capture") {
+        pending = null;
+        stageOne = {
+          revision: 5,
+          draft: {
+            ...stageOne.draft,
+            jobDescription: capture.capture.payload.text,
+            jobUrl: capture.capture.payload.url,
+          },
+        };
+        return reply(stageOne);
+      }
+      if (name === "save_application_stage_one")
+        return reply({
+          revision: 6,
+          draft: (args as Record<string, unknown>).draft,
+        });
+      throw new Error(`Unexpected command: ${name}`);
+    });
+    const { host } = await mount();
+    if (delivery === "browser event") {
+      pending = capture;
+      await act(async () =>
+        listeners.get("ort:browser-capture")?.({ payload: null }),
+      );
+    }
+    const description = host.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Job Description"]',
+    )!;
+    expect(description.value).toBe(capture.capture.payload.text);
+    expect(
+      host.querySelector<HTMLInputElement>('input[aria-label="Job URL"]')
+        ?.value,
+    ).toBe(capture.capture.payload.url);
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(invoke).toHaveBeenCalledWith("apply_application_job_capture", {
+      requestId: "job-capture",
+      expectedRevision: 4,
+    });
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_application",
+      expect.anything(),
+    );
+    expect(dragWindow.setPosition).not.toHaveBeenCalled();
+    await editField(description, "Edited captured description");
+    await act(async () => vi.advanceTimersByTimeAsync(1500));
+    expect(description.value).toBe("Edited captured description");
+    expect(
+      vi
+        .mocked(invoke)
+        .mock.calls.filter(
+          ([name]) => name === "apply_application_job_capture",
+        ),
+    ).toHaveLength(1);
+    expect(invoke).toHaveBeenCalledWith("save_application_stage_one", {
+      expectedRevision: 5,
+      draft: {
+        ...stageOne.draft,
+        jobDescription: "Edited captured description",
+      },
+    });
+  },
+);
+
+it("waits for an in-flight job save before applying the capture at its new revision", async () => {
+  vi.useFakeTimers();
+  const saving = deferred<unknown>();
+  const capture = {
+    revision: 1,
+    capture: {
+      requestId: "next-job",
+      payload: {
+        target: "job",
+        text: "New capture",
+        url: "https" + "://example.test/new",
+        title: "New job",
+      },
+    },
+  };
+  let pending: typeof capture | null = null;
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context") return reply(context);
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "load_application_capture") return reply(pending);
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "save_application_stage_one") return saving.promise;
+    if (name === "apply_application_job_capture") {
+      pending = null;
+      return reply({
+        revision: 2,
+        draft: {
+          jobDescription: "New capture",
+          jobUrl: "https" + "://example.test/new",
+          style: "technical",
+        },
+      });
+    }
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host } = await mount();
+  const field = host.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="Job Description"]',
+  )!;
+  await editField(field, "Earlier manual edit");
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  pending = capture;
+  await act(async () =>
+    listeners.get("ort:browser-capture")?.({ payload: null }),
+  );
+  expect(invoke).not.toHaveBeenCalledWith(
+    "apply_application_job_capture",
+    expect.anything(),
+  );
+  await act(async () =>
+    saving.resolve(
+      reply({
+        revision: 1,
+        draft: {
+          jobDescription: "Earlier manual edit",
+          jobUrl: "",
+          style: "technical",
+        },
+      }),
+    ),
+  );
+  expect(invoke).toHaveBeenCalledWith("apply_application_job_capture", {
+    requestId: "next-job",
+    expectedRevision: 1,
+  });
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(field.value).toBe("New capture");
+  expect(
+    vi
+      .mocked(invoke)
+      .mock.calls.filter(([name]) => name === "save_application_stage_one"),
+  ).toHaveLength(1);
+});
+
+it.each(["", "Original"])(
+  "preserves reverting field edits before and during an autosave (original: %s)",
+  async (original) => {
+    vi.useFakeTimers();
+    const saving = deferred<unknown>();
+    let saves = 0;
+    vi.mocked(invoke).mockImplementation(async (name, args) => {
+      if (name === "application_context") return reply(context);
+      if (name === "application_capture_status") return reply(idleCapture);
+      if (name === "load_application_stage_one")
+        return reply({
+          revision: 1,
+          draft: { jobDescription: original, jobUrl: "", style: "technical" },
+        });
+      if (name.startsWith("load_application_")) return reply(null);
+      if (name === "save_application_stage_one") {
+        if (++saves === 1) return saving.promise;
+        return reply({
+          revision: 3,
+          draft: (args as Record<string, unknown>).draft,
+        });
+      }
+      throw new Error(`Unexpected command: ${name}`);
+    });
+    const { host } = await mount();
+    const field = host.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Job Description"]',
+    )!;
+    await editField(field, "Transient edit");
+    await editField(field, original);
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(saves).toBe(0);
+    expect(host.textContent).toContain("Your details are saved locally.");
+    await editField(field, "Edit being saved");
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    await editField(field, original);
+    await act(async () =>
+      saving.resolve(
+        reply({
+          revision: 2,
+          draft: {
+            jobDescription: "Edit being saved",
+            jobUrl: "",
+            style: "technical",
+          },
+        }),
+      ),
+    );
+    expect(invoke).toHaveBeenCalledWith("save_application_stage_one", {
+      expectedRevision: 2,
+      draft: { jobDescription: original, jobUrl: "", style: "technical" },
+    });
+    expect(field.value).toBe(original);
+    expect(host.textContent).toContain("Your details are saved locally.");
+  },
+);
+
+it("keeps the original job and captured payload on failure, with an inline retry", async () => {
+  const capture = {
+    revision: 1,
+    capture: {
+      requestId: "retry-job",
+      payload: {
+        target: "job",
+        text: "Replacement",
+        url: "https" + "://example.test/job",
+        title: "Job",
+      },
+    },
+  };
+  let pending: typeof capture | null = capture;
+  let attempts = 0;
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context") return reply(context);
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "load_application_workspace") return reply(null);
+    if (name === "load_application_capture") return reply(pending);
+    if (name === "load_application_stage_one")
+      return reply({
+        revision: 1,
+        draft: { jobDescription: "Original", jobUrl: "", style: "technical" },
+      });
+    if (name === "apply_application_job_capture") {
+      if (++attempts === 1)
+        return { ok: false, error: { code: "STORAGE_UNAVAILABLE" } };
+      pending = null;
+      return reply({
+        revision: 2,
+        draft: {
+          jobDescription: "Replacement",
+          jobUrl: "https" + "://example.test/job",
+          style: "technical",
+        },
+      });
+    }
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  const field = host.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="Job Description"]',
+  )!;
+  expect(field.value).toBe("Original");
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(button("Tailor").disabled).toBe(true);
+  await act(async () =>
+    listeners.get("ort:browser-capture")?.({ payload: null }),
+  );
+  expect(attempts).toBe(1);
+  await act(async () => button("Retry capture").click());
+  expect(field.value).toBe("Replacement");
+  expect(pending).toBeNull();
+  expect(host.textContent).not.toContain("Retry capture");
 });
 
 it.each([
@@ -191,6 +478,7 @@ it.each([
   ],
 ])("renders a brief qualification point %j", async (alert, expected) => {
   vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name === "load_application_workspace")
       return reply({
@@ -208,6 +496,7 @@ it.each([
 it("displays alerts immediately from a successful tailoring response", async () => {
   const tailored = { ...workspace(), alerts: [qualificationAlert] };
   vi.mocked(invoke).mockImplementation(async (name, args) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "save_application_stage_one")
@@ -235,6 +524,22 @@ function deferred<T>() {
   return { promise, resolve };
 }
 const cleanups: (() => Promise<void>)[] = [];
+async function editField(
+  field: HTMLInputElement | HTMLTextAreaElement,
+  value: string,
+) {
+  await act(async () => {
+    const prototype =
+      field instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(
+      field,
+      value,
+    );
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
 async function mount() {
   const host = document.createElement("div");
   document.body.append(host);
@@ -265,6 +570,7 @@ afterEach(async () => {
 
 it("clamps header dragging before moving the native window", async () => {
   vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name.startsWith("load_application_")) return reply(null);
     throw new Error(`Unexpected command: ${name}`);
@@ -294,6 +600,7 @@ it("clamps header dragging before moving the native window", async () => {
 it("refreshes its model preset when the main app changes it", async () => {
   let current = context;
   vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(current);
     if (name.startsWith("load_application_")) return reply(null);
     throw new Error(`Unexpected command: ${name}`);
@@ -309,36 +616,72 @@ it("refreshes its model preset when the main app changes it", async () => {
   ).toBe("economy");
 });
 
-it("uses one cover editor and copies the current cover letter", async () => {
-  const current = { ...workspace(), coverLetter: "Updated cover letter" };
+it("keeps Answers available without a question capture button", async () => {
   vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "application_context")
+      return reply({ ...context, browserConnected: true });
+    if (name === "load_application_workspace")
+      return reply({ revision: 1, workspace: workspace() });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports") return reply({});
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  await act(async () => button("Answers").click());
+  expect(host.textContent).not.toContain("Capture question");
+  expect(host.textContent).toContain("Question");
+  expect(invoke).not.toHaveBeenCalledWith(
+    "request_application_capture",
+    expect.anything(),
+  );
+});
+
+it("opens the cover PDF with View and the current cover text with Edit", async () => {
+  vi.useFakeTimers();
+  const current = { ...workspace(), coverLetter: "Updated cover letter" };
+  vi.mocked(invoke).mockImplementation(async (name, args) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports") return reply({});
+    if (name === "save_application_workspace")
+      return reply({
+        revision: 2,
+        workspace: (args as Record<string, unknown>).workspace,
+      });
     throw new Error(`Unexpected command: ${name}`);
   });
-  const writeText = vi.fn(async () => {});
-  const prior = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-  Object.defineProperty(navigator, "clipboard", {
-    configurable: true,
-    value: { writeText },
+  const { host, button } = await mount();
+  await act(async () => button("Cover letter").click());
+  expect(button("View").disabled).toBe(false);
+  await act(async () => button("View").click());
+  expect(popup.open).toHaveBeenCalledWith("cover-view");
+  expect(popup.options?.workspaceRevision).toBe(1);
+  await act(async () => button("Edit").click());
+  expect(popup.open).toHaveBeenCalledWith("cover");
+  expect(popup.options?.coverLetter).toBe("Updated cover letter");
+  await act(async () =>
+    popup.options?.onCoverChange("Freshly edited cover letter"),
+  );
+  expect(button("View").disabled).toBe(true);
+  await act(async () => vi.advanceTimersByTimeAsync(180));
+  await act(async () => button("View").click());
+  expect(invoke).toHaveBeenCalledWith("prepare_application_exports", {
+    expectedRevision: 2,
+    kind: "cover_letter",
   });
-  try {
-    const { host, button } = await mount();
-    await act(async () => button("Cover letter").click());
-    expect(host.textContent).not.toContain(
-      "A letter grounded in your experience and this role.",
-    );
-    await act(async () => button("View and edit").click());
-    expect(popup.open).toHaveBeenCalledWith("cover");
-    await act(async () => button("Copy").click());
-    expect(writeText).toHaveBeenCalledWith("Updated cover letter");
-  } finally {
-    if (prior) Object.defineProperty(navigator, "clipboard", prior);
-    else Reflect.deleteProperty(navigator, "clipboard");
-  }
+  expect(popup.options?.workspaceRevision).toBe(2);
+  expect(popup.options?.coverLetter).toBe("Freshly edited cover letter");
+  expect(popup.open).toHaveBeenLastCalledWith("cover-view");
+  expect(host.textContent).not.toContain("View and edit");
+  expect(
+    [...host.querySelectorAll("button")].some(
+      (button) => button.textContent?.trim() === "Copy",
+    ),
+  ).toBe(false);
 });
 
 it("refines an answer and saves only its final version on reset", async () => {
@@ -351,6 +694,7 @@ it("refines an answer and saves only its final version on reset", async () => {
   let revision = 1;
   vi.mocked(invoke).mockImplementation(async (name, args) => {
     const input = args as Record<string, unknown>;
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name === "load_application_workspace")
       return reply({ revision, workspace: current });
@@ -419,6 +763,7 @@ it("finishes directly and saves the final answer with tracker details", async ()
   let revision = 1;
   vi.mocked(invoke).mockImplementation(async (name, args) => {
     const input = args as Record<string, unknown>;
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name === "load_application_workspace")
       return reply({ revision, workspace: current });
@@ -458,6 +803,7 @@ it("edits tracker details before finishing and saves all materials", async () =>
     approvedAnswers: [{ question: "Why?", answer: "Because." }],
   };
   vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: current });
@@ -501,6 +847,7 @@ it("edits tracker details before finishing and saves all materials", async () =>
 
 it("confirms discarding the application without a tracker entry", async () => {
   vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: workspace() });
@@ -526,11 +873,12 @@ it("confirms discarding the application without a tracker entry", async () => {
   });
 });
 
-it("keeps Stage 1 compact and saves popup job edits before tailoring", async () => {
+it("edits the job fields directly and saves them before tailoring", async () => {
   const calls: string[] = [];
   vi.mocked(invoke).mockImplementation(async (name, args) => {
     calls.push(name);
     const input = args as Record<string, unknown>;
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "save_application_stage_one")
@@ -542,24 +890,31 @@ it("keeps Stage 1 compact and saves popup job edits before tailoring", async () 
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host, button } = await mount();
-  expect(host.querySelector("textarea")).toBeNull();
+  const description = host.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="Job Description"]',
+  )!;
+  const url = host.querySelector<HTMLInputElement>(
+    'input[aria-label="Job URL"]',
+  )!;
+  expect(description).toBeTruthy();
+  expect(url.type).toBe("url");
   expect(host.textContent).not.toContain("Capture the opportunity");
   expect(host.textContent).not.toContain("Ready for your next role");
   expect(host.textContent).not.toContain("Resume style");
   expect(button("Capture").disabled).toBe(true);
   expect(button("Tailor").disabled).toBe(true);
-  await act(async () => button("View Job Description").click());
-  expect(popup.open).toHaveBeenCalledWith("job");
-  await act(async () => popup.options?.onJobChange("Rust engineer required"));
+  await editField(description, "Rust engineer required");
+  await editField(url, "https" + "://example.test/job");
   expect(button("Tailor").disabled).toBe(false);
-  expect(host.textContent).toContain("Complete");
+  expect(popup.open).not.toHaveBeenCalled();
+  expect(host.textContent).not.toContain("Complete");
   await act(async () => button("Tailor").click());
   expect(calls.indexOf("start_application")).toBeGreaterThan(
     calls.indexOf("save_application_stage_one"),
   );
   expect(invoke).toHaveBeenCalledWith("start_application", {
     jobDescription: "Rust engineer required",
-    jobUrl: "",
+    jobUrl: "https" + "://example.test/job",
     style: "technical",
   });
   expect(host.textContent).toContain("Example");
@@ -578,6 +933,7 @@ it.each([
   ["AI_MODEL_UNAVAILABLE", "unavailable to this API key (HTTP 404)"],
 ])("shows %s without saving or preparing exports", async (code, expected) => {
   vi.mocked(invoke).mockImplementation(async (name, args) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "save_application_stage_one")
@@ -606,6 +962,7 @@ it("places Finish Application directly below the header when no role was found",
   const draft = workspace();
   draft.roleInfo = { company: "", title: "", location: "" };
   vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: draft });
@@ -629,7 +986,10 @@ it("requires an active key even when a job exists and routes connected capture +
     browserConnected: true,
   };
   vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(activeContext);
+    if (name === "request_application_capture")
+      return reply({ phase: "waiting", sessionId: "capture-one", error: null });
     if (name.startsWith("load_application_")) return reply(null);
     return reply(true);
   });
@@ -664,6 +1024,7 @@ it("autosaves without losing newer typing and only exports the latest prepared r
   let latest = workspace();
   vi.mocked(invoke).mockImplementation(async (name, args) => {
     const input = args as Record<string, unknown>;
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(context);
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: latest });
@@ -753,6 +1114,7 @@ it("autosaves without losing newer typing and only exports the latest prepared r
 it("shows working/stop in the persistent header and retains dirty edits after save failure", async () => {
   vi.useFakeTimers();
   vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context")
       return reply({ ...context, aiBusy: true });
     if (name === "load_application_workspace")
@@ -785,4 +1147,53 @@ it("shows working/stop in the persistent header and retains dirty edits after sa
     attempt: "dirty",
     dirty: true,
   });
+});
+
+it("uses the overlay button to start, switch to Cancel after the first corner, and revoke that generation", async () => {
+  let mode = { phase: "idle", sessionId: null as string | null, error: null };
+  let delayNextStatus = false;
+  let resolveStaleStatus: ((value: unknown) => void) | undefined;
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_context")
+      return reply({ ...context, browserConnected: true });
+    if (name === "application_capture_status") {
+      if (delayNextStatus) {
+        delayNextStatus = false;
+        return new Promise((resolve) => {
+          resolveStaleStatus = resolve;
+        });
+      }
+      return reply(mode);
+    }
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "request_application_capture") {
+      mode = { phase: "waiting", sessionId: "capture-one", error: null };
+      return reply(mode);
+    }
+    if (name === "cancel_application_capture") {
+      mode = idleCapture;
+      return reply(mode);
+    }
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  await act(async () => button("Capture").click());
+  expect(button("Capture").getAttribute("aria-pressed")).toBe("true");
+  expect(host.textContent).toContain("top-left corner");
+  mode = { phase: "selecting", sessionId: "capture-one", error: null };
+  await act(async () =>
+    listeners.get("ort:capture-mode")?.({ payload: { phase: "forged" } }),
+  );
+  expect(button("Cancel").disabled).toBe(false);
+  expect(host.textContent).toContain("bottom-right corner");
+  const staleMode = mode;
+  delayNextStatus = true;
+  await act(async () => listeners.get("ort:capture-mode")?.({ payload: null }));
+  await act(async () => button("Cancel").click());
+  expect(invoke).toHaveBeenCalledWith("cancel_application_capture", {
+    sessionId: "capture-one",
+  });
+  expect(button("Capture").getAttribute("aria-pressed")).toBe("false");
+  await act(async () => resolveStaleStatus!(reply(staleMode)));
+  expect(button("Capture").getAttribute("aria-pressed")).toBe("false");
 });

@@ -11,6 +11,10 @@ repository.workspace = true
 name = "ort_desktop"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = []
+dev-browser-bridge = ["ort-ipc/dev-browser-bridge"]
+
 [build-dependencies]
 tauri-build.workspace = true
 

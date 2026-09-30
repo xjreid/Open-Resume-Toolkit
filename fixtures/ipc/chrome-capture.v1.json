@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "requestId": "018bd20e-8d6e-7a0b-8000-000000000001",
+  "sentAt": "2026-09-29T12:00:00.000Z",
+  "kind": "capture.selection",
+  "payload": {
+    "text": "Synthetic job description\nRésumé experience required.",
+    "url": "https://example.test/job?jobId=42",
+    "title": "Synthetic job",
+    "target": "job",
+    "browser": "chrome"
+  }
+}

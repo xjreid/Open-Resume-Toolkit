@@ -121,6 +121,16 @@ type Context = {
   presetOptions: { preset: Preset; label: string; model: string | null }[];
   browserConnected: boolean;
 };
+type CaptureMode = {
+  phase: "idle" | "waiting" | "selecting";
+  sessionId: string | null;
+  error: string | null;
+};
+const idleCapture: CaptureMode = {
+  phase: "idle",
+  sessionId: null,
+  error: null,
+};
 type Response<T> =
   | { ok: true; value: T }
   | { ok: false; error: { code: string; messageKey: string } };
@@ -136,7 +146,21 @@ async function command<T>(
 
 const errors: Record<string, string> = {
   BROWSER_CAPTURE_UNAVAILABLE:
-    "Browser capture is not connected in this build.",
+    "Enable Browser connections in ORT Settings and reload the Chrome extension.",
+  PAGE_UNAVAILABLE:
+    "Open a normal web page in Chrome and allow the ORT extension access to that site.",
+  PAGE_CHANGED: "The page changed. Press Capture to select the text again.",
+  EMPTY_SELECTION:
+    "The box contained no readable text. Press Capture and choose another area.",
+  CAPTURE_EXPIRED: "Capture mode timed out. Press Capture to begin again.",
+  CAPTURE_TOO_LARGE: "Choose a smaller area of text (128 KiB maximum).",
+  CAPTURE_PENDING:
+    "Review or discard the current capture before starting another.",
+  BRIDGE_UNAVAILABLE:
+    "The browser connection is unavailable. Check Browser connections in Settings.",
+  DELIVERY_UNCONFIRMED:
+    "Check the capture review before trying again; delivery could not be confirmed.",
+  CAPTURE_BUSY: "Capture mode is already active.",
   PUBLISHED_RESUME_REQUIRED:
     "Publish a master resume in the main window before continuing.",
   AI_DISABLED: "Set up a Direct AI key in the main window before continuing.",
@@ -216,6 +240,13 @@ export function ApplicationOverlay() {
   const [stageOneReady, setStageOneReady] = useState(false);
   const [pendingCapture, setPendingCapture] =
     useState<SavedPendingCapture | null>(null);
+  const [captureMode, setCaptureMode] = useState<CaptureMode>(idleCapture);
+  const captureRefreshEpoch = useRef(0);
+  const applyingJobCapture = useRef(false);
+  const attemptedJobCapture = useRef<string | null>(null);
+  const [jobCaptureError, setJobCaptureError] = useState(false);
+  const capturing =
+    captureMode.phase === "waiting" || captureMode.phase === "selecting";
   const [captureText, setCaptureText] = useState("");
   const [captureUrl, setCaptureUrl] = useState("");
   const headerDrag = useRef<{
@@ -280,6 +311,7 @@ export function ApplicationOverlay() {
     resume: draft?.resume ?? null,
     style: draft?.style ?? style,
     coverLetter: draft?.coverLetter ?? null,
+    workspaceRevision: saved?.revision,
     disabled: busy || closePending,
     onJobChange: setJob,
     onUrlChange: setJobUrl,
@@ -360,8 +392,10 @@ export function ApplicationOverlay() {
       command<Saved | null>("load_application_workspace"),
       command<SavedStageOne | null>("load_application_stage_one"),
       command<SavedPendingCapture | null>("load_application_capture"),
+      command<CaptureMode | null>("application_capture_status"),
     ])
-      .then(([nextContext, current, stageOne, capture]) => {
+      .then(([nextContext, current, stageOne, capture, mode]) => {
+        setCaptureMode(mode ?? idleCapture);
         setContext(nextContext);
         savedRef.current = current;
         draftRef.current = current?.workspace ?? null;
@@ -384,25 +418,30 @@ export function ApplicationOverlay() {
   useEffect(() => {
     let active = true;
     const refreshContext = () => {
+      const epoch = ++captureRefreshEpoch.current;
       void Promise.all([
         command<SavedPendingCapture | null>("load_application_capture"),
         command<Context>("application_context"),
+        command<CaptureMode | null>("application_capture_status"),
       ])
-        .then(([capture, nextContext]) => {
-          if (active) {
+        .then(([capture, nextContext, mode]) => {
+          if (active && epoch === captureRefreshEpoch.current) {
             setPendingCapture(capture);
             setContext(nextContext);
+            setCaptureMode(mode ?? idleCapture);
           }
         })
         .catch((error: unknown) => {
-          if (active) setNotice(message(error));
+          if (active && epoch === captureRefreshEpoch.current)
+            setNotice(message(error));
         });
     };
     window.addEventListener("focus", refreshContext);
-    const timer = window.setInterval(refreshContext, 2000);
+    const timer = window.setInterval(refreshContext, 500);
     const overlayWindow = getCurrentWebviewWindow();
     const subscriptions = Promise.all([
       overlayWindow.listen("ort:browser-capture", refreshContext),
+      overlayWindow.listen("ort:capture-mode", refreshContext),
       overlayWindow.listen("ort:ai-preset-changed", refreshContext),
     ]).catch(() => []);
     return () => {
@@ -452,21 +491,78 @@ export function ApplicationOverlay() {
   }
 
   useEffect(() => {
-    if (!stageOneReady || saved) return;
+    if (!stageOneReady || saved || applyingJobCapture.current) return;
+    const next = { jobDescription: job, jobUrl, style };
     if (
-      !job &&
-      !jobUrl &&
-      style === "technical" &&
-      stageOneRevision.current === null
-    )
+      !stageOneFlush.current &&
+      JSON.stringify(next) ===
+        JSON.stringify(
+          stageOneSaved.current ?? {
+            jobDescription: "",
+            jobUrl: "",
+            style: "technical",
+          },
+        )
+    ) {
+      stageOnePending.current = null;
+      setStageOneStatus("saved");
       return;
-    stageOnePending.current = { jobDescription: job, jobUrl, style };
+    }
+    stageOnePending.current = next;
     setStageOneStatus("saving");
     const timer = window.setTimeout(() => {
       void flushStageOne().catch((error: unknown) => setNotice(message(error)));
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [job, jobUrl, style, stageOneReady, saved]);
+  }, [job, jobUrl, style, stageOneReady, saved, busy]);
+
+  useEffect(() => {
+    if (
+      !stageOneReady ||
+      saved ||
+      busy ||
+      closePending ||
+      pendingCapture?.capture.payload.target !== "job" ||
+      attemptedJobCapture.current === pendingCapture.capture.requestId
+    )
+      return;
+    applyJobCapture(pendingCapture);
+  }, [pendingCapture, stageOneReady, saved, busy, closePending]);
+
+  function applyJobCapture(capture: SavedPendingCapture) {
+    if (applyingJobCapture.current) return;
+    applyingJobCapture.current = true;
+    attemptedJobCapture.current = capture.capture.requestId;
+    setJobCaptureError(false);
+    void run(async () => {
+      try {
+        // Finish earlier local edits before applying the browser result. This
+        // keeps their revision from racing the atomic capture transaction.
+        await flushStageOne();
+        const updated = await command<SavedStageOne>(
+          "apply_application_job_capture",
+          {
+            requestId: capture.capture.requestId,
+            expectedRevision: stageOneRevision.current,
+          },
+        );
+        captureRefreshEpoch.current++;
+        stageOneRevision.current = updated.revision;
+        stageOneSaved.current = updated.draft;
+        stageOnePending.current = null;
+        setJob(updated.draft.jobDescription);
+        setJobUrl(updated.draft.jobUrl);
+        setStyle(updated.draft.style);
+        setStageOneStatus("saved");
+        setPendingCapture(null);
+      } catch (error) {
+        setJobCaptureError(true);
+        throw error;
+      } finally {
+        applyingJobCapture.current = false;
+      }
+    });
+  }
 
   function apply(current: Saved) {
     savedRef.current = current;
@@ -710,23 +806,31 @@ export function ApplicationOverlay() {
               <button
                 type="button"
                 className="application-secondary"
-                onClick={() => popup.open("cover")}
+                disabled={!exportReady}
+                onClick={() =>
+                  void run(async () => {
+                    await popup.flush();
+                    await flushWorkspace();
+                    const current = savedRef.current;
+                    if (!current) return;
+                    await command("prepare_application_exports", {
+                      expectedRevision: current.revision,
+                      kind: "cover_letter",
+                    });
+                    await popup.open("cover-view");
+                  })
+                }
               >
-                <OverlayIcon name="edit" />
-                View and edit
+                <OverlayIcon name="view" />
+                View
               </button>
               <button
                 type="button"
                 className="application-secondary"
-                onClick={() =>
-                  void navigator.clipboard
-                    .writeText(draft?.coverLetter ?? "")
-                    .catch(() =>
-                      setNotice("The cover letter could not be copied."),
-                    )
-                }
+                onClick={() => popup.open("cover")}
               >
-                Copy
+                <OverlayIcon name="edit" />
+                Edit
               </button>
             </>
           ) : (
@@ -813,6 +917,26 @@ export function ApplicationOverlay() {
     });
   }
 
+  function toggleCapture(target: "job" | "question") {
+    return run(async () => {
+      // An older heartbeat must not restore a cancelled generation in the UI.
+      captureRefreshEpoch.current++;
+      let nextMode: CaptureMode;
+      if (capturing && captureMode.sessionId) {
+        nextMode = await command<CaptureMode>("cancel_application_capture", {
+          sessionId: captureMode.sessionId,
+        });
+      } else {
+        nextMode = await command<CaptureMode>("request_application_capture", {
+          target,
+        });
+      }
+      captureRefreshEpoch.current++;
+      setCaptureMode(nextMode);
+      setNotice("");
+    });
+  }
+
   function resolveCapture(accept: boolean) {
     if (!pendingCapture) return;
     const capture = pendingCapture;
@@ -837,6 +961,7 @@ export function ApplicationOverlay() {
             : (saved?.revision ?? null)
           : null,
       });
+      captureRefreshEpoch.current++;
       setPendingCapture(null);
       if (!accept) return;
       if (capture.capture.payload.target === "job") {
@@ -1023,6 +1148,15 @@ export function ApplicationOverlay() {
         </div>
       </header>
       <div className="application-content">
+        {(capturing || captureMode.error) && (
+          <p className="application-notice" role="status">
+            {captureMode.error
+              ? message(new Error(captureMode.error))
+              : captureMode.phase === "selecting"
+                ? "Move to the bottom-right corner and click to capture. Press Cancel to stop."
+                : "In Chrome, click the top-left corner of the text you want to capture. Press Capture again to cancel."}
+          </p>
+        )}
         {notice && (
           <p className="application-notice" role="alert">
             {notice}
@@ -1046,23 +1180,26 @@ export function ApplicationOverlay() {
                 <button
                   type="button"
                   className="application-secondary"
-                  disabled={!context?.browserConnected}
-                  onClick={() =>
-                    void run(async () => {
-                      await command("request_application_capture", {
-                        target: "job",
-                      });
-                      setNotice("Select the job description in your browser.");
-                    })
+                  disabled={
+                    !capturing &&
+                    (!context?.browserConnected || !!pendingCapture)
                   }
+                  aria-pressed={capturing}
+                  title={
+                    capturing
+                      ? "Cancel capture mode"
+                      : "Capture text from Chrome"
+                  }
+                  onClick={() => void toggleCapture("job")}
                 >
                   <OverlayIcon name="capture" />
-                  Capture
+                  {captureMode.phase === "selecting" ? "Cancel" : "Capture"}
                 </button>
                 <button
                   type="button"
                   disabled={
                     !stageOneReady ||
+                    pendingCapture?.capture.payload.target === "job" ||
                     !jobReady ||
                     !context?.publishedRevision ||
                     !context?.aiReady ||
@@ -1092,16 +1229,29 @@ export function ApplicationOverlay() {
                   <OverlayIcon name="arrow" />
                 </button>
               </div>
-              <CaptureField
-                title="Job Description"
-                complete={jobReady}
-                onView={() => popup.open("job")}
-              />
-              <CaptureField
-                title="Job URL"
-                complete={!!jobUrl.trim()}
-                onView={() => popup.open("url")}
-              />
+              <label className="application-job-field">
+                Job Description
+                <textarea
+                  aria-label="Job Description"
+                  value={job}
+                  onChange={(event) => setJob(event.target.value)}
+                  placeholder="Capture a job description or paste it here"
+                  maxLength={131072}
+                  spellCheck={false}
+                />
+              </label>
+              <label className="application-job-field">
+                Job URL
+                <input
+                  aria-label="Job URL"
+                  type="url"
+                  value={jobUrl}
+                  onChange={(event) => setJobUrl(event.target.value)}
+                  placeholder="Job page URL (optional)"
+                  maxLength={4096}
+                  spellCheck={false}
+                />
+              </label>
               {job.length > 20_000 && (
                 <p className="application-note" role="status">
                   Trim the job description to 20,000 characters before
@@ -1461,7 +1611,34 @@ export function ApplicationOverlay() {
           )}
         </fieldset>
       </div>
-      {pendingCapture && !finishMode && (
+      {pendingCapture?.capture.payload.target === "job" &&
+        (jobCaptureError || saved) &&
+        !busy && (
+          <div className="application-notice" role="status">
+            <p>
+              {saved
+                ? "Finish the current application to fill in the captured job."
+                : "The captured job is kept locally. Retry to fill in the fields."}
+            </p>
+            {!saved && (
+              <button
+                type="button"
+                disabled={closePending}
+                onClick={() => applyJobCapture(pendingCapture)}
+              >
+                Retry capture
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={closePending}
+              onClick={() => resolveCapture(false)}
+            >
+              Discard capture
+            </button>
+          </div>
+        )}
+      {pendingCapture?.capture.payload.target === "question" && !finishMode && (
         <div className="application-dialog-backdrop">
           <section
             role="dialog"
@@ -1471,9 +1648,8 @@ export function ApplicationOverlay() {
           >
             <h2>Review browser capture</h2>
             <p>
-              {pendingCapture.capture.payload.target === "job"
-                ? "Accepting this capture replaces the current reviewed job text and source URL."
-                : "Accepting this capture saves the current answer and replaces the question."}
+              Accepting this capture saves the current answer and replaces the
+              question.
             </p>
             {pendingCapture.capture.payload.title && (
               <p>{pendingCapture.capture.payload.title}</p>
@@ -1498,14 +1674,7 @@ export function ApplicationOverlay() {
             </label>
             {!captureReady && (
               <p role="status">
-                {pendingCapture.capture.payload.target === "question"
-                  ? "Trim the question to 2,000 characters before accepting it."
-                  : "Trim the selection to the 128 KiB capture limit before accepting it."}
-              </p>
-            )}
-            {pendingCapture.capture.payload.target === "job" && saved && (
-              <p role="status">
-                Finish the current application before accepting a new job.
+                Trim the question to 2,000 characters before accepting it.
               </p>
             )}
             {pendingCapture.capture.payload.target === "question" && !saved && (
@@ -1525,16 +1694,12 @@ export function ApplicationOverlay() {
                   busy ||
                   dirty ||
                   !captureReady ||
-                  (pendingCapture.capture.payload.target === "job" &&
-                    !!saved) ||
                   (pendingCapture.capture.payload.target === "question" &&
                     !saved)
                 }
                 onClick={() => resolveCapture(true)}
               >
-                {pendingCapture.capture.payload.target === "job"
-                  ? "Replace reviewed job"
-                  : "Replace current question"}
+                Replace current question
               </button>
               <button
                 type="button"
@@ -1616,34 +1781,6 @@ export function ApplicationOverlay() {
   );
 }
 
-function CaptureField({
-  title,
-  complete,
-  onView,
-}: {
-  title: string;
-  complete: boolean;
-  onView: () => void;
-}) {
-  return (
-    <section className="application-capture-field">
-      <h2>{title}</h2>
-      <p className={complete ? "is-complete" : ""}>
-        <OverlayIcon name={complete ? "check" : "waiting"} />
-        {complete ? "Complete" : "Waiting"}
-      </p>
-      <button
-        type="button"
-        className="application-secondary"
-        aria-label={`View ${title}`}
-        onClick={onView}
-      >
-        <OverlayIcon name="view" />
-        View
-      </button>
-    </section>
-  );
-}
 function OverlayIcon({
   name,
 }: {

@@ -6,12 +6,17 @@
   "type": "module",
   "scripts": {
     "build": "pnpm build:chrome && pnpm build:edge",
-    "build:chrome": "tsc -p tsconfig.json --outDir dist/chrome && node scripts/write-manifest.mjs chrome",
+    "build:chrome": "node scripts/write-manifest.mjs chrome store prepare && tsc -p tsconfig.json --outDir dist/chrome && node scripts/write-manifest.mjs chrome store",
     "build:edge": "tsc -p tsconfig.json --outDir dist/edge && node scripts/write-manifest.mjs edge",
-    "dev:chrome": "pnpm build:chrome",
+    "dev:chrome": "node scripts/write-manifest.mjs chrome dev prepare && tsc -p tsconfig.json --outDir dist/chrome-dev && node scripts/write-manifest.mjs chrome dev",
     "dev:edge": "pnpm build:edge",
     "lint": "tsc --noEmit",
-    "test": "pnpm build:chrome && node --test tests/*.test.mjs"
+    "test": "pnpm build:chrome && pnpm build:chrome:dev-bridge && node --test tests/*.test.mjs",
+    "package:chrome": "pnpm build:chrome && node scripts/package-chrome.mjs",
+    "test:browser": "pnpm build:chrome && node scripts/smoke-chrome.mjs",
+    "build:chrome:dev-bridge": "node scripts/write-manifest.mjs chrome dev-bridge prepare && tsc -p tsconfig.json --outDir dist/chrome-dev-bridge && node scripts/write-manifest.mjs chrome dev-bridge",
+    "package:chrome:dev": "pnpm build:chrome:dev-bridge && node scripts/package-chrome.mjs dev-bridge",
+    "test:browser:dev": "pnpm build:chrome:dev-bridge && node scripts/test-dev-bridge.mjs"
   },
   "devDependencies": {
     "typescript": "7.0.2"

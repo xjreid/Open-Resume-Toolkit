@@ -19,10 +19,12 @@ mod ai_request;
 mod ai_settings;
 mod application_materials;
 mod backup_export;
+mod browser_bridge;
 mod close_guard;
 mod data_deletion;
 mod import_review;
 mod menu;
+mod overlay_position;
 mod pdf_preview;
 mod text_export;
 mod tracker;
@@ -91,6 +93,9 @@ fn resolve_close_on_main(
         request.payload.decision,
     ) {
         return CommandResponse::failure(code, "errors.closeUnavailable", true);
+    }
+    if quitting {
+        overlay_position::remember(app);
     }
     #[cfg(target_os = "macos")]
     let native_reply = ort_macos_lifecycle::reply(quitting);
@@ -417,6 +422,7 @@ fn toggle_application_overlay(window: WebviewWindow) -> CommandResponse<bool> {
         return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
     };
     if overlay.is_visible().unwrap_or(false) && !overlay.is_minimized().unwrap_or(false) {
+        overlay_position::remember(window.app_handle());
         hide_application_popup_for(window.app_handle());
         if overlay.hide().is_err() {
             return CommandResponse::failure(
@@ -428,7 +434,7 @@ fn toggle_application_overlay(window: WebviewWindow) -> CommandResponse<bool> {
         let _ = window.emit("ort:overlay-visibility", false);
         return CommandResponse::success(false);
     }
-    if position_overlay(&overlay).is_err() {
+    if overlay_position::restore(&overlay).is_err() {
         return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
     }
     if overlay.show().is_err() || overlay.unminimize().is_err() {
@@ -481,25 +487,6 @@ fn signed_dimension(value: u32) -> i32 {
     i32::try_from(value).unwrap_or(i32::MAX)
 }
 
-fn position_overlay(overlay: &WebviewWindow) -> tauri::Result<()> {
-    let scale = overlay.scale_factor()?;
-    let Some(monitor) = overlay.current_monitor()?.or(overlay.primary_monitor()?) else {
-        return Ok(());
-    };
-    let work = monitor.work_area();
-    let width = physical_dimension(OVERLAY_LOGICAL_WIDTH, scale);
-    let desired_height = physical_dimension(OVERLAY_LOGICAL_HEIGHT, scale);
-    let height = desired_height.min(work.size.height);
-    let x = work.position.x;
-    let vertical_margin = i64::from(work.size.height) - i64::from(height);
-    let y = work
-        .position
-        .y
-        .saturating_add(i32::try_from(vertical_margin.max(0)).unwrap_or(i32::MAX) / 2);
-    overlay.set_size(PhysicalSize::new(width.min(work.size.width), height))?;
-    overlay.set_position(PhysicalPosition::new(x, y))
-}
-
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 enum ApplicationPopupKind {
@@ -508,12 +495,13 @@ enum ApplicationPopupKind {
     ResumeView,
     ResumeEdit,
     Cover,
+    CoverView,
 }
 
 impl ApplicationPopupKind {
     fn logical_size(self) -> (f64, f64) {
         match self {
-            Self::ResumeView => (850.0, 760.0),
+            Self::ResumeView | Self::CoverView => (850.0, 760.0),
             Self::ResumeEdit => (1051.0, 760.0),
             Self::Job | Self::Url | Self::Cover => (520.0, 420.0),
         }
@@ -622,6 +610,8 @@ fn hide_application_popup(window: WebviewWindow) -> CommandResponse<bool> {
 pub fn run() {
     tauri::Builder::default()
         .manage(CloseGuard::default())
+        .manage(overlay_position::OverlayPositionState::default())
+        .manage(browser_bridge::BrowserBridgeState::default())
         .manage(text_export::ExportState::default())
         .manage(pdf_preview::PdfState::default())
         .manage(pdf_preview::PortablePdfState::default())
@@ -654,6 +644,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            browser_bridge::browser_connection_status,
+            browser_bridge::application_capture_status,
+            browser_bridge::cancel_application_capture,
+            browser_bridge::connect_development_browser,
+            browser_bridge::disconnect_development_browser,
             ai_keys::load_ai_connection,
             ai_keys::add_ai_key,
             ai_keys::change_ai_key,
@@ -668,6 +663,7 @@ pub fn run() {
             application_materials::load_application_capture,
             application_materials::request_application_capture,
             application_materials::resolve_application_capture,
+            application_materials::apply_application_job_capture,
             application_materials::application_context,
             application_materials::cancel_application_generation,
             application_materials::start_application,
@@ -801,13 +797,6 @@ pub fn run() {
                 api.prevent_close();
                 hide_application_popup_for(app);
             }
-            RunEvent::WindowEvent {
-                label,
-                event: WindowEvent::Focused(false),
-                ..
-            } if label == "application-popup" => {
-                hide_application_popup_for(app);
-            }
             RunEvent::ExitRequested { api, .. } if !app.state::<CloseGuard>().approved() => {
                 api.prevent_exit();
                 request_native_close(app);
@@ -820,6 +809,8 @@ pub fn run() {
                 let _ = app.state::<DesktopState>().reviews.clear();
             }
             RunEvent::Exit => {
+                app.state::<browser_bridge::BrowserBridgeState>()
+                    .disconnect();
                 let _ = app.state::<DesktopState>().reviews.clear();
             }
             _ => {}

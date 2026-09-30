@@ -1,5 +1,5 @@
 const trackingKey =
-  /^(utm_[a-z0-9_]+|gclid|fbclid|msclkid|mc_cid|mc_eid|token|access_token|auth|session|code)$/i;
+  /^(utm_[a-z0-9_]+|gclid|fbclid|msclkid|mc_cid|mc_eid|token|access_token|refresh_token|id_token|auth|authorization|session|sessionid|session_id|code|password|passwd|secret|api_key|apikey)$/i;
 
 export function sanitizeCaptureUrl(input: string): string {
   if (!input.trim()) return "";

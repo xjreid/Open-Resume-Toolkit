@@ -3970,14 +3970,18 @@ dependencies = [
 name = "ort-ipc"
 version = "0.0.0-dev"
 dependencies = [
+ "getrandom 0.4.3",
  "hmac",
  "jiff",
+ "rustix",
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "tempfile",
  "thiserror 2.0.20",
  "url",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]

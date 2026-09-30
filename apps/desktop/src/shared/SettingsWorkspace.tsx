@@ -1,3 +1,4 @@
+import { BrowserConnectionSettings } from "./BrowserConnectionSettings";
 import { useState, type ReactNode } from "react";
 
 // Settings sections accept feature-owned panels. Keep them mounted when changing
@@ -49,18 +50,7 @@ export function SettingsWorkspace({
       </nav>
       <div hidden={section !== "backup"}>{backup}</div>
       <div hidden={section !== "storage"}>{storage}</div>
-      <div hidden={section !== "browser"}>
-        <h3>Chrome and Edge</h3>
-        <p>
-          Browser capture is unavailable in this unsigned development preview.
-          Both browsers are disconnected; no native host is registered.
-        </p>
-        <p>
-          Paste selected text into the application overlay to continue working.
-          Browser connection setup requires a signed desktop and native host
-          with verified Keychain access.
-        </p>
-      </div>
+      {section === "browser" && <BrowserConnectionSettings />}
     </section>
   );
 }

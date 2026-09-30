@@ -12,6 +12,7 @@ import type {
 import { documentUsage } from "./resume-validation";
 import { PopupSectionNavigator } from "./PopupSectionNavigator";
 import "./application-popup.css";
+import { ApplicationCoverPreview } from "./ApplicationCoverPreview";
 
 type PopupState = ApplicationPopupSnapshot | null;
 
@@ -22,6 +23,7 @@ function title(kind: ApplicationPopupSnapshot["kind"]) {
     "resume-view": "Resume preview",
     "resume-edit": "Edit tailored resume",
     cover: "Cover letter",
+    "cover-view": "Cover letter preview",
   }[kind];
 }
 
@@ -175,15 +177,7 @@ export function ApplicationPopup() {
       }
     };
     void connect();
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        void close();
-      }
-    };
-    globalThis.window.addEventListener("keydown", escape);
     return () => {
-      globalThis.window.removeEventListener("keydown", escape);
       stops.forEach((stop) => stop());
     };
   }, [close, finalUpdate]);
@@ -199,7 +193,7 @@ export function ApplicationPopup() {
     : false;
   return (
     <main
-      className={`application-popup${snapshot.kind === "resume-edit" ? " application-popup--resume-edit" : ""}`}
+      className={`application-popup application-popup--${snapshot.kind}`}
       aria-label={title(snapshot.kind)}
     >
       <header className="application-popup__header">
@@ -275,6 +269,13 @@ export function ApplicationPopup() {
               onChange={(value) => sendChange({ field: "resume", value })}
             />
           </div>
+        )}
+        {snapshot.kind === "cover-view" && (
+          <ApplicationCoverPreview
+            key={snapshot.session}
+            revision={snapshot.workspaceRevision}
+            text={snapshot.coverLetter ?? ""}
+          />
         )}
         {snapshot.kind === "cover" && (
           <label className="application-popup__field">

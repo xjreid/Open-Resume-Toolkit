@@ -109,3 +109,17 @@
   background: #fff4ed;
   border: 1px solid #dec6aa;
 }
+.application-popup--cover-view .pdf-canvas-scroll {
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.application-popup--cover-view .pdf-page {
+  margin: 14px auto;
+}
+.application-popup--cover-view .pdf-page canvas {
+  box-shadow: 0 10px 30px #1833561f;
+  background: #fff;
+}

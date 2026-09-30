@@ -10,7 +10,8 @@ export type ApplicationPopupKind =
   | "url"
   | "resume-view"
   | "resume-edit"
-  | "cover";
+  | "cover"
+  | "cover-view";
 export type ApplicationPopupSnapshot = {
   session: string;
   generation: number;
@@ -22,6 +23,7 @@ export type ApplicationPopupSnapshot = {
   resume: ResumeDocument | null;
   style: DocumentStyle;
   coverLetter: string | null;
+  workspaceRevision?: number;
   disabled: boolean;
 };
 export type ApplicationPopupChange =
@@ -106,8 +108,15 @@ export function useApplicationPopup(options: UseApplicationPopupOptions) {
   const sendSnapshot = useCallback(async () => {
     const active = activeRef.current;
     if (!active) return;
-    const { job, jobUrl, resume, style, coverLetter, disabled } =
-      optionsRef.current;
+    const {
+      job,
+      jobUrl,
+      resume,
+      style,
+      coverLetter,
+      workspaceRevision,
+      disabled,
+    } = optionsRef.current;
     await emitTo("application-popup", "ort:application-popup-snapshot", {
       ...active,
       revision: ++revisionRef.current,
@@ -116,6 +125,7 @@ export function useApplicationPopup(options: UseApplicationPopupOptions) {
       resume,
       style,
       coverLetter,
+      workspaceRevision,
       disabled,
     } satisfies ApplicationPopupSnapshot);
   }, []);
@@ -183,6 +193,7 @@ export function useApplicationPopup(options: UseApplicationPopupOptions) {
     options.resume,
     options.style,
     options.coverLetter,
+    options.workspaceRevision,
     options.disabled,
     sendSnapshot,
     report,
