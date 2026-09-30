@@ -156,7 +156,7 @@ if (command === "configure-key") {
       0o600,
     );
     console.log(
-      `Registered development host for ${id}. Open the dev app and enable Settings → Browser connections.`,
+      `Registered development host for ${id}. Open or restart the dev app; the connection enables automatically on launch.`,
     );
   }
 } else

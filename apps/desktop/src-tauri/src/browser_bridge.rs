@@ -1,4 +1,4 @@
-//! Explicit development-channel bridge; production IPC remains disabled.
+//! Development-channel bridge; production IPC remains disabled.
 use ort_domain::CommandResponse;
 use serde::Serialize;
 use tauri::{Manager, WebviewWindow};
@@ -101,9 +101,20 @@ pub fn connect_development_browser(window: WebviewWindow) -> CommandResponse<boo
         );
     }
     #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
-    return connect(&window);
+    return connect(window.app_handle());
     #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
     CommandResponse::failure("DEV_BRIDGE_NOT_BUILT", "errors.browserBridge", false)
+}
+
+/// Enable the registered development bridge on each launch. Missing or invalid
+/// setup leaves it disabled; starting the listener does not imply an extension is connected.
+pub(crate) fn enable_on_launch(app: &tauri::AppHandle) {
+    #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+    if crate::development_identity_allowed(&app.config().identifier) {
+        let _ = connect(app);
+    }
+    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+    let _ = app;
 }
 
 #[tauri::command]
@@ -184,11 +195,11 @@ pub(crate) fn receive_development_request(
 }
 
 #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
-fn connect(window: &WebviewWindow) -> CommandResponse<bool> {
+fn connect(handle: &tauri::AppHandle) -> CommandResponse<bool> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     use tauri::{Emitter, EventTarget};
-    let app = window.app_handle().clone();
-    let state = window.state::<BrowserBridgeState>();
+    let app = handle.clone();
+    let state = handle.state::<BrowserBridgeState>();
     let Ok(mut slot) = state.server.lock() else {
         return failed();
     };

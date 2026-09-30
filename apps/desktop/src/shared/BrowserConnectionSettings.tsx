@@ -54,14 +54,13 @@ export function BrowserConnectionSettings() {
       {status?.available ? (
         <>
           <p>
-            Enable this connection while testing the BETA extension. Press
-            Capture on the ORT overlay, then click the top-left and bottom-right
-            corners of the text in Chrome. ORT will ask you to review each
-            capture.
+            The connection enables automatically on launch after development
+            host setup. Press Capture on the ORT overlay, then click the
+            top-left and bottom-right corners of the text in Chrome.
           </p>
           <p>
             This development connection trusts programs running under your macOS
-            account. It turns off when you quit ORT.
+            account. Disabling it lasts until the next app launch.
           </p>
           <button type="button" disabled={busy} onClick={() => void change()}>
             {status.connected

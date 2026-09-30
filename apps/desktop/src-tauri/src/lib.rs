@@ -641,6 +641,7 @@ pub fn run() {
                 reviews: std::sync::Arc::default(),
             });
             import_review::ReviewState::start_expiry(&app.state::<DesktopState>().reviews)?;
+            browser_bridge::enable_on_launch(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

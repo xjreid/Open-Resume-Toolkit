@@ -1,5 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import { PdfCanvas } from "./ApplicationViews";
 import {
   TrackerFields,
@@ -40,6 +47,78 @@ function contentLabel(kind: ContentKind) {
   if (kind === "resume") return "Final resume";
   if (kind === "cover_letter") return "Cover letter";
   return "Approved answers";
+}
+
+function TrackerSourceLink({
+  source,
+  label,
+  onClick,
+  onEdit,
+}: {
+  source: string;
+  label: string;
+  onClick: (event: MouseEvent<HTMLAnchorElement>) => void;
+  onEdit: () => void;
+}) {
+  const container = useRef<HTMLDivElement>(null);
+  const link = useRef<HTMLAnchorElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+
+  useLayoutEffect(() => {
+    if (expanded) return;
+    const measure = () => {
+      if (container.current && link.current) {
+        // Compare with the whole cell, so a toggle does not itself cause overflow.
+        setOverflows(link.current.scrollWidth > container.current.clientWidth);
+      }
+    };
+    measure();
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measure);
+    if (container.current) observer?.observe(container.current);
+    if (link.current) observer?.observe(link.current);
+    return () => observer?.disconnect();
+  }, [source, expanded]);
+
+  return (
+    <div
+      ref={container}
+      className={
+        "tracker-source" + (expanded ? " tracker-source--expanded" : "")
+      }
+    >
+      <a
+        ref={link}
+        className="tracker-source-link"
+        href={trackerLinkTarget(source) ?? "#"}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Click to open; double-click to edit"
+        onClick={onClick}
+        onDoubleClick={(event) => {
+          event.preventDefault();
+          onEdit();
+        }}
+      >
+        {source}
+      </a>
+      {(overflows || expanded) && (
+        <button
+          type="button"
+          className="tracker-source-toggle"
+          aria-label={(expanded ? "Compress" : "Expand") + " link for " + label}
+          aria-expanded={expanded}
+          title={expanded ? "Compress link" : "Expand link"}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? "Compress" : "Expand"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function TrackerWorkspace({
@@ -684,22 +763,14 @@ export function TrackerWorkspace({
                         }}
                       />
                     ) : value.sourceUrl ? (
-                      <a
-                        className="tracker-source-link"
-                        href={trackerLinkTarget(value.sourceUrl) ?? "#"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Click to open; double-click to edit"
+                      <TrackerSourceLink
+                        source={value.sourceUrl}
+                        label={value.company || value.title || "application"}
                         onClick={(event) =>
                           linkClick(event, id, value.sourceUrl)
                         }
-                        onDoubleClick={(event) => {
-                          event.preventDefault();
-                          beginLinkEdit(id);
-                        }}
-                      >
-                        {value.sourceUrl}
-                      </a>
+                        onEdit={() => beginLinkEdit(id)}
+                      />
                     ) : (
                       <button
                         type="button"
@@ -753,14 +824,17 @@ export function TrackerWorkspace({
                   <td className="tracker-delete-cell">
                     <button
                       type="button"
-                      className="button--danger"
+                      className="tracker-delete-button"
                       onClick={() => setDeleteId(id)}
+                      title="Delete application"
                       aria-label={
                         "Delete " +
                         (value.company || value.title || "application")
                       }
                     >
-                      Delete
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="m5 5 10 10M15 5 5 15" />
+                      </svg>
                     </button>
                   </td>
                 </tr>

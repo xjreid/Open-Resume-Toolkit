@@ -449,3 +449,77 @@ it("opens a source on one click and edits arbitrary source text on a double-clic
     host.remove();
   }
 });
+
+it("expands overflowing links independently without changing their full targets or saving rows", async () => {
+  const source = "example.test/jobs/" + "long-path-".repeat(40);
+  const records = [
+    { id: "one", company: "Northstar", sourceUrl: source },
+    { id: "two", company: "Birch", sourceUrl: source + "two" },
+    { id: "short", company: "Acme", sourceUrl: "example.test" },
+  ].map(({ id, company, sourceUrl }) => ({
+    id,
+    revision: 1,
+    value: { ...emptyTrackerEntry(), company, sourceUrl },
+  }));
+  const width = vi
+    .spyOn(HTMLElement.prototype, "clientWidth", "get")
+    .mockReturnValue(206);
+  const scrollWidth = vi
+    .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+    .mockImplementation(function (this: HTMLElement) {
+      return this.textContent?.includes("long-path-") ? 1000 : 100;
+    });
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "list_tracker_entries") return { ok: true, value: records };
+    if (name === "open_tracker_link") return { ok: true, value: true };
+    throw new Error("Unexpected command: " + name);
+  });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () =>
+      root.render(<TrackerWorkspace active onDirtyChange={() => {}} />),
+    );
+    const toggle = host.querySelector<HTMLButtonElement>(
+      '[aria-label="Expand link for Northstar"]',
+    )!;
+    const link = toggle.parentElement!.querySelector("a")!;
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      host.querySelector('[aria-label="Expand link for Acme"]'),
+    ).toBeNull();
+    expect(link.textContent).toBe(source);
+    expect(link.href).toBe("https:" + "//" + source);
+    vi.mocked(invoke).mockClear();
+    await act(async () => toggle.click());
+    expect(toggle.getAttribute("aria-label")).toBe(
+      "Compress link for Northstar",
+    );
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      host
+        .querySelector('[aria-label="Expand link for Birch"]')
+        ?.getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(invoke).not.toHaveBeenCalled();
+    await act(async () => link.click());
+    expect(invoke).toHaveBeenCalledWith("open_tracker_link", {
+      target: "https:" + "//" + source,
+    });
+    vi.mocked(invoke).mockClear();
+    await act(async () => toggle.click());
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(link.href).toBe("https:" + "//" + source);
+    expect(invoke).not.toHaveBeenCalled();
+    await act(async () => link.click());
+    expect(invoke).toHaveBeenCalledWith("open_tracker_link", {
+      target: "https:" + "//" + source,
+    });
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    width.mockRestore();
+    scrollWidth.mockRestore();
+  }
+});

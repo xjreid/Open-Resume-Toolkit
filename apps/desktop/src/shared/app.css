@@ -5641,14 +5641,60 @@ ul.resume-document__body {
 .tracker-table input[type="date"]:focus::-webkit-calendar-picker-indicator {
   opacity: 1;
 }
+.tracker-source {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
 .tracker-source-link {
   display: block;
+  flex: 1;
+  min-width: 0;
   min-height: 34px;
   padding: 8px;
   color: #205f96;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+.tracker-source-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-height: 26px;
+  margin-top: 4px;
+  padding: 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #5c6f82;
+  font-size: 0.78rem;
+  font-weight: 400;
+  text-underline-offset: 2px;
+}
+.tracker-source-toggle:hover:not(:disabled) {
+  background: transparent;
+  color: #183356;
+  text-decoration: underline;
+}
+.tracker-source--expanded {
+  display: block;
+  padding: 8px;
+}
+.tracker-source--expanded .tracker-source-link {
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.tracker-source--expanded .tracker-source-toggle {
+  margin: 0 0 0 6px;
+  vertical-align: middle;
 }
 .tracker-source-link:hover {
   color: #163f69;
@@ -5677,11 +5723,36 @@ ul.resume-document__body {
   flex-wrap: wrap;
   gap: 6px;
 }
-.tracker-content-cell button,
-.tracker-delete-cell button {
+.tracker-content-cell button {
   min-height: 34px;
   padding: 4px 10px;
   font-size: 0.84rem;
+}
+.tracker-delete-cell .tracker-delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #b42424;
+}
+.tracker-delete-cell .tracker-delete-button:hover:not(:disabled),
+.tracker-delete-cell .tracker-delete-button:focus-visible {
+  border-color: #cc9691;
+  background: transparent;
+}
+.tracker-delete-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
 }
 .tracker-save-status {
   margin: 8px 0 0;

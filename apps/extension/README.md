@@ -7,8 +7,11 @@ explicit BETA channel; production transport remains gated.
 
 ## Workflow
 
-Enable the development connection in ORT Settings → Browser connections. With a
-normal job page active in Chrome, press Capture on the ORT overlay. Click the
+After development host setup, ORT enables the browser connection automatically
+on each app launch. Settings → Browser connections can disable it until the
+next launch. The overlay reports Connected only while the extension is actively
+communicating; otherwise Capture stays disabled. With a normal job page active
+in Chrome, press Capture on the ORT overlay. Click the
 top-left corner of the text. Move the pointer to preview the blue rectangle and the highlighted words, then
 click the bottom-right corner. ORT receives visible text inside the rectangle,
 a sanitized page link, and the title. Job captures automatically replace the

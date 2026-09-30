@@ -30,6 +30,25 @@ it("enables and disables explicitly and refreshes native status", async () => {
   await act(async () => container.querySelector("button")!.click());
   expect(container.textContent).toContain("Development connection disabled.");
 });
+it("shows an automatically enabled connection and can disable it for this run", async () => {
+  let connected = true;
+  invoke.mockImplementation(async (command: string) => {
+    if (command === "browser_connection_status")
+      return { ok: true, value: { available: true, connected } };
+    if (command === "disconnect_development_browser") {
+      connected = false;
+      return { ok: true, value: true };
+    }
+    throw new Error("Unexpected command");
+  });
+  root = createRoot(container);
+  await act(async () => root.render(<BrowserConnectionSettings />));
+  expect(container.querySelector("button")?.textContent).toBe(
+    "Disable development connection",
+  );
+  await act(async () => container.querySelector("button")!.click());
+  expect(container.textContent).toContain("Development connection disabled.");
+});
 it("does not claim readiness when setup fails or the feature is absent", async () => {
   invoke
     .mockResolvedValueOnce({
