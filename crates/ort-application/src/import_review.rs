@@ -79,6 +79,7 @@ pub struct ImportReview {
     base: VersionedResumeResponse,
     proposal: ImportProposal,
     decisions: Vec<Option<ReviewDecision>>,
+    imported_document: ResumeDocument,
 }
 
 impl ImportReview {
@@ -100,10 +101,13 @@ impl ImportReview {
             return Err(ReviewError::InvalidContent);
         }
         let decisions = vec![None; proposal.items().len()];
+        let imported_document = ort_documents::resume_import::map_resume(proposal.source())
+            .map_err(|_| ReviewError::InvalidContent)?;
         Ok(Self {
             base,
             proposal,
             decisions,
+            imported_document,
         })
     }
 
@@ -176,6 +180,7 @@ impl ImportReview {
         let contact = &self.base.document.contact;
         ImportReviewSnapshot {
             id,
+            imported_document: self.imported_document.clone(),
             base_revision: self.base.revision,
             mapping_version: ort_documents::import::MAPPING_VERSION,
             blocks,
@@ -196,6 +201,31 @@ impl ImportReview {
                 location: contact.location.clone(),
             },
         }
+    }
+
+    /// Prepares a whole-document replacement after explicit editor review.
+    /// # Errors
+    /// Rejects stale saved data, a foreign candidate identity or invalid content.
+    pub fn prepare_replacement(
+        &self,
+        current: &VersionedResumeResponse,
+        document: ResumeDocument,
+    ) -> Result<SaveResumePayload, ReviewError> {
+        if &self.base != current {
+            return Err(ReviewError::StaleDraft);
+        }
+        if document.document_id != self.imported_document.document_id
+            || document.schema_version != 2
+        {
+            return Err(ReviewError::InvalidContent);
+        }
+        document
+            .validate(DocumentLimits::default())
+            .map_err(|_| ReviewError::InvalidContent)?;
+        Ok(SaveResumePayload {
+            expected_revision: (self.base.revision > 0).then_some(self.base.revision),
+            document,
+        })
     }
 
     #[must_use]

@@ -8,6 +8,7 @@ export function CloseDialog({
   error,
   saveError,
   otherUnsavedWork = false,
+  otherUnsavedWorkMessage,
   overlayUnsavedWork = false,
   overlayCheckFailed = false,
   onCancel,
@@ -22,6 +23,7 @@ export function CloseDialog({
   error: string | null;
   saveError: string | null;
   otherUnsavedWork?: boolean;
+  otherUnsavedWorkMessage?: string;
   overlayUnsavedWork?: boolean;
   overlayCheckFailed?: boolean;
   onCancel: () => void;
@@ -90,7 +92,8 @@ export function CloseDialog({
           {overlayUnsavedWork
             ? "Keep editing, then save your application overlay edits before quitting."
             : otherUnsavedWork
-              ? "Save or discard your tracker edits before quitting."
+              ? (otherUnsavedWorkMessage ??
+                "Save or discard your tracker edits before quitting.")
               : "To save, keep editing and correct any validation or storage errors first."}
         </p>
       ) : null}

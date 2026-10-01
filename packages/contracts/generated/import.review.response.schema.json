@@ -19,6 +19,10 @@
     "id": {
       "type": "string"
     },
+    "importedDocument": {
+      "description": "Separate editable import candidate, never the saved draft.",
+      "$ref": "#/$defs/ResumeDocument"
+    },
     "mappingVersion": {
       "type": "integer",
       "format": "uint16",
@@ -39,9 +43,128 @@
     "mappingVersion",
     "blocks",
     "sections",
-    "contacts"
+    "contacts",
+    "importedDocument"
   ],
   "$defs": {
+    "Bullet": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "text"
+      ]
+    },
+    "CalendarDate": {
+      "description": "Precision is explicit: an absent month is a year, never an inferred January.",
+      "type": "object",
+      "properties": {
+        "expected": {
+          "type": "boolean"
+        },
+        "month": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "year": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "year",
+        "expected"
+      ]
+    },
+    "ContactDetails": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Link"
+          }
+        },
+        "location": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fullName",
+        "email",
+        "phone",
+        "location",
+        "links"
+      ]
+    },
+    "DateEnd": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "present"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "date"
+            },
+            "value": {
+              "$ref": "#/$defs/CalendarDate"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ]
+        }
+      ]
+    },
     "ImportReviewBlock": {
       "type": "object",
       "properties": {
@@ -132,6 +255,238 @@
         "email",
         "phone",
         "location"
+      ]
+    },
+    "Link": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "label": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "url"
+      ]
+    },
+    "NamedField": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "isSkill": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "label",
+        "value",
+        "isSkill"
+      ]
+    },
+    "ResumeDate": {
+      "description": "One stable, ordered date or range. Either endpoint may be omitted. The label\ncan describe graduation, certification, or another optional date detail.",
+      "type": "object",
+      "properties": {
+        "end": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateEnd"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "label": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "start": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CalendarDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "label"
+      ]
+    },
+    "ResumeDocument": {
+      "type": "object",
+      "properties": {
+        "contact": {
+          "$ref": "#/$defs/ContactDetails"
+        },
+        "documentId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResumeSection"
+          }
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "documentId",
+        "title",
+        "contact",
+        "sections"
+      ]
+    },
+    "ResumeEntry": {
+      "type": "object",
+      "properties": {
+        "bullets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Bullet"
+          }
+        },
+        "dateRange": {
+          "type": "string"
+        },
+        "dates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResumeDate"
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NamedField"
+          }
+        },
+        "heading": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Link"
+          }
+        },
+        "location": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "subheading": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "heading",
+        "subheading",
+        "dateRange",
+        "location",
+        "fields",
+        "bullets",
+        "links"
+      ]
+    },
+    "ResumeSection": {
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResumeEntry"
+          }
+        },
+        "heading": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "order": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "heading",
+        "entries"
       ]
     }
   }

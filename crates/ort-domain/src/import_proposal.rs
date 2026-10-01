@@ -11,6 +11,8 @@ pub struct ImportReviewSnapshot {
     pub blocks: Vec<ImportReviewBlock>,
     pub sections: Vec<ImportReviewSection>,
     pub contacts: ImportReviewContacts,
+    /// Separate editable import candidate, never the saved draft.
+    pub imported_document: crate::ResumeDocument,
 }
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

@@ -236,3 +236,37 @@ fn exact_limits_are_accepted_and_sensitive_content_is_not_debug_logged() {
         None
     );
 }
+
+#[test]
+fn optional_layout_round_trips_and_rejects_invalid_or_multiline_bounds() {
+    let layout = json!({"left":72_000,"top":100_000,"right":200_000,
+        "bottom":112_000,"fontSize":12_000});
+    let mut value = block("Example", "paragraph");
+    value["layout"] = layout.clone();
+    let extraction = decode(&envelope(json!([value.clone()]))).unwrap();
+    assert_eq!(extraction.blocks()[0].layout.unwrap().left, 72_000);
+    assert_eq!(
+        serde_json::to_value(&extraction.blocks()[0]).unwrap()["layout"],
+        layout
+    );
+    for (key, invalid) in [
+        ("left", json!(200_000)),
+        ("top", json!(112_000)),
+        ("right", json!(14_400_001)),
+        ("fontSize", json!(0)),
+        ("fontSize", json!(1_000_001)),
+        ("bottom", json!("NaN")),
+    ] {
+        let mut malformed = value.clone();
+        malformed["layout"][key] = invalid;
+        assert_eq!(
+            decode(&envelope(json!([malformed]))).unwrap_err(),
+            ImportError::InvalidExtraction
+        );
+    }
+    value["text"] = json!("Example\nsecond line");
+    assert_eq!(
+        decode(&envelope(json!([value]))).unwrap_err(),
+        ImportError::InvalidExtraction
+    );
+}

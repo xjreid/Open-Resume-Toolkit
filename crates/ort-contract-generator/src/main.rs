@@ -34,6 +34,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_schema::<ort_domain::ApplyImportReviewRequest>(
         &output.join("import.apply.request.schema.json"),
     )?;
+    write_schema::<ort_domain::MapImportReviewRequest>(
+        &output.join("import.map.request.schema.json"),
+    )?;
     write_schema::<ort_domain::ImportChoices>(&output.join("import.choices.schema.json"))?;
     fs::write(output.join("import.ts"), include_str!("import.ts.template"))?;
     write_schema::<ExportTextRequest>(&output.join("export.text.request.schema.json"))?;

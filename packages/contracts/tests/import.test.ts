@@ -4,6 +4,13 @@ const id = "01900000-0000-7000-8000-000000000001";
 function snapshot() {
   return {
     id,
+    importedDocument: {
+      schemaVersion: 2,
+      documentId: id,
+      title: "Imported Resume",
+      contact: { fullName: "", email: "", phone: "", location: "", links: [] },
+      sections: [],
+    },
     baseRevision: 1,
     mappingVersion: 1,
     blocks: [
@@ -52,5 +59,19 @@ it("enforces aggregate extracted text and original block page bounds", () => {
   expect(isImportReviewSnapshot(value)).toBe(false);
   value.blocks[1].source = "x";
   value.blocks[1].page = 11;
+  expect(isImportReviewSnapshot(value)).toBe(false);
+});
+
+it("rejects malformed imported documents and unsupported schema versions", () => {
+  expect(
+    isImportReviewSnapshot({
+      ...snapshot(),
+      importedDocument: { owner: "forged" },
+    }),
+  ).toBe(false);
+  const value = snapshot();
+  value.importedDocument.schemaVersion = 1;
+  expect(isImportReviewSnapshot(value)).toBe(false);
+  value.importedDocument.schemaVersion = 99;
   expect(isImportReviewSnapshot(value)).toBe(false);
 });

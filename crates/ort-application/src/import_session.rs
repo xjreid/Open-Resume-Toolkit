@@ -190,12 +190,54 @@ impl ReviewSessions {
         current: &VersionedResumeResponse,
         save: impl FnOnce(&SaveResumePayload) -> Result<VersionedResumeResponse, E>,
     ) -> Result<VersionedResumeResponse, CommitError<E>> {
+        self.commit_candidate(
+            owner,
+            token,
+            now,
+            current,
+            |review| review.prepare(current),
+            save,
+        )
+    }
+
+    /// Commits the edited import as a replacement, with the same owner, expiry,
+    /// revision and receipt checks as the legacy decision review.
+    /// # Errors
+    /// Invalid or stale candidates never call storage; confirmed success retires the session.
+    #[allow(clippy::too_many_arguments)] // Native owner/token/clock and CAS inputs stay explicit.
+    pub fn commit_replacement<E>(
+        &mut self,
+        owner: ReviewOwner,
+        token: ReviewToken,
+        now: Instant,
+        current: &VersionedResumeResponse,
+        document: ort_domain::ResumeDocument,
+        save: impl FnOnce(&SaveResumePayload) -> Result<VersionedResumeResponse, E>,
+    ) -> Result<VersionedResumeResponse, CommitError<E>> {
+        self.commit_candidate(
+            owner,
+            token,
+            now,
+            current,
+            |review| review.prepare_replacement(current, document),
+            save,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn commit_candidate<E>(
+        &mut self,
+        owner: ReviewOwner,
+        token: ReviewToken,
+        now: Instant,
+        current: &VersionedResumeResponse,
+        prepare: impl FnOnce(&ImportReview) -> Result<SaveResumePayload, ReviewError>,
+        save: impl FnOnce(&SaveResumePayload) -> Result<VersionedResumeResponse, E>,
+    ) -> Result<VersionedResumeResponse, CommitError<E>> {
         let active = self
             .authorized(owner, token, now)
             .map_err(CommitError::Session)?;
-        let candidate = active
-            .review
-            .prepare(current)
+        let candidate = prepare(&active.review)
             .map_err(|error| CommitError::Session(SessionError::Review(error)))?;
         let saved = save(&candidate).map_err(CommitError::Storage)?;
         self.active = None;

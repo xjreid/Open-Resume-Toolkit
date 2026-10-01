@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { DOCUMENT_LIMITS, type ResumeDocument } from "@ort/contracts/resume";
-import { createSection } from "./resume-editor";
+import { createSection, moveItem } from "./resume-editor";
 import { SUGGESTED_SECTIONS } from "./starting-profiles";
 
 export function PopupSectionNavigator({
   document,
   disabled,
   onChange,
+  accessibleControls = false,
 }: {
   document: ResumeDocument;
   disabled: boolean;
+  accessibleControls?: boolean;
   onChange: (document: ResumeDocument) => void;
 }) {
   const [suggestedSection, setSuggestedSection] = useState("Custom Section");
@@ -188,7 +190,7 @@ export function PopupSectionNavigator({
           <span>Contact</span>
         </div>
         <div ref={list} className="section-sort-list">
-          {ordered.map((section) => (
+          {ordered.map((section, index) => (
             <div
               key={section.id}
               ref={(card) => {
@@ -201,7 +203,7 @@ export function PopupSectionNavigator({
                   disabled ||
                   event.button !== 0 ||
                   renaming === section.id ||
-                  (event.target as HTMLElement).closest("input")
+                  (event.target as HTMLElement).closest("input, button")
                 )
                   return;
                 event.preventDefault();
@@ -242,12 +244,63 @@ export function PopupSectionNavigator({
                       })
                     }
                   />
+                ) : accessibleControls ? (
+                  <button
+                    type="button"
+                    className="section-nav-title button--quiet"
+                    disabled={disabled}
+                    onClick={() => setRenaming(section.id)}
+                    aria-label={`Rename ${section.heading || "untitled section"}`}
+                  >
+                    {section.heading || "Untitled section"}
+                  </button>
                 ) : (
                   <span className="section-nav-title">
                     {section.heading || "Untitled section"}
                   </span>
                 )}
               </div>
+              {accessibleControls && (
+                <div className="import-section-actions">
+                  <button
+                    type="button"
+                    className="button--quiet button--compact"
+                    aria-label={`Move ${section.heading} up`}
+                    disabled={disabled || index === 0}
+                    onClick={() =>
+                      onChange({
+                        ...document,
+                        sections: moveItem(document.sections, section.id, -1),
+                      })
+                    }
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="button--quiet button--compact"
+                    aria-label={`Move ${section.heading} down`}
+                    disabled={disabled || index === ordered.length - 1}
+                    onClick={() =>
+                      onChange({
+                        ...document,
+                        sections: moveItem(document.sections, section.id, 1),
+                      })
+                    }
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    className="button--quiet button--compact"
+                    aria-label={`Delete ${section.heading}`}
+                    disabled={disabled}
+                    onClick={() => setPendingDelete(section.id)}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

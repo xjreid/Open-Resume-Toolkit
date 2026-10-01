@@ -8,7 +8,8 @@ use serde::Serialize;
 
 use crate::import::{
     BlockKind, EXTRACTION_VERSION, ExtractedBlock, ImportError, InputFormat, MAX_BLOCK_CHARACTERS,
-    MAX_BLOCKS, MAX_EXTRACTED_CHARACTERS, MAX_EXTRACTION_BYTES, MAX_PAGES, ValidatedExtraction,
+    MAX_BLOCKS, MAX_EXTRACTED_CHARACTERS, MAX_EXTRACTION_BYTES, MAX_PAGES, TextLayout,
+    ValidatedExtraction,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -75,6 +76,22 @@ impl WorkerExtractionBuilder {
         kind: BlockKind,
         text: String,
     ) -> Result<(), WorkerOutputError> {
+        self.push_with_layout(page, kind, text, None)
+    }
+
+    /// Adds text and optional bounded single-line layout observations.
+    /// # Errors
+    /// Rejects invalid geometry as well as the same limits enforced by `push`.
+    pub fn push_with_layout(
+        &mut self,
+        page: u16,
+        kind: BlockKind,
+        text: String,
+        layout: Option<TextLayout>,
+    ) -> Result<(), WorkerOutputError> {
+        if layout.is_some_and(|value| !value.is_valid() || text.contains(['\n', '\r'])) {
+            return Err(WorkerOutputError::InvalidBlock);
+        }
         if page < self.last_page || page == 0 || page > self.page_count {
             return Err(WorkerOutputError::InvalidBlock);
         }
@@ -101,7 +118,12 @@ impl WorkerExtractionBuilder {
         self.readable |= text.chars().any(|character| !character.is_whitespace());
         self.character_count = total;
         self.last_page = page;
-        self.blocks.push(ExtractedBlock { page, kind, text });
+        self.blocks.push(ExtractedBlock {
+            page,
+            kind,
+            text,
+            layout,
+        });
         Ok(())
     }
 

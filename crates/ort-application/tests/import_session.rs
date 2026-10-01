@@ -366,3 +366,165 @@ fn expired_or_already_retired_review_can_be_dismissed_without_cancelling_a_new_r
             .is_err()
     );
 }
+
+#[test]
+fn replacement_is_separate_and_edits_replace_rather_than_merge_the_saved_document() {
+    let directory = TempDir::new().unwrap();
+    let vault = MemoryDatabaseKeyVault::new();
+    let store = EncryptedStore::open_or_initialize(directory.path(), "test", &vault).unwrap();
+    let mut existing = ResumeDocument::empty("Saved resume");
+    existing.contact.full_name = "Saved Person".into();
+    let saved = store.create_draft(&existing).unwrap();
+    let current = VersionedResumeResponse {
+        revision: saved.revision,
+        document: saved.document,
+    };
+    let now = Instant::now();
+    let owner = ReviewOwner::default();
+    let mut sessions = ReviewSessions::default();
+    let token = sessions
+        .begin(owner, current.clone(), proposal(), now)
+        .unwrap();
+    let mut imported = sessions
+        .read(owner, token, now)
+        .unwrap()
+        .snapshot(token.identifier())
+        .imported_document;
+    assert_ne!(imported.document_id, current.document.document_id);
+    assert_ne!(
+        imported.contact.full_name,
+        current.document.contact.full_name
+    );
+    imported.contact.full_name = "Reviewed Person".into();
+    assert_eq!(
+        store.load_draft().unwrap().unwrap().document,
+        current.document
+    );
+    let mapped = sessions
+        .commit_replacement(owner, token, now, &current, imported.clone(), |payload| {
+            let saved = store.save_imported_draft(
+                payload.expected_revision.unwrap_or(0),
+                &payload.document,
+                1,
+                0,
+            )?;
+            Ok::<_, StorageError>(VersionedResumeResponse {
+                revision: saved.revision,
+                document: saved.document,
+            })
+        })
+        .unwrap();
+    assert_eq!(mapped.revision, current.revision + 1);
+    assert_eq!(mapped.document, imported);
+    assert_eq!(store.load_draft().unwrap().unwrap().document, imported);
+    assert!(sessions.read(owner, token, now).is_err());
+    assert!(
+        sessions
+            .commit_replacement::<()>(owner, token, now, &current, imported, |_| panic!(
+                "retired session reached storage"
+            ))
+            .is_err()
+    );
+}
+
+#[test]
+fn replacement_refuses_foreign_expired_invalid_and_stale_candidates_without_storage() {
+    let now = Instant::now();
+    let owner = ReviewOwner::default();
+    let mut sessions = ReviewSessions::default();
+    let current = base();
+    let token = sessions
+        .begin(owner, current.clone(), proposal(), now)
+        .unwrap();
+    let imported = sessions
+        .read(owner, token, now)
+        .unwrap()
+        .snapshot(token.identifier())
+        .imported_document;
+    let refuse = |_: &ort_domain::SaveResumePayload| -> Result<VersionedResumeResponse, ()> {
+        panic!("invalid replacement reached storage")
+    };
+    assert!(
+        sessions
+            .commit_replacement(
+                ReviewOwner::default(),
+                token,
+                now,
+                &current,
+                imported.clone(),
+                refuse
+            )
+            .is_err()
+    );
+    let mut invalid = imported.clone();
+    invalid.document_id = current.document.document_id;
+    assert!(
+        sessions
+            .commit_replacement(owner, token, now, &current, invalid, refuse)
+            .is_err()
+    );
+    let mut invalid = imported.clone();
+    invalid.title.clear();
+    assert!(
+        sessions
+            .commit_replacement(owner, token, now, &current, invalid, refuse)
+            .is_err()
+    );
+    let mut stale = current.clone();
+    stale.revision += 1;
+    assert!(
+        sessions
+            .commit_replacement(owner, token, now, &stale, imported.clone(), refuse)
+            .is_err()
+    );
+    let mut changed = current.clone();
+    changed.document.title = "changed without revision".into();
+    assert!(
+        sessions
+            .commit_replacement(owner, token, now, &changed, imported.clone(), refuse)
+            .is_err()
+    );
+    assert_eq!(
+        sessions
+            .commit_replacement::<()>(owner, token, now, &current, imported.clone(), |_| Err(())),
+        Err(CommitError::Storage(()))
+    );
+    assert!(sessions.read(owner, token, now).is_ok());
+    assert!(
+        sessions
+            .commit_replacement(
+                owner,
+                token,
+                now + REVIEW_LIFETIME,
+                &current,
+                imported,
+                refuse
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn cancelling_an_edited_replacement_keeps_saved_data_and_allows_a_fresh_import() {
+    let now = Instant::now();
+    let owner = ReviewOwner::default();
+    let mut sessions = ReviewSessions::default();
+    let current = base();
+    let token = sessions
+        .begin(owner, current.clone(), proposal(), now)
+        .unwrap();
+    let imported = sessions
+        .read(owner, token, now)
+        .unwrap()
+        .snapshot(token.identifier())
+        .imported_document;
+    sessions.cancel(owner, token, now).unwrap();
+    assert!(
+        sessions
+            .commit_replacement::<()>(owner, token, now, &current, imported, |_| panic!(
+                "cancelled import reached storage"
+            ))
+            .is_err()
+    );
+    assert!(sessions.begin(owner, current, proposal(), now).is_ok());
+}

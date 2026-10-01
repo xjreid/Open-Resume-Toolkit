@@ -60,6 +60,38 @@ pub struct ApplyImportReviewPayload {
     /// Encoded decision-only payload, bounded before its native decode.
     pub decisions_json: String,
 }
+/// The editor may rearrange or add content; native session and revision remain authoritative.
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MapImportReviewRequest {
+    pub contract_version: u16,
+    pub request_id: String,
+    pub payload: MapImportReviewPayload,
+}
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MapImportReviewPayload {
+    pub review_id: String,
+    /// Bounded before decoding the edited resume.
+    pub document_json: String,
+}
+impl MapImportReviewRequest {
+    /// # Errors
+    /// Rejects metadata, identities and oversized document bytes before decode.
+    pub fn validate(&self) -> Result<(), ErrorEnvelope> {
+        validate_request_metadata(self.contract_version, &self.request_id)?;
+        identifier(&self.payload.review_id)?;
+        if self.payload.document_json.len() > crate::DocumentLimits::default().serialized_bytes {
+            return Err(ErrorEnvelope::new(
+                "IMPORT_REVIEW_INVALID",
+                "errors.importReviewInvalid",
+                false,
+            ));
+        }
+        Ok(())
+    }
+}
+
 fn identifier(value: &str) -> Result<(), ErrorEnvelope> {
     if value.len() != 36 || EntityId::parse(value).is_err() {
         return Err(ErrorEnvelope::new(
@@ -98,6 +130,25 @@ impl ApplyImportReviewRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn replacement_request_rejects_oversized_unicode_bytes_and_foreign_metadata() {
+        let mut request = MapImportReviewRequest {
+            contract_version: crate::CONTRACT_VERSION,
+            request_id: "import-map".into(),
+            payload: MapImportReviewPayload {
+                review_id: EntityId::new().to_string(),
+                document_json: "{}".into(),
+            },
+        };
+        assert!(request.validate().is_ok());
+        request.payload.document_json =
+            "é".repeat(crate::DocumentLimits::default().serialized_bytes / 2 + 1);
+        assert!(request.validate().is_err());
+        request.payload.document_json.clear();
+        request.payload.review_id = "foreign".into();
+        assert!(request.validate().is_err());
+    }
+
     #[test]
     fn review_command_metadata_ids_and_bytes_are_bounded() {
         let mut request = ApplyImportReviewRequest {

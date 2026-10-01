@@ -1,4 +1,5 @@
 use ort_parser_runtime::extract_pdf;
+use std::fmt::Write as _;
 fn main() {
     let bytes = std::fs::read("target/wasm-containment/pdfium.wasm").unwrap();
     let result = extract_pdf(&bytes, &synthetic_pdf()).expect("guest parse");
@@ -19,12 +20,127 @@ fn main() {
         .is_ok()
     );
     assert!(extract_pdf(&bytes, b"%PDF-1.7\ninvalid\n%%EOF").is_err());
+    let extraction = extract_pdf(&bytes, &positioned_resume()).expect("positioned PDF parse");
+    assert!(
+        extraction
+            .blocks()
+            .iter()
+            .all(|block| block.layout.is_some())
+    );
+    let resume = ort_documents::resume_import::map_resume(&extraction).unwrap();
+    resume
+        .validate(ort_domain::DocumentLimits::default())
+        .unwrap();
+    assert_eq!(resume.sections.len(), 2);
+    assert_eq!(resume.sections[0].entries.len(), 1);
+    let entry = &resume.sections[0].entries[0];
+    assert_eq!(entry.heading, "Example Company");
+    assert_eq!(entry.subheading, "Senior Engineer");
+    assert_eq!(entry.location, "Boston, MA");
+    assert_eq!(entry.date_range, "2022 - Present");
+    assert_eq!(
+        entry
+            .fields
+            .iter()
+            .find(|field| field.label == "Details")
+            .unwrap()
+            .value,
+        "Rust, SQL"
+    );
+    assert_eq!(
+        entry
+            .fields
+            .iter()
+            .find(|field| field.label == "Extra")
+            .unwrap()
+            .value,
+        "Hybrid"
+    );
+    assert!(
+        entry
+            .fields
+            .iter()
+            .find(|field| field.label == "__ort_body_paragraph__")
+            .unwrap()
+            .value
+            .contains("Built tools")
+    );
+    let sidebar = extract_pdf(&bytes, &column_resume()).expect("column PDF parse");
+    let sidebar_resume = ort_documents::resume_import::map_resume(&sidebar).unwrap();
+    sidebar_resume
+        .validate(ort_domain::DocumentLimits::default())
+        .unwrap();
+    assert_eq!(sidebar_resume.contact.full_name, "Jane Example");
+    assert_eq!(sidebar_resume.sections.len(), 2);
+    assert_eq!(sidebar_resume.sections[0].heading, "Skills");
+    assert_eq!(
+        sidebar_resume.sections[0].entries[0].fields[0].value,
+        "Languages: Rust\nTools: Git, Docker"
+    );
+    assert_eq!(sidebar_resume.sections[1].heading, "Experience");
+    assert_eq!(
+        sidebar_resume.sections[1].entries[0].heading,
+        "Example Company"
+    );
+    assert_eq!(sidebar_resume.sections[1].entries[0].subheading, "Engineer");
+    assert_eq!(resume.sections[1].entries.len(), 1);
+    assert_eq!(
+        resume.sections[1].entries[0].fields[0].value,
+        "Programming: Rust, TypeScript\nTools: Git, Docker"
+    );
+
     println!(
-        "PASS: bounded PDF text extraction, scanned-page denial, ordinary logo acceptance and malformed source denial"
+        "PASS: bounded PDF extraction, six header slots, nonbulleted skills, visual reading order, columns, scanned-page denial, logo acceptance and malformed-source denial"
     );
 }
 fn synthetic_pdf() -> Vec<u8> {
-    let stream = b"BT /F1 18 Tf 72 720 Td (Experience) Tj 0 -24 Td (- Built safely) Tj ET";
+    stream_pdf(b"BT /F1 18 Tf 72 720 Td (Experience) Tj 0 -24 Td (- Built safely) Tj ET")
+}
+fn positioned_resume() -> Vec<u8> {
+    // Deliberately paint the body/right column before the left header. Reading
+    // order must follow visual placement, not PDF content-stream order.
+    let lines = [
+        (72, 625, 11, "Built tools for distributed teams."),
+        (465, 692, 11, "Boston, MA"),
+        (420, 673, 11, "2022 - Present"),
+        (465, 654, 11, "Hybrid"),
+        (72, 720, 14, "Experience"),
+        (72, 692, 12, "Example Company"),
+        (215, 692, 11, "Rust, SQL"),
+        (72, 673, 11, "Senior Engineer"),
+        (72, 590, 14, "Skills"),
+        (72, 562, 11, "Programming: Rust, TypeScript"),
+        (72, 546, 11, "Tools: Git, Docker"),
+    ];
+    let stream = lines
+        .iter()
+        .fold(String::new(), |mut stream, (x, y, font, text)| {
+            writeln!(stream, "BT /F1 {font} Tf 1 0 0 1 {x} {y} Tm ({text}) Tj ET").unwrap();
+            stream
+        });
+    stream_pdf(stream.as_bytes())
+}
+fn column_resume() -> Vec<u8> {
+    let lines = [
+        (72, 750, 16, "Jane Example"),
+        (72, 720, 14, "Skills"),
+        (300, 720, 14, "Experience"),
+        (72, 692, 11, "Languages: Rust"),
+        (300, 692, 12, "Example Company"),
+        (72, 676, 11, "Tools: Git, Docker"),
+        (300, 673, 11, "Engineer"),
+        (460, 673, 11, "2020 - 2024"),
+        (300, 644, 11, "Built reliable services."),
+    ];
+    let stream = lines
+        .iter()
+        .fold(String::new(), |mut stream, (x, y, font, text)| {
+            writeln!(stream, "BT /F1 {font} Tf 1 0 0 1 {x} {y} Tm ({text}) Tj ET").unwrap();
+            stream
+        });
+    stream_pdf(stream.as_bytes())
+}
+fn stream_pdf(stream: &[u8]) -> Vec<u8> {
     let objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),

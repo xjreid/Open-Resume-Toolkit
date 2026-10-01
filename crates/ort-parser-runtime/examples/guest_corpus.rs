@@ -114,6 +114,7 @@ fn verify_content(path: &std::path::Path, value: &ort_documents::import::Validat
         "missing synthetic content in {}",
         path.display()
     );
+    verify_mapped_content(path, value, &expected);
     let mut ordered = vec![];
     for section in &original.sections {
         if section.entries.is_empty() {
@@ -136,4 +137,38 @@ fn verify_content(path: &std::path::Path, value: &ort_documents::import::Validat
             .expect("synthetic heading/bullet order preserved");
         cursor += offset + item.len();
     }
+}
+
+fn verify_mapped_content(
+    path: &std::path::Path,
+    extraction: &ort_documents::import::ValidatedExtraction,
+    expected: &[&str],
+) {
+    let document =
+        ort_documents::resume_import::map_resume(extraction).expect("editable imported draft");
+    let mut values = vec![
+        document.contact.full_name.as_str(),
+        document.contact.email.as_str(),
+        document.contact.phone.as_str(),
+        document.contact.location.as_str(),
+    ];
+    for section in &document.sections {
+        values.push(&section.heading);
+        for entry in &section.entries {
+            values.extend([
+                entry.heading.as_str(),
+                entry.subheading.as_str(),
+                entry.date_range.as_str(),
+                entry.location.as_str(),
+            ]);
+            values.extend(entry.fields.iter().map(|field| field.value.as_str()));
+            values.extend(entry.bullets.iter().map(|bullet| bullet.text.as_str()));
+        }
+    }
+    let mapped = folded(&values.join(" "));
+    assert!(
+        expected.iter().all(|value| mapped.contains(&folded(value))),
+        "missing imported draft content in {}",
+        path.display()
+    );
 }

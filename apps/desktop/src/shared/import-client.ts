@@ -5,6 +5,7 @@ import {
   isVersionedResumeCommandResponse,
   type CommandResponse,
   type VersionedResume,
+  type ResumeDocument,
 } from "@ort/contracts/resume";
 import {
   isImportReviewSnapshot,
@@ -12,6 +13,7 @@ import {
   type ImportChoices,
   type ImportReviewRequest,
   type ApplyImportReviewRequest,
+  type MapImportReviewRequest,
 } from "@ort/contracts/import";
 
 function failure<T>(): CommandResponse<T> {
@@ -53,6 +55,22 @@ export async function applyImportReview(
   };
   try {
     const response: unknown = await invoke("apply_import_review", { request });
+    return isVersionedResumeCommandResponse(response) ? response : failure();
+  } catch {
+    return failure();
+  }
+}
+export async function mapImportReview(
+  reviewId: string,
+  document: ResumeDocument,
+): Promise<CommandResponse<VersionedResume>> {
+  const request: MapImportReviewRequest = {
+    contractVersion: CONTRACT_VERSION,
+    requestId: crypto.randomUUID(),
+    payload: { reviewId, documentJson: JSON.stringify(document) },
+  };
+  try {
+    const response: unknown = await invoke("map_import_review", { request });
     return isVersionedResumeCommandResponse(response) ? response : failure();
   } catch {
     return failure();

@@ -94,7 +94,7 @@ fn wire(extraction: &ValidatedExtraction) -> Result<Vec<u8>, ()> {
         .map_err(|_| ())?;
     for block in extraction.blocks() {
         builder
-            .push(block.page, block.kind, block.text.clone())
+            .push_with_layout(block.page, block.kind, block.text.clone(), block.layout)
             .map_err(|_| ())?;
     }
     builder.finish().map_err(|_| ())

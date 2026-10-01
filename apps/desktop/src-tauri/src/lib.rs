@@ -707,6 +707,7 @@ pub fn run() {
             import_review::begin::document_import_available,
             import_review::read_import_review,
             import_review::apply_import_review,
+            import_review::map_import_review,
             import_review::cancel_import_review,
             health,
             load_resume,

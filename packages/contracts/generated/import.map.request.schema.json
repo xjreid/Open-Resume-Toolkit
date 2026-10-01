@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MapImportReviewRequest",
+  "description": "The editor may rearrange or add content; native session and revision remain authoritative.",
+  "type": "object",
+  "properties": {
+    "contractVersion": {
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "payload": {
+      "$ref": "#/$defs/MapImportReviewPayload"
+    },
+    "requestId": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "requestId",
+    "payload"
+  ],
+  "$defs": {
+    "MapImportReviewPayload": {
+      "type": "object",
+      "properties": {
+        "documentJson": {
+          "description": "Bounded before decoding the edited resume.",
+          "type": "string"
+        },
+        "reviewId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "reviewId",
+        "documentJson"
+      ]
+    }
+  }
+}

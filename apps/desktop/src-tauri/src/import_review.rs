@@ -51,6 +51,74 @@ impl ReviewState {
             })?;
         Ok(())
     }
+    fn map(
+        &self,
+        store: &EncryptedStore,
+        identifier: &str,
+        bytes: &[u8],
+    ) -> CommandResponse<VersionedResumeResponse> {
+        let Some(token) = ReviewToken::parse(identifier) else {
+            return failure("IMPORT_REVIEW_UNAVAILABLE");
+        };
+        if bytes.len() > ort_domain::DocumentLimits::default().serialized_bytes {
+            return failure("IMPORT_REVIEW_INVALID");
+        }
+        let Ok(document) = serde_json::from_slice::<ort_domain::ResumeDocument>(bytes) else {
+            return failure("IMPORT_REVIEW_INVALID");
+        };
+        let Ok(mut sessions) = self.sessions.lock() else {
+            return failure("IMPORT_REVIEW_UNAVAILABLE");
+        };
+        let Ok(review) = sessions.read(self.owner, token, Instant::now()) else {
+            return failure("IMPORT_REVIEW_UNAVAILABLE");
+        };
+        let Ok(accepted) = u16::try_from(review.proposal().items().len()) else {
+            return failure("IMPORT_REVIEW_INVALID");
+        };
+        let current = match store.load_draft() {
+            Ok(Some(value)) => VersionedResumeResponse {
+                revision: value.revision,
+                document: value.document,
+            },
+            Ok(None) => match review.empty_base() {
+                Some(base) => base,
+                None => return failure("IMPORT_REVIEW_UNAVAILABLE"),
+            },
+            Err(_) => return failure("IMPORT_REVIEW_UNAVAILABLE"),
+        };
+        match sessions.commit_replacement(
+            self.owner,
+            token,
+            Instant::now(),
+            &current,
+            document,
+            |payload| {
+                store
+                    .save_imported_draft(
+                        payload.expected_revision.unwrap_or(0),
+                        &payload.document,
+                        accepted,
+                        0,
+                    )
+                    .map(|saved| VersionedResumeResponse {
+                        revision: saved.revision,
+                        document: saved.document,
+                    })
+            },
+        ) {
+            Ok(saved) => CommandResponse::success(saved),
+            Err(CommitError::Storage(error)) => super::storage_failure(&error),
+            Err(CommitError::Session(ort_application::import_session::SessionError::Review(
+                ort_application::import_review::ReviewError::StaleDraft,
+            ))) => failure("REVISION_CONFLICT"),
+            Err(CommitError::Session(
+                ort_application::import_session::SessionError::Unavailable,
+            )) => failure("IMPORT_REVIEW_UNAVAILABLE"),
+            Err(CommitError::Session(_)) => failure("IMPORT_REVIEW_INVALID"),
+            Err(CommitError::UnexpectedReceipt) => failure("IMPORT_REVIEW_OUTCOME_UNKNOWN"),
+        }
+    }
+
     fn apply(
         &self,
         store: &EncryptedStore,
@@ -199,6 +267,44 @@ pub(crate) async fn apply_import_review(
                     store,
                     &request.payload.review_id,
                     request.payload.decisions_json.as_bytes(),
+                ))
+            })
+            .unwrap_or_else(|_| failure("IMPORT_REVIEW_UNAVAILABLE"))
+    })
+    .await
+    {
+        Ok(response) => response,
+        Err(_) => failure("IMPORT_REVIEW_OUTCOME_UNKNOWN"),
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn map_import_review(
+    window: WebviewWindow,
+    request: ort_domain::MapImportReviewRequest,
+) -> CommandResponse<VersionedResumeResponse> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if !import_available(window.label()) {
+        return failure("IMPORT_DISABLED");
+    }
+    if let Err(error) = request.validate() {
+        return CommandResponse::Failure { ok: false, error };
+    }
+    let app = window.app_handle().clone();
+    let Some(lease) = app.state::<ExportState>().begin() else {
+        return failure("LOCAL_DATA_OPERATION_BUSY");
+    };
+    match tauri::async_runtime::spawn_blocking(move || {
+        let _lease = lease;
+        let state = app.state::<DesktopState>();
+        state
+            .with_store(|store| {
+                Ok(state.reviews.map(
+                    store,
+                    &request.payload.review_id,
+                    request.payload.document_json.as_bytes(),
                 ))
             })
             .unwrap_or_else(|_| failure("IMPORT_REVIEW_UNAVAILABLE"))
@@ -360,6 +466,132 @@ mod tests {
     }
 
     #[test]
+    fn native_mapping_replaces_saved_content_once_and_preserves_publication() {
+        let directory = TempDir::new().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(directory.path(), "test", &vault).unwrap();
+        let mut document = ResumeDocument::empty("Saved Resume");
+        document.contact.full_name = "Old Person".into();
+        let original = store.create_draft(&document).unwrap();
+        let published = store.publish_draft(original.revision).unwrap();
+        let state = ReviewState::default();
+        let token = seed(&state, &store);
+        let mut imported = state
+            .sessions
+            .lock()
+            .unwrap()
+            .read(state.owner, token, Instant::now())
+            .unwrap()
+            .snapshot(token.identifier())
+            .imported_document;
+        imported.contact.full_name = "Edited Import".into();
+        assert!(matches!(
+            state.map(&store, &token.identifier(), b"{}"),
+            CommandResponse::Failure { .. }
+        ));
+        assert_eq!(store.load_draft().unwrap().unwrap().document, document);
+        let bytes = serde_json::to_vec(&imported).unwrap();
+        assert!(matches!(
+            state.map(&store, &token.identifier(), &bytes),
+            CommandResponse::Success { .. }
+        ));
+        assert_eq!(store.load_draft().unwrap().unwrap().document, imported);
+        assert_eq!(store.load_latest_published().unwrap().unwrap(), published);
+        assert!(matches!(
+            state.map(&store, &token.identifier(), &bytes),
+            CommandResponse::Failure { .. }
+        ));
+        assert_eq!(
+            store.load_draft().unwrap().unwrap().revision,
+            original.revision + 1
+        );
+    }
+
+    #[test]
+    fn native_mapping_loads_the_fresh_saved_revision_and_refuses_overwriting_it() {
+        let directory = TempDir::new().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(directory.path(), "test", &vault).unwrap();
+        let saved = store.create_draft(&ResumeDocument::empty("Saved")).unwrap();
+        let state = ReviewState::default();
+        let token = seed(&state, &store);
+        let imported = state
+            .sessions
+            .lock()
+            .unwrap()
+            .read(state.owner, token, Instant::now())
+            .unwrap()
+            .snapshot(token.identifier())
+            .imported_document;
+        let mut changed = saved.document;
+        changed.contact.full_name = "Later edit".into();
+        let later = store.save_draft(saved.revision, &changed).unwrap();
+        let result = state.map(
+            &store,
+            &token.identifier(),
+            &serde_json::to_vec(&imported).unwrap(),
+        );
+        let CommandResponse::Failure { error, .. } = result else {
+            panic!("stale mapping saved");
+        };
+        assert_eq!(error.code, "REVISION_CONFLICT");
+        assert_eq!(store.load_draft().unwrap().unwrap(), later);
+    }
+
+    #[test]
+    fn native_mapping_creates_first_draft_only_on_explicit_mapping_and_cancel_drops_it() {
+        let directory = TempDir::new().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(directory.path(), "test", &vault).unwrap();
+        let state = ReviewState::default();
+        let begin = || {
+            let source = ValidatedExtraction::decode(br#"{"version":1,"format":"pdf","pageCount":1,"blocks":[{"page":1,"kind":"paragraph","text":"Name: Imported Person"}]}"#, InputFormat::Pdf).unwrap();
+            state
+                .sessions
+                .lock()
+                .unwrap()
+                .begin(
+                    state.owner,
+                    VersionedResumeResponse {
+                        revision: 0,
+                        document: ResumeDocument::empty("Empty base"),
+                    },
+                    ImportProposal::map(source),
+                    Instant::now(),
+                )
+                .unwrap()
+        };
+        let token = begin();
+        assert!(store.load_draft().unwrap().is_none());
+        state
+            .sessions
+            .lock()
+            .unwrap()
+            .cancel(state.owner, token, Instant::now())
+            .unwrap();
+        assert!(store.load_draft().unwrap().is_none());
+        let token = begin();
+        let imported = state
+            .sessions
+            .lock()
+            .unwrap()
+            .read(state.owner, token, Instant::now())
+            .unwrap()
+            .snapshot(token.identifier())
+            .imported_document;
+        assert!(matches!(
+            state.map(
+                &store,
+                &token.identifier(),
+                &serde_json::to_vec(&imported).unwrap()
+            ),
+            CommandResponse::Success { .. }
+        ));
+        assert_eq!(store.load_draft().unwrap().unwrap().revision, 1);
+        assert_eq!(store.load_draft().unwrap().unwrap().document, imported);
+    }
+
+    #[test]
     fn parser_gate_refuses_non_main_windows_and_unpinned_builds() {
         for label in ["overlay", "unknown", ""] {
             assert!(!import_available(label));
@@ -368,6 +600,8 @@ mod tests {
             || option_env!("ORT_PARSER_HELPER_CDHASH").is_none()
         {
             assert!(!import_available("main"));
+        } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+            assert!(import_available("main"));
         }
     }
 }

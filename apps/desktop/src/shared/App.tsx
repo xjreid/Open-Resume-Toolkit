@@ -137,7 +137,7 @@ function ResumeEditor() {
   const [trackerDirty, setTrackerDirty] = useState(false);
   const close = useCloseGuard(
     importWorking ? { ...editor, status: "exporting" } : editor,
-    trackerDirty,
+    trackerDirty || importActive,
   );
   const [confirmReload, setConfirmReload] = useState(false);
   const [documentStyle, setDocumentStyle] =
@@ -691,13 +691,19 @@ function ResumeEditor() {
           !!document &&
           dirty &&
           !trackerDirty &&
+          !importActive &&
           !close.overlayDirty &&
           !mustReload &&
           issues.length === 0
         }
         error={close.error}
         saveError={editor.errorCode ? friendlyError(editor.errorCode) : null}
-        otherUnsavedWork={trackerDirty || close.overlayDirty}
+        otherUnsavedWork={trackerDirty || importActive || close.overlayDirty}
+        otherUnsavedWorkMessage={
+          importActive
+            ? "Keep editing to review and map your imported resume before quitting."
+            : undefined
+        }
         overlayUnsavedWork={close.overlayDirty}
         overlayCheckFailed={close.overlayCheckFailed}
         onCancel={close.cancel}
@@ -1280,11 +1286,16 @@ function ResumeEditor() {
         ) : null}
       </div>
       <div className="import-page" hidden={destination !== "import"}>
-        <section className="workspace-data" aria-labelledby="import-page-title">
+        <section className="workspace-data" aria-label="Resume import">
           <p className="eyebrow">Master resume</p>
-          <h2 id="import-page-title">Import a resume</h2>
-          <p>Bring in an existing document, then edit it in Master resume.</p>
           <DocumentImport
+            style={documentStyle}
+            reviewDisabled={!storageReady || mustReload || close.pending}
+            disabledReason={
+              dirty && !showStart
+                ? "Save your current resume edits before importing."
+                : undefined
+            }
             disabled={
               !storageReady ||
               busy ||
@@ -1294,6 +1305,10 @@ function ResumeEditor() {
               (dirty && !showStart)
             }
             revision={revision}
+            onReloadRequired={() =>
+              dispatch({ type: "failed", code: "COMMAND_UNAVAILABLE" })
+            }
+            onReload={() => void loadWorkspace()}
             onBusyChange={setImportActive}
             onOperationChange={setImportWorking}
             onSaved={(saved) => {

@@ -700,7 +700,7 @@ describe("M2 live editor accessibility", () => {
   });
 });
 
-it("quits an idle review even after cancellation fails, but waits for actual import work", async () => {
+it("guards an idle import review after failed cancellation and waits for actual import work", async () => {
   const original = native.invoke.getMockImplementation()!;
   let closeAttempt: string | null = null;
   let wake!: () => void;
@@ -709,6 +709,7 @@ it("quits an idle review even after cancellation fails, but waits for actual imp
     id: createEntityId(),
     baseRevision: 1,
     mappingVersion: 1,
+    importedDocument: upgradeDocumentV2(createResumeDocument()),
     blocks: [
       {
         source: "Projects",
@@ -744,9 +745,8 @@ it("quits an idle review even after cancellation fails, but waits for actual imp
     return original(command, ...args);
   });
   const container = await render(<App surface="main" />);
-  await act(async () =>
-    buttonNamed(container, "Import an existing resume").click(),
-  );
+  await act(async () => buttonNamed(container, "Import").click());
+  await act(async () => buttonNamed(container, "Import resume").click());
   closeAttempt = createEntityId();
   await act(async () => wake());
   expect(
@@ -758,7 +758,7 @@ it("quits an idle review even after cancellation fails, but waits for actual imp
   await act(async () => buttonNamed(container, "Keep editing").click());
   await act(async () => finish({ ok: true, value: snapshot }));
   await settle();
-  await act(async () => buttonNamed(container, "Cancel import").click());
+  await act(async () => buttonNamed(container, "Cancel").click());
   expect(container.textContent).toContain(
     "Cancellation could not be confirmed",
   );
@@ -769,5 +769,124 @@ it("quits an idle review even after cancellation fails, but waits for actual imp
     native.invoke.mock.calls
       .filter(([command]) => command === "resolve_close")
       .at(-1)?.[1],
+  ).toMatchObject({ request: { payload: { decision: "cancel" } } });
+  expect(
+    buttonNamed(container, "Discard unsaved edits and quit").disabled,
+  ).toBe(false);
+  await act(async () =>
+    buttonNamed(container, "Discard unsaved edits and quit").click(),
+  );
+  expect(
+    native.invoke.mock.calls
+      .filter(([command]) => command === "resolve_close")
+      .at(-1)?.[1],
   ).toMatchObject({ request: { payload: { decision: "quit" } } });
+});
+
+it("keeps import edits separate until mapping and returns cancellation to the import screen", async () => {
+  const original = native.invoke.getMockImplementation()!;
+  const importedDocument = upgradeDocumentV2(createResumeDocument());
+  importedDocument.contact.fullName = "Imported Person";
+  importedDocument.sections = [
+    {
+      ...createSection(0),
+      heading: "Experience",
+      entries: [{ ...createEntry(0, 2), heading: "Imported Company" }],
+    },
+  ];
+  const snapshot = {
+    id: createEntityId(),
+    baseRevision: 1,
+    mappingVersion: 1,
+    importedDocument,
+    blocks: [
+      {
+        source: "Experience",
+        page: 1,
+        explanation: "Heading",
+        suggestedTarget: "section",
+        suggestedValue: "Experience",
+        proposedSection: null,
+      },
+    ],
+    sections: [],
+    contacts: {
+      fullName: "Synthetic Person",
+      email: "",
+      phone: "",
+      location: "",
+    },
+  };
+  native.invoke.mockImplementation(async (command, ...args) => {
+    if (command === "document_import_available") return true;
+    if (command === "begin_document_import")
+      return { ok: true, value: snapshot };
+    if (command === "cancel_import_review") return { ok: true, value: true };
+    if (command === "map_import_review") {
+      const [{ request }] = args as [
+        { request: { payload: { documentJson: string } } },
+      ];
+      return {
+        ok: true,
+        value: {
+          revision: 2,
+          document: JSON.parse(request.payload.documentJson),
+        },
+      };
+    }
+    return original(command, ...args);
+  });
+  const container = await render(<App surface="main" />);
+  await act(async () => buttonNamed(container, "Import").click());
+  await act(async () => buttonNamed(container, "Import resume").click());
+  const review = container.querySelector(".import-review-editor")!;
+  expect(review.textContent).toContain("Imported Person");
+  await expectSurfaceAccessible(container);
+  await act(async () =>
+    (
+      review.querySelector(
+        ".resume-canvas__contact .canvas-field__button",
+      ) as HTMLButtonElement
+    ).click(),
+  );
+  await act(async () =>
+    inputValue(
+      review.querySelector('input[aria-label="Name"]')!,
+      "Discarded Edit",
+    ),
+  );
+  await act(async () => buttonNamed(review, "Cancel").click());
+  expect(container.querySelector(".import-review-editor")).toBeNull();
+  expect(buttonNamed(container, "Import resume").disabled).toBe(false);
+  expect(container.querySelector(".resume-page")!.textContent).toContain(
+    "Synthetic Person",
+  );
+  expect(
+    native.invoke.mock.calls.some(
+      ([command]) =>
+        command === "save_resume" || command === "map_import_review",
+    ),
+  ).toBe(false);
+  await act(async () => buttonNamed(container, "Import resume").click());
+  expect(
+    container.querySelector(".import-review-editor")!.textContent,
+  ).not.toContain("Discarded Edit");
+  await act(async () =>
+    buttonNamed(
+      container.querySelector(".import-review-editor")!,
+      "Map to current saved resume",
+    ).click(),
+  );
+  expect(container.querySelector(".import-review-editor")).toBeNull();
+  expect(container.querySelector(".resume-page")!.hasAttribute("hidden")).toBe(
+    false,
+  );
+  expect(container.querySelector(".resume-page")!.textContent).toContain(
+    "Imported Person",
+  );
+  expect(
+    native.invoke.mock.calls.filter(
+      ([command]) => command === "map_import_review",
+    ),
+  ).toHaveLength(1);
 });

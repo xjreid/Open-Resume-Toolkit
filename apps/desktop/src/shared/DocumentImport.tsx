@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import type { DocumentStyle } from "@ort/contracts/export";
+import type { ImportReviewSnapshot } from "@ort/contracts/import";
 import type { VersionedResume } from "@ort/contracts/resume";
 import {
   beginDocumentImport,
@@ -9,24 +11,34 @@ import { ImportReviewFlow } from "./ImportReviewFlow";
 
 export function DocumentImport({
   disabled,
+  reviewDisabled = false,
+  disabledReason,
+  style,
   revision,
   onBusyChange,
   onOperationChange,
   onSaved,
+  onReloadRequired,
+  onReload,
 }: {
   disabled: boolean;
+  reviewDisabled?: boolean;
+  disabledReason?: string;
+  style?: DocumentStyle;
   revision: number | null;
   onBusyChange: (busy: boolean) => void;
   onOperationChange?: (busy: boolean) => void;
   onSaved: (saved: VersionedResume) => void;
+  onReloadRequired?: () => void;
+  onReload?: () => void;
 }) {
-  const [available, setAvailable] = useState(false);
+  const [available, setAvailable] = useState<boolean | null>(null);
   const [pending, setPending] = useState(false);
-  const [reviewId, setReviewId] = useState<string | null>(null);
+  const [review, setReview] = useState<ImportReviewSnapshot | null>(null);
+  const reviewId = review?.id ?? null;
   const [error, setError] = useState<string | null>(null);
   const launch = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
-  const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     if (reviewId === null && restoreFocus.current) {
       restoreFocus.current = false;
@@ -34,6 +46,7 @@ export function DocumentImport({
     }
   }, [reviewId]);
   const inFlight = useRef(false);
+  const reloadNeeded = useRef(false);
   const mounted = useRef(true);
   const cancelled = useRef(false);
   useEffect(() => {
@@ -49,9 +62,9 @@ export function DocumentImport({
     if (disabled || !available || inFlight.current || reviewId) return;
     inFlight.current = true;
     cancelled.current = false;
+    reloadNeeded.current = false;
     setPending(true);
     setError(null);
-    setNotice(null);
     onBusyChange(true);
     onOperationChange?.(true);
     const result = await beginDocumentImport(revision);
@@ -62,12 +75,12 @@ export function DocumentImport({
     if (result.ok && result.value) {
       // A cancellation may race successful native completion. Retain the
       // native-created session so its explicit Cancel action can retire it.
-      setReviewId(result.value.id);
+      setReview(result.value);
     } else {
       onBusyChange(false);
       if (!result.ok && !cancelled.current)
         setError(
-          "Import could not finish. Your resume has not been changed. Choose a supported text-based PDF or DOCX and try again.",
+          "Could not read this resume. Choose a text-based PDF or DOCX and try again.",
         );
     }
   }
@@ -81,26 +94,26 @@ export function DocumentImport({
   }
   function finished() {
     restoreFocus.current = true;
-    setReviewId(null);
+    setReview(null);
     onBusyChange(false);
   }
   return (
     <section aria-label="Resume file importer">
-      <h2>Import an existing resume</h2>
-      <p>
-        Choose a PDF or DOCX, compare the extracted text, and accept or reject
-        every proposed change. Scans require OCR and are not supported.
-      </p>
-      {reviewId ? (
+      {review ? (
         <ImportReviewFlow
-          reviewId={reviewId}
+          reviewId={review.id}
+          initialSnapshot={review}
+          style={style}
+          disabled={reviewDisabled}
           currentRevision={revision ?? 0}
           onOperationChange={onOperationChange}
+          onReloadRequired={() => {
+            reloadNeeded.current = true;
+            onReloadRequired?.();
+          }}
           onCancelled={() => {
-            setNotice(
-              "Import review closed. No changes were applied by cancellation.",
-            );
             finished();
+            if (reloadNeeded.current) onReload?.();
           }}
           onSaved={(saved) => {
             finished();
@@ -109,6 +122,8 @@ export function DocumentImport({
         />
       ) : (
         <>
+          <h2>Import a resume</h2>
+          <p>Text-based PDF or DOCX</p>
           <button
             type="button"
             ref={launch}
@@ -116,17 +131,17 @@ export function DocumentImport({
             disabled={disabled || !available || pending}
             onClick={() => void begin()}
           >
-            Import an existing resume
+            Import resume
           </button>
-          {!available ? (
-            <p>Import is not available in this version of the app.</p>
+          {available === false ? (
+            <p role="status">Import is unavailable in this build.</p>
+          ) : null}
+          {disabledReason && available && !pending ? (
+            <p role="status">{disabledReason}</p>
           ) : null}
           {pending ? (
             <div role="status">
-              <p>
-                Preparing your import. If the file picker is open, use its
-                Cancel button to close it.
-              </p>
+              <p>Reading resume…</p>
               <button type="button" onClick={() => void cancel()}>
                 Cancel import
               </button>
@@ -134,7 +149,6 @@ export function DocumentImport({
           ) : null}
         </>
       )}
-      {notice ? <p role="status">{notice}</p> : null}
       {error ? <p role="alert">{error}</p> : null}
     </section>
   );

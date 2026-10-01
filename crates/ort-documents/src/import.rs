@@ -42,6 +42,32 @@ pub struct ExtractedBlock {
     pub page: u16,
     pub kind: BlockKind,
     pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<TextLayout>,
+}
+
+/// Parser-observed single-line bounds in thousandths of a PDF point, with a
+/// top-left origin. Optional so text-only DOCX and older extractions still work.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TextLayout {
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+    pub font_size: u32,
+}
+
+impl TextLayout {
+    #[must_use]
+    pub fn is_valid(self) -> bool {
+        [self.left, self.top, self.right, self.bottom]
+            .iter()
+            .all(|coordinate| coordinate.unsigned_abs() <= 14_400_000)
+            && self.left < self.right
+            && self.top < self.bottom
+            && (1..=1_000_000).contains(&self.font_size)
+    }
 }
 
 /// Constructible only through the bounded parent-side decoder. Block indices
@@ -86,6 +112,12 @@ impl ValidatedExtraction {
         let mut prior_page = 1;
         let mut readable = false;
         for block in &wire.blocks {
+            if block
+                .layout
+                .is_some_and(|layout| !layout.is_valid() || block.text.contains(['\n', '\r']))
+            {
+                return Err(ImportError::InvalidExtraction);
+            }
             if block.page < prior_page || block.page > wire.page_count {
                 return Err(ImportError::InvalidExtraction);
             }

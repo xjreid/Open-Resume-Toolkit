@@ -83,6 +83,35 @@ Undo and redo operate on the in-memory editing history. Up to the recent 30
 document states are retained for undo. Reloading or discarding unsaved edits is
 explicitly confirmed.
 
+## Import
+
+**Master resume → Import → Import resume** opens the native PDF/DOCX picker.
+Readable text is parsed locally by the signed, isolated document helper. The
+macOS ARM64 package must include that helper and its compiled identity pins;
+other builds keep import unavailable. Scanned PDFs requiring OCR are unsupported.
+
+The imported resume opens in a separate review draft using the same editable
+canvas as Edit. Contact information, section headings, entries, free-text dates,
+skill details and body text are mapped into the current v2 schema. PDF alignment,
+spacing and font size distinguish the six entry header slots from body text;
+section columns are kept together. Skills categories, including unbulleted lists,
+share one entry's body instead of creating an entry for every category. Text-only
+extractions use conservative text rules. Unclear text
+remains editable; no dates or professional facts are invented. Sections can be
+renamed, added, deleted and reordered with drag or keyboard buttons. Edits and
+undo/redo affect only this imported draft; review does not autosave.
+
+**Map to current saved resume** validates the reviewed document and replaces the
+entire saved draft in one revision-checked transaction, then opens Edit. It does
+not merge with old content or modify published snapshots. **Cancel** discards the
+review and returns to Import without saving. Save current edits before starting
+an import. Quitting during review requires explicitly discarding the import.
+
+A changed saved revision or expired review blocks mapping. Cancel and import
+again. An uncertain save is never retried automatically; cancellation then
+reloads the saved workspace before another import can begin. Review sessions
+remain in memory only and expire after 30 minutes.
+
 ## View mode
 
 View mode removes editing controls and shows a reading-oriented version. The

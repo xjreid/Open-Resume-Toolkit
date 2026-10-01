@@ -1,8 +1,8 @@
 use crate::{MEMORY_BYTES, MODULE_BYTES, PDF_FUEL, ParserError, pdf_host};
 use ort_documents::{
     import::{
-        BlockKind, InputFormat, MAX_EXTRACTED_CHARACTERS, MAX_PAGES, ValidatedExtraction,
-        section_kind,
+        BlockKind, InputFormat, MAX_EXTRACTED_CHARACTERS, MAX_PAGES, TextLayout,
+        ValidatedExtraction, section_kind,
     },
     import_source::inspect_source,
     worker_output::WorkerExtractionBuilder,
@@ -18,6 +18,92 @@ pub const PDFIUM_SHA256: [u8; 32] = [
     0x98, 0x73, 0x38, 0x92, 0x51, 0x5e, 0xfe, 0xa4, 0xe4, 0x42, 0x6c, 0xc0, 0x64, 0x96, 0xd5, 0x12,
 ];
 const MAX_OBJECTS: i32 = 20_000;
+#[derive(Default)]
+struct PdfLine {
+    text: String,
+    layout: Option<TextLayout>,
+}
+fn flush_line(lines: &mut Vec<PdfLine>, line: &mut PdfLine) {
+    if line.text.trim().is_empty() {
+        *line = PdfLine::default();
+    } else {
+        line.text = line.text.trim().to_owned();
+        lines.push(std::mem::take(line));
+    }
+}
+// Quantization is bounded before casting, including nonfinite guest values.
+#[allow(clippy::cast_possible_truncation)]
+fn point(value: f64) -> Option<i32> {
+    let scaled = (value * 1000.0).round();
+    (scaled.is_finite() && scaled.abs() <= 14_400_000.0).then_some(scaled as i32)
+}
+fn glyph_layout(values: &[f64], height: f64, font: f64) -> Option<TextLayout> {
+    let layout = TextLayout {
+        left: point(values[0])?,
+        right: point(values[1])?,
+        top: point(height - values[3])?,
+        bottom: point(height - values[2])?,
+        font_size: u32::try_from(point(font)?).ok()?,
+    };
+    layout.is_valid().then_some(layout)
+}
+fn order_lines(lines: &mut [PdfLine]) {
+    lines.sort_by_key(|line| line.layout.map(|value| (value.top, value.left)));
+    let mut start = 0;
+    while start < lines.len() {
+        let Some(anchor) = lines[start].layout else {
+            start += 1;
+            continue;
+        };
+        let mut end = start + 1;
+        while end < lines.len()
+            && lines[end].layout.is_some_and(|value| {
+                (i64::from(value.bottom) - i64::from(anchor.bottom)).abs()
+                    <= i64::from(value.font_size.max(anchor.font_size)) / 2
+            })
+        {
+            end += 1;
+        }
+        lines[start..end].sort_by_key(|line| line.layout.map(|value| value.left));
+        start = end;
+    }
+}
+// Section headings establish column margins. Group each column as a whole
+// so a sidebar Skills section cannot absorb rows from Experience beside it.
+fn order_columns(lines: &mut [PdfLine]) {
+    let mut headings: Vec<_> = lines
+        .iter()
+        .filter(|line| section_kind(&line.text).is_some())
+        .filter_map(|line| line.layout)
+        .collect();
+    headings.sort_by_key(|layout| layout.left);
+    let mut columns: Vec<TextLayout> = Vec::new();
+    for heading in &headings {
+        if columns.last().is_none_or(|prior| {
+            i64::from(heading.left) - i64::from(prior.left)
+                > i64::from(heading.font_size.max(prior.font_size)) * 8
+        }) {
+            columns.push(*heading);
+        }
+    }
+    if !(2..=3).contains(&columns.len()) {
+        return;
+    }
+    let first_heading = headings.iter().map(|layout| layout.top).min().unwrap_or(0);
+    // Keep the contact area above all section columns, in its visual order.
+    lines.sort_by_key(|line| {
+        line.layout.map_or(0, |layout| {
+            if layout.bottom < first_heading {
+                0
+            } else {
+                columns
+                    .iter()
+                    .rposition(|column| layout.left >= column.left - 5_000)
+                    .map_or(1, |index| index + 1)
+            }
+        })
+    });
+}
 struct Guest {
     store: Store<StoreLimits>,
     instance: Instance,
@@ -46,7 +132,11 @@ impl Guest {
             .get_memory(&self.store, "memory")
             .ok_or(ParserError::Module)
     }
-    fn page_text(&mut self, page: i32, remaining: usize) -> Result<String, ParserError> {
+    fn page_text(
+        &mut self,
+        page: i32,
+        remaining: usize,
+    ) -> Result<(String, Vec<PdfLine>), ParserError> {
         let objects: i32 = self.call("FPDFPage_CountObjects", page)?;
         if !(0..=MAX_OBJECTS).contains(&objects) {
             return Err(ParserError::Output);
@@ -96,8 +186,125 @@ impl Guest {
             return Err(ParserError::Output);
         }
         self.call::<_, ()>("free", pointer)?;
+        let height: f64 = self.call("FPDF_GetPageHeight", page)?;
+        let lines = self.positioned_lines(text_page, count, height, &text)?;
         self.call::<_, ()>("FPDFText_ClosePage", text_page)?;
-        Ok(text)
+        Ok((text, lines))
+    }
+    fn character_layout(
+        &mut self,
+        text_page: i32,
+        index: i32,
+        pointer: i32,
+        height: f64,
+    ) -> Result<Option<TextLayout>, ParserError> {
+        let success: i32 = self.call(
+            "FPDFText_GetCharBox",
+            (
+                text_page,
+                index,
+                pointer,
+                pointer + 8,
+                pointer + 16,
+                pointer + 24,
+            ),
+        )?;
+        if success == 0 {
+            return Ok(None);
+        }
+        let mut bytes = [0; 32];
+        self.memory()?
+            .read(
+                &self.store,
+                usize::try_from(pointer).map_err(|_| ParserError::Output)?,
+                &mut bytes,
+            )
+            .map_err(|_| ParserError::Output)?;
+        let values: Vec<_> = bytes
+            .as_chunks::<8>()
+            .0
+            .iter()
+            .map(|value| f64::from_le_bytes(*value))
+            .collect();
+        let font: f64 = self.call("FPDFText_GetFontSize", (text_page, index))?;
+        Ok(glyph_layout(&values, height, font))
+    }
+    fn positioned_lines(
+        &mut self,
+        text_page: i32,
+        count: i32,
+        height: f64,
+        original: &str,
+    ) -> Result<Vec<PdfLine>, ParserError> {
+        let pointer = self.pointer("malloc", 32)?;
+        let mut lines = Vec::new();
+        let mut line = PdfLine::default();
+        let mut observed = String::new();
+        let mut complete_layout = true;
+        for index in 0..count {
+            let unicode: u32 = self.call("FPDFText_GetUnicode", (text_page, index))?;
+            let Some(character) = char::from_u32(unicode).filter(|c| *c != '\0') else {
+                continue;
+            };
+            observed.push(character);
+            if matches!(character, '\n' | '\r') {
+                flush_line(&mut lines, &mut line);
+                continue;
+            }
+            if character.is_whitespace() {
+                line.text.push(character);
+                continue;
+            }
+            let bounds = self.character_layout(text_page, index, pointer, height)?;
+            complete_layout &= bounds.is_some();
+            if let (Some(prior), Some(next)) = (line.layout, bounds) {
+                let tolerance = i64::from(prior.font_size.max(next.font_size));
+                let vertical = (i64::from(prior.bottom) - i64::from(next.bottom)).abs();
+                let gap = i64::from(next.left) - i64::from(prior.right);
+                if vertical > tolerance * 2 / 3
+                    || gap > tolerance * 3 / 2
+                    || i64::from(next.right) < i64::from(prior.left) - tolerance
+                {
+                    flush_line(&mut lines, &mut line);
+                }
+            }
+            line.text.push(character);
+            line.layout = match (line.layout, bounds) {
+                (Some(prior), Some(next)) => Some(TextLayout {
+                    left: prior.left.min(next.left),
+                    top: prior.top.min(next.top),
+                    right: prior.right.max(next.right),
+                    bottom: prior.bottom.max(next.bottom),
+                    font_size: prior.font_size.max(next.font_size),
+                }),
+                (None, next) => next,
+                (prior, None) => prior,
+            };
+        }
+        flush_line(&mut lines, &mut line);
+        self.call::<_, ()>("free", pointer)?;
+        // Unicode APIs may omit unmapped glyphs. Keep the original text-only
+        // extraction if the positioned version cannot account for every word.
+        if !complete_layout
+            || observed
+                .chars()
+                .filter(|c| !c.is_whitespace())
+                .ne(original.chars().filter(|c| !c.is_whitespace()))
+            || lines.iter().any(|line| line.layout.is_none())
+        {
+            return Ok(original
+                .replace("\r\n", "\n")
+                .replace('\r', "\n")
+                .split('\n')
+                .map(|text| PdfLine {
+                    text: text.into(),
+                    layout: None,
+                })
+                .collect());
+        }
+        order_lines(&mut lines);
+        order_columns(&mut lines);
+        Ok(lines)
     }
 }
 /// Extracts text with the pinned `PDFium` guest and no host OS capabilities.
@@ -160,13 +367,12 @@ pub fn extract_pdf(module_bytes: &[u8], input: &[u8]) -> Result<ValidatedExtract
     let mut remaining = MAX_EXTRACTED_CHARACTERS;
     for index in 0..count {
         let page = guest.pointer("FPDF_LoadPage", (document, index))?;
-        let text = guest.page_text(page, remaining)?;
+        let (text, lines) = guest.page_text(page, remaining)?;
         remaining = remaining
             .checked_sub(text.chars().count())
             .ok_or(ParserError::Output)?;
-        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
-        for line in normalized.split('\n') {
-            let trimmed = line.trim();
+        for line in lines {
+            let trimmed = line.text.trim();
             let kind = if section_kind(trimmed).is_some() {
                 BlockKind::Heading
             } else if ["- ", "• ", "* "]
@@ -178,10 +384,11 @@ pub fn extract_pdf(module_bytes: &[u8], input: &[u8]) -> Result<ValidatedExtract
                 BlockKind::Paragraph
             };
             builder
-                .push(
+                .push_with_layout(
                     u16::try_from(index + 1).map_err(|_| ParserError::Output)?,
                     kind,
-                    line.to_owned(),
+                    line.text,
+                    line.layout,
                 )
                 .map_err(|_| ParserError::Output)?;
         }
