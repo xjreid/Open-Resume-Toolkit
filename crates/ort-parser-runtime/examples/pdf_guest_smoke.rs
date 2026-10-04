@@ -65,6 +65,7 @@ fn main() {
             .value
             .contains("Built tools")
     );
+    verify_scaled_matrix(&bytes);
     let sidebar = extract_pdf(&bytes, &column_resume()).expect("column PDF parse");
     let sidebar_resume = ort_documents::resume_import::map_resume(&sidebar).unwrap();
     sidebar_resume
@@ -91,6 +92,24 @@ fn main() {
 
     println!(
         "PASS: bounded PDF extraction, six header slots, nonbulleted skills, visual reading order, columns, scanned-page denial, logo acceptance and malformed-source denial"
+    );
+}
+fn verify_scaled_matrix(bytes: &[u8]) {
+    let scaled = extract_pdf(bytes, &stream_pdf(
+        b"BT /F1 1 Tf 14 0 0 14 72 720 Tm (Experience) Tj ET BT /F1 1 Tf 12 0 0 12 72 690 Tm (Example Company) Tj ET BT /F1 1 Tf 11 0 0 11 72 670 Tm (Engineer) Tj ET BT /F1 1 Tf 11 0 0 11 425 670 Tm (2020 - Present) Tj ET"
+    )).expect("scaled text matrix");
+    assert_eq!(scaled.blocks().len(), 4);
+    assert_eq!(scaled.blocks()[0].layout.unwrap().font_size, 14_000);
+    let scaled_resume = ort_documents::resume_import::map_resume(&scaled).unwrap();
+    assert_eq!(scaled_resume.sections[0].heading, "Experience");
+    assert_eq!(
+        scaled_resume.sections[0].entries[0].heading,
+        "Example Company"
+    );
+    assert_eq!(scaled_resume.sections[0].entries[0].subheading, "Engineer");
+    assert_eq!(
+        scaled_resume.sections[0].entries[0].date_range,
+        "2020 - Present"
     );
 }
 fn synthetic_pdf() -> Vec<u8> {

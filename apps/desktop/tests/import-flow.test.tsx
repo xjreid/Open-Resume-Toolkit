@@ -23,12 +23,64 @@ const saved = vi.fn();
 const cancelled = vi.fn();
 function button(text: string) {
   return Array.from(host.querySelectorAll("button")).find(
-    (button) => button.textContent?.trim() === text,
+    (button) =>
+      button.textContent?.trim() === text &&
+      !button.closest("dialog:not([open])"),
   )!;
+}
+function pointer(target: EventTarget, type: string, x: number, y: number) {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    button: 0,
+    clientX: x,
+    clientY: y,
+  });
+  Object.defineProperty(event, "pointerId", { value: 1 });
+  target.dispatchEvent(event);
+}
+async function dragFirstSectionToTrash() {
+  const nav = host.querySelector<HTMLElement>(".document-navigator")!;
+  const card = nav.querySelector<HTMLElement>(".section-nav-card")!;
+  const list = nav.querySelector<HTMLElement>(".section-sort-list")!;
+  const trash = nav.querySelector<HTMLElement>(".section-trash")!;
+  for (const [element, top, bottom] of [
+    [nav, 0, 500],
+    [list, 0, 250],
+    [card, 0, 40],
+    [trash, 300, 350],
+  ] as const) {
+    vi.spyOn(element, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      right: 200,
+      top,
+      bottom,
+      width: 200,
+      height: bottom - top,
+    } as DOMRect);
+  }
+  await act(async () => {
+    pointer(card, "pointerdown", 10, 10);
+    pointer(window, "pointermove", 10, 320);
+    pointer(window, "pointerup", 10, 320);
+  });
 }
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.clearAllMocks();
+  Object.defineProperties(HTMLDialogElement.prototype, {
+    showModal: {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        this.open = true;
+      },
+    },
+    close: {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        this.open = false;
+      },
+    },
+  });
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -65,6 +117,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 async function render(revision = 1) {
@@ -107,11 +160,25 @@ it("uses the editor with an isolated draft and submits edited, reordered v2 cont
   });
   await act(async () =>
     (
-      host.querySelector('[aria-label="Move Projects up"]') as HTMLButtonElement
-    ).click(),
+      host.querySelector('[aria-label="Rename Projects"]') as HTMLButtonElement
+    ).dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowUp",
+        altKey: true,
+        bubbles: true,
+      }),
+    ),
   );
-  await act(async () => button("Undo").click());
-  await act(async () => button("Redo").click());
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="Undo import edit"]')!
+      .click(),
+  );
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="Redo import edit"]')!
+      .click(),
+  );
   expect(snapshot.importedDocument.contact.fullName).toBe("Imported Person");
   expect(snapshot.importedDocument.sections[0].heading).toBe("Experience");
   await act(async () => button("Map to current saved resume").click());
@@ -138,6 +205,62 @@ it("cancels without mapping or saving, and preserves the review when cancellatio
   expect(cancelled).toHaveBeenCalledOnce();
   expect(client.mapImportReview).not.toHaveBeenCalled();
   expect(saved).not.toHaveBeenCalled();
+});
+it("keeps section deletion reviewable and undoable without saving the imported draft", async () => {
+  await render();
+  expect(host.querySelector(".resume-display-header")?.textContent).toContain(
+    "Not saved yet",
+  );
+  await dragFirstSectionToTrash();
+  const dialog = host.querySelector<HTMLDialogElement>("dialog[open]")!;
+  expect(dialog).not.toBeNull();
+  expect(dialog.closest("nav")).toBeNull();
+  expect(document.activeElement).toBe(dialog.querySelector("button"));
+  expect(host.querySelector(".section-trash-confirmation")).toBeNull();
+  expect(host.querySelectorAll(".section-nav-card")).toHaveLength(2);
+  await act(async () => button("Delete section").click());
+  expect(host.querySelectorAll(".section-nav-card")).toHaveLength(1);
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="Undo import edit"]')!
+      .click(),
+  );
+  expect(host.querySelectorAll(".section-nav-card")).toHaveLength(2);
+  expect(snapshot.importedDocument.sections).toHaveLength(2);
+  expect(client.mapImportReview).not.toHaveBeenCalled();
+  expect(saved).not.toHaveBeenCalled();
+});
+it("opens only a rename field on title click and cancels the deletion popup without changing content", async () => {
+  await render();
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="Rename Experience"]')!
+      .click(),
+  );
+  const input = host.querySelector<HTMLInputElement>(
+    '[aria-label="Section name Experience"]',
+  )!;
+  expect(document.activeElement).toBe(input);
+  expect(host.querySelector(".section-nav-keyboard-actions")).toBeNull();
+  expect(host.querySelectorAll(".section-nav-card button")).toHaveLength(1);
+  expect(host.querySelector("dialog[open]")).toBeNull();
+  await act(async () => input.blur());
+  await dragFirstSectionToTrash();
+  await act(async () => button("Cancel").click());
+  expect(host.querySelector("dialog[open]")).toBeNull();
+  expect(document.activeElement).toBe(
+    host.querySelector('[aria-label="Rename Experience"]'),
+  );
+  expect(host.querySelectorAll(".section-nav-card")).toHaveLength(2);
+  await dragFirstSectionToTrash();
+  await act(async () =>
+    host
+      .querySelector("dialog[open]")!
+      .dispatchEvent(new Event("cancel", { cancelable: true })),
+  );
+  expect(host.querySelector("dialog[open]")).toBeNull();
+  expect(host.querySelectorAll(".section-nav-card")).toHaveLength(2);
+  expect(client.mapImportReview).not.toHaveBeenCalled();
 });
 it("blocks stale revisions and invalid drafts before submitting", async () => {
   await render(2);

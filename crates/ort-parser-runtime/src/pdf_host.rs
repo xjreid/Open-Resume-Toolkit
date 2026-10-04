@@ -1,9 +1,24 @@
 use crate::{MEMORY_BYTES, pdf_abi};
 use wasmi::{Caller, Engine, Extern, ExternType, Linker, Module, StoreLimits, Val};
+// Reentrant indirect calls share the same store, fuel and memory limiter.
+// Bound host-mediated nesting separately from Wasmi's guest call-stack limit.
+pub(super) struct PdfHost {
+    pub(super) limits: StoreLimits,
+    callback_depth: u8,
+}
+impl PdfHost {
+    pub(super) fn new(limits: StoreLimits) -> Self {
+        Self {
+            limits,
+            callback_depth: 0,
+        }
+    }
+}
+const MAX_CALLBACK_DEPTH: u8 = 16;
 fn refused() -> wasmi::Error {
     wasmi::Error::new("guest operation refused")
 }
-fn charge(caller: &mut Caller<'_, StoreLimits>, bytes: usize) -> Result<(), wasmi::Error> {
+fn charge(caller: &mut Caller<'_, PdfHost>, bytes: usize) -> Result<(), wasmi::Error> {
     let cost = u64::try_from(bytes)
         .map_err(|_| refused())?
         .checked_add(32)
@@ -17,13 +32,13 @@ fn offset(value: &Val) -> Result<usize, wasmi::Error> {
         .and_then(|v| usize::try_from(v).ok())
         .ok_or_else(refused)
 }
-fn memory(caller: &Caller<'_, StoreLimits>) -> Result<wasmi::Memory, wasmi::Error> {
+fn memory(caller: &Caller<'_, PdfHost>) -> Result<wasmi::Memory, wasmi::Error> {
     caller
         .get_export("memory")
         .and_then(Extern::into_memory)
         .ok_or_else(refused)
 }
-pub(super) fn link(engine: &Engine, module: &Module) -> Result<Linker<StoreLimits>, wasmi::Error> {
+pub(super) fn link(engine: &Engine, module: &Module) -> Result<Linker<PdfHost>, wasmi::Error> {
     let mut linker = Linker::new(engine);
     for import in module.imports() {
         let expected = pdf_abi::signature(import.module(), import.name()).ok_or_else(refused)?;
@@ -103,7 +118,10 @@ pub(super) fn link(engine: &Engine, module: &Module) -> Result<Linker<StoreLimit
                         results[0] = Val::I32(8);
                     }
                     n if n.starts_with("__syscall_") => results[0] = Val::I32(-63),
-                    // Exception/time/mapping helpers have no host implementation. A
+                    "invoke_ii" | "invoke_iii" | "invoke_iiii" | "invoke_iiiii" | "invoke_viii" => {
+                        invoke_guest(&mut caller, params, results)?;
+                    }
+                    // Exceptions and mapping helpers have no host implementation. A
                     // PDF requiring them fails closed, without retaining partial text.
                     _ => return Err(refused()),
                 }
@@ -115,7 +133,7 @@ pub(super) fn link(engine: &Engine, module: &Module) -> Result<Linker<StoreLimit
 }
 
 fn convert_time(
-    caller: &mut Caller<'_, StoreLimits>,
+    caller: &mut Caller<'_, PdfHost>,
     params: &[Val],
     utc: bool,
 ) -> Result<(), wasmi::Error> {
@@ -152,4 +170,42 @@ fn convert_time(
         )
         .map_err(|_| refused())?;
     Ok(())
+}
+
+fn invoke_guest(
+    caller: &mut Caller<'_, PdfHost>,
+    params: &[Val],
+    results: &mut [Val],
+) -> Result<(), wasmi::Error> {
+    let index = params
+        .first()
+        .and_then(Val::i32)
+        .and_then(|value| u64::try_from(value).ok())
+        .ok_or_else(refused)?;
+    let table = caller
+        .get_export("__indirect_function_table")
+        .and_then(Extern::into_table)
+        .ok_or_else(refused)?;
+    let value = table.get(&*caller, index).ok_or_else(refused)?;
+    let function = value
+        .funcref()
+        .and_then(|reference| reference.val().map(|function| **function))
+        .ok_or_else(refused)?;
+    let ty = function.ty(&*caller);
+    if ty
+        .params()
+        .iter()
+        .copied()
+        .ne(params[1..].iter().map(Val::ty))
+        || ty.results().iter().copied().ne(results.iter().map(Val::ty))
+        || caller.data().callback_depth >= MAX_CALLBACK_DEPTH
+    {
+        return Err(refused());
+    }
+    caller.data_mut().callback_depth += 1;
+    // A trap aborts the whole extraction. Never swallow exceptions or return
+    // partial text; successful dispatch grants no additional host capability.
+    let result = function.call(&mut *caller, &params[1..], results);
+    caller.data_mut().callback_depth -= 1;
+    result
 }

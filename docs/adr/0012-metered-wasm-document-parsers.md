@@ -105,3 +105,24 @@ The initial 50M PDF budget was replaced by a fixed 500M budget validated against
 96 schema/style fixtures; DOCX uses 50M. No request retries with additional fuel.
 See [completion evidence](../../evidence/0.0.0-dev/m2-implementation-completion.md).
 Final Step 6 native-reader/accessibility/account acceptance is still pending.
+
+## Import compatibility update, 2026-10-01
+
+The five pinned Emscripten `invoke_*` imports dispatch only to matching typed
+functions in the same guest's indirect table. They share its fuel and memory
+limiter, with host-mediated nesting capped at 16. Invalid indices, null targets,
+signature mismatches, traps and exhausted fuel withhold extraction. No new OS
+capability or exception recovery is provided. PDF text geometry now uses the
+character matrix to convert font size into page coordinates, including exports
+that use a one-point font with a scaled text matrix.
+
+DOCX inspection accepts the standard Deflate speed-option bits while retaining
+the encryption, reserved-flag, size, expansion, CRC and active-content checks.
+Document relationships may normalize relative paths within the package; paths
+that escape the package, encoded paths and active relationships remain denied.
+Normalization never opens a file or fetches a URI.
+
+Synthetic callback, scaled-text and DOCX regressions cover these changes. The
+`import_check` example accepts explicitly supplied local PDF/DOCX files and
+checks source inspection, extraction, mapping and document validity without
+printing document contents or adding personal files to repository fixtures.

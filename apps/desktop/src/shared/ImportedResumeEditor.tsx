@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { DocumentStyle } from "@ort/contracts/export";
 import { DOCUMENT_LIMITS, type ResumeDocument } from "@ort/contracts/resume";
 import { ResumeCanvas } from "./App";
-import { PopupSectionNavigator } from "./PopupSectionNavigator";
+import { ResumeSectionNavigator } from "./ResumeSectionNavigator";
+import { UndoIcon, RedoIcon } from "./ResumeHistoryIcons";
 import { normalizeDocument } from "./resume-editor";
 import { documentUsage, validateEditorDocument } from "./resume-validation";
 
@@ -30,6 +31,7 @@ export function ImportedResumeEditor({
   });
   const [divider, setDivider] = useState<"dot" | "bar" | "dash">("dot");
   const heading = useRef<HTMLHeadingElement>(null);
+  const headingId = useId();
   useEffect(() => {
     heading.current?.focus();
   }, []);
@@ -95,45 +97,67 @@ export function ImportedResumeEditor({
       className="import-review-editor"
       aria-label="Review imported resume"
     >
-      <header className="import-review-editor__header">
-        <h2 ref={heading} tabIndex={-1}>
-          Review imported resume
-        </h2>
-        <div
-          className="resume-history-actions"
-          role="group"
-          aria-label="Import edit history"
-        >
-          <button
-            type="button"
-            className="button--secondary button--compact"
-            disabled={disabled || !history.undo.length}
-            onClick={undo}
-          >
-            Undo
-          </button>
-          <button
-            type="button"
-            className="button--secondary button--compact"
-            disabled={disabled || !history.redo.length}
-            onClick={redo}
-          >
-            Redo
-          </button>
-        </div>
-      </header>
       <fieldset className="import-review-editor__fields" disabled={disabled}>
         <legend className="import-review-editor__legend">
           Imported resume
         </legend>
         <div className="document-workspace import-review-editor__workspace">
-          <PopupSectionNavigator
+          <ResumeSectionNavigator
             document={document}
             disabled={disabled}
-            accessibleControls
-            onChange={(next) => change(() => next)}
+            onChange={change}
           />
-          <div className="document-display">
+          <div className="resume-reading-panel">
+            <header className="resume-display-header">
+              <div className="resume-display-header__title-row">
+                <div className="resume-display-header__title">
+                  <h2 id={headingId} ref={heading} tabIndex={-1}>
+                    Review imported resume
+                  </h2>
+                  <span className="resume-save-status" role="status">
+                    <span
+                      className="resume-save-status__dot"
+                      aria-hidden="true"
+                    />
+                    {busy
+                      ? "Working…"
+                      : error
+                        ? "Review needs attention"
+                        : "Not saved yet"}
+                  </span>
+                </div>
+                <div
+                  className="resume-history-actions"
+                  role="group"
+                  aria-label="Import edit history"
+                >
+                  <button
+                    type="button"
+                    className="button--secondary button--compact"
+                    aria-label="Undo import edit"
+                    title="Undo"
+                    disabled={disabled || !history.undo.length}
+                    onClick={undo}
+                  >
+                    <UndoIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className="button--secondary button--compact"
+                    aria-label="Redo import edit"
+                    title="Redo"
+                    disabled={disabled || !history.redo.length}
+                    onClick={redo}
+                  >
+                    <RedoIcon />
+                  </button>
+                </div>
+              </div>
+              <p className="import-review-editor__save-note">
+                Review edits are temporary until you map them to your saved
+                resume.
+              </p>
+            </header>
             <ResumeCanvas
               document={document}
               style={style}

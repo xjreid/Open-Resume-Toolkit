@@ -18,7 +18,6 @@ import {
   useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
@@ -50,10 +49,9 @@ import { BackupPanel } from "./BackupPanel";
 import { StoragePanel } from "./StoragePanel";
 import { ResumeStart } from "./ResumeStart";
 import { DocumentImport } from "./DocumentImport";
-import {
-  createStartingSections,
-  SUGGESTED_SECTIONS,
-} from "./starting-profiles";
+import { ResumeSectionNavigator } from "./ResumeSectionNavigator";
+import { UndoIcon, RedoIcon } from "./ResumeHistoryIcons";
+import { createStartingSections } from "./starting-profiles";
 import { useCloseGuard } from "./use-close-guard";
 import {
   editorReducer,
@@ -82,7 +80,6 @@ import {
   createEntityId,
   createEntry,
   createResumeDocument,
-  createSection,
   createNamedField,
   moveItem,
   normalizeDocument,
@@ -106,22 +103,6 @@ type HealthState =
 export function App({ surface }: { surface: Surface }) {
   if (surface === "overlay") return <ApplicationOverlay />;
   return <ResumeEditor />;
-}
-
-function UndoIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M9 7 4 11.5 9 16v-3h4.4c2.8 0 4.5 1.1 5.6 3.7-.1-5.2-2.6-7.7-7.2-7.7H9V7Z" />
-    </svg>
-  );
-}
-
-function RedoIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m15 7 5 4.5-5 4.5v-3h-4.4C7.8 13 6.1 14.1 5 16.7 5.1 11.5 7.6 9 12.2 9H15V7Z" />
-    </svg>
-  );
 }
 
 function ResumeEditor() {
@@ -168,58 +149,6 @@ function ResumeEditor() {
       focusValidationField(focusPanel.current, validationFocus.path);
     }
   }, [validationFocus]);
-  const [suggestedSection, setSuggestedSection] =
-    useState<string>("Custom Section");
-  const [renamingSection, setRenamingSection] = useState<string | null>(null);
-  const [draggingSection, setDraggingSection] = useState<string | null>(null);
-  const [sectionDragOrder, setSectionDragOrder] = useState<string[] | null>(
-    null,
-  );
-  const [trashActive, setTrashActive] = useState(false);
-  const [pendingTrashSection, setPendingTrashSection] = useState<string | null>(
-    null,
-  );
-  const sectionPointerDrag = useRef<{
-    id: string;
-    pointerId: number;
-    startX: number;
-    startY: number;
-    dragging: boolean;
-    offsetX: number;
-    offsetY: number;
-    width: number;
-    height: number;
-  } | null>(null);
-  const sectionDragOrderRef = useRef<string[] | null>(null);
-  const sectionLayoutBefore = useRef<Map<string, DOMRect>>(new Map());
-  const sectionCards = useRef<Map<string, HTMLDivElement>>(new Map());
-  const sectionList = useRef<HTMLDivElement>(null);
-  const sectionTrash = useRef<HTMLDivElement>(null);
-  const sectionNavigator = useRef<HTMLElement>(null);
-  const [sectionDragPosition, setSectionDragPosition] = useState<{
-    x: number;
-    y: number;
-    label: string;
-  } | null>(null);
-  useLayoutEffect(() => {
-    if (!sectionDragOrder) return;
-    for (const [id, previous] of sectionLayoutBefore.current) {
-      const card = sectionCards.current.get(id);
-      if (!card || id === draggingSection) continue;
-      card.getAnimations().forEach((animation) => animation.cancel());
-      const current = card.getBoundingClientRect();
-      const delta = previous.top - current.top;
-      if (Math.abs(delta) < 1) continue;
-      card.animate(
-        [
-          { transform: `translateY(${delta}px)` },
-          { transform: "translateY(0)" },
-        ],
-        { duration: 190, easing: "cubic-bezier(.2,.8,.2,1)" },
-      );
-    }
-    sectionLayoutBefore.current.clear();
-  }, [sectionDragOrder, draggingSection]);
   const firstContactField = useRef<HTMLInputElement>(null);
   const focusAfterStart = useRef(false);
   const ioBusy = useRef(false);
@@ -322,181 +251,6 @@ function ResumeEditor() {
   function changeDocument(update: (current: ResumeDocument) => ResumeDocument) {
     dispatch({ type: "edit", update });
   }
-
-  function captureSectionLayout() {
-    sectionLayoutBefore.current = new Map(
-      [...sectionCards.current].map(([id, card]) => [
-        id,
-        card.getBoundingClientRect(),
-      ]),
-    );
-  }
-
-  function updateSectionDragOrder(sourceId: string, clientY: number) {
-    const list = sectionList.current;
-    const currentOrder = sectionDragOrderRef.current;
-    if (!list || !currentOrder) return;
-    const otherIds = currentOrder.filter((id) => id !== sourceId);
-    const localY = clientY - list.getBoundingClientRect().top;
-    let destination = otherIds.length;
-    for (let index = 0; index < otherIds.length; index += 1) {
-      const card = sectionCards.current.get(otherIds[index]);
-      if (!card) continue;
-      const center = card.offsetTop - list.offsetTop + card.offsetHeight / 2;
-      if (localY < center) {
-        destination = index;
-        break;
-      }
-    }
-    const nextOrder = [...otherIds];
-    nextOrder.splice(destination, 0, sourceId);
-    if (nextOrder.every((id, index) => id === currentOrder[index])) return;
-    captureSectionLayout();
-    sectionDragOrderRef.current = nextOrder;
-    setSectionDragOrder(nextOrder);
-  }
-
-  function commitSectionDragOrder(order: string[]) {
-    changeDocument((current) => {
-      const byId = new Map(
-        current.sections.map((section) => [section.id, section]),
-      );
-      const sections = order
-        .map((id) => byId.get(id))
-        .filter((section): section is ResumeSection => Boolean(section))
-        .map((section, sectionOrder) => ({
-          ...section,
-          order: sectionOrder,
-        }));
-      if (sections.length !== current.sections.length) return current;
-      return { ...current, sections };
-    });
-  }
-
-  function clearSectionDrag() {
-    window.document.body.classList.remove("is-section-sorting");
-    sectionPointerDrag.current = null;
-    sectionDragOrderRef.current = null;
-    setSectionDragOrder(null);
-    setDraggingSection(null);
-    setSectionDragPosition(null);
-    setTrashActive(false);
-  }
-
-  useEffect(() => {
-    if (!document) return;
-    const activeDocument = document;
-    function moveSectionPointer(event: PointerEvent) {
-      const gesture = sectionPointerDrag.current;
-      if (!gesture || gesture.pointerId !== event.pointerId) return;
-      if (!gesture.dragging) {
-        const distance = Math.hypot(
-          event.clientX - gesture.startX,
-          event.clientY - gesture.startY,
-        );
-        if (distance < 6) return;
-        gesture.dragging = true;
-        const order = activeDocument.sections.map((section) => section.id);
-        sectionDragOrderRef.current = order;
-        setSectionDragOrder(order);
-        setDraggingSection(gesture.id);
-        window.document.body.classList.add("is-section-sorting");
-      }
-      event.preventDefault();
-      const navigatorBounds = sectionNavigator.current?.getBoundingClientRect();
-      const listBounds = sectionList.current?.getBoundingClientRect();
-      const trashBounds = sectionTrash.current?.getBoundingClientRect();
-      if (!navigatorBounds || !listBounds || !trashBounds) return;
-      const navigator = sectionNavigator.current;
-      if (navigator) {
-        if (event.clientY < navigatorBounds.top + 28) navigator.scrollTop -= 8;
-        else if (event.clientY > navigatorBounds.bottom - 28)
-          navigator.scrollTop += 8;
-      }
-      const minimumX = navigatorBounds.left + 8;
-      const maximumX = Math.max(
-        minimumX,
-        navigatorBounds.right - gesture.width - 8,
-      );
-      const minimumY = Math.max(navigatorBounds.top + 8, listBounds.top);
-      const maximumY = Math.max(
-        minimumY,
-        Math.min(navigatorBounds.bottom - 8, trashBounds.bottom) -
-          gesture.height,
-      );
-      const boundedX = Math.min(
-        maximumX,
-        Math.max(minimumX, event.clientX - gesture.offsetX),
-      );
-      const boundedY = Math.min(
-        maximumY,
-        Math.max(minimumY, event.clientY - gesture.offsetY),
-      );
-      const draggedSection = activeDocument.sections.find(
-        (section) => section.id === gesture.id,
-      );
-      setSectionDragPosition({
-        x: boundedX,
-        y: boundedY,
-        label: draggedSection?.heading || "Untitled section",
-      });
-      const overTrash =
-        event.clientX >= trashBounds.left &&
-        event.clientX <= trashBounds.right &&
-        event.clientY >= trashBounds.top &&
-        event.clientY <= trashBounds.bottom;
-      setTrashActive(overTrash);
-      if (overTrash) return;
-      updateSectionDragOrder(
-        gesture.id,
-        Math.min(listBounds.bottom, Math.max(listBounds.top, event.clientY)),
-      );
-    }
-
-    function finishSectionPointer(event: PointerEvent) {
-      const gesture = sectionPointerDrag.current;
-      if (!gesture || gesture.pointerId !== event.pointerId) return;
-      const trashBounds = sectionTrash.current?.getBoundingClientRect();
-      const droppedOnTrash = Boolean(
-        trashBounds &&
-          event.clientX >= trashBounds.left &&
-          event.clientX <= trashBounds.right &&
-          event.clientY >= trashBounds.top &&
-          event.clientY <= trashBounds.bottom,
-      );
-      if (gesture.dragging) {
-        if (droppedOnTrash) setPendingTrashSection(gesture.id);
-        else if (sectionDragOrderRef.current)
-          commitSectionDragOrder(sectionDragOrderRef.current);
-      } else {
-        setRenamingSection(gesture.id);
-      }
-      clearSectionDrag();
-    }
-
-    function cancelSectionPointer(event: PointerEvent) {
-      if (sectionPointerDrag.current?.pointerId === event.pointerId)
-        clearSectionDrag();
-    }
-
-    function cancelSectionPointerOnBlur() {
-      if (sectionPointerDrag.current) clearSectionDrag();
-    }
-
-    window.addEventListener("pointermove", moveSectionPointer, {
-      passive: false,
-    });
-    window.addEventListener("pointerup", finishSectionPointer);
-    window.addEventListener("pointercancel", cancelSectionPointer);
-    window.addEventListener("blur", cancelSectionPointerOnBlur);
-    return () => {
-      window.document.body.classList.remove("is-section-sorting");
-      window.removeEventListener("pointermove", moveSectionPointer);
-      window.removeEventListener("pointerup", finishSectionPointer);
-      window.removeEventListener("pointercancel", cancelSectionPointer);
-      window.removeEventListener("blur", cancelSectionPointerOnBlur);
-    };
-  }, [document]);
 
   const save = useCallback(async () => {
     if (
@@ -648,11 +402,6 @@ function ResumeEditor() {
     editor.published !== null &&
     JSON.stringify(editor.saved.document) ===
       JSON.stringify(editor.published.document);
-  const navigationSections = document
-    ? (sectionDragOrder ?? document.sections.map((section) => section.id))
-        .map((id) => document.sections.find((section) => section.id === id))
-        .filter((section): section is ResumeSection => Boolean(section))
-    : [];
 
   return (
     <AppShell
@@ -937,186 +686,12 @@ function ResumeEditor() {
             <div
               className={`document-workspace${workflow === "view" ? " document-workspace--view" : ""}`}
             >
-              <nav
-                ref={sectionNavigator}
-                className={`document-navigator${draggingSection ? " document-navigator--sorting" : ""}`}
-                aria-label="Resume section navigation"
+              <ResumeSectionNavigator
+                document={document}
+                disabled={busy || mustReload || confirmReload || close.pending}
                 hidden={workflow !== "edit"}
-              >
-                <div id="resume-navigation">
-                  <div className="contact-nav-item">
-                    <span>Contact</span>
-                  </div>
-                  <div className="section-sort-list" ref={sectionList}>
-                    {navigationSections.map((section) => (
-                      <div
-                        className={`section-nav-card${draggingSection === section.id ? " section-nav-card--dragging" : ""}`}
-                        key={section.id}
-                        data-section-id={section.id}
-                        ref={(card) => {
-                          if (card) sectionCards.current.set(section.id, card);
-                          else sectionCards.current.delete(section.id);
-                        }}
-                        onPointerDown={(event) => {
-                          if (
-                            event.button !== 0 ||
-                            renamingSection === section.id ||
-                            (event.target as HTMLElement).closest("input")
-                          )
-                            return;
-                          event.preventDefault();
-                          const bounds =
-                            event.currentTarget.getBoundingClientRect();
-                          sectionPointerDrag.current = {
-                            id: section.id,
-                            pointerId: event.pointerId,
-                            startX: event.clientX,
-                            startY: event.clientY,
-                            dragging: false,
-                            offsetX: event.clientX - bounds.left,
-                            offsetY: event.clientY - bounds.top,
-                            width: bounds.width,
-                            height: bounds.height,
-                          };
-                        }}
-                      >
-                        <div className="section-nav-row">
-                          {renamingSection === section.id ? (
-                            <input
-                              aria-label={`Section name ${section.heading || "untitled"}`}
-                              autoFocus
-                              value={section.heading}
-                              onBlur={() => setRenamingSection(null)}
-                              onKeyDown={(event) => {
-                                if (
-                                  event.key === "Enter" ||
-                                  event.key === "Escape"
-                                ) {
-                                  setRenamingSection(null);
-                                  event.currentTarget.blur();
-                                }
-                              }}
-                              onChange={(event) =>
-                                changeDocument((current) => ({
-                                  ...current,
-                                  sections: current.sections.map((item) =>
-                                    item.id === section.id
-                                      ? { ...item, heading: event.target.value }
-                                      : item,
-                                  ),
-                                }))
-                              }
-                            />
-                          ) : (
-                            <span className="section-nav-title">
-                              {section.heading || "Untitled section"}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {sectionDragPosition ? (
-                    <div
-                      className="section-drag-ghost"
-                      style={{
-                        left: sectionDragPosition.x,
-                        top: sectionDragPosition.y,
-                      }}
-                      aria-hidden="true"
-                    >
-                      {sectionDragPosition.label}
-                    </div>
-                  ) : null}
-                  <div
-                    ref={sectionTrash}
-                    className={`section-trash${trashActive ? " section-trash--active" : ""}`}
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M8 4h8l1 2h4v2H3V6h4l1-2Zm-2 6h12l-1 10H7L6 10Zm3 2v6h2v-6H9Zm4 0v6h2v-6h-2Z" />
-                    </svg>
-                    <span>Drag a section here to delete</span>
-                  </div>
-                  {pendingTrashSection ? (
-                    <div
-                      className="section-trash-confirmation"
-                      role="group"
-                      aria-label="Confirm section deletion"
-                    >
-                      <strong>Delete this section?</strong>
-                      <p>
-                        {document.sections.find(
-                          (section) => section.id === pendingTrashSection,
-                        )?.heading || "This section"}{" "}
-                        and all of its items will be removed. You can undo this
-                        change afterward.
-                      </p>
-                      <div>
-                        <button
-                          type="button"
-                          className="button--secondary button--compact"
-                          onClick={() => setPendingTrashSection(null)}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          className="button--danger button--compact"
-                          onClick={() => {
-                            const sectionId = pendingTrashSection;
-                            setPendingTrashSection(null);
-                            changeDocument((current) => ({
-                              ...current,
-                              sections: current.sections
-                                .filter((section) => section.id !== sectionId)
-                                .map((section, order) => ({
-                                  ...section,
-                                  order,
-                                })),
-                            }));
-                          }}
-                        >
-                          Delete section
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                  <div className="section-add-control">
-                    <label>
-                      Add section
-                      <select
-                        value={suggestedSection}
-                        onChange={(event) =>
-                          setSuggestedSection(event.target.value)
-                        }
-                      >
-                        {SUGGESTED_SECTIONS.map((heading) => (
-                          <option key={heading} value={heading}>
-                            {heading}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      type="button"
-                      className="button--secondary button--compact"
-                      disabled={usage!.sections >= DOCUMENT_LIMITS.sections}
-                      onClick={() => {
-                        const next = {
-                          ...createSection(document.sections.length),
-                          heading: suggestedSection,
-                        };
-                        changeDocument((current) => ({
-                          ...current,
-                          sections: [...current.sections, next],
-                        }));
-                      }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </nav>
+                onChange={changeDocument}
+              />
               <section
                 className="resume-reading-panel"
                 aria-labelledby="reading-title"
@@ -1287,7 +862,6 @@ function ResumeEditor() {
       </div>
       <div className="import-page" hidden={destination !== "import"}>
         <section className="workspace-data" aria-label="Resume import">
-          <p className="eyebrow">Master resume</p>
           <DocumentImport
             style={documentStyle}
             reviewDisabled={!storageReady || mustReload || close.pending}

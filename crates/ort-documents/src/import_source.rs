@@ -165,7 +165,9 @@ fn inspect_docx_entries(
         if flags & 0x2041 != 0 {
             return Err(SourceError::ActiveContent);
         }
-        if flags & !0x0808 != 0 || method != 0 && method != 8 {
+        // ZIP bits 1/2 select Deflate speed; they do not enable capabilities.
+        let allowed_flags = if method == 8 { 0x080e } else { 0x0808 };
+        if flags & !allowed_flags != 0 || method != 0 && method != 8 {
             return Err(SourceError::InvalidContainer);
         }
         if compressed == ZIP64_SENTINEL_U32
@@ -494,6 +496,42 @@ mod tests {
     }
 
     #[test]
+    fn docx_allows_deflate_speed_bits_but_not_reserved_or_encrypted_flags() {
+        for flags in [0, 2, 4, 6, 0x080e] {
+            let mut entries = required();
+            for entry in &mut entries {
+                entry.method = 8;
+                entry.flags = flags;
+            }
+            assert!(inspect_source(&package(&entries), InputFormat::Docx).is_ok());
+        }
+        for flags in [0x10, 0x20, 0x80, 0x1000, 0x4000, 0x8000] {
+            let mut entries = required();
+            entries[0].method = 8;
+            entries[0].flags = flags;
+            assert_eq!(
+                inspect_source(&package(&entries), InputFormat::Docx),
+                Err(SourceError::InvalidContainer)
+            );
+        }
+        for flags in [1, 0x40, 0x2000, 7] {
+            let mut entries = required();
+            entries[0].method = 8;
+            entries[0].flags = flags;
+            assert_eq!(
+                inspect_source(&package(&entries), InputFormat::Docx),
+                Err(SourceError::ActiveContent)
+            );
+        }
+        let mut stored = required();
+        stored[0].flags = 6;
+        assert_eq!(
+            inspect_source(&package(&stored), InputFormat::Docx),
+            Err(SourceError::InvalidContainer)
+        );
+    }
+
+    #[test]
     fn docx_rejects_bombs_missing_parts_and_corrupt_metadata() {
         let mut bomb = required();
         bomb[2].compressed = 1;
@@ -542,7 +580,7 @@ mod tests {
         );
 
         let mut unsupported = required();
-        unsupported[0].flags = 2;
+        unsupported[0].flags = 0x10;
         assert_eq!(
             inspect_source(&package(&unsupported), InputFormat::Docx),
             Err(SourceError::InvalidContainer)

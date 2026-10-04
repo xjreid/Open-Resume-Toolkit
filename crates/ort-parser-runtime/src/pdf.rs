@@ -8,10 +8,7 @@ use ort_documents::{
     worker_output::WorkerExtractionBuilder,
 };
 use sha2::{Digest, Sha256};
-use wasmi::{
-    Config, Engine, Instance, Module, Store, StoreLimits, StoreLimitsBuilder, WasmParams,
-    WasmResults,
-};
+use wasmi::{Config, Engine, Instance, Module, Store, StoreLimitsBuilder, WasmParams, WasmResults};
 
 pub const PDFIUM_SHA256: [u8; 32] = [
     0x32, 0x83, 0x85, 0x7c, 0x1d, 0x26, 0xd4, 0xb1, 0x1c, 0x64, 0x74, 0x3d, 0xeb, 0x41, 0x39, 0x0c,
@@ -105,7 +102,7 @@ fn order_columns(lines: &mut [PdfLine]) {
     });
 }
 struct Guest {
-    store: Store<StoreLimits>,
+    store: Store<pdf_host::PdfHost>,
     instance: Instance,
 }
 impl Guest {
@@ -227,7 +224,27 @@ impl Guest {
             .map(|value| f64::from_le_bytes(*value))
             .collect();
         let font: f64 = self.call("FPDFText_GetFontSize", (text_page, index))?;
-        Ok(glyph_layout(&values, height, font))
+        let success: i32 = self.call("FPDFText_GetMatrix", (text_page, index, pointer))?;
+        if success == 0 {
+            return Ok(None);
+        }
+        let mut matrix = [0; 24];
+        self.memory()?
+            .read(
+                &self.store,
+                usize::try_from(pointer).map_err(|_| ParserError::Output)?,
+                &mut matrix,
+            )
+            .map_err(|_| ParserError::Output)?;
+        // FS_MATRIX uses floats. Font size is in text space; its vertical
+        // matrix vector supplies the effective size used by page coordinates.
+        let c = f64::from(f32::from_le_bytes(
+            matrix[8..12].try_into().map_err(|_| ParserError::Output)?,
+        ));
+        let d = f64::from(f32::from_le_bytes(
+            matrix[12..16].try_into().map_err(|_| ParserError::Output)?,
+        ));
+        Ok(glyph_layout(&values, height, font * c.hypot(d)))
     }
     fn positioned_lines(
         &mut self,
@@ -335,8 +352,8 @@ pub fn extract_pdf(module_bytes: &[u8], input: &[u8]) -> Result<ValidatedExtract
         .instances(1)
         .trap_on_grow_failure(true)
         .build();
-    let mut store = Store::new(&engine, limits);
-    store.limiter(|limits| limits);
+    let mut store = Store::new(&engine, pdf_host::PdfHost::new(limits));
+    store.limiter(|host| &mut host.limits);
     store
         .set_fuel(PDF_FUEL)
         .map_err(|_| ParserError::Execution)?;

@@ -79,9 +79,7 @@ export function DocumentImport({
     } else {
       onBusyChange(false);
       if (!result.ok && !cancelled.current)
-        setError(
-          "Could not read this resume. Choose a text-based PDF or DOCX and try again.",
-        );
+        setError(importFailureMessage(result.error.code));
     }
   }
   async function cancel() {
@@ -98,7 +96,7 @@ export function DocumentImport({
     onBusyChange(false);
   }
   return (
-    <section aria-label="Resume file importer">
+    <section className="resume-import" aria-label="Resume file importer">
       {review ? (
         <ImportReviewFlow
           reviewId={review.id}
@@ -121,18 +119,57 @@ export function DocumentImport({
           }}
         />
       ) : (
-        <>
-          <h2>Import a resume</h2>
-          <p>Text-based PDF or DOCX</p>
-          <button
-            type="button"
-            ref={launch}
-            className="button--secondary"
-            disabled={disabled || !available || pending}
-            onClick={() => void begin()}
-          >
-            Import resume
-          </button>
+        <div className="resume-import-start">
+          <div className="resume-import-start__intro">
+            <svg
+              className="resume-import-start__icon"
+              viewBox="0 0 32 32"
+              aria-hidden="true"
+            >
+              <path d="M9 3h10l6 6v20H9V3Z" />
+              <path d="M19 3v7h6M13 15h8M13 19h8M13 23h5" />
+            </svg>
+            <div>
+              <h2>Import a resume</h2>
+              <p className="resume-import-start__description">
+                Bring your existing resume into the editor, then review and
+                refine it.
+              </p>
+            </div>
+          </div>
+          <div className="resume-import-start__file">
+            <div>
+              <strong>Start with your resume file</strong>
+              <p>Text-based PDF or DOCX</p>
+            </div>
+            <button
+              type="button"
+              ref={launch}
+              disabled={disabled || !available || pending}
+              onClick={() => void begin()}
+            >
+              Import resume
+            </button>
+          </div>
+          <ol className="resume-import-start__steps" aria-label="Import steps">
+            <li>
+              <strong>Choose a file</strong>
+              <span>Open a text-based PDF or DOCX from your computer.</span>
+            </li>
+            <li>
+              <strong>Review your resume</strong>
+              <span>
+                Edit the content and organize its sections in the resume editor.
+              </span>
+            </li>
+            <li>
+              <strong>Save when ready</strong>
+              <span>Map the reviewed content to your saved master resume.</span>
+            </li>
+          </ol>
+          <p className="resume-import-start__note">
+            Your saved resume stays unchanged until you confirm the import.
+          </p>
           {available === false ? (
             <p role="status">Import is unavailable in this build.</p>
           ) : null}
@@ -147,9 +184,24 @@ export function DocumentImport({
               </button>
             </div>
           ) : null}
-        </>
+        </div>
       )}
       {error ? <p role="alert">{error}</p> : null}
     </section>
   );
+}
+
+function importFailureMessage(code: string): string {
+  switch (code) {
+    case "LOCAL_DATA_OPERATION_BUSY":
+      return "Another file operation is in progress. Try again when it finishes.";
+    case "REVISION_CONFLICT":
+      return "Your saved resume changed. Reload it before importing.";
+    case "IMPORT_INVALID_SOURCE":
+      return "This file is unsupported, encrypted, or too large to import.";
+    case "IMPORT_DISABLED":
+      return "Import is unavailable in this build.";
+    default:
+      return "This resume could not be imported. Try exporting a new PDF or DOCX copy.";
+  }
 }

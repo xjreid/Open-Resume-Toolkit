@@ -177,7 +177,7 @@ fn pdf_host_copy_is_bounded_and_fueled_before_mutation() {
     let engine = engine();
     let module = Module::new(&engine, fixture("env", "_emscripten_memcpy_js", 3, false)).unwrap();
     let linker = pdf_host::link(&engine, &module).unwrap();
-    let mut store = Store::new(
+    let mut store = pdf_store(
         &engine,
         StoreLimitsBuilder::new().memory_size(131_072).build(),
     );
@@ -226,14 +226,14 @@ fn pdf_host_cannot_grow_over_store_limit_or_expose_files() {
     ] {
         let module = Module::new(&engine, fixture(namespace, function, params, true)).unwrap();
         let linker = pdf_host::link(&engine, &module).unwrap();
-        let mut store = Store::new(
+        let mut store = pdf_store(
             &engine,
             StoreLimitsBuilder::new()
                 .memory_size(131_072)
                 .trap_on_grow_failure(true)
                 .build(),
         );
-        store.limiter(|limits| limits);
+        store.limiter(|host| &mut host.limits);
         store.set_fuel(1_000_000).unwrap();
         let instance = linker.instantiate_and_start(&mut store, &module).unwrap();
         let mut output = [Val::default(ValType::I32)];
@@ -268,7 +268,7 @@ fn pdf_dates_use_fixed_utc_and_bound_the_exact_tm_write() {
     for function in ["_gmtime_js", "_localtime_js"] {
         let module = Module::new(&engine, fixture("env", function, 3, false)).unwrap();
         let linker = pdf_host::link(&engine, &module).unwrap();
-        let mut store = Store::new(&engine, StoreLimitsBuilder::new().build());
+        let mut store = pdf_store(&engine, StoreLimitsBuilder::new().build());
         store.set_fuel(1000).unwrap();
         let instance = linker.instantiate_and_start(&mut store, &module).unwrap();
         let memory = instance.get_memory(&store, "memory").unwrap();
@@ -286,5 +286,118 @@ fn pdf_dates_use_fixed_utc_and_bound_the_exact_tm_write() {
             assert_eq!(&bytes[32..40], &[0x42; 8]);
         }
         assert!(run.call(&mut store, (0, 0, 131_060)).is_err());
+    }
+}
+
+fn pdf_store(engine: &Engine, limits: StoreLimits) -> Store<pdf_host::PdfHost> {
+    let mut store = Store::new(engine, pdf_host::PdfHost::new(limits));
+    store.limiter(|host| &mut host.limits);
+    store
+}
+
+// An imported invoke wrapper calls only a typed function in this guest's table.
+// Entries exercise success, recursion, traps, signature mismatch and null slots.
+fn invoke_fixture(function: &str, arguments: usize, returns: bool) -> Vec<u8> {
+    let mut module = b"\0asm\x01\0\0\0".to_vec();
+    let mut types = vec![2];
+    for count in [arguments + 1, arguments] {
+        types.extend([0x60, u8::try_from(count).unwrap()]);
+        types.extend(vec![0x7f; count]);
+        types.push(u8::from(returns));
+        if returns {
+            types.push(0x7f);
+        }
+    }
+    section(&mut module, 1, &types);
+    let mut imports = vec![1];
+    name(&mut imports, "env");
+    name(&mut imports, function);
+    imports.extend([0, 0]);
+    section(&mut module, 2, &imports);
+    section(&mut module, 3, &[4, 0, 1, 1, 1]);
+    section(&mut module, 4, &[1, 0x70, 0, 5]);
+    section(&mut module, 5, &[1, 0, 2]);
+    let mut exports = vec![3];
+    name(&mut exports, "run");
+    exports.extend([0, 1]);
+    name(&mut exports, "__indirect_function_table");
+    exports.extend([1, 0]);
+    name(&mut exports, "memory");
+    exports.extend([2, 0]);
+    section(&mut module, 7, &exports);
+    section(&mut module, 9, &[1, 0, 0x41, 0, 0x0b, 4, 2, 3, 4, 0]);
+    let mut run = vec![0];
+    for index in 0..=arguments {
+        run.extend([0x20, u8::try_from(index).unwrap()]);
+    }
+    run.extend([0x10, 0, 0x0b]);
+    let mut sum = vec![0, 0x41, 0, 0x41, 42, 0x36, 2, 0]; // memory[0] = 42
+    if returns {
+        sum.extend([0x20, 0]);
+        for index in 1..arguments {
+            sum.extend([0x20, u8::try_from(index).unwrap(), 0x6a]);
+        }
+    }
+    sum.push(0x0b);
+    let mut recursive = vec![0, 0x41, 1];
+    for index in 0..arguments {
+        recursive.extend([0x20, u8::try_from(index).unwrap()]);
+    }
+    recursive.extend([0x10, 0, 0x0b]);
+    let trap = vec![0, 0, 0x0b];
+    let mut code = vec![4];
+    for body in [run, sum, recursive, trap] {
+        code.extend(leb(u32::try_from(body.len()).unwrap()));
+        code.extend(body);
+    }
+    section(&mut module, 10, &code);
+    module
+}
+
+#[test]
+fn pdf_indirect_callbacks_validate_targets_signatures_recursion_and_fuel() {
+    for (name, arguments, returns) in [
+        ("invoke_ii", 1, true),
+        ("invoke_iii", 2, true),
+        ("invoke_iiii", 3, true),
+        ("invoke_iiiii", 4, true),
+        ("invoke_viii", 3, false),
+    ] {
+        let engine = engine();
+        let module = Module::new(&engine, invoke_fixture(name, arguments, returns)).unwrap();
+        let linker = pdf_host::link(&engine, &module).unwrap();
+        let mut store = pdf_store(
+            &engine,
+            StoreLimitsBuilder::new().memory_size(131_072).build(),
+        );
+        store.set_fuel(100_000).unwrap();
+        let instance = linker.instantiate_and_start(&mut store, &module).unwrap();
+        let run = instance.get_func(&store, "run").unwrap();
+        let mut input = vec![Val::I32(0)];
+        input.extend(vec![Val::I32(7); arguments]);
+        let mut output = if returns { vec![Val::I32(0)] } else { vec![] };
+        run.call(&mut store, &input, &mut output).unwrap();
+        if returns {
+            assert_eq!(output[0].i32(), Some(i32::try_from(arguments).unwrap() * 7));
+        }
+        let memory = instance.get_memory(&store, "memory").unwrap();
+        let mut bytes = [0; 4];
+        memory.read(&store, 0, &mut bytes).unwrap();
+        assert_eq!(i32::from_le_bytes(bytes), 42);
+        for index in [1, 2, 3, 4, 5, -1] {
+            input[0] = Val::I32(index);
+            assert!(
+                run.call(&mut store, &input, &mut output).is_err(),
+                "{name}: {index}"
+            );
+        }
+        // A rejected recursive call must release its depth accounting.
+        input[0] = Val::I32(0);
+        run.call(&mut store, &input, &mut output).unwrap();
+        memory.write(&mut store, 0, &[0; 4]).unwrap();
+        store.set_fuel(10).unwrap();
+        assert!(run.call(&mut store, &input, &mut output).is_err());
+        memory.read(&store, 0, &mut bytes).unwrap();
+        assert_eq!(bytes, [0; 4]);
     }
 }

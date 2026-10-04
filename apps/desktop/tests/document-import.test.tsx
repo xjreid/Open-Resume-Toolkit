@@ -113,3 +113,44 @@ it("owns one pending request and retains a review if cancellation races completi
     await act(async () => root.unmount());
   }
 });
+
+it.each([
+  ["IMPORT_FAILED", "Try exporting a new PDF or DOCX copy."],
+  ["IMPORT_INVALID_SOURCE", "unsupported, encrypted, or too large"],
+  ["LOCAL_DATA_OPERATION_BUSY", "Another file operation is in progress."],
+  ["REVISION_CONFLICT", "Reload it before importing."],
+  ["IMPORT_DISABLED", "Import is unavailable in this build."],
+])("reports %s without changing the saved resume", async (code, message) => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  client.documentImportAvailable.mockResolvedValue(true);
+  client.beginDocumentImport.mockReset().mockResolvedValue({
+    ok: false,
+    error: { code },
+  });
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  const saved = vi.fn();
+  const busy = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <DocumentImport
+          disabled={false}
+          revision={3}
+          onSaved={saved}
+          onBusyChange={busy}
+        />,
+      ),
+    );
+    await act(async () => host.querySelector("button")!.click());
+    expect(host.querySelector('[role="alert"]')!.textContent).toContain(
+      message,
+    );
+    expect(host.textContent).not.toContain("Choose a text-based PDF");
+    expect(saved).not.toHaveBeenCalled();
+    expect(busy).toHaveBeenLastCalledWith(false);
+    expect(host.querySelector("button")!.disabled).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
+  }
+});

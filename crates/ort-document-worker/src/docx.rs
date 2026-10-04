@@ -665,7 +665,7 @@ fn validate_relationship(
             return Err(DocxParseError::ActiveContent);
         }
     } else if target_mode.is_some()
-        || !safe_internal_target(&target)
+        || !safe_internal_target(&target, scope)
         || active_relationship_type(&relation_type)
     {
         return Err(DocxParseError::ActiveContent);
@@ -782,13 +782,31 @@ fn allowed_external_target(target: &str) -> bool {
             || lower.starts_with("mailto:"))
 }
 
-fn safe_internal_target(target: &str) -> bool {
-    !target.is_empty()
-        && !target.starts_with('/')
-        && !target.contains(['\\', ':', '\0'])
-        && !target
-            .split('/')
-            .any(|component| component.is_empty() || matches!(component, "." | ".."))
+fn safe_internal_target(target: &str, scope: RelationshipScope) -> bool {
+    if target.is_empty()
+        || target.starts_with('/')
+        || target.contains(['\\', ':', '\0', '%', '?', '#'])
+        || target.chars().any(char::is_control)
+    {
+        return false;
+    }
+    // Resolve only lexically inside the package. No file or URI is opened.
+    // Document relationships start in word/, package relationships at root.
+    let mut depth = usize::from(matches!(scope, RelationshipScope::Document));
+    for component in target.split('/') {
+        match component {
+            "" => return false,
+            "." => {}
+            ".." => {
+                let Some(parent) = depth.checked_sub(1) else {
+                    return false;
+                };
+                depth = parent;
+            }
+            _ => depth += 1,
+        }
+    }
+    depth > 0 && !target.ends_with(['/', '.'])
 }
 
 fn map_output_error(error: WorkerOutputError) -> DocxParseError {
@@ -1011,6 +1029,85 @@ mod tests {
             extract(&docx(document, Some(embedded), false)).unwrap_err(),
             DocxParseError::ActiveContent
         );
+    }
+
+    #[test]
+    fn internal_relationships_stay_inside_the_package_after_normalization() {
+        for target in [
+            "styles.xml",
+            "./styles.xml",
+            "../customXml/item1.xml",
+            "../docProps/core.xml",
+            "child/../styles.xml",
+        ] {
+            assert!(
+                safe_internal_target(target, RelationshipScope::Document),
+                "{target}"
+            );
+            let relationships = format!(
+                "<Relationships><Relationship Id=\"data\" Type=\"customXml\" Target=\"{target}\"/></Relationships>"
+            );
+            assert!(
+                validate_relationships(relationships.as_bytes(), RelationshipScope::Document)
+                    .is_ok()
+            );
+        }
+        for target in [
+            "../../secret.xml",
+            "../..",
+            "../",
+            "/private/secret",
+            "file:///secret",
+            "..\\secret",
+            "%2e%2e/secret",
+            "../%2e%2e/secret",
+            "styles.xml#fragment",
+            "styles.xml?url",
+            "styles.xml\0",
+        ] {
+            assert!(
+                !safe_internal_target(target, RelationshipScope::Document),
+                "{target}"
+            );
+        }
+        assert!(!safe_internal_target(
+            "../customXml/item1.xml",
+            RelationshipScope::Package
+        ));
+        let active = br#"<Relationships><Relationship Id="bad" Type="oleObject" Target="../customXml/item1.xml"/></Relationships>"#;
+        assert_eq!(
+            validate_relationships(active, RelationshipScope::Document),
+            Err(DocxParseError::ActiveContent)
+        );
+    }
+
+    #[test]
+    fn accepts_word_deflate_speed_flags_with_real_compressed_xml() {
+        let document = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Word export text</w:t></w:r></w:p></w:body></w:document>"#;
+        for bits in [2u16, 4, 6] {
+            let mut bytes = docx(document, Some(EMPTY_RELS), true);
+            // Set only the speed-option flags in both header copies. Compressed
+            // data, descriptors, CRC and size declarations are unchanged.
+            let mut cursor = 0;
+            while cursor + 10 <= bytes.len() {
+                let signature = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap());
+                let offset = match signature {
+                    ZIP_LOCAL_HEADER => Some(cursor + 6),
+                    ZIP_CENTRAL_HEADER => Some(cursor + 8),
+                    _ => None,
+                };
+                if let Some(offset) = offset {
+                    let flags =
+                        u16::from_le_bytes(bytes[offset..offset + 2].try_into().unwrap()) | bits;
+                    bytes[offset..offset + 2].copy_from_slice(&flags.to_le_bytes());
+                }
+                cursor += 1;
+            }
+            assert_eq!(
+                extract(&bytes).unwrap().blocks()[0].text,
+                "Word export text"
+            );
+        }
     }
 
     #[test]

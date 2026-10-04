@@ -33,10 +33,20 @@ are encrypted with the user-provided passphrase.
 Import accepts supported text-based PDF or DOCX files through a native Open
 dialog. Scanned documents require OCR and are not supported.
 
-Extracted content is staged into a review session. The user must review and
-accept or reject every proposed change and choose its destination before the
-saved draft changes. Cancelling review applies nothing. A concurrent revision
-change prevents stale review content from silently overwriting the draft.
+The import entry screen presents the supported file types and the choose,
+review, and save steps. Extracted content is staged into a separate resume
+editor. The review shares the main editor's section panel: rename, reorder,
+add, and delete sections. Clicking a section title opens only its rename field.
+Dropping a section in the delete area opens a separate confirmation popup.
+Focused section titles support Alt+Up/Down for reordering and Delete to open
+the same confirmation, without displaying extra buttons. The review title, status, and undo/redo controls sit
+above the resume.
+
+Review edits remain temporary and are labeled **Not saved yet** until the user
+chooses **Map to current saved resume**. This action explicitly commits the
+reviewed content; the status indicator does not imply review autosave.
+Cancelling review applies nothing. A concurrent revision change prevents stale
+review content from silently overwriting the draft.
 
 ## Backup and recovery
 
