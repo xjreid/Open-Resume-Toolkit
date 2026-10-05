@@ -881,17 +881,22 @@ button:disabled {
     11px/1.5 Hanken,
     sans-serif;
 }
-.canvas-entry__title-line > .canvas-field:first-child {
-  flex: 1;
-}
 /* Keep optional fields next to the resume information they describe. */
 .canvas-entry__title-line {
-  gap: 12px;
+  gap: 7px;
   align-items: start;
 }
+.canvas-entry__title-line > .entry-title-separator {
+  padding-top: 4px;
+}
+.canvas-entry__title-line > .canvas-field:first-child,
 .canvas-entry__title-line > .canvas-field:last-child {
-  flex: 0 1 45%;
+  flex: 0 1 auto;
   min-width: 0;
+}
+.canvas-entry__title-line > .canvas-field.canvas-field--editing {
+  flex-grow: 1;
+  min-width: min(100%, 180px);
 }
 .canvas-entry__dates {
   display: flex;

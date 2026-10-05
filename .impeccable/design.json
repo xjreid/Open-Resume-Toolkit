@@ -155,7 +155,7 @@
       "offset": "3px"
     },
     "resumeEntry": {
-      "order": "Title; Skills/details right; Role below Title; Date/Location/Extra right-aligned stack",
+      "order": "Title sized to text; decorative | between Title and Skills/details with 7px gaps; resting fields do not grow; active editor can grow; Role below Title; Date/Location/Extra right-aligned stack",
       "emptyDate": "canvas-field--empty, 11px Hanken muted Add control"
     },
     "inlineEditor": {

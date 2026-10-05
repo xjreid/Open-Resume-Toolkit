@@ -2238,6 +2238,9 @@ function CanvasEntry({
             disabled={disabled}
             onChange={(value) => onChange({ ...entry, heading: value })}
           />
+          <span className="entry-title-separator" aria-hidden="true">
+            |
+          </span>
           <CanvasField
             label="Skills / details"
             value={details?.value ?? ""}
