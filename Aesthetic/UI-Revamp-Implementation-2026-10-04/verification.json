@@ -1,0 +1,39 @@
+{
+  "desktopTests": {
+    "files": 39,
+    "passed": 237
+  },
+  "extensionTests": {
+    "passed": 22
+  },
+  "rootToolsTests": {
+    "passed": 32
+  },
+  "desktopTypecheck": "pass",
+  "desktopWebBuild": "pass",
+  "extensionChromeStoreBuild": "pass",
+  "extensionChromeDevBridgeBuild": "pass",
+  "extensionEdgeDevBuild": "pass",
+  "webSecurity": "pass",
+  "secrets": "pass",
+  "dependencyLicenses": "pass",
+  "detectorFindings": 0,
+  "capturePageErrors": [],
+  "interactionSmoke": [
+    "inline editing/autosave/undo",
+    "contact disclosure and formatting fields",
+    "section rename and Escape",
+    "saved/published version and export controls",
+    "backup restore disclosure and disabled confirmation",
+    "tracker creation dialog cancellation",
+    "AI key form and time/metric selection",
+    "overlay material tabs and export controls"
+  ],
+  "nativeMacDevelopmentBundle": "target/debug/bundle/macos/Open Resume Toolkit Dev.app",
+  "nativeBuild": "pass; debug linker compact-unwind warning",
+  "windowsRendering": "not exercised on this Mac",
+  "strictPixelHeroGate": "original comparison archived at 77% with region vetoes; superseded by explicit user approval of implemented layout as final reference",
+  "designApproval": "Approve the implemented layout (Recommended); exact question and answer saved in approval.json",
+  "automatedWorkflow": "finish refused; current phase plates/component approval open; hero, sections, motion, responsive not closed in reset workflow. Existing human approval could not be transferred into CLI approval store.",
+  "independentDesignReview": "ship under human-approved implemented layout; all three scoped findings resolved within accepted authority"
+}

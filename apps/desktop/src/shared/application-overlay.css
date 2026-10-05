@@ -6,7 +6,7 @@
   flex-direction: column;
   overflow: hidden;
   background: #f3f5f7;
-  color: #20334a;
+  color: #1c3135;
   font-size: 13px;
 }
 .application-shell .application-header {
@@ -42,7 +42,7 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: #20334a;
+  color: #1c3135;
   font-size: 11px;
   font-weight: 750;
   text-overflow: ellipsis;
@@ -52,7 +52,7 @@
   align-items: center;
   gap: 5px;
   min-height: 24px;
-  color: #68778a;
+  color: #566c70;
   font-size: 10px;
 }
 .application-shell .application-key-status button {
@@ -152,7 +152,7 @@
   font-weight: 700;
 }
 .application-shell .application-intro {
-  color: #758194;
+  color: #566c70;
   font-size: 12px;
   line-height: 1.65;
   margin: 0 0 24px;
@@ -206,7 +206,7 @@
   border: 1px solid #b6c5d2;
   border-radius: 8px;
   background: #fff;
-  color: #17243a;
+  color: #1c3135;
   font: inherit;
   font-weight: 400;
   line-height: 1.5;
@@ -221,13 +221,13 @@
 }
 .application-shell .application-job-field textarea:focus,
 .application-shell .application-job-field input:focus {
-  outline: 2px solid #466387;
+  outline: 2px solid #28676c;
   outline-offset: 2px;
 }
 .application-shell .application-local-status {
   text-align: center;
   font-size: 10px;
-  color: #91a0ae;
+  color: #607a7f;
   margin-top: 22px;
 }
 .application-shell .application-role {
@@ -243,7 +243,7 @@
 }
 .application-shell .application-role-details > p {
   margin: 0;
-  color: #738196;
+  color: #566c70;
   line-height: 1.4;
 }
 .application-shell .application-finish-actions {
@@ -290,11 +290,11 @@
   padding: 5px;
   border-radius: 5px;
   font-size: 11px;
-  color: #7b8999;
+  color: #566c70;
 }
 .application-shell .application-tabs button.selected {
   background: #fff;
-  color: #233d5c;
+  color: #1d4f53;
   box-shadow: 0 1px 4px #233d5c0d;
 }
 .application-shell .application-panel {
@@ -325,7 +325,7 @@
 .application-shell .application-note {
   font-size: 11px;
   line-height: 1.55;
-  color: #7b8999;
+  color: #566c70;
 }
 .application-shell .application-tailoring-notes {
   background: #eaf0f5;
@@ -340,7 +340,7 @@
 .application-shell .application-tailoring-notes ul {
   margin: 10px 0 0;
   padding-left: 15px;
-  color: #6e8094;
+  color: #566c70;
   font-size: 11px;
   line-height: 1.6;
 }
@@ -403,7 +403,7 @@
   gap: 7px;
 }
 .application-shell .application-alert {
-  color: #233d5c;
+  color: #1d4f53;
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;

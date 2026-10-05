@@ -1,0 +1,14 @@
+{
+  "installedAtUTC": "2026-10-05T01:58:38.632276+00:00",
+  "source": "/Users/xavierreid/Open-Resume-Toolkit/target/release/bundle/macos/Open Resume Toolkit Dev.app",
+  "installed": "/Applications/Open Resume Toolkit Dev.app",
+  "previousBundle": "/Users/xavierreid/Open-Resume-Toolkit/target/dev-app-backups/ui-refresh-750oax5y/Open Resume Toolkit Dev.previous.app",
+  "identifier": "com.openresumetoolkit.dev",
+  "filesVerified": 25,
+  "desktopSha256": "1fbea17f194bf6a8e589a0c495cf36c4cb96f88282137fbbb81419fd3d951239",
+  "parserHelperSha256": "419183df6faa2804e3b4ee49f122571953c323ad21cfc881c19b801aab25033d",
+  "signatureVerification": "codesign --verify --deep --strict passed",
+  "closedInstalledPids": [],
+  "launched": false,
+  "profileOrCredentialsModified": false
+}

@@ -1,0 +1,857 @@
+{
+  "regions": [
+    {
+      "id": "page-title",
+      "kind": "text",
+      "box": {
+        "x": 0.17083333333333334,
+        "y": 0.028965212264150945,
+        "w": 0.12590060763888888,
+        "h": 0.031692216981132074
+      },
+      "snap": false,
+      "note": "Interface text: Master resume"
+    },
+    {
+      "id": "element-1",
+      "kind": "control",
+      "box": {
+        "x": 0.011111111111111112,
+        "y": 0.09811320754716982,
+        "w": 0.12638888888888888,
+        "h": 0.04150943396226415
+      },
+      "snap": false,
+      "note": "UI control: Master resume"
+    },
+    {
+      "id": "element-2",
+      "kind": "control",
+      "box": {
+        "x": 0.011111111111111112,
+        "y": 0.14622641509433962,
+        "w": 0.12638888888888888,
+        "h": 0.04150943396226415
+      },
+      "snap": false,
+      "note": "UI control: AI & monitoring"
+    },
+    {
+      "id": "element-3",
+      "kind": "control",
+      "box": {
+        "x": 0.011111111111111112,
+        "y": 0.19433962264150945,
+        "w": 0.12638888888888888,
+        "h": 0.04150943396226415
+      },
+      "snap": false,
+      "note": "UI control: Application tracker"
+    },
+    {
+      "id": "element-4",
+      "kind": "control",
+      "box": {
+        "x": 0.011111111111111112,
+        "y": 0.24245283018867925,
+        "w": 0.12638888888888888,
+        "h": 0.04150943396226415
+      },
+      "snap": false,
+      "note": "UI control: Settings"
+    },
+    {
+      "id": "element-5",
+      "kind": "control",
+      "box": {
+        "x": 0.011111111111111112,
+        "y": 0.8721698113207547,
+        "w": 0.12638888888888888,
+        "h": 0.03962264150943396
+      },
+      "snap": false,
+      "note": "UI control: Show overlay"
+    },
+    {
+      "id": "element-6",
+      "kind": "control",
+      "box": {
+        "x": 0.17083333333333334,
+        "y": 0.10707547169811321,
+        "w": 0.04001736111111111,
+        "h": 0.033962264150943396
+      },
+      "snap": false,
+      "note": "UI control: Edit"
+    },
+    {
+      "id": "element-7",
+      "kind": "control",
+      "box": {
+        "x": 0.21085069444444443,
+        "y": 0.10707547169811321,
+        "w": 0.04365234375,
+        "h": 0.033962264150943396
+      },
+      "snap": false,
+      "note": "UI control: View"
+    },
+    {
+      "id": "element-8",
+      "kind": "control",
+      "box": {
+        "x": 0.2545030381944444,
+        "y": 0.10707547169811321,
+        "w": 0.05112847222222222,
+        "h": 0.033962264150943396
+      },
+      "snap": false,
+      "note": "UI control: Import"
+    },
+    {
+      "id": "element-9",
+      "kind": "control",
+      "box": {
+        "x": 0.7222222222222222,
+        "y": 0.10707547169811321,
+        "w": 0.18055555555555555,
+        "h": 0.033962264150943396
+      },
+      "snap": false,
+      "note": "UI control: Technical / EngineeringProfessional / BusinessModern / Marketing & Sales"
+    },
+    {
+      "id": "element-10",
+      "kind": "control",
+      "box": {
+        "x": 0.9138888888888889,
+        "y": 0.1080188679245283,
+        "w": 0.06388888888888888,
+        "h": 0.03207547169811321
+      },
+      "snap": false,
+      "note": "UI control: Publish"
+    },
+    {
+      "id": "element-11",
+      "kind": "control",
+      "box": {
+        "x": 0.18055555555555555,
+        "y": 0.3068691037735849,
+        "w": 0.09375,
+        "h": 0.04150943396226415
+      },
+      "snap": false,
+      "note": "UI control: Experience"
+    },
+    {
+      "id": "element-12",
+      "kind": "control",
+      "box": {
+        "x": 0.18055555555555555,
+        "y": 0.3540389150943396,
+        "w": 0.09375,
+        "h": 0.04150943396226415
+      },
+      "snap": false,
+      "note": "UI control: Projects"
+    },
+    {
+      "id": "element-13",
+      "kind": "control",
+      "box": {
+        "x": 0.18055555555555555,
+        "y": 0.40120872641509436,
+        "w": 0.09375,
+        "h": 0.04150943396226415
+      },
+      "snap": false,
+      "note": "UI control: Education"
+    },
+    {
+      "id": "element-14",
+      "kind": "control",
+      "box": {
+        "x": 0.18055555555555555,
+        "y": 0.44837853773584907,
+        "w": 0.09375,
+        "h": 0.04150943396226415
+      },
+      "snap": false,
+      "note": "UI control: Skills"
+    },
+    {
+      "id": "element-15",
+      "kind": "control",
+      "box": {
+        "x": 0.1625,
+        "y": 0.5530955188679245,
+        "w": 0.11458333333333333,
+        "h": 0.033962264150943396
+      },
+      "snap": false,
+      "note": "UI control: Professional SummaryEducationExperienceInternshipsProjectsSkillsCertifications and LicensesAwards and HonorsLeadershipVolunteer ExperienceResearchPublicationsCourseworkActivities and OrganizationsLanguagesAccomplishmentsPortfolio and Professional LinksCustom Section"
+    },
+    {
+      "id": "element-16",
+      "kind": "control",
+      "box": {
+        "x": 0.1625,
+        "y": 0.5964917452830188,
+        "w": 0.11458333333333333,
+        "h": 0.03773584905660377
+      },
+      "snap": false,
+      "note": "UI control: Add section"
+    },
+    {
+      "id": "element-17",
+      "kind": "control",
+      "box": {
+        "x": 0.8666666666666667,
+        "y": 0.180188679245283,
+        "w": 0.02638888888888889,
+        "h": 0.03207547169811321
+      },
+      "snap": false,
+      "note": "UI control: Undo edit"
+    },
+    {
+      "id": "element-18",
+      "kind": "control",
+      "box": {
+        "x": 0.8972222222222223,
+        "y": 0.180188679245283,
+        "w": 0.02638888888888889,
+        "h": 0.03207547169811321
+      },
+      "snap": false,
+      "note": "UI control: Redo edit"
+    },
+    {
+      "id": "element-19",
+      "kind": "control",
+      "box": {
+        "x": 0.4,
+        "y": 0.3132075471698113,
+        "w": 0.49166666666666664,
+        "h": 0.048673349056603775
+      },
+      "snap": false,
+      "note": "UI control: NameAlex Morgan"
+    },
+    {
+      "id": "element-20",
+      "kind": "control",
+      "box": {
+        "x": 0.4,
+        "y": 0.3647110849056604,
+        "w": 0.49166666666666664,
+        "h": 0.030630896226415093
+      },
+      "snap": false,
+      "note": "UI control: alex.morgan@example.org • +1 (202) 555-0142 • Portland, OR"
+    },
+    {
+      "id": "element-21",
+      "kind": "control",
+      "box": {
+        "x": 0.8055447048611111,
+        "y": 0.41137971698113207,
+        "w": 0.020345052083333332,
+        "h": 0.026415094339622643
+      },
+      "snap": false,
+      "note": "UI control: B"
+    },
+    {
+      "id": "element-22",
+      "kind": "control",
+      "box": {
+        "x": 0.8293619791666667,
+        "y": 0.41137971698113207,
+        "w": 0.019444444444444445,
+        "h": 0.026415094339622643
+      },
+      "snap": false,
+      "note": "UI control: I"
+    },
+    {
+      "id": "element-23",
+      "kind": "control",
+      "box": {
+        "x": 0.8522786458333333,
+        "y": 0.41137971698113207,
+        "w": 0.030360243055555555,
+        "h": 0.026415094339622643
+      },
+      "snap": false,
+      "note": "UI control: Link"
+    },
+    {
+      "id": "element-24",
+      "kind": "control",
+      "box": {
+        "x": 0.40902777777777777,
+        "y": 0.4519457547169811,
+        "w": 0.44930555555555557,
+        "h": 0.03018867924528302
+      },
+      "snap": false,
+      "note": "UI control: Contact information 1"
+    },
+    {
+      "id": "element-25",
+      "kind": "control",
+      "box": {
+        "x": 0.8618055555555556,
+        "y": 0.4519457547169811,
+        "w": 0.020833333333333332,
+        "h": 0.03018867924528302
+      },
+      "snap": false,
+      "note": "UI control: ×"
+    },
+    {
+      "id": "element-26",
+      "kind": "control",
+      "box": {
+        "x": 0.40902777777777777,
+        "y": 0.4868514150943396,
+        "w": 0.44930555555555557,
+        "h": 0.03018867924528302
+      },
+      "snap": false,
+      "note": "UI control: Contact information 2"
+    },
+    {
+      "id": "element-27",
+      "kind": "control",
+      "box": {
+        "x": 0.8618055555555556,
+        "y": 0.4868514150943396,
+        "w": 0.020833333333333332,
+        "h": 0.03018867924528302
+      },
+      "snap": false,
+      "note": "UI control: ×"
+    },
+    {
+      "id": "element-28",
+      "kind": "control",
+      "box": {
+        "x": 0.40902777777777777,
+        "y": 0.5217570754716981,
+        "w": 0.44930555555555557,
+        "h": 0.03018867924528302
+      },
+      "snap": false,
+      "note": "UI control: Contact information 3"
+    },
+    {
+      "id": "element-29",
+      "kind": "control",
+      "box": {
+        "x": 0.8618055555555556,
+        "y": 0.5217570754716981,
+        "w": 0.020833333333333332,
+        "h": 0.03018867924528302
+      },
+      "snap": false,
+      "note": "UI control: ×"
+    },
+    {
+      "id": "element-30",
+      "kind": "control",
+      "box": {
+        "x": 0.4,
+        "y": 0.4057193396226415,
+        "w": 0.10477430555555556,
+        "h": 0.029245283018867925
+      },
+      "snap": false,
+      "note": "UI control: + Add contact information"
+    },
+    {
+      "id": "element-31",
+      "kind": "control",
+      "box": {
+        "x": 0.8361111111111111,
+        "y": 0.4061910377358491,
+        "w": 0.05555555555555555,
+        "h": 0.02830188679245283
+      },
+      "snap": false,
+      "note": "UI control: Dot •Bar |Dash -"
+    },
+    {
+      "id": "element-32",
+      "kind": "control",
+      "box": {
+        "x": 0.8271158854166667,
+        "y": 0.7248231132075472,
+        "w": 0.06455078125,
+        "h": 0.024528301886792454
+      },
+      "snap": false,
+      "note": "UI control: Remove item"
+    },
+    {
+      "id": "element-33",
+      "kind": "control",
+      "box": {
+        "x": 0.4,
+        "y": 0.49534198113207545,
+        "w": 0.3765190972222222,
+        "h": 0.025368514150943395
+      },
+      "snap": false,
+      "note": "UI control: TitleSenior Software Engineer"
+    },
+    {
+      "id": "element-34",
+      "kind": "control",
+      "box": {
+        "x": 0.4,
+        "y": 0.5207104952830188,
+        "w": 0.3765190972222222,
+        "h": 0.025368514150943395
+      },
+      "snap": false,
+      "note": "UI control: RoleExample Studio"
+    },
+    {
+      "id": "element-35",
+      "kind": "control",
+      "box": {
+        "x": 0.7862413194444444,
+        "y": 0.49534198113207545,
+        "w": 0.10542534722222222,
+        "h": 0.025368514150943395
+      },
+      "snap": false,
+      "note": "UI control: Date2022–Present"
+    },
+    {
+      "id": "element-36",
+      "kind": "control",
+      "box": {
+        "x": 0.4,
+        "y": 0.5507959905660378,
+        "w": 0.06255425347222222,
+        "h": 0.024528301886792454
+      },
+      "snap": false,
+      "note": "UI control: Skills / detailsAdd skills / details"
+    },
+    {
+      "id": "element-37",
+      "kind": "control",
+      "box": {
+        "x": 0.47366536458333336,
+        "y": 0.5507959905660378,
+        "w": 0.04377170138888889,
+        "h": 0.024528301886792454
+      },
+      "snap": false,
+      "note": "UI control: LocationAdd location"
+    },
+    {
+      "id": "element-38",
+      "kind": "control",
+      "box": {
+        "x": 0.5285481770833333,
+        "y": 0.5507959905660378,
+        "w": 0.03432074652777778,
+        "h": 0.024528301886792454
+      },
+      "snap": false,
+      "note": "UI control: ExtraAdd extra"
+    },
+    {
+      "id": "element-39",
+      "kind": "control",
+      "box": {
+        "x": 0.7214084201388888,
+        "y": 0.5956073113207547,
+        "w": 0.02177734375,
+        "h": 0.026415094339622643
+      },
+      "snap": false,
+      "note": "UI control: ×"
+    },
+    {
+      "id": "element-40",
+      "kind": "control",
+      "box": {
+        "x": 0.7466579861111111,
+        "y": 0.5956073113207547,
+        "w": 0.020345052083333332,
+        "h": 0.026415094339622643
+      },
+      "snap": false,
+      "note": "UI control: B"
+    },
+    {
+      "id": "element-41",
+      "kind": "control",
+      "box": {
+        "x": 0.7704752604166667,
+        "y": 0.5956073113207547,
+        "w": 0.019444444444444445,
+        "h": 0.026415094339622643
+      },
+      "snap": false,
+      "note": "UI control: I"
+    },
+    {
+      "id": "element-42",
+      "kind": "control",
+      "box": {
+        "x": 0.7933919270833333,
+        "y": 0.5956073113207547,
+        "w": 0.030360243055555555,
+        "h": 0.026415094339622643
+      },
+      "snap": false,
+      "note": "UI control: Link"
+    },
+    {
+      "id": "element-43",
+      "kind": "control",
+      "box": {
+        "x": 0.82861328125,
+        "y": 0.5941922169811321,
+        "w": 0.05333116319444445,
+        "h": 0.029245283018867925
+      },
+      "snap": false,
+      "note": "UI control: Paragraph"
+    },
+    {
+      "id": "element-44",
+      "kind": "control",
+      "box": {
+        "x": 0.4097222222222222,
+        "y": 0.6423054245283019,
+        "w": 0.4722222222222222,
+        "h": 0.06132075471698113
+      },
+      "snap": false,
+      "note": "UI control: Led the development of accessible planning tools for cross-functional teams. Reduced report preparation time by 35% through a reusable data validation workflow. Partnered with design and customer teams to simplify onboarding and document editing."
+    },
+    {
+      "id": "element-45",
+      "kind": "control",
+      "box": {
+        "x": 0.8271158854166667,
+        "y": 0.908372641509434,
+        "w": 0.06455078125,
+        "h": 0.024528301886792454
+      },
+      "snap": false,
+      "note": "UI control: Remove item"
+    },
+    {
+      "id": "element-46",
+      "kind": "control",
+      "box": {
+        "x": 0.4,
+        "y": 0.7738797169811321,
+        "w": 0.3765190972222222,
+        "h": 0.025368514150943395
+      },
+      "snap": false,
+      "note": "UI control: TitleSoftware Engineer"
+    },
+    {
+      "id": "element-47",
+      "kind": "control",
+      "box": {
+        "x": 0.4,
+        "y": 0.7992482311320754,
+        "w": 0.3765190972222222,
+        "h": 0.025368514150943395
+      },
+      "snap": false,
+      "note": "UI control: RoleNorthstar Example Cooperative"
+    },
+    {
+      "id": "element-48",
+      "kind": "control",
+      "box": {
+        "x": 0.7862413194444444,
+        "y": 0.7738797169811321,
+        "w": 0.10542534722222222,
+        "h": 0.025368514150943395
+      },
+      "snap": false,
+      "note": "UI control: Date2019–2022"
+    },
+    {
+      "id": "element-49",
+      "kind": "control",
+      "box": {
+        "x": 0.4,
+        "y": 0.8293337264150943,
+        "w": 0.06255425347222222,
+        "h": 0.024528301886792454
+      },
+      "snap": false,
+      "note": "UI control: Skills / detailsAdd skills / details"
+    },
+    {
+      "id": "element-50",
+      "kind": "control",
+      "box": {
+        "x": 0.47366536458333336,
+        "y": 0.8293337264150943,
+        "w": 0.04377170138888889,
+        "h": 0.024528301886792454
+      },
+      "snap": false,
+      "note": "UI control: LocationAdd location"
+    },
+    {
+      "id": "element-51",
+      "kind": "control",
+      "box": {
+        "x": 0.5285481770833333,
+        "y": 0.8293337264150943,
+        "w": 0.03432074652777778,
+        "h": 0.024528301886792454
+      },
+      "snap": false,
+      "note": "UI control: ExtraAdd extra"
+    },
+    {
+      "id": "element-52",
+      "kind": "control",
+      "box": {
+        "x": 0.4125,
+        "y": 0.8604658018867924,
+        "w": 0.4791666666666667,
+        "h": 0.04318985849056604
+      },
+      "snap": false,
+      "note": "UI control: Information• Built reliable services in TypeScript and SQL with clear operational documentation.• Introduced automated checks for data quality and keyboard accessibility."
+    },
+    {
+      "id": "element-53",
+      "kind": "control",
+      "box": {
+        "x": 0.4097222222222222,
+        "y": 0.9527122641509433,
+        "w": 0.48194444444444445,
+        "h": 0.029245283018867925
+      },
+      "snap": false,
+      "note": "UI control: + Add another item"
+    },
+    {
+      "id": "element-54",
+      "kind": "text",
+      "box": {
+        "x": 0.05,
+        "y": 0.03018867924528302,
+        "w": 0.07390407986111111,
+        "h": 0.03773584905660377
+      },
+      "snap": false,
+      "note": "Interface text: Open Resume Toolkit"
+    },
+    {
+      "id": "element-55",
+      "kind": "text",
+      "box": {
+        "x": 0.011111111111111112,
+        "y": 0.9287735849056604,
+        "w": 0.12638888888888888,
+        "h": 0.05235849056603774
+      },
+      "snap": false,
+      "note": "Interface text: Encrypted storageEncrypted storage ready"
+    },
+    {
+      "id": "element-56",
+      "kind": "text",
+      "box": {
+        "x": 0.8397786458333333,
+        "y": 0.03632075471698113,
+        "w": 0.13799913194444444,
+        "h": 0.016981132075471698
+      },
+      "snap": false,
+      "note": "Interface text: Tailoring uses your published resume"
+    },
+    {
+      "id": "element-57",
+      "kind": "text",
+      "box": {
+        "x": 0.16527777777777777,
+        "y": 0.1811320754716981,
+        "w": 0.10902777777777778,
+        "h": 0.01839622641509434
+      },
+      "snap": false,
+      "note": "Interface text: Resume sections"
+    },
+    {
+      "id": "element-58",
+      "kind": "text",
+      "box": {
+        "x": 0.16527777777777777,
+        "y": 0.21273584905660378,
+        "w": 0.10902777777777778,
+        "h": 0.0328125
+      },
+      "snap": false,
+      "note": "Interface text: Drag to reorder.Select a name to rename."
+    },
+    {
+      "id": "element-59",
+      "kind": "text",
+      "box": {
+        "x": 0.1597222222222222,
+        "y": 0.2606426886792453,
+        "w": 0.12013888888888889,
+        "h": 0.03962264150943396
+      },
+      "snap": false,
+      "note": "Interface text: Contact"
+    },
+    {
+      "id": "element-60",
+      "kind": "text",
+      "box": {
+        "x": 0.3680555555555556,
+        "y": 0.18702830188679245,
+        "w": 0.05101996527777778,
+        "h": 0.01839622641509434
+      },
+      "snap": false,
+      "note": "Interface text: Your resume"
+    },
+    {
+      "id": "element-61",
+      "kind": "text",
+      "box": {
+        "x": 0.4260199652777778,
+        "y": 0.18466981132075472,
+        "w": 0.041731770833333334,
+        "h": 0.02311320754716981
+      },
+      "snap": false,
+      "note": "Interface text: Saved"
+    },
+    {
+      "id": "element-62",
+      "kind": "text",
+      "box": {
+        "x": 0.4,
+        "y": 0.25943396226415094,
+        "w": 0.49166666666666664,
+        "h": 0.033962264150943396
+      },
+      "snap": false,
+      "note": "Interface text: Select any labeled area to edit your resume. Changes save automatically."
+    },
+    {
+      "id": "element-63",
+      "kind": "text",
+      "box": {
+        "x": 0.4,
+        "y": 0.4576061320754717,
+        "w": 0.49166666666666664,
+        "h": 0.01981132075471698
+      },
+      "snap": false,
+      "note": "Interface text: Experience"
+    },
+    {
+      "id": "element-64",
+      "kind": "text",
+      "box": {
+        "x": 0.4,
+        "y": 0.9970518867924528,
+        "w": 0.49166666666666664,
+        "h": 0.00294811320754717
+      },
+      "snap": false,
+      "note": "Interface text: Projects"
+    },
+    {
+      "id": "element-65",
+      "kind": "chrome",
+      "box": {
+        "x": 0.019444444444444445,
+        "y": 0.03018867924528302,
+        "w": 0.10972222222222222,
+        "h": 0.03773584905660377
+      },
+      "snap": false,
+      "note": "Flat UI panel or rule: Open Resume Toolkit"
+    },
+    {
+      "id": "element-66",
+      "kind": "chrome",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0.1486111111111111,
+        "h": 1
+      },
+      "snap": false,
+      "note": "Flat UI panel or rule: Open Resume ToolkitMaster resumeAI & monitoringApplication trackerSettingsShow overlayEncrypted storageEncrypted storage ready"
+    },
+    {
+      "id": "element-67",
+      "kind": "chrome",
+      "box": {
+        "x": 0.1486111111111111,
+        "y": 0,
+        "w": 0.8513888888888889,
+        "h": 0.09056603773584905
+      },
+      "snap": false,
+      "note": "Flat UI panel or rule: Master resumeTailoring uses your published resume"
+    },
+    {
+      "id": "element-68",
+      "kind": "chrome",
+      "box": {
+        "x": 0.1486111111111111,
+        "y": 0.09056603773584905,
+        "w": 0.8513888888888889,
+        "h": 0.06792452830188679
+      },
+      "snap": false,
+      "note": "Flat UI panel or rule: EditViewImportResume styleTechnical / EngineeringProfessional / BusinessModern / Marketing & SalesPublish"
+    },
+    {
+      "id": "element-69",
+      "kind": "chrome",
+      "box": {
+        "x": 0.1486111111111111,
+        "y": 0.15849056603773584,
+        "w": 0.14305555555555555,
+        "h": 0.8415094339622642
+      },
+      "snap": false,
+      "note": "Flat UI panel or rule: Resume sectionsDrag to reorder.Select a name to rename.Activate a section name to rename it. Use Alt and the up or down arrow to reorder a focused section, or Delete to request deletion.ContactExperienceProjectsEducationSkillsDrag a section here to deleteAdd sectionProfessional SummaryEducationExperienceInternshipsProjectsSkillsCertifications and LicensesAwards and HonorsLeadershipVolunteer ExperienceResearchPublicationsCourseworkActivities and OrganizationsLanguagesAccomplishmentsPortfolio and Professional LinksCustom SectionAdd section"
+    },
+    {
+      "id": "paper",
+      "kind": "chrome",
+      "box": {
+        "x": 0.3680555555555556,
+        "y": 0.22735849056603774,
+        "w": 0.5555555555555556,
+        "h": 0.7726415094339623
+      },
+      "snap": false,
+      "note": "Flat white document paper container with semantic inline fields",
+      "container": true
+    }
+  ]
+}

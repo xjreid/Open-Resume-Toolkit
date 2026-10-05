@@ -506,7 +506,7 @@ function ResumeEditor() {
         </button>
         {destination !== "import" && document && !showStart && (
           <label className="workflow-style">
-            Resume style
+            <span>Resume style</span>
             <select
               value={documentStyle}
               disabled={busy || close.pending}
@@ -690,6 +690,7 @@ function ResumeEditor() {
                 document={document}
                 disabled={busy || mustReload || confirmReload || close.pending}
                 hidden={workflow !== "edit"}
+                currentSection={focusedPart}
                 onChange={changeDocument}
               />
               <section
@@ -830,6 +831,7 @@ function ResumeEditor() {
                     style={documentStyle}
                     contactDivider={contactDivider}
                     onContactDividerChange={setContactDivider}
+                    onFocusSection={setFocusedPart}
                     disabled={busy || mustReload}
                     canAddEntry={usage!.entries < DOCUMENT_LIMITS.entries}
                     onChange={changeDocument}
@@ -1693,6 +1695,7 @@ export function ResumeCanvas({
   contactDivider,
   onContactDividerChange,
   showContactDivider = true,
+  onFocusSection,
   disabled,
   canAddEntry,
   onChange,
@@ -1702,6 +1705,7 @@ export function ResumeCanvas({
   contactDivider: ContactDivider;
   onContactDividerChange: (divider: ContactDivider) => void;
   showContactDivider?: boolean;
+  onFocusSection?: (sectionId: string) => void;
   disabled: boolean;
   canAddEntry: boolean;
   onChange: (update: (current: ResumeDocument) => ResumeDocument) => void;
@@ -1740,10 +1744,12 @@ export function ResumeCanvas({
       aria-label="Editable resume"
     >
       <p className="resume-canvas__hint">
-        Select a labeled area to add or change information. The labels are
-        suggestions—you can use each area however it suits your resume.
+        Select any labeled area to edit your resume. Changes save automatically.
       </p>
-      <header className="resume-canvas__contact">
+      <header
+        className="resume-canvas__contact"
+        onFocusCapture={() => onFocusSection?.("contact")}
+      >
         <CanvasField
           label="Name"
           value={document.contact.fullName}
@@ -1763,7 +1769,11 @@ export function ResumeCanvas({
         />
       </header>
       {document.sections.map((section) => (
-        <section className="resume-canvas__section" key={section.id}>
+        <section
+          className="resume-canvas__section"
+          key={section.id}
+          onFocusCapture={() => onFocusSection?.(section.id)}
+        >
           <h3>{section.heading || "Untitled section"}</h3>
           {section.entries.map((entry) => (
             <CanvasEntry
@@ -1835,6 +1845,7 @@ function ContactInformationEditor({
   onDividerChange: (divider: ContactDivider) => void;
   showDivider?: boolean;
 }) {
+  const details = useRef<HTMLDetailsElement>(null);
   const initialItems = [
     contact.email,
     contact.phone,
@@ -1945,159 +1956,190 @@ function ContactInformationEditor({
   }
 
   return (
-    <section className="contact-information-editor">
-      <div className="contact-information-editor__toolbar">
-        <span>Contact information</span>
-        <div className="canvas-field__formatting">
-          <button
-            type="button"
-            className="button--quiet button--compact"
-            aria-label="Bold contact text"
-            aria-pressed={typingFormat.bold}
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => applyFormat("bold")}
-          >
-            <strong aria-hidden="true">B</strong>
-          </button>
-          <button
-            type="button"
-            className="button--quiet button--compact canvas-format-italic"
-            aria-label="Italicize contact text"
-            aria-pressed={typingFormat.italic}
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => applyFormat("italic")}
-          >
-            <em aria-hidden="true">I</em>
-          </button>
-          <button
-            type="button"
-            className="button--quiet button--compact"
-            aria-expanded={linkOpen}
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => {
-              setLinkRange(selection);
-              setLinkOpen((open) => !open);
-            }}
-          >
-            Link
-          </button>
-        </div>
-      </div>
-      {linkOpen ? (
-        <div className="contact-information-editor__link">
+    <>
+      <details ref={details} className="contact-information-details">
+        <summary aria-label="Edit contact information">
           <span>
-            Link text:{" "}
-            {linkRange.end > linkRange.start
-              ? activeValue.slice(linkRange.start, linkRange.end)
-              : "Enter Text Here"}
+            {items.filter(Boolean).map((item, index) => (
+              <span key={index}>
+                {index > 0
+                  ? divider === "bar"
+                    ? " | "
+                    : divider === "dash"
+                      ? " - "
+                      : " • "
+                  : ""}
+                <FormattedText value={item} />
+              </span>
+            ))}
+            {!items.some(Boolean) ? "Add contact information" : null}
           </span>
-          <input
-            autoFocus
-            type="url"
-            aria-label="Contact link address"
-            value={linkUrl}
-            placeholder={"https:" + "//example.com"}
-            onChange={(event) => setLinkUrl(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && linkIsValid) {
-                event.preventDefault();
-                applyLink();
-              }
-            }}
-          />
-          <button type="button" disabled={!linkIsValid} onClick={applyLink}>
-            Apply
-          </button>
-        </div>
-      ) : null}
-      <div className="contact-information-editor__items">
-        {items.map((value, index) => (
-          <div className="contact-information-editor__item" key={index}>
-            <input
-              ref={(node) => {
-                inputs.current[index] = node;
-              }}
-              aria-label={`Contact information ${index + 1}`}
-              value={value}
-              disabled={disabled}
-              className={`${activeIndex === index && typingFormat.bold ? "is-typing-bold" : ""}${activeIndex === index && typingFormat.italic ? " is-typing-italic" : ""}`}
-              placeholder="Email, phone, location, portfolio…"
-              onFocus={(event) => {
-                setActiveIndex(index);
-                setSelection({
-                  start: event.currentTarget.selectionStart ?? 0,
-                  end: event.currentTarget.selectionEnd ?? 0,
-                });
-                setTypingFormat({ bold: false, italic: false });
-              }}
-              onSelect={(event) => {
-                setActiveIndex(index);
-                setSelection({
-                  start: event.currentTarget.selectionStart ?? 0,
-                  end: event.currentTarget.selectionEnd ?? 0,
-                });
-              }}
-              onChange={(event) => updateItem(index, event.target.value)}
-            />
-            <button
-              type="button"
-              className="contact-information-editor__delete button--quiet"
-              aria-label={`Delete contact information ${index + 1}`}
-              title="Delete contact"
-              disabled={disabled}
-              onClick={() => {
-                const next = items.filter(
-                  (_, itemIndex) => itemIndex !== index,
-                );
-                commit(next.length ? next : [""]);
-                setActiveIndex(Math.max(0, index - 1));
-              }}
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
-      <button
-        type="button"
-        className="contact-information-editor__add button--secondary button--compact"
-        disabled={disabled}
-        onClick={() => {
-          commit([...items, ""]);
-          setActiveIndex(items.length);
-          window.requestAnimationFrame(() =>
-            inputs.current[items.length]?.focus(),
-          );
-        }}
-      >
-        + Add contact information
-      </button>
-      {showDivider ? (
-        <label className="contact-divider-control">
-          Contact divider
-          <select
-            value={divider}
-            disabled={disabled}
-            onChange={(event) =>
-              onDividerChange(
-                event.target.value === "bar"
-                  ? "bar"
-                  : event.target.value === "dash"
-                    ? "dash"
-                    : "dot",
-              )
-            }
+          <svg
+            className="workspace-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
           >
-            <option value="dot">Dot •</option>
-            <option value="bar">Bar |</option>
-            <option value="dash">Dash -</option>
-          </select>
-        </label>
-      ) : null}
-    </section>
+            <path d="m16 3 5 5-13 13H3v-5zM13 6l5 5" />
+          </svg>
+        </summary>
+        <section className="contact-information-editor">
+          <div className="contact-information-editor__toolbar">
+            <span>Contact information</span>
+            <div className="canvas-field__formatting">
+              <button
+                type="button"
+                className="button--quiet button--compact"
+                aria-label="Bold contact text"
+                aria-pressed={typingFormat.bold}
+                disabled={disabled}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => applyFormat("bold")}
+              >
+                <strong aria-hidden="true">B</strong>
+              </button>
+              <button
+                type="button"
+                className="button--quiet button--compact canvas-format-italic"
+                aria-label="Italicize contact text"
+                aria-pressed={typingFormat.italic}
+                disabled={disabled}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => applyFormat("italic")}
+              >
+                <em aria-hidden="true">I</em>
+              </button>
+              <button
+                type="button"
+                className="button--quiet button--compact"
+                aria-expanded={linkOpen}
+                disabled={disabled}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setLinkRange(selection);
+                  setLinkOpen((open) => !open);
+                }}
+              >
+                Link
+              </button>
+            </div>
+          </div>
+          {linkOpen ? (
+            <div className="contact-information-editor__link">
+              <span>
+                Link text:{" "}
+                {linkRange.end > linkRange.start
+                  ? activeValue.slice(linkRange.start, linkRange.end)
+                  : "Enter Text Here"}
+              </span>
+              <input
+                autoFocus
+                type="url"
+                aria-label="Contact link address"
+                value={linkUrl}
+                placeholder={"https:" + "//example.com"}
+                onChange={(event) => setLinkUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && linkIsValid) {
+                    event.preventDefault();
+                    applyLink();
+                  }
+                }}
+              />
+              <button type="button" disabled={!linkIsValid} onClick={applyLink}>
+                Apply
+              </button>
+            </div>
+          ) : null}
+          <div className="contact-information-editor__items">
+            {items.map((value, index) => (
+              <div className="contact-information-editor__item" key={index}>
+                <input
+                  ref={(node) => {
+                    inputs.current[index] = node;
+                  }}
+                  aria-label={`Contact information ${index + 1}`}
+                  value={value}
+                  disabled={disabled}
+                  className={`${activeIndex === index && typingFormat.bold ? "is-typing-bold" : ""}${activeIndex === index && typingFormat.italic ? " is-typing-italic" : ""}`}
+                  placeholder="Email, phone, location, portfolio…"
+                  onFocus={(event) => {
+                    setActiveIndex(index);
+                    setSelection({
+                      start: event.currentTarget.selectionStart ?? 0,
+                      end: event.currentTarget.selectionEnd ?? 0,
+                    });
+                    setTypingFormat({ bold: false, italic: false });
+                  }}
+                  onSelect={(event) => {
+                    setActiveIndex(index);
+                    setSelection({
+                      start: event.currentTarget.selectionStart ?? 0,
+                      end: event.currentTarget.selectionEnd ?? 0,
+                    });
+                  }}
+                  onChange={(event) => updateItem(index, event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="contact-information-editor__delete button--quiet"
+                  aria-label={`Delete contact information ${index + 1}`}
+                  title="Delete contact"
+                  disabled={disabled}
+                  onClick={() => {
+                    const next = items.filter(
+                      (_, itemIndex) => itemIndex !== index,
+                    );
+                    commit(next.length ? next : [""]);
+                    setActiveIndex(Math.max(0, index - 1));
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      </details>
+      <div className="contact-information-actions">
+        <button
+          type="button"
+          className="contact-information-editor__add button--secondary button--compact"
+          disabled={disabled}
+          onClick={() => {
+            if (details.current) details.current.open = true;
+            commit([...items, ""]);
+            setActiveIndex(items.length);
+            window.requestAnimationFrame(() =>
+              inputs.current[items.length]?.focus(),
+            );
+          }}
+        >
+          + Add contact information
+        </button>
+        {showDivider ? (
+          <label className="contact-divider-control">
+            Contact divider
+            <select
+              value={divider}
+              disabled={disabled}
+              onChange={(event) =>
+                onDividerChange(
+                  event.target.value === "bar"
+                    ? "bar"
+                    : event.target.value === "dash"
+                      ? "dash"
+                      : "dot",
+                )
+              }
+            >
+              <option value="dot">Dot •</option>
+              <option value="bar">Bar |</option>
+              <option value="dash">Dash -</option>
+            </select>
+          </label>
+        ) : null}
+      </div>
+    </>
   );
 }
 
@@ -2196,9 +2238,6 @@ function CanvasEntry({
             disabled={disabled}
             onChange={(value) => onChange({ ...entry, heading: value })}
           />
-          <span className="entry-title-separator" aria-hidden="true">
-            |
-          </span>
           <CanvasField
             label="Skills / details"
             value={details?.value ?? ""}
@@ -2217,16 +2256,16 @@ function CanvasEntry({
         />
       </div>
       <div className="canvas-entry__dates">
+        <CanvasDateField
+          entry={entry}
+          disabled={disabled}
+          onChange={onChange}
+        />
         <CanvasField
           label="Location"
           value={entry.location}
           disabled={disabled}
           onChange={(value) => onChange({ ...entry, location: value })}
-        />
-        <CanvasDateField
-          entry={entry}
-          disabled={disabled}
-          onChange={onChange}
         />
         <CanvasField
           label="Extra"
@@ -2324,7 +2363,7 @@ function CanvasDateField({
   return (
     <div
       ref={container}
-      className={`canvas-field canvas-date-field${editing ? " canvas-field--editing" : ""}`}
+      className={`canvas-field canvas-date-field${!display ? " canvas-field--empty" : ""}${editing ? " canvas-field--editing" : ""}`}
     >
       {editing ? (
         <div className="canvas-date-editor">
@@ -2335,9 +2374,17 @@ function CanvasDateField({
               className="button--quiet button--compact"
               aria-label="Clear date"
               title="Clear date"
+              disabled={disabled || !display}
               onClick={() => onChange({ ...entry, dateRange: "", dates: [] })}
             >
-              ×
+              Clear date
+            </button>
+            <button
+              type="button"
+              className="button--quiet button--compact"
+              onClick={() => setEditing(false)}
+            >
+              Done
             </button>
           </div>
           {entry.dateRange.trim() ? (
@@ -2495,6 +2542,7 @@ function CanvasField({
     bold: false,
     italic: false,
   });
+  const editButton = useRef<HTMLButtonElement>(null);
   const editor = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const container = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -2507,8 +2555,14 @@ function CanvasField({
       }
     }
     window.addEventListener("pointerdown", closeOnOutsideClick);
-    return () => window.removeEventListener("pointerdown", closeOnOutsideClick);
-  }, [editing]);
+    const frame = window.requestAnimationFrame?.(() => {
+      container.current?.scrollIntoView?.({ block: "nearest" });
+    });
+    return () => {
+      if (frame !== undefined) window.cancelAnimationFrame?.(frame);
+      window.removeEventListener("pointerdown", closeOnOutsideClick);
+    };
+  }, [editing, linkOpen]);
   const hasSelection = selection.end > selection.start;
   const bullets = bulk && bulkMode === "bullets";
   const selectedText = value.slice(selection.start, selection.end);
@@ -2596,6 +2650,27 @@ function CanvasField({
     setLinkOpen(false);
     setLinkSelectionRange(null);
   }
+  function finishEditing() {
+    setEditing(false);
+    setLinkOpen(false);
+    setLinkSelectionRange(null);
+    setTypingFormat({ bold: false, italic: false });
+    window.requestAnimationFrame(() => editButton.current?.focus());
+  }
+  function handleEditorKey(
+    event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      finishEditing();
+    } else if (
+      (event.metaKey || event.ctrlKey) &&
+      ["b", "i"].includes(event.key.toLowerCase())
+    ) {
+      event.preventDefault();
+      decorate(event.key.toLowerCase() === "b" ? "bold" : "italic");
+    }
+  }
   function rememberSelection() {
     const target = editor.current;
     setSelection({
@@ -2606,7 +2681,7 @@ function CanvasField({
   return (
     <div
       ref={container}
-      className={`canvas-field${editing ? " canvas-field--editing" : ""}${multiline ? " canvas-field--multiline" : " canvas-field--singleline"}${bold ? " canvas-field--bold" : ""}${bullets ? " canvas-field--bullets" : ""}`}
+      className={`canvas-field${!value ? " canvas-field--empty" : ""}${editing ? " canvas-field--editing" : ""}${multiline ? " canvas-field--multiline" : " canvas-field--singleline"}${bold ? " canvas-field--bold" : ""}${bullets ? " canvas-field--bullets" : ""}`}
     >
       {editing ? (
         <>
@@ -2618,7 +2693,7 @@ function CanvasField({
                 className="button--quiet button--compact canvas-format-clear"
                 aria-label={`Clear ${label.toLowerCase()}`}
                 title="Clear all text"
-                disabled={!value}
+                disabled={disabled || !value}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   onChange("");
@@ -2635,6 +2710,7 @@ function CanvasField({
                 className="button--quiet button--compact"
                 aria-label={boldPressed ? "Turn bold off" : "Turn bold on"}
                 title={boldPressed ? "Turn bold off" : "Bold"}
+                disabled={disabled}
                 aria-pressed={boldPressed}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => decorate("bold")}
@@ -2648,6 +2724,7 @@ function CanvasField({
                   italicPressed ? "Turn italics off" : "Turn italics on"
                 }
                 title={italicPressed ? "Turn italics off" : "Italic"}
+                disabled={disabled}
                 aria-pressed={italicPressed}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => decorate("italic")}
@@ -2658,6 +2735,7 @@ function CanvasField({
                 type="button"
                 className="button--quiet button--compact"
                 onMouseDown={(event) => event.preventDefault()}
+                disabled={disabled}
                 aria-expanded={linkOpen}
                 onClick={() => {
                   if (!linkOpen) setLinkSelectionRange(selection);
@@ -2738,6 +2816,7 @@ function CanvasField({
                 bullets ? "One bullet per line" : `Add ${label.toLowerCase()}`
               }
               onChange={(event) => onChange(event.target.value)}
+              onKeyDown={handleEditorKey}
               onSelect={rememberSelection}
               onMouseUp={rememberSelection}
               onKeyUp={rememberSelection}
@@ -2752,6 +2831,7 @@ function CanvasField({
               disabled={disabled}
               placeholder={`Add ${label.toLowerCase()}`}
               onChange={(event) => onChange(event.target.value)}
+              onKeyDown={handleEditorKey}
               onSelect={rememberSelection}
               onMouseUp={rememberSelection}
               onKeyUp={rememberSelection}
@@ -2761,6 +2841,7 @@ function CanvasField({
       ) : (
         <button
           type="button"
+          ref={editButton}
           className="canvas-field__button"
           disabled={disabled}
           onClick={() => setEditing(true)}

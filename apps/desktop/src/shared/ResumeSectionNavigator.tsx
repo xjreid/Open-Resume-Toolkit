@@ -12,11 +12,13 @@ export function ResumeSectionNavigator({
   document,
   disabled,
   hidden = false,
+  currentSection = null,
   onChange,
 }: {
   document: ResumeDocument;
   disabled: boolean;
   hidden?: boolean;
+  currentSection?: string | null;
   onChange: (update: (current: ResumeDocument) => ResumeDocument) => void;
 }) {
   const changeDocument = onChange;
@@ -300,16 +302,30 @@ export function ResumeSectionNavigator({
         hidden={hidden}
       >
         <div className="resume-navigation">
+          <h3>Resume sections</h3>
+          <p className="section-navigation-help">
+            Drag to reorder.
+            <br />
+            Select a name to rename.
+          </p>
           <p id={keyboardHelpId} className="visually-hidden">
             Activate a section name to rename it. Use Alt and the up or down
             arrow to reorder a focused section, or Delete to request deletion.
           </p>
-          <div className="contact-nav-item">
+          <div
+            className="contact-nav-item"
+            aria-current={currentSection === "contact" ? "location" : undefined}
+          >
             <span>Contact</span>
           </div>
           <div className="section-sort-list" ref={sectionList}>
             {navigationSections.map((section) => (
               <div
+                aria-current={
+                  (renamingSection ?? currentSection) === section.id
+                    ? "location"
+                    : undefined
+                }
                 className={`section-nav-card${draggingSection === section.id ? " section-nav-card--dragging" : ""}`}
                 key={section.id}
                 data-section-id={section.id}
@@ -342,6 +358,18 @@ export function ResumeSectionNavigator({
                 }}
               >
                 <div className="section-nav-row">
+                  <svg
+                    className="section-nav-grip"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <circle cx="9" cy="5" r="1" />
+                    <circle cx="15" cy="5" r="1" />
+                    <circle cx="9" cy="12" r="1" />
+                    <circle cx="15" cy="12" r="1" />
+                    <circle cx="9" cy="19" r="1" />
+                    <circle cx="15" cy="19" r="1" />
+                  </svg>
                   {renamingSection === section.id ? (
                     <input
                       disabled={disabled}
@@ -458,7 +486,7 @@ export function ResumeSectionNavigator({
                 }));
               }}
             >
-              Add
+              Add section
             </button>
           </div>
         </div>

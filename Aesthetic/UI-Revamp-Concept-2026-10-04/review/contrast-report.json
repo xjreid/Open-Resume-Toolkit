@@ -1,0 +1,51 @@
+[
+  {
+    "role": "Body",
+    "foreground": "#1C3135",
+    "background": "#FFFFFF",
+    "contrast": 13.64,
+    "AA_body": true
+  },
+  {
+    "role": "Secondary",
+    "foreground": "#566C70",
+    "background": "#FFFFFF",
+    "contrast": 5.56,
+    "AA_body": true
+  },
+  {
+    "role": "Small support",
+    "foreground": "#607A7F",
+    "background": "#FFFFFF",
+    "contrast": 4.58,
+    "AA_body": true
+  },
+  {
+    "role": "Primary action",
+    "foreground": "#FFFFFF",
+    "background": "#28676C",
+    "contrast": 6.47,
+    "AA_body": true
+  },
+  {
+    "role": "Rail text",
+    "foreground": "#D5E5E6",
+    "background": "#204D52",
+    "contrast": 7.21,
+    "AA_body": true
+  },
+  {
+    "role": "Rail support",
+    "foreground": "#B9D2D4",
+    "background": "#204D52",
+    "contrast": 5.89,
+    "AA_body": true
+  },
+  {
+    "role": "Warning",
+    "foreground": "#775021",
+    "background": "#FCF4E7",
+    "contrast": 6.51,
+    "AA_body": true
+  }
+]

@@ -1,0 +1,109 @@
+{
+  "tool": "build-phase",
+  "version": 2,
+  "startedAt": "2026-10-05T01:02:32.515Z",
+  "comp": "Aesthetic/UI-Revamp-Implementation-2026-10-04/screens/edit-desktop.png",
+  "direction": null,
+  "breakpoint": "2880x2120",
+  "artifact": "apps/desktop/src/main.tsx",
+  "phase": "plates",
+  "phases": {
+    "comps": {
+      "status": "skipped",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [
+        {
+          "at": "2026-10-05T01:02:32.515Z",
+          "text": "started with an approved comp; the comp round happened before this state (surface round or manual)"
+        }
+      ],
+      "gate": null,
+      "forced": null
+    },
+    "spec": {
+      "status": "closed",
+      "openedAt": "2026-10-05T01:02:32.515Z",
+      "closedAt": "2026-10-05T01:08:14.322Z",
+      "attempts": 6,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "71 regions, 0 plates, 12 text regions measured",
+        "at": "2026-10-05T01:08:14.322Z"
+      },
+      "forced": null
+    },
+    "plates": {
+      "status": "open",
+      "openedAt": "2026-10-05T01:08:14.322Z",
+      "closedAt": null,
+      "attempts": 3,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "no plates owed",
+        "at": "2026-10-05T01:10:21.489Z"
+      },
+      "forced": null
+    },
+    "hero": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": {
+        "ok": false,
+        "reasons": [
+          "the lead text region element-54 is measured (compressed regular, cap 62.1px) but no face is ranked: run /Users/xavierreid/.codex/skills/impeccable/scripts/impeccable font-match --rank element-54 --text \"<its first words>\" [--candidates \"Family:weight,...\"] and use the USE line."
+        ],
+        "at": "2026-10-05T01:06:26.087Z"
+      },
+      "forced": null,
+      "records": 2
+    },
+    "sections": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "motion": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "responsive": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "review": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    }
+  },
+  "finish": null,
+  "sessionId": "01a10942-5697-7f62-a1bf-e2a46c956ceb",
+  "plates": {}
+}

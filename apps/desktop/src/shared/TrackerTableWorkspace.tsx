@@ -515,8 +515,9 @@ export function TrackerWorkspace({
     <section className="tracker-workspace">
       <div className="tracker-heading">
         <div>
-          <p className="application-kicker">Local applications</p>
-          <h2>Application tracker</h2>
+          <p className="tracker-intro">
+            Track applications and review the materials you chose to save.
+          </p>
         </div>
         <div className="application-row">
           <button

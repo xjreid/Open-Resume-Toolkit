@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
-import logo from "../assets/open-frame-icon.svg";
+import { useEffect, useRef, type ReactNode } from "react";
+import { WorkspaceIcon } from "./WorkspaceIcon";
+import logo from "../assets/open-folio-reversed.svg";
 
 // Add a destination only when its workspace is implemented. Feature state stays
 // with its owner; changing destinations must not discard an editing session.
@@ -41,9 +42,16 @@ export function AppShell({
   status: ReactNode;
   children: ReactNode;
 }) {
+  const content = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (content.current) {
+      content.current.scrollTop = 0;
+      content.current.scrollLeft = 0;
+    }
+  }, [destination]);
   return (
     <main className="shell shell--editor">
-      <header className="masthead masthead--workspace">
+      <aside className="workspace-rail" aria-label="Your workspace">
         <Brand />
         <nav className="workspace-shortcuts" aria-label="Workspace areas">
           {WORKSPACE_DESTINATIONS.map((item) => (
@@ -60,7 +68,8 @@ export function AppShell({
               disabled={navigationBlocked}
               onClick={() => onNavigate(item.id)}
             >
-              {item.label}
+              <WorkspaceIcon name={item.id} />
+              <span>{item.label}</span>
             </button>
           ))}
         </nav>
@@ -72,15 +81,35 @@ export function AppShell({
           aria-pressed={overlayVisible}
           onClick={onOpenApplication}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <path d="M8 12h8" />
-            {!overlayVisible && <path d="M12 8v8" />}
-          </svg>
+          <WorkspaceIcon name="overlay" />
+          <span>{overlayVisible ? "Hide overlay" : "Show overlay"}</span>
         </button>
-        {status}
-      </header>
-      <div className="app-content">{children}</div>
+        <div className="rail-storage-status">
+          <WorkspaceIcon name="lock" />
+          <div>
+            <span>Encrypted storage</span>
+            {status}
+          </div>
+        </div>
+      </aside>
+      <div className="workspace-main">
+        <header className="workspace-page-heading">
+          <h2>
+            {destination === "import"
+              ? "Master resume"
+              : WORKSPACE_DESTINATIONS.find((item) => item.id === destination)
+                  ?.label}
+          </h2>
+          <p>
+            {destination === "resume" || destination === "import"
+              ? "Tailoring uses your published resume"
+              : "Local workspace"}
+          </p>
+        </header>
+        <div className="app-content" ref={content}>
+          {children}
+        </div>
+      </div>
     </main>
   );
 }

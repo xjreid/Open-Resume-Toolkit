@@ -223,6 +223,26 @@ export function AiUsageChart({
           <strong>{summary.value}</strong>
           <small>{summary.detail}</small>
         </div>
+        <div className="ai-chart__timeframe">
+          <span>Timeframe</span>
+          <div
+            className="ai-segments"
+            role="group"
+            aria-label="Monitoring period"
+          >
+            {(["Week", "Month", "Year", "All time"] as const).map((value) => (
+              <button
+                type="button"
+                className="button--secondary"
+                aria-pressed={period === value}
+                key={value}
+                onClick={() => onPeriodChange(value)}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="ai-chart__plot">
         <svg
@@ -247,8 +267,8 @@ export function AiUsageChart({
         >
           <defs>
             <linearGradient id="ai-chart-area" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#3e719f" stopOpacity="0.2" />
-              <stop offset="100%" stopColor="#3e719f" stopOpacity="0.01" />
+              <stop offset="0%" stopColor="#4b8b90" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#4b8b90" stopOpacity="0.01" />
             </linearGradient>
           </defs>
           {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
@@ -377,26 +397,6 @@ export function AiUsageChart({
             </>
           </div>
         )}
-      </div>
-      <div className="ai-chart__timeframe">
-        <span>Timeframe</span>
-        <div
-          className="ai-segments"
-          role="group"
-          aria-label="Monitoring period"
-        >
-          {(["Week", "Month", "Year", "All time"] as const).map((value) => (
-            <button
-              type="button"
-              className="button--secondary"
-              aria-pressed={period === value}
-              key={value}
-              onClick={() => onPeriodChange(value)}
-            >
-              {value}
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   );

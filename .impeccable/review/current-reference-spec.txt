@@ -1,0 +1,78 @@
+WROTE .impeccable/build/spec.json
+SPEC comp Aesthetic/UI-Revamp-Implementation-2026-10-04/screens/edit-desktop.png 2880x2120 landscape
+PALETTE #f4f8f8(84%) #284858(14%) #336868(1%) #1c1c1c(1%) #586878(0%)
+BANDS 5%
+REGION page-title         text     semantic box x17% y3% w13% h3% (363x67px, 5.4179:1) palette #f7f7f7 #183838 #a9aeaf  # Interface text: Master resume
+REGION element-1          control  semantic box x1% y10% w13% h4% (364x88px, 4.1364:1) palette #386868 #f4f5f5 #9db6b8  # UI control: Master resume
+REGION element-2          control  semantic box x1% y15% w13% h4% (364x88px, 4.1364:1) palette #284858 #d6e6e6 #a0b6ba  # UI control: AI & monitoring
+REGION element-3          control  semantic box x1% y19% w13% h4% (364x88px, 4.1364:1) palette #284858 #d7e7e7 #6a8a8a  # UI control: Application tracker
+REGION element-4          control  semantic box x1% y24% w13% h4% (364x88px, 4.1364:1) palette #284858 #d6e6e6 #457173  # UI control: Settings
+REGION element-5          control  semantic box x1% y87% w13% h4% (364x84px, 4.3333:1) palette #284858 #f5f6f6 #618384  # UI control: Show overlay
+REGION element-6          control  semantic box x17% y11% w4% h3% (115x72px, 1.5972:1) palette #f7f8f8 #1f4c5c #a7bdc2  # UI control: Edit
+REGION element-7          control  semantic box x21% y11% w4% h3% (126x72px, 1.75:1) palette #f8f8f8 #596979 #9eaeae  # UI control: View
+REGION element-8          control  semantic box x25% y11% w5% h3% (147x72px, 2.0417:1) palette #f7f7f7 #596a79 #99a9ac  # UI control: Import
+REGION element-9          control  semantic box x72% y11% w18% h3% (520x72px, 7.2222:1) palette #f7f8f8 #1a3939 #617171  # UI control: Technical / EngineeringProfessional / BusinessModern / Marketing & Sales
+REGION element-10         control  semantic box x91% y11% w6% h3% (184x68px, 2.7059:1) palette #286868 #f6f7f7 #99b8b9  # UI control: Publish
+REGION element-11         control  semantic box x18% y31% w9% h4% (270x88px, 3.0682:1) palette #e8e8f8 #194959 #6c8e8f  # UI control: Experience
+REGION element-12         control  semantic box x18% y35% w9% h4% (270x88px, 3.0682:1) palette #f8f8f8 #596978 #bec8c8  # UI control: Projects
+REGION element-13         control  semantic box x18% y40% w9% h4% (270x88px, 3.0682:1) palette #f8f8f8 #596978 #88959b  # UI control: Education
+REGION element-14         control  semantic box x18% y45% w9% h4% (270x88px, 3.0682:1) palette #f8f8f8 #586878 #bec5c9  # UI control: Skills
+REGION element-15         control  semantic box x16% y55% w11% h3% (330x72px, 4.5833:1) palette #f3f5f5 #1a3939 #7e8d8d  # UI control: Professional SummaryEducationExperienceInternshipsProjectsSkillsCertifications and LicensesAwards and HonorsLeadershipVolunteer ExperienceResearchPublicationsCourseworkActivities and OrganizationsLanguagesAccomplishmentsPortfolio and Professional LinksCustom Section
+REGION element-16         control  semantic box x16% y60% w11% h4% (330x80px, 4.125:1) palette #f5f7f7 #1b3939 #bdc5c5  # UI control: Add section
+REGION element-17         control  semantic box x87% y18% w3% h3% (76x68px, 1.1176:1) palette #f5f6f6 #788888 #b0c0c0  # UI control: Undo edit
+REGION element-18         control  semantic box x90% y18% w3% h3% (76x68px, 1.1176:1) palette #f5f6f6 #788888 #abbbbb  # UI control: Redo edit
+REGION element-19         control  semantic box x40% y31% w49% h5% (1416x103px, 13.7476:1) palette #f8f8f8 #282828 #575757  # UI control: NameAlex Morgan
+REGION element-20         control  semantic box x40% y36% w49% h3% (1416x65px, 21.7846:1) palette #f8f8f8 #1a1a1a #5f6060  # UI control: alex.morgan@example.org • +1 (202) 555-0142 • Portland, OR
+REGION element-21         control  semantic box x81% y41% w2% h3% (59x56px, 1.0536:1) palette #f8f8f8 #586878 #788b8b  # UI control: B
+REGION element-22         control  semantic box x83% y41% w2% h3% (56x56px, 1:1) palette #f6f7f7 #183838 #808488  # UI control: I
+REGION element-23         control  semantic box x85% y41% w3% h3% (87x56px, 1.5536:1) palette #f5f6f6 #183838 #748080  # UI control: Link
+REGION element-24         control  semantic box x41% y45% w45% h3% (1294x64px, 20.2188:1) palette #f8f8f8 #191919 #b9b9b9  # UI control: Contact information 1
+REGION element-25         control  semantic box x86% y45% w2% h3% (60x64px, 0.9375:1) palette #f8f8f8  # UI control: ×
+REGION element-26         control  semantic box x41% y49% w45% h3% (1294x64px, 20.2188:1) palette #f8f8f8 #242424 #acacac  # UI control: Contact information 2
+REGION element-27         control  semantic box x86% y49% w2% h3% (60x64px, 0.9375:1) palette #f8f8f8  # UI control: ×
+REGION element-28         control  semantic box x41% y52% w45% h3% (1294x64px, 20.2188:1) palette #f8f8f8 #1a1a1a #9d9d9d  # UI control: Contact information 3
+REGION element-29         control  semantic box x86% y52% w2% h3% (60x64px, 0.9375:1) palette #f8f8f8  # UI control: ×
+REGION element-30         control  semantic box x40% y41% w10% h3% (302x62px, 4.871:1) palette #f7f8f8 #2b6a6b #b4cbd0  # UI control: + Add contact information
+REGION element-31         control  semantic box x84% y41% w6% h3% (160x60px, 2.6667:1) palette #f6f7f7 #193838 #b4b8bc  # UI control: Dot •Bar |Dash -
+REGION element-32         control  semantic box x83% y72% w6% h2% (186x52px, 3.5769:1) palette #f5f7f7 #496b78 #779497  # UI control: Remove item
+REGION element-33         control  semantic box x40% y50% w38% h3% (1084x54px, 20.0741:1) palette #f8f8f8 #292929 #737373  # UI control: TitleSenior Software Engineer
+REGION element-34         control  semantic box x40% y52% w38% h3% (1084x54px, 20.0741:1) palette #f8f8f8 #191919 #b1b1b1  # UI control: RoleExample Studio
+REGION element-35         control  semantic box x79% y50% w11% h3% (304x54px, 5.6296:1) palette #f8f8f8 #191919 #515151  # UI control: Date2022–Present
+REGION element-36         control  semantic box x40% y55% w6% h2% (180x52px, 3.4615:1) palette #f8f8f8 #5a6b79 #c8cbd1  # UI control: Skills / detailsAdd skills / details
+REGION element-37         control  semantic box x47% y55% w4% h2% (126x52px, 2.4231:1) palette #f8f8f8 #5c6e7a #aeb7b8  # UI control: LocationAdd location
+REGION element-38         control  semantic box x53% y55% w3% h2% (99x52px, 1.9038:1) palette #f8f8f8 #586a78 #a5b1b2  # UI control: ExtraAdd extra
+REGION element-39         control  semantic box x72% y60% w2% h3% (63x56px, 1.125:1) palette #f3f5f5 #883838 #a06060  # UI control: ×
+REGION element-40         control  semantic box x75% y60% w2% h3% (59x56px, 1.0536:1) palette #f3f5f5 #1a3a3a #506068  # UI control: B
+REGION element-41         control  semantic box x77% y60% w2% h3% (56x56px, 1:1) palette #f3f5f5 #183838  # UI control: I
+REGION element-42         control  semantic box x79% y60% w3% h3% (87x56px, 1.5536:1) palette #f4f6f6 #1a3a3a #889494  # UI control: Link
+REGION element-43         control  semantic box x83% y59% w5% h3% (154x62px, 2.4839:1) palette #f4f6f6 #1a3838 #455556  # UI control: Paragraph
+REGION element-44         control  semantic box x41% y64% w47% h6% (1360x130px, 10.4615:1) palette #f7f8f8 #1a1a1a #a7abab  # UI control: Led the development of accessible planning tools for cross-functional teams. Reduced report preparation time by 35% through a reusable data validation workflow. Partnered with design and customer teams to simplify onboarding and document editing.
+REGION element-45         control  semantic box x83% y91% w6% h2% (186x52px, 3.5769:1) palette #f3f5f5 #486b78 #6d8c8e  # UI control: Remove item
+REGION element-46         control  semantic box x40% y77% w38% h3% (1084x54px, 20.0741:1) palette #f8f8f8 #292929 #b2b2b2  # UI control: TitleSoftware Engineer
+REGION element-47         control  semantic box x40% y80% w38% h3% (1084x54px, 20.0741:1) palette #f8f8f8 #191919 #a1a1a1  # UI control: RoleNorthstar Example Cooperative
+REGION element-48         control  semantic box x79% y77% w11% h3% (304x54px, 5.6296:1) palette #f8f8f8 #181818 #373737  # UI control: Date2019–2022
+REGION element-49         control  semantic box x40% y83% w6% h2% (180x52px, 3.4615:1) palette #f8f8f8 #5a6b79 #c8cbd1  # UI control: Skills / detailsAdd skills / details
+REGION element-50         control  semantic box x47% y83% w4% h2% (126x52px, 2.4231:1) palette #f8f8f8 #5c6e7a #aeb7b8  # UI control: LocationAdd location
+REGION element-51         control  semantic box x53% y83% w3% h2% (99x52px, 1.9038:1) palette #f8f8f8 #586a78 #a5b1b2  # UI control: ExtraAdd extra
+REGION element-52         control  semantic box x41% y86% w48% h4% (1380x92px, 15:1) palette #f8f8f8 #1a1a1a #707070  # UI control: Information• Built reliable services in TypeScript and SQL with clear operational documentation.• Introduced automated checks for data quality and keyboard accessibility.
+REGION element-53         control  semantic box x41% y95% w48% h3% (1388x62px, 22.3871:1) palette #f8f8f8 #2a696a #88a8a8  # UI control: + Add another item
+REGION element-54         text     semantic box x5% y3% w7% h4% (213x80px, 2.6625:1) palette #284858 #f7f7f7 #bac8c9  # Interface text: Open Resume Toolkit
+REGION element-55         text     semantic box x1% y93% w13% h5% (364x111px, 3.2793:1) palette #284858 #d5e7e7 #9bb6b8  # Interface text: Encrypted storageEncrypted storage ready
+REGION element-56         text     semantic box x84% y4% w14% h2% (397x36px, 11.0278:1) palette #f7f7f7 #5d6e7c #bbc3c8  # Interface text: Tailoring uses your published resume
+REGION element-57         text     semantic box x17% y18% w11% h2% (314x39px, 8.0513:1) palette #f8f8f8 #1a3838 #939c9d  # Interface text: Resume sections
+REGION element-58         text     semantic box x17% y21% w11% h3% (314x70px, 4.4857:1) palette #f7f7f7 #586a78 #b1babc  # Interface text: Drag to reorder.Select a name to rename.
+REGION element-59         text     semantic box x16% y26% w12% h4% (346x84px, 4.119:1) palette #f7f7f7 #5a6c78 #91a1a1  # Interface text: Contact
+REGION element-60         text     semantic box x37% y19% w5% h2% (147x39px, 3.7692:1) palette #e8f7f8 #596978 #a4b1b5  # Interface text: Your resume
+REGION element-61         text     semantic box x43% y18% w4% h2% (120x49px, 2.449:1) palette #e8f8ea #2a694a #7ea192  # Interface text: Saved
+REGION element-62         text     semantic box x40% y26% w49% h3% (1416x72px, 19.6667:1) palette #f8f8f8 #596979 #728686  # Interface text: Select any labeled area to edit your resume. Changes save automatically.
+REGION element-63         text     semantic box x40% y46% w49% h2% (1416x42px, 33.7143:1) palette #f8f8f8 #191919 #4a4a4a  # Interface text: Experience
+REGION element-64         text     semantic box x40% y100% w49% h0% (1416x6px, 236:1) palette #f8f8f8  # Interface text: Projects
+REGION element-65         chrome   semantic box x2% y3% w11% h4% (316x80px, 3.95:1) palette #284858 #f4f5f5 #8b9fa1  # Flat UI panel or rule: Open Resume Toolkit
+REGION element-66         chrome   semantic box x0% y0% w15% h100% (428x2120px, 0.2019:1) palette #284858 #396869 #e7efef  # Flat UI panel or rule: Open Resume ToolkitMaster resumeAI & monitoringApplication trackerSettingsShow overlayEncrypted storageEncrypted storage ready
+REGION element-67         chrome   semantic box x15% y0% w85% h9% (2452x192px, 12.7708:1) palette #f8f8f8 #183838 #586878  # Flat UI panel or rule: Master resumeTailoring uses your published resume
+REGION element-68         chrome   semantic box x15% y9% w85% h7% (2452x144px, 17.0278:1) palette #f8f8f8 #286868 #183b3e  # Flat UI panel or rule: EditViewImportResume styleTechnical / EngineeringProfessional / BusinessModern / Marketing & SalesPublish
+REGION element-69         chrome   semantic box x15% y16% w14% h84% (412x1784px, 0.2309:1) palette #f7f7f8 #5c6c78 #183b3f  # Flat UI panel or rule: Resume sectionsDrag to reorder.Select a name to rename.Activate a section name to rename it. Use Alt and the up or down arrow to reorder a focused section, or Delete to request deletion.ContactExperienceProjectsEducationSkillsDrag a section here to deleteAdd sectionProfessional SummaryEducationExperienceInternshipsProjectsSkillsCertifications and LicensesAwards and HonorsLeadershipVolunteer ExperienceResearchPublicationsCourseworkActivities and OrganizationsLanguagesAccomplishmentsPortfolio and Professional LinksCustom SectionAdd section
+REGION paper              chrome   semantic box x37% y23% w56% h77% (1600x1638px, 0.9768:1) palette #f8f8f8 #1e1e1e #489898  # Flat white document paper container with semantic inline fields
+PLATES 0 to produce: none
+WARN region paper: "container": true set in the regions file (the region-size refusal is overridden: one undivided element)
+RULE anything not in this list does not exist on the page: no borders, rules, chrome, or containers the comp does not show. Every raster region ships as its plate, never as CSS.

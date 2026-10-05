@@ -1,0 +1,113 @@
+[
+  {
+    "screen": "edit",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "font": true,
+    "scrollAreas": [
+      {
+        "name": "main",
+        "height": 1022,
+        "scroll": 1022
+      },
+      {
+        "name": "document-area",
+        "height": 854,
+        "scroll": 1136
+      }
+    ],
+    "pageErrors": []
+  },
+  {
+    "screen": "view",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "font": true,
+    "scrollAreas": [
+      {
+        "name": "main",
+        "height": 1042,
+        "scroll": 1042
+      },
+      {
+        "name": "view-stage",
+        "height": 874,
+        "scroll": 910
+      }
+    ],
+    "pageErrors": []
+  },
+  {
+    "screen": "keys",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "font": true,
+    "scrollAreas": [
+      {
+        "name": "main",
+        "height": 962,
+        "scroll": 984
+      }
+    ],
+    "pageErrors": []
+  },
+  {
+    "screen": "data",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "font": true,
+    "scrollAreas": [
+      {
+        "name": "main",
+        "height": 1142,
+        "scroll": 1147
+      }
+    ],
+    "pageErrors": []
+  },
+  {
+    "screen": "settings",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "font": true,
+    "scrollAreas": [
+      {
+        "name": "main",
+        "height": 962,
+        "scroll": 965
+      }
+    ],
+    "pageErrors": []
+  },
+  {
+    "screen": "overlay",
+    "width": 700,
+    "bodyWidth": 700,
+    "font": true,
+    "scrollAreas": [],
+    "pageErrors": []
+  },
+  {
+    "screen": "logo",
+    "width": 1440,
+    "bodyWidth": 1440,
+    "font": true,
+    "scrollAreas": [],
+    "pageErrors": []
+  },
+  {
+    "screen": "edit-small-desktop",
+    "width": 1100,
+    "bodyWidth": 1100
+  },
+  {
+    "screen": "data-small-desktop",
+    "width": 1100,
+    "bodyWidth": 1100
+  },
+  {
+    "screen": "settings-small-desktop",
+    "width": 1100,
+    "bodyWidth": 1100
+  }
+]

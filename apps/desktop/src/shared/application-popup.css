@@ -1,7 +1,7 @@
 .application-popup {
   min-height: 100vh;
-  color: #17243a;
-  background: #f8fafc;
+  color: #1c3135;
+  background: #fbfdfd;
 }
 
 .application-popup--loading {
@@ -16,7 +16,7 @@
   justify-content: space-between;
   min-height: 56px;
   padding: 8px 16px;
-  border-bottom: 1px solid #cbd5e1;
+  border-bottom: 1px solid #d8e3e5;
   background: #fff;
 }
 .application-popup__header h1 {
@@ -29,12 +29,12 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: #17243a;
+  color: #1c3135;
   font-size: 1.5rem;
 }
 .application-popup__close:hover:not(:disabled) {
   background: #e2e8f0;
-  color: #17243a;
+  color: #1c3135;
 }
 .application-popup__body {
   padding: 16px;
@@ -66,9 +66,9 @@
   margin-top: 14px;
   overflow: auto;
   padding: 0;
-  border-left: 1px solid #cbd5e1;
+  border-left: 1px solid #d8e3e5;
   border-right: 0;
-  background: #f8fafc;
+  background: #fbfdfd;
 }
 .application-popup .application-popup__navigator > div {
   display: block;

@@ -1,0 +1,732 @@
+{
+  "regions": [
+    {
+      "id": "element-1",
+      "kind": "text",
+      "pixelBox": {
+        "x": 32,
+        "y": 64,
+        "w": 364,
+        "h": 86
+      },
+      "note": "UI text: Your workspaceOpen Resume Toolkit",
+      "snap": false
+    },
+    {
+      "id": "element-2",
+      "kind": "control",
+      "pixelBox": {
+        "x": 32,
+        "y": 206,
+        "w": 364,
+        "h": 88
+      },
+      "note": "UI control: Master resume",
+      "snap": false
+    },
+    {
+      "id": "element-3",
+      "kind": "control",
+      "pixelBox": {
+        "x": 32,
+        "y": 308,
+        "w": 364,
+        "h": 88
+      },
+      "note": "UI control: AI & monitoring",
+      "snap": false
+    },
+    {
+      "id": "element-4",
+      "kind": "control",
+      "pixelBox": {
+        "x": 32,
+        "y": 410,
+        "w": 364,
+        "h": 88
+      },
+      "note": "UI control: Application tracker",
+      "snap": false
+    },
+    {
+      "id": "element-5",
+      "kind": "control",
+      "pixelBox": {
+        "x": 32,
+        "y": 512,
+        "w": 364,
+        "h": 88
+      },
+      "note": "UI control: Settings",
+      "snap": false
+    },
+    {
+      "id": "element-6",
+      "kind": "control",
+      "pixelBox": {
+        "x": 32,
+        "y": 1852,
+        "w": 364,
+        "h": 84
+      },
+      "note": "UI control: Show overlay",
+      "snap": false
+    },
+    {
+      "id": "element-7",
+      "kind": "text",
+      "pixelBox": {
+        "x": 32,
+        "y": 1972,
+        "w": 364,
+        "h": 112
+      },
+      "note": "UI text: Encrypted storageReady on this device",
+      "snap": false
+    },
+    {
+      "id": "page-title",
+      "kind": "text",
+      "pixelBox": {
+        "x": 492,
+        "y": 63,
+        "w": 363,
+        "h": 67
+      },
+      "note": "UI text: Master resume",
+      "snap": false
+    },
+    {
+      "id": "element-8",
+      "kind": "text",
+      "pixelBox": {
+        "x": 2197,
+        "y": 73,
+        "w": 619,
+        "h": 48
+      },
+      "note": "UI text: Tailoring uses your published resumeDraft saved",
+      "snap": false
+    },
+    {
+      "id": "element-9",
+      "kind": "control",
+      "pixelBox": {
+        "x": 500,
+        "y": 232,
+        "w": 110,
+        "h": 62
+      },
+      "note": "UI control: Edit",
+      "snap": false
+    },
+    {
+      "id": "element-10",
+      "kind": "control",
+      "pixelBox": {
+        "x": 616,
+        "y": 232,
+        "w": 121,
+        "h": 62
+      },
+      "note": "UI control: View",
+      "snap": false
+    },
+    {
+      "id": "element-11",
+      "kind": "control",
+      "pixelBox": {
+        "x": 743,
+        "y": 232,
+        "w": 143,
+        "h": 62
+      },
+      "note": "UI control: Import",
+      "snap": false
+    },
+    {
+      "id": "element-12",
+      "kind": "control",
+      "pixelBox": {
+        "x": 2238,
+        "y": 227,
+        "w": 398,
+        "h": 72
+      },
+      "note": "UI control: Technical / EngineeringProfessionalModern",
+      "snap": false
+    },
+    {
+      "id": "element-13",
+      "kind": "control",
+      "pixelBox": {
+        "x": 2668,
+        "y": 223,
+        "w": 148,
+        "h": 80
+      },
+      "note": "UI control: Publish",
+      "snap": false
+    },
+    {
+      "id": "element-14",
+      "kind": "text",
+      "pixelBox": {
+        "x": 460,
+        "y": 384,
+        "w": 346,
+        "h": 34
+      },
+      "note": "UI text: Resume sections",
+      "snap": false
+    },
+    {
+      "id": "element-15",
+      "kind": "text",
+      "pixelBox": {
+        "x": 460,
+        "y": 448,
+        "w": 346,
+        "h": 70
+      },
+      "note": "UI text: Drag to reorder.Select a name to rename.",
+      "snap": false
+    },
+    {
+      "id": "element-16",
+      "kind": "control",
+      "pixelBox": {
+        "x": 460,
+        "y": 652,
+        "w": 346,
+        "h": 82
+      },
+      "note": "UI control: Experience",
+      "snap": false
+    },
+    {
+      "id": "element-17",
+      "kind": "control",
+      "pixelBox": {
+        "x": 460,
+        "y": 742,
+        "w": 346,
+        "h": 82
+      },
+      "note": "UI control: Projects",
+      "snap": false
+    },
+    {
+      "id": "element-18",
+      "kind": "control",
+      "pixelBox": {
+        "x": 460,
+        "y": 832,
+        "w": 346,
+        "h": 82
+      },
+      "note": "UI control: Education",
+      "snap": false
+    },
+    {
+      "id": "element-19",
+      "kind": "control",
+      "pixelBox": {
+        "x": 460,
+        "y": 922,
+        "w": 346,
+        "h": 82
+      },
+      "note": "UI control: Skills",
+      "snap": false
+    },
+    {
+      "id": "element-20",
+      "kind": "control",
+      "pixelBox": {
+        "x": 460,
+        "y": 1130,
+        "w": 346,
+        "h": 80
+      },
+      "note": "UI control: Custom sectionSummaryExperienceProjectsEducationSkills",
+      "snap": false
+    },
+    {
+      "id": "element-21",
+      "kind": "control",
+      "pixelBox": {
+        "x": 460,
+        "y": 1228,
+        "w": 346,
+        "h": 80
+      },
+      "note": "UI control: Add section",
+      "snap": false
+    },
+    {
+      "id": "element-22",
+      "kind": "text",
+      "pixelBox": {
+        "x": 460,
+        "y": 1946,
+        "w": 346,
+        "h": 126
+      },
+      "note": "UI text: Drag a section hereto delete",
+      "snap": false
+    },
+    {
+      "id": "element-23",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1152,
+        "y": 546,
+        "w": 1416,
+        "h": 69
+      },
+      "note": "UI text: Select any labeled area to edit your resume. Changes save automatically.",
+      "snap": false
+    },
+    {
+      "id": "element-24",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1152,
+        "y": 673,
+        "w": 316,
+        "h": 67
+      },
+      "note": "UI text: Alex Morgan",
+      "snap": false
+    },
+    {
+      "id": "element-25",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1132,
+        "y": 756,
+        "w": 1456,
+        "h": 69
+      },
+      "note": "UI text: alex.morgan@example.org \u2022 +1 (202) 555-0142 \u2022 Portland, OR",
+      "snap": false
+    },
+    {
+      "id": "element-26",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1152,
+        "y": 841,
+        "w": 364,
+        "h": 64
+      },
+      "note": "UI control: Add contact information",
+      "snap": false
+    },
+    {
+      "id": "element-27",
+      "kind": "control",
+      "pixelBox": {
+        "x": 2410,
+        "y": 846,
+        "w": 158,
+        "h": 54
+      },
+      "note": "UI control: DotBarDash",
+      "snap": false
+    },
+    {
+      "id": "element-28",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1152,
+        "y": 945,
+        "w": 1416,
+        "h": 51
+      },
+      "note": "UI text: Experience",
+      "snap": false
+    },
+    {
+      "id": "element-29",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1152,
+        "y": 1016,
+        "w": 1416,
+        "h": 51
+      },
+      "note": "UI text: Senior Software Engineer2022\u2013Present",
+      "snap": false
+    },
+    {
+      "id": "element-30",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1152,
+        "y": 1067,
+        "w": 1416,
+        "h": 48
+      },
+      "note": "UI text: Example Studio",
+      "snap": false
+    },
+    {
+      "id": "element-31",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1152,
+        "y": 1125,
+        "w": 170,
+        "h": 44
+      },
+      "note": "UI control: Add skills / details",
+      "snap": false
+    },
+    {
+      "id": "element-32",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1354,
+        "y": 1125,
+        "w": 118,
+        "h": 44
+      },
+      "note": "UI control: Add location",
+      "snap": false
+    },
+    {
+      "id": "element-33",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1504,
+        "y": 1125,
+        "w": 93,
+        "h": 44
+      },
+      "note": "UI control: Add extra",
+      "snap": false
+    },
+    {
+      "id": "element-34",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1154,
+        "y": 1226,
+        "w": 103,
+        "h": 30
+      },
+      "note": "UI text: Information",
+      "snap": false
+    },
+    {
+      "id": "element-35",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1281,
+        "y": 1215,
+        "w": 52,
+        "h": 52
+      },
+      "note": "UI control: B",
+      "snap": false
+    },
+    {
+      "id": "element-36",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1341,
+        "y": 1215,
+        "w": 52,
+        "h": 52
+      },
+      "note": "UI control: I",
+      "snap": false
+    },
+    {
+      "id": "element-37",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1401,
+        "y": 1215,
+        "w": 111,
+        "h": 52
+      },
+      "note": "UI control: Link",
+      "snap": false
+    },
+    {
+      "id": "element-38",
+      "kind": "control",
+      "pixelBox": {
+        "x": 2374,
+        "y": 1215,
+        "w": 130,
+        "h": 52
+      },
+      "note": "UI control: Paragraph",
+      "snap": false
+    },
+    {
+      "id": "element-39",
+      "kind": "control",
+      "pixelBox": {
+        "x": 2360,
+        "y": 1474,
+        "w": 208,
+        "h": 54
+      },
+      "note": "UI control: Remove item",
+      "snap": false
+    },
+    {
+      "id": "element-40",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1152,
+        "y": 1558,
+        "w": 1416,
+        "h": 51
+      },
+      "note": "UI text: Software Engineer2019\u20132022",
+      "snap": false
+    },
+    {
+      "id": "element-41",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1152,
+        "y": 1609,
+        "w": 1416,
+        "h": 48
+      },
+      "note": "UI text: Northstar Example Cooperative",
+      "snap": false
+    },
+    {
+      "id": "element-42",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1152,
+        "y": 1667,
+        "w": 170,
+        "h": 44
+      },
+      "note": "UI control: Add skills / details",
+      "snap": false
+    },
+    {
+      "id": "element-43",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1354,
+        "y": 1667,
+        "w": 118,
+        "h": 44
+      },
+      "note": "UI control: Add location",
+      "snap": false
+    },
+    {
+      "id": "element-44",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1504,
+        "y": 1667,
+        "w": 93,
+        "h": 44
+      },
+      "note": "UI control: Add extra",
+      "snap": false
+    },
+    {
+      "id": "element-45",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1186,
+        "y": 1725,
+        "w": 1382,
+        "h": 36
+      },
+      "note": "UI text: Built reliable services in TypeScript and SQL with clear operational documentation.",
+      "snap": false
+    },
+    {
+      "id": "element-46",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1186,
+        "y": 1766,
+        "w": 1382,
+        "h": 36
+      },
+      "note": "UI text: Introduced automated checks for data quality and keyboard accessibility.",
+      "snap": false
+    },
+    {
+      "id": "element-47",
+      "kind": "control",
+      "pixelBox": {
+        "x": 2360,
+        "y": 1822,
+        "w": 208,
+        "h": 54
+      },
+      "note": "UI control: Remove item",
+      "snap": false
+    },
+    {
+      "id": "element-48",
+      "kind": "control",
+      "pixelBox": {
+        "x": 1152,
+        "y": 1898,
+        "w": 211,
+        "h": 48
+      },
+      "note": "UI control: Add another item",
+      "snap": false
+    },
+    {
+      "id": "element-49",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1152,
+        "y": 1986,
+        "w": 1416,
+        "h": 51
+      },
+      "note": "UI text: Projects",
+      "snap": false
+    },
+    {
+      "id": "element-50",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1152,
+        "y": 2057,
+        "w": 1416,
+        "h": 51
+      },
+      "note": "UI text: Community Resource Directory2024",
+      "snap": false
+    },
+    {
+      "id": "element-51",
+      "kind": "text",
+      "pixelBox": {
+        "x": 1152,
+        "y": 2108,
+        "w": 1416,
+        "h": 12
+      },
+      "note": "UI text: Independent project",
+      "snap": false
+    },
+    {
+      "id": "rail",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 0,
+        "y": 0,
+        "w": 428,
+        "h": 2120
+      },
+      "container": true,
+      "note": "UI chrome: rail flat background and boundary",
+      "snap": false
+    },
+    {
+      "id": "page-head",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 428,
+        "y": 0,
+        "w": 2452,
+        "h": 192
+      },
+      "container": true,
+      "note": "UI chrome: page-head flat background and boundary",
+      "snap": false
+    },
+    {
+      "id": "toolbar",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 428,
+        "y": 192,
+        "w": 2452,
+        "h": 144
+      },
+      "container": true,
+      "note": "UI chrome: toolbar flat background and boundary",
+      "snap": false
+    },
+    {
+      "id": "section-panel",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 428,
+        "y": 336,
+        "w": 412,
+        "h": 1784
+      },
+      "container": true,
+      "note": "UI chrome: section-panel flat background and boundary",
+      "snap": false
+    },
+    {
+      "id": "paper",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 1060,
+        "y": 478,
+        "w": 1600,
+        "h": 1642
+      },
+      "container": true,
+      "note": "UI chrome: paper flat background and boundary",
+      "snap": false
+    },
+    {
+      "id": "editing-block",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 1126,
+        "y": 1189,
+        "w": 1468,
+        "h": 262
+      },
+      "container": true,
+      "note": "UI chrome: editing-block flat background and boundary",
+      "snap": false
+    },
+    {
+      "id": "section-add",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 460,
+        "y": 1046,
+        "w": 346,
+        "h": 262
+      },
+      "container": true,
+      "note": "UI chrome: section-add flat background and boundary",
+      "snap": false
+    },
+    {
+      "id": "section-list",
+      "kind": "chrome",
+      "pixelBox": {
+        "x": 460,
+        "y": 550,
+        "w": 346,
+        "h": 454
+      },
+      "container": true,
+      "note": "UI chrome: section-list flat background and boundary",
+      "snap": false
+    }
+  ]
+}

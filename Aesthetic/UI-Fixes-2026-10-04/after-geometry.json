@@ -1,0 +1,292 @@
+{
+  "geometry": {
+    "editor": {
+      "scrollport": {
+        "x": 180,
+        "y": 0,
+        "width": 900,
+        "height": 760,
+        "font": "14px / 21px Hanken, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "color": "rgb(28, 49, 53)"
+      },
+      "navigation": {
+        "x": 180,
+        "y": 96,
+        "width": 900,
+        "height": 72,
+        "font": "14px / 21px Hanken, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "color": "rgb(28, 49, 53)"
+      },
+      "fields": [
+        {
+          "label": "Title",
+          "x": 416,
+          "y": 525.0625,
+          "width": 243.234375,
+          "height": 26.890625,
+          "font": "700 13.5px / 18.9px \"Times New Roman\", Times, serif",
+          "color": "rgb(23, 23, 23)"
+        },
+        {
+          "label": "Skills / details",
+          "x": 671.234375,
+          "y": 525.0625,
+          "width": 208.828125,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Role",
+          "x": 416,
+          "y": 551.953125,
+          "width": 464.0625,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Date",
+          "x": 894.0625,
+          "y": 525.0625,
+          "width": 129.9375,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Location",
+          "x": 894.0625,
+          "y": 555.0625,
+          "width": 129.9375,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Extra",
+          "x": 894.0625,
+          "y": 585.0625,
+          "width": 129.9375,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Information",
+          "x": 434,
+          "y": 618.0625,
+          "width": 590,
+          "height": 64.671875,
+          "font": "13.5px / 18.9px \"Times New Roman\", Times, serif",
+          "color": "rgb(23, 23, 23)"
+        }
+      ]
+    },
+    "editorScrolled": {
+      "scrollport": {
+        "x": 180,
+        "y": 0,
+        "width": 900,
+        "height": 760,
+        "font": "14px / 21px Hanken, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "color": "rgb(28, 49, 53)"
+      },
+      "navigation": {
+        "x": 180,
+        "y": 0,
+        "width": 900,
+        "height": 72,
+        "font": "14px / 21px Hanken, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "color": "rgb(28, 49, 53)"
+      },
+      "fields": [
+        {
+          "label": "Title",
+          "x": 416,
+          "y": 175.0625,
+          "width": 243.234375,
+          "height": 26.890625,
+          "font": "700 13.5px / 18.9px \"Times New Roman\", Times, serif",
+          "color": "rgb(23, 23, 23)"
+        },
+        {
+          "label": "Skills / details",
+          "x": 671.234375,
+          "y": 175.0625,
+          "width": 208.828125,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Role",
+          "x": 416,
+          "y": 201.953125,
+          "width": 464.0625,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Date",
+          "x": 894.0625,
+          "y": 175.0625,
+          "width": 129.9375,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Location",
+          "x": 894.0625,
+          "y": 205.0625,
+          "width": 129.9375,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Extra",
+          "x": 894.0625,
+          "y": 235.0625,
+          "width": 129.9375,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Information",
+          "x": 434,
+          "y": 268.0625,
+          "width": 590,
+          "height": 64.671875,
+          "font": "13.5px / 18.9px \"Times New Roman\", Times, serif",
+          "color": "rgb(23, 23, 23)"
+        }
+      ]
+    },
+    "minimumEditor": {
+      "scrollport": {
+        "x": 72,
+        "y": 0,
+        "width": 648,
+        "height": 520,
+        "font": "14px / 21px Hanken, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "color": "rgb(28, 49, 53)"
+      },
+      "navigation": {
+        "x": 72,
+        "y": 0,
+        "width": 648,
+        "height": 72,
+        "font": "14px / 21px Hanken, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "color": "rgb(28, 49, 53)"
+      },
+      "fields": [
+        {
+          "label": "Title",
+          "x": 256,
+          "y": 256.0625,
+          "width": 150.8125,
+          "height": 26.890625,
+          "font": "700 13.5px / 18.9px \"Times New Roman\", Times, serif",
+          "color": "rgb(23, 23, 23)"
+        },
+        {
+          "label": "Skills / details",
+          "x": 418.8125,
+          "y": 256.0625,
+          "width": 133.1875,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Role",
+          "x": 256,
+          "y": 282.953125,
+          "width": 296,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Date",
+          "x": 566,
+          "y": 256.0625,
+          "width": 118,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Location",
+          "x": 566,
+          "y": 286.0625,
+          "width": 118,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Extra",
+          "x": 566,
+          "y": 316.0625,
+          "width": 118,
+          "height": 26,
+          "font": "11px / 16.5px Hanken, sans-serif",
+          "color": "rgb(86, 108, 112)"
+        },
+        {
+          "label": "Information",
+          "x": 274,
+          "y": 349.0625,
+          "width": 410,
+          "height": 121.34375,
+          "font": "13.5px / 18.9px \"Times New Roman\", Times, serif",
+          "color": "rgb(23, 23, 23)"
+        }
+      ]
+    },
+    "interactions": [
+      "selected-text bold",
+      "italic keyboard shortcut",
+      "link validation/application",
+      "Done and focus restoration",
+      "clear text",
+      "Escape closes",
+      "details/location/date editing",
+      "paragraph/bullet preservation"
+    ],
+    "aiKeysScrolled": {
+      "navigation": {
+        "x": 180,
+        "y": 61,
+        "width": 900,
+        "height": 54
+      },
+      "scrollport": {
+        "x": 180,
+        "y": 61,
+        "width": 900,
+        "height": 699
+      }
+    },
+    "aiDataScrolled": {
+      "navigation": {
+        "x": 180,
+        "y": 61,
+        "width": 900,
+        "height": 54
+      },
+      "scrollport": {
+        "x": 180,
+        "y": 61,
+        "width": 900,
+        "height": 699
+      }
+    }
+  },
+  "errors": []
+}

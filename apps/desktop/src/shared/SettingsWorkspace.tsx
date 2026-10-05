@@ -16,9 +16,7 @@ export function SettingsWorkspace({
     "backup",
   );
   return (
-    <section className="workspace-data" aria-labelledby="workspace-data-title">
-      <h2 id="workspace-data-title">Your local workspace</h2>
-      <p>Manage saved data, create a backup, or recover an earlier profile.</p>
+    <section className="workspace-data" aria-label="Settings">
       <nav className="settings-navigation" aria-label="Settings sections">
         <button
           type="button"
@@ -50,7 +48,9 @@ export function SettingsWorkspace({
       </nav>
       <div hidden={section !== "backup"}>{backup}</div>
       <div hidden={section !== "storage"}>{storage}</div>
-      {section === "browser" && <BrowserConnectionSettings />}
+      <div hidden={section !== "browser"}>
+        {section === "browser" && <BrowserConnectionSettings />}
+      </div>
     </section>
   );
 }

@@ -968,7 +968,14 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                   setAddOpen(true);
                 }}
               >
-                <span aria-hidden="true">+</span>
+                <svg
+                  className="workspace-icon"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                <span>Add key</span>
               </button>
             </div>
             {addOpen && (
@@ -1367,8 +1374,10 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
           <section className="ai-panel" aria-label="Usage data">
             <div className="ai-data-heading">
               <div>
-                <strong>{activityView.title}</strong>
-                <small>{activityView.detail}</small>
+                <h3>Activity</h3>
+                <small>
+                  {activityView.title} · {activityView.detail}
+                </small>
               </div>
               <AiDataKeyPicker
                 keys={activityKeys}

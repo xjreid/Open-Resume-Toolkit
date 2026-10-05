@@ -42,7 +42,11 @@ export function BrowserConnectionSettings() {
     }
   }
   return (
-    <section aria-labelledby="browser-connection-title" aria-busy={busy}>
+    <section
+      className="browser-connection-settings"
+      aria-labelledby="browser-connection-title"
+      aria-busy={busy}
+    >
       <h3 id="browser-connection-title">Chrome development connection</h3>
       <p role="status">
         {status

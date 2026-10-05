@@ -83,12 +83,13 @@ The public name is Open Resume Toolkit, abbreviated ORT. Copy is direct, specifi
 functional, and documentation-oriented; it explains actions, state, limits,
 privacy, installation, and source without inflated AI or employment claims.
 
-Future interface work preserves the approved Precision Workbench direction,
-Quiet Navy identity, Offset Open Frame assets, and light-only application UI.
-The existing [aesthetic direction](Aesthetic/README.md) and
-[visual rules](Aesthetic/Precision_Workbench_Visual_Direction.md) supply the visual
-authority. Resume and cover-letter documents remain independent professional
-documents and do not inherit ORT branding, logos, colors, or promotional language.
+Future interface work uses the user-approved Open Folio document workspace,
+muted blue-green palette, Hanken Grotesk interface typography, Open Folio assets,
+and light-only application UI. The October 4, 2026 implementation supersedes
+Precision Workbench / Quiet Navy / Offset Open Frame. The [aesthetic overview](Aesthetic/README.md)
+and [design system](DESIGN.md) supply current visual authority. The [prior plans and imagery](<Aesthetic/previous refrence/README-archive.md>) remain available for reference.
+Resume and cover-letter documents remain independent professional documents and
+do not inherit ORT branding, logos, colors, or promotional language.
 
 ## Evidence on Hand
 
@@ -98,8 +99,8 @@ documents and do not inherit ORT branding, logos, colors, or promotional languag
   desktop code in `apps/desktop`, and milestone records in `evidence/0.0.0-dev`
   document implementation behavior and its verification limits.
 - [Logo assets](Aesthetic/Logo/README.md),
-  [document examples](Aesthetic/Resume-Designs/README.md), and the original visual
-  reference in `Aesthetic/Reference` provide existing design evidence. Reference
+  [document examples](Aesthetic/Resume-Designs/README.md), and the archived original visual
+  reference in `Aesthetic/previous refrence/Reference` provide design evidence. Reference
   layouts are illustrative and do not override approved workflows.
 - No customer testimonials, measured employment outcomes, universal ATS evidence,
   or user-research findings were established by this initialization. Do not

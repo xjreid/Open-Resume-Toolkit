@@ -1,0 +1,7 @@
+{
+  "question": "Do you approve this implemented editor’s live controls and spacing as the final visual reference? The app and tests are ready; the strict comparison with the original static mockup remains open.",
+  "answer": "Approve the implemented layout (Recommended)",
+  "reference": "screens/edit-desktop.png",
+  "originalComparison": "strict-mock-comparison",
+  "scope": "User-approved replacement of the static mockup spacing/control reference with the implemented live editor. No pixel-perfect pass against the original mockup is claimed."
+}

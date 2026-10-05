@@ -1,0 +1,2437 @@
+{
+  "tool": "comp-diff",
+  "version": 1,
+  "createdAt": "2026-10-05T00:59:55.730Z",
+  "label": "hero",
+  "comp": ".impeccable/build/approved-edit-content.png",
+  "build": ".impeccable/review/hero-repro.png",
+  "spec": ".impeccable/build/spec.json",
+  "compSize": "2880x2120",
+  "buildSize": "2880x2120",
+  "align": "top",
+  "overall": 0.7682,
+  "verdict": "drift",
+  "scores": {
+    "overall": 0.7682,
+    "structure": 0.8576,
+    "color": 0.9945,
+    "colorIntersection": 0.9924,
+    "paletteMatch": 0.9956,
+    "detail": 0.7396,
+    "detailRaw": 0.8021,
+    "detailAdded": 0.125,
+    "bands": 0.23
+  },
+  "palette": {
+    "comp": [
+      {
+        "hex": "#f5f8f8",
+        "coverage": 0.8399
+      },
+      {
+        "hex": "#284858",
+        "coverage": 0.1439
+      },
+      {
+        "hex": "#336868",
+        "coverage": 0.0075
+      },
+      {
+        "hex": "#bccfcf",
+        "coverage": 0.0042
+      },
+      {
+        "hex": "#181818",
+        "coverage": 0.0033
+      },
+      {
+        "hex": "#586878",
+        "coverage": 0.0013
+      }
+    ],
+    "build": [
+      {
+        "hex": "#f4f8f8",
+        "coverage": 0.8401
+      },
+      {
+        "hex": "#284858",
+        "coverage": 0.1436
+      },
+      {
+        "hex": "#336868",
+        "coverage": 0.0071
+      },
+      {
+        "hex": "#1c1c1c",
+        "coverage": 0.0054
+      },
+      {
+        "hex": "#586878",
+        "coverage": 0.0022
+      },
+      {
+        "hex": "#489898",
+        "coverage": 0.0016
+      }
+    ]
+  },
+  "regions": [
+    {
+      "id": "element-1",
+      "x": 0.0111,
+      "y": 0.0302,
+      "w": 0.1264,
+      "h": 0.0406,
+      "kind": "text",
+      "score": {
+        "overall": 0.5442,
+        "structure": 0.4093,
+        "color": 0.9607,
+        "colorIntersection": 0.932,
+        "paletteMatch": 0.9762,
+        "detail": 0.2346,
+        "detailRaw": 0.3492,
+        "detailAdded": 0.2292,
+        "bands": 0.6417
+      },
+      "verdict": "contradicted",
+      "inkBox": {
+        "comp": {
+          "x": 28,
+          "y": 8,
+          "w": 252,
+          "h": 76
+        },
+        "build": {
+          "x": 32,
+          "y": 7,
+          "w": 293,
+          "h": 64
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-1 (text) is contradicted (structure 41%, detail added 23%): the composition of this text region differs from the comp; re-derive it from the spec box"
+      ],
+      "rawVerdict": "contradicted"
+    },
+    {
+      "id": "element-2",
+      "x": 0.0111,
+      "y": 0.0972,
+      "w": 0.1264,
+      "h": 0.0415,
+      "kind": "control",
+      "score": {
+        "overall": 0.857,
+        "structure": 0.8265,
+        "color": 0.9826,
+        "colorIntersection": 0.9654,
+        "paletteMatch": 0.9919,
+        "detail": 0.7057,
+        "detailRaw": 0.7682,
+        "detailAdded": 0.125,
+        "bands": 0.92
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 29,
+          "y": 29,
+          "w": 227,
+          "h": 30
+        },
+        "build": {
+          "x": 29,
+          "y": 29,
+          "w": 229,
+          "h": 33
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-3",
+      "x": 0.0111,
+      "y": 0.1453,
+      "w": 0.1264,
+      "h": 0.0415,
+      "kind": "control",
+      "score": {
+        "overall": 0.9139,
+        "structure": 0.9086,
+        "color": 0.9914,
+        "colorIntersection": 0.9903,
+        "paletteMatch": 0.992,
+        "detail": 0.7904,
+        "detailRaw": 0.7956,
+        "detailAdded": 0.0104,
+        "bands": 1
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 27,
+          "y": 31,
+          "w": 235,
+          "h": 28
+        },
+        "build": {
+          "x": 27,
+          "y": 31,
+          "w": 236,
+          "h": 31
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-4",
+      "x": 0.0111,
+      "y": 0.1934,
+      "w": 0.1264,
+      "h": 0.0415,
+      "kind": "control",
+      "score": {
+        "overall": 0.8966,
+        "structure": 0.8787,
+        "color": 0.9896,
+        "colorIntersection": 0.988,
+        "paletteMatch": 0.9905,
+        "detail": 0.7741,
+        "detailRaw": 0.7845,
+        "detailAdded": 0.0208,
+        "bands": 0.9429
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 27,
+          "y": 31,
+          "w": 279,
+          "h": 27
+        },
+        "build": {
+          "x": 27,
+          "y": 31,
+          "w": 279,
+          "h": 30
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-5",
+      "x": 0.0111,
+      "y": 0.2415,
+      "w": 0.1264,
+      "h": 0.0415,
+      "kind": "control",
+      "score": {
+        "overall": 0.9307,
+        "structure": 0.9288,
+        "color": 0.9961,
+        "colorIntersection": 0.993,
+        "paletteMatch": 0.9977,
+        "detail": 0.8204,
+        "detailRaw": 0.8308,
+        "detailAdded": 0.0208,
+        "bands": 1
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 27,
+          "y": 29,
+          "w": 147,
+          "h": 29
+        },
+        "build": {
+          "x": 28,
+          "y": 29,
+          "w": 148,
+          "h": 31
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-6",
+      "x": 0.0111,
+      "y": 0.8736,
+      "w": 0.1264,
+      "h": 0.0396,
+      "kind": "control",
+      "score": {
+        "overall": 0.842,
+        "structure": 0.8623,
+        "color": 0.9888,
+        "colorIntersection": 0.9736,
+        "paletteMatch": 0.997,
+        "detail": 0.5393,
+        "detailRaw": 0.6226,
+        "detailAdded": 0.1667,
+        "bands": 0.775
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 0,
+          "w": 364,
+          "h": 84
+        },
+        "build": {
+          "x": 0,
+          "y": 0,
+          "w": 364,
+          "h": 82
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-7",
+      "x": 0.0111,
+      "y": 0.9302,
+      "w": 0.1264,
+      "h": 0.0528,
+      "kind": "text",
+      "score": {
+        "overall": 0.8062,
+        "structure": 0.7821,
+        "color": 0.9771,
+        "colorIntersection": 0.9752,
+        "paletteMatch": 0.9782,
+        "detail": 0.6167,
+        "detailRaw": 0.674,
+        "detailAdded": 0.1146,
+        "bands": 0.7833
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 30,
+          "y": 49,
+          "w": 267,
+          "h": 58
+        },
+        "build": {
+          "x": 31,
+          "y": 45,
+          "w": 299,
+          "h": 60
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "page-title",
+      "x": 0.1708,
+      "y": 0.0297,
+      "w": 0.126,
+      "h": 0.0316,
+      "kind": "text",
+      "score": {
+        "overall": 0.8851,
+        "structure": 0.8926,
+        "color": 0.9936,
+        "colorIntersection": 1,
+        "paletteMatch": 0.9901,
+        "detail": 0.8076,
+        "detailRaw": 0.8336,
+        "detailAdded": 0.0521,
+        "bands": 0.6929
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 3,
+          "y": 13,
+          "w": 359,
+          "h": 41
+        },
+        "build": {
+          "x": 3,
+          "y": 11,
+          "w": 359,
+          "h": 41
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-8",
+      "x": 0.7628,
+      "y": 0.0344,
+      "w": 0.2149,
+      "h": 0.0226,
+      "kind": "text",
+      "score": {
+        "overall": 0.6985,
+        "structure": 0.7637,
+        "color": 0.8197,
+        "colorIntersection": 0.7187,
+        "paletteMatch": 0.874,
+        "detail": 0.3671,
+        "detailRaw": 0.4139,
+        "detailAdded": 0.0938,
+        "bands": 0.5667
+      },
+      "verdict": "drift",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 16,
+          "w": 600,
+          "h": 22
+        },
+        "build": {
+          "x": 222,
+          "y": 14,
+          "w": 396,
+          "h": 22
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "drift"
+    },
+    {
+      "id": "element-9",
+      "x": 0.1736,
+      "y": 0.1094,
+      "w": 0.0382,
+      "h": 0.0292,
+      "kind": "control",
+      "score": {
+        "overall": 0.8971,
+        "structure": 0.9193,
+        "color": 0.9722,
+        "colorIntersection": 0.9654,
+        "paletteMatch": 0.9758,
+        "detail": 0.7157,
+        "detailRaw": 0.7261,
+        "detailAdded": 0.0208,
+        "bands": 0.9
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 33,
+          "y": 21,
+          "w": 44,
+          "h": 19
+        },
+        "build": {
+          "x": 31,
+          "y": 23,
+          "w": 40,
+          "h": 17
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-10",
+      "x": 0.2139,
+      "y": 0.1094,
+      "w": 0.042,
+      "h": 0.0292,
+      "kind": "control",
+      "score": {
+        "overall": 0.895,
+        "structure": 0.9069,
+        "color": 0.9836,
+        "colorIntersection": 0.9778,
+        "paletteMatch": 0.9867,
+        "detail": 0.7132,
+        "detailRaw": 0.7132,
+        "detailAdded": 0,
+        "bands": 1
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 32,
+          "y": 21,
+          "w": 56,
+          "h": 19
+        },
+        "build": {
+          "x": 29,
+          "y": 23,
+          "w": 52,
+          "h": 17
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-11",
+      "x": 0.258,
+      "y": 0.1094,
+      "w": 0.0497,
+      "h": 0.0292,
+      "kind": "control",
+      "score": {
+        "overall": 0.8563,
+        "structure": 0.848,
+        "color": 0.985,
+        "colorIntersection": 0.9745,
+        "paletteMatch": 0.9907,
+        "detail": 0.6499,
+        "detailRaw": 0.6759,
+        "detailAdded": 0.0521,
+        "bands": 1
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 33,
+          "y": 21,
+          "w": 77,
+          "h": 24
+        },
+        "build": {
+          "x": 29,
+          "y": 23,
+          "w": 70,
+          "h": 22
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-12",
+      "x": 0.7771,
+      "y": 0.1071,
+      "w": 0.1382,
+      "h": 0.034,
+      "kind": "control",
+      "score": {
+        "overall": 0.7253,
+        "structure": 0.7194,
+        "color": 0.9715,
+        "colorIntersection": 0.9407,
+        "paletteMatch": 0.9881,
+        "detail": 0.3078,
+        "detailRaw": 0.386,
+        "detailAdded": 0.1563,
+        "bands": 0.8
+      },
+      "verdict": "drift",
+      "inkBox": {
+        "comp": {
+          "x": 34,
+          "y": 26,
+          "w": 356,
+          "h": 25
+        },
+        "build": {
+          "x": 0,
+          "y": 7,
+          "w": 398,
+          "h": 60
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "drift"
+    },
+    {
+      "id": "element-13",
+      "x": 0.9264,
+      "y": 0.1052,
+      "w": 0.0514,
+      "h": 0.0377,
+      "kind": "control",
+      "score": {
+        "overall": 0.7421,
+        "structure": 0.6957,
+        "color": 0.9482,
+        "colorIntersection": 0.874,
+        "paletteMatch": 0.9881,
+        "detail": 0.486,
+        "detailRaw": 0.5693,
+        "detailAdded": 0.1667,
+        "bands": 0.7667
+      },
+      "verdict": "drift",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 0,
+          "w": 148,
+          "h": 80
+        },
+        "build": {
+          "x": 0,
+          "y": 0,
+          "w": 148,
+          "h": 80
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "drift"
+    },
+    {
+      "id": "element-14",
+      "x": 0.1597,
+      "y": 0.1811,
+      "w": 0.1201,
+      "h": 0.016,
+      "kind": "text",
+      "score": {
+        "overall": 0.839,
+        "structure": 0.826,
+        "color": 0.9844,
+        "colorIntersection": 0.9762,
+        "paletteMatch": 0.9888,
+        "detail": 0.7194,
+        "detailRaw": 0.7611,
+        "detailAdded": 0.0833,
+        "bands": 0.72
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 17,
+          "y": 7,
+          "w": 195,
+          "h": 19
+        },
+        "build": {
+          "x": 17,
+          "y": 9,
+          "w": 195,
+          "h": 19
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-15",
+      "x": 0.1597,
+      "y": 0.2113,
+      "w": 0.1201,
+      "h": 0.033,
+      "kind": "text",
+      "score": {
+        "overall": 0.8014,
+        "structure": 0.8036,
+        "color": 0.9959,
+        "colorIntersection": 1,
+        "paletteMatch": 0.9937,
+        "detail": 0.541,
+        "detailRaw": 0.6296,
+        "detailAdded": 0.1771,
+        "bands": 0.6952
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 17,
+          "y": 7,
+          "w": 270,
+          "h": 51
+        },
+        "build": {
+          "x": 17,
+          "y": 11,
+          "w": 270,
+          "h": 51
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-16",
+      "x": 0.1597,
+      "y": 0.3075,
+      "w": 0.1201,
+      "h": 0.0387,
+      "kind": "control",
+      "score": {
+        "overall": 0.9727,
+        "structure": 0.9805,
+        "color": 0.9908,
+        "colorIntersection": 0.9875,
+        "paletteMatch": 0.9926,
+        "detail": 0.9232,
+        "detailRaw": 0.9336,
+        "detailAdded": 0.0208,
+        "bands": 1
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 29,
+          "y": 30,
+          "w": 170,
+          "h": 25
+        },
+        "build": {
+          "x": 25,
+          "y": 31,
+          "w": 174,
+          "h": 24
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-17",
+      "x": 0.1597,
+      "y": 0.35,
+      "w": 0.1201,
+      "h": 0.0387,
+      "kind": "control",
+      "score": {
+        "overall": 0.8333,
+        "structure": 0.9256,
+        "color": 0.9946,
+        "colorIntersection": 0.9931,
+        "paletteMatch": 0.9954,
+        "detail": 0.3435,
+        "detailRaw": 0.3852,
+        "detailAdded": 0.0833,
+        "bands": 0
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 29,
+          "y": 30,
+          "w": 132,
+          "h": 26
+        },
+        "build": {
+          "x": 25,
+          "y": 41,
+          "w": 137,
+          "h": 25
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-18",
+      "x": 0.1597,
+      "y": 0.3925,
+      "w": 0.1201,
+      "h": 0.0387,
+      "kind": "control",
+      "score": {
+        "overall": 0.7173,
+        "structure": 0.822,
+        "color": 0.9927,
+        "colorIntersection": 0.992,
+        "paletteMatch": 0.9931,
+        "detail": 0,
+        "detailRaw": 0.0139,
+        "detailAdded": 0.1458,
+        "bands": 0
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 29,
+          "y": 30,
+          "w": 154,
+          "h": 20
+        },
+        "build": {
+          "x": 25,
+          "y": 51,
+          "w": 158,
+          "h": 20
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-18 is missing (detail 0%, structure 82%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-19",
+      "x": 0.1597,
+      "y": 0.4349,
+      "w": 0.1201,
+      "h": 0.0387,
+      "kind": "control",
+      "score": {
+        "overall": 0.7467,
+        "structure": 0.8847,
+        "color": 0.9959,
+        "colorIntersection": 0.9937,
+        "paletteMatch": 0.9971,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0.125,
+        "bands": 1
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 29,
+          "y": 30,
+          "w": 98,
+          "h": 20
+        },
+        "build": {
+          "x": 25,
+          "y": 61,
+          "w": 104,
+          "h": 20
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-19 is missing (detail 0%, structure 88%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-20",
+      "x": 0.1597,
+      "y": 0.533,
+      "w": 0.1201,
+      "h": 0.0377,
+      "kind": "control",
+      "score": {
+        "overall": 0.6177,
+        "structure": 0.6208,
+        "color": 0.9666,
+        "colorIntersection": 0.9523,
+        "paletteMatch": 0.9742,
+        "detail": 0,
+        "detailRaw": 0.1011,
+        "detailAdded": 0.3125,
+        "bands": 0.6857
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 27,
+          "y": 30,
+          "w": 311,
+          "h": 19
+        },
+        "build": {
+          "x": 8,
+          "y": 1,
+          "w": 322,
+          "h": 79
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-20 is missing (detail 0%, structure 62%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-21",
+      "x": 0.1597,
+      "y": 0.5792,
+      "w": 0.1201,
+      "h": 0.0377,
+      "kind": "control",
+      "score": {
+        "overall": 0.6737,
+        "structure": 0.7394,
+        "color": 0.9742,
+        "colorIntersection": 0.9412,
+        "paletteMatch": 0.992,
+        "detail": 0,
+        "detailRaw": 0.0778,
+        "detailAdded": 0.2708,
+        "bands": 0.2
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 83,
+          "y": 27,
+          "w": 186,
+          "h": 26
+        },
+        "build": {
+          "x": 32,
+          "y": 67,
+          "w": 133,
+          "h": 13
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-21 is missing (detail 0%, structure 74%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-22",
+      "x": 0.1597,
+      "y": 0.9179,
+      "w": 0.1201,
+      "h": 0.0594,
+      "kind": "text",
+      "score": {
+        "overall": 0.873,
+        "structure": 0.846,
+        "color": 0.9954,
+        "colorIntersection": 0.9916,
+        "paletteMatch": 0.9975,
+        "detail": 0.7885,
+        "detailRaw": 0.8354,
+        "detailAdded": 0.0938,
+        "bands": 0.8286
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 0,
+          "w": 346,
+          "h": 126
+        },
+        "build": {
+          "x": 6,
+          "y": 0,
+          "w": 334,
+          "h": 126
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-23",
+      "x": 0.4,
+      "y": 0.2575,
+      "w": 0.4917,
+      "h": 0.0325,
+      "kind": "text",
+      "score": {
+        "overall": 0.8026,
+        "structure": 0.9294,
+        "color": 0.9733,
+        "colorIntersection": 0.9477,
+        "paletteMatch": 0.987,
+        "detail": 0.6307,
+        "detailRaw": 0.6828,
+        "detailAdded": 0.1042,
+        "bands": 0
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 1,
+          "y": 8,
+          "w": 717,
+          "h": 21
+        },
+        "build": {
+          "x": 1,
+          "y": 13,
+          "w": 782,
+          "h": 22
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-24",
+      "x": 0.4,
+      "y": 0.3175,
+      "w": 0.1097,
+      "h": 0.0316,
+      "kind": "text",
+      "score": {
+        "overall": 0.5757,
+        "structure": 0.4491,
+        "color": 0.8715,
+        "colorIntersection": 0.7714,
+        "paletteMatch": 0.9254,
+        "detail": 0.4218,
+        "detailRaw": 0.4947,
+        "detailAdded": 0.1458,
+        "bands": 0.7
+      },
+      "verdict": "drift",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 13,
+          "w": 315,
+          "h": 53
+        },
+        "build": {
+          "x": 22,
+          "y": 22,
+          "w": 294,
+          "h": 45
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "drift"
+    },
+    {
+      "id": "element-25",
+      "x": 0.3931,
+      "y": 0.3566,
+      "w": 0.5056,
+      "h": 0.0325,
+      "kind": "text",
+      "score": {
+        "overall": 0.7928,
+        "structure": 0.999,
+        "color": 0.9913,
+        "colorIntersection": 0.9844,
+        "paletteMatch": 0.995,
+        "detail": 0.0364,
+        "detailRaw": 0.2343,
+        "detailAdded": 0.3958,
+        "bands": 0.4
+      },
+      "verdict": "drift",
+      "inkBox": {
+        "comp": {
+          "x": 20,
+          "y": 23,
+          "w": 1414,
+          "h": 24
+        },
+        "build": {
+          "x": 41,
+          "y": 37,
+          "w": 1372,
+          "h": 27
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "drift"
+    },
+    {
+      "id": "element-26",
+      "x": 0.4,
+      "y": 0.3967,
+      "w": 0.1264,
+      "h": 0.0302,
+      "kind": "control",
+      "score": {
+        "overall": 0.6082,
+        "structure": 0.5833,
+        "color": 0.9877,
+        "colorIntersection": 0.9835,
+        "paletteMatch": 0.99,
+        "detail": 0,
+        "detailRaw": 0.0154,
+        "detailAdded": 0.3125,
+        "bands": 0
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 29,
+          "y": 18,
+          "w": 312,
+          "h": 26
+        },
+        "build": {
+          "x": 3,
+          "y": 40,
+          "w": 276,
+          "h": 17
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-26 is missing (detail 0%, structure 58%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-27",
+      "x": 0.8368,
+      "y": 0.3991,
+      "w": 0.0549,
+      "h": 0.0255,
+      "kind": "control",
+      "score": {
+        "overall": 0.6724,
+        "structure": 0.7511,
+        "color": 0.9555,
+        "colorIntersection": 0.9423,
+        "paletteMatch": 0.9627,
+        "detail": 0,
+        "detailRaw": 0.077,
+        "detailAdded": 0.2708,
+        "bands": 0
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 27,
+          "y": 18,
+          "w": 123,
+          "h": 16
+        },
+        "build": {
+          "x": 23,
+          "y": 38,
+          "w": 127,
+          "h": 16
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-27 is missing (detail 0%, structure 75%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-28",
+      "x": 0.4,
+      "y": 0.4458,
+      "w": 0.4917,
+      "h": 0.0241,
+      "kind": "text",
+      "score": {
+        "overall": 0.7828,
+        "structure": 0.9639,
+        "color": 0.9837,
+        "colorIntersection": 0.9566,
+        "paletteMatch": 0.9982,
+        "detail": 0.0995,
+        "detailRaw": 0.1203,
+        "detailAdded": 0.0417,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 8,
+          "w": 1416,
+          "h": 43
+        },
+        "build": {
+          "x": 0,
+          "y": 32,
+          "w": 190,
+          "h": 19
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-28 is missing (detail 10%, structure 96%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-29",
+      "x": 0.4,
+      "y": 0.4792,
+      "w": 0.4917,
+      "h": 0.0241,
+      "kind": "text",
+      "score": {
+        "overall": 0.7201,
+        "structure": 0.8816,
+        "color": 0.957,
+        "colorIntersection": 0.9574,
+        "paletteMatch": 0.9569,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0.0417,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 1,
+          "y": 14,
+          "w": 1415,
+          "h": 24
+        },
+        "build": {
+          "x": 5,
+          "y": 49,
+          "w": 1187,
+          "h": 2
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-29 is missing (detail 0%, structure 88%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-30",
+      "x": 0.4,
+      "y": 0.5033,
+      "w": 0.4917,
+      "h": 0.0226,
+      "kind": "text",
+      "score": {
+        "overall": 0.79,
+        "structure": 0.9277,
+        "color": 0.9835,
+        "colorIntersection": 0.9599,
+        "paletteMatch": 0.9963,
+        "detail": 0.1352,
+        "detailRaw": 0.2237,
+        "detailAdded": 0.1771,
+        "bands": 0.6
+      },
+      "verdict": "drift",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 13,
+          "w": 147,
+          "h": 21
+        },
+        "build": {
+          "x": 3,
+          "y": 0,
+          "w": 1256,
+          "h": 23
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "drift"
+    },
+    {
+      "id": "element-31",
+      "x": 0.4,
+      "y": 0.5307,
+      "w": 0.059,
+      "h": 0.0208,
+      "kind": "control",
+      "score": {
+        "overall": 0.4443,
+        "structure": 0.3076,
+        "color": 0.8739,
+        "colorIntersection": 0.8278,
+        "paletteMatch": 0.8987,
+        "detail": 0,
+        "detailRaw": 0.0384,
+        "detailAdded": 0.375,
+        "bands": 0.1417
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 2,
+          "y": 15,
+          "w": 165,
+          "h": 18
+        },
+        "build": {
+          "x": 2,
+          "y": 0,
+          "w": 168,
+          "h": 19
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-31 is missing (detail 0%, structure 31%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-32",
+      "x": 0.4701,
+      "y": 0.5307,
+      "w": 0.041,
+      "h": 0.0208,
+      "kind": "control",
+      "score": {
+        "overall": 0.5908,
+        "structure": 0.6507,
+        "color": 0.8514,
+        "colorIntersection": 0.8251,
+        "paletteMatch": 0.8656,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 2,
+          "y": 15,
+          "w": 114,
+          "h": 14
+        },
+        "build": null
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-32 is missing (detail 0%, structure 65%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-33",
+      "x": 0.5222,
+      "y": 0.5307,
+      "w": 0.0323,
+      "h": 0.0208,
+      "kind": "control",
+      "score": {
+        "overall": 0.6185,
+        "structure": 0.7031,
+        "color": 0.8633,
+        "colorIntersection": 0.8433,
+        "paletteMatch": 0.874,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 3,
+          "y": 15,
+          "w": 88,
+          "h": 14
+        },
+        "build": null
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-33 is missing (detail 0%, structure 70%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-34",
+      "x": 0.4007,
+      "y": 0.5783,
+      "w": 0.0358,
+      "h": 0.0142,
+      "kind": "text",
+      "score": {
+        "overall": 0.5327,
+        "structure": 0.6075,
+        "color": 0.8192,
+        "colorIntersection": 0.8077,
+        "paletteMatch": 0.8254,
+        "detail": 0.0273,
+        "detailRaw": 0.069,
+        "detailAdded": 0.0833,
+        "bands": 0.2
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 1,
+          "y": 8,
+          "w": 101,
+          "h": 14
+        },
+        "build": {
+          "x": 0,
+          "y": 8,
+          "w": 103,
+          "h": 11
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-34 is missing (detail 3%, structure 61%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-35",
+      "x": 0.4448,
+      "y": 0.5731,
+      "w": 0.0181,
+      "h": 0.0245,
+      "kind": "control",
+      "score": {
+        "overall": 0.6942,
+        "structure": 0.8153,
+        "color": 0.8679,
+        "colorIntersection": 0.787,
+        "paletteMatch": 0.9115,
+        "detail": 0.1178,
+        "detailRaw": 0.1178,
+        "detailAdded": 0,
+        "bands": 0
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 20,
+          "y": 17,
+          "w": 12,
+          "h": 16
+        },
+        "build": {
+          "x": 0,
+          "y": 19,
+          "w": 52,
+          "h": 2
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-35 is missing (detail 12%, structure 82%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-36",
+      "x": 0.4656,
+      "y": 0.5731,
+      "w": 0.0181,
+      "h": 0.0245,
+      "kind": "control",
+      "score": {
+        "overall": 0.7305,
+        "structure": 0.8646,
+        "color": 0.9032,
+        "colorIntersection": 0.8314,
+        "paletteMatch": 0.9419,
+        "detail": 0.1268,
+        "detailRaw": 0.1268,
+        "detailAdded": 0,
+        "bands": 0.6
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 24,
+          "y": 17,
+          "w": 3,
+          "h": 16
+        },
+        "build": {
+          "x": 0,
+          "y": 19,
+          "w": 52,
+          "h": 2
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-36 is missing (detail 13%, structure 86%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-37",
+      "x": 0.4865,
+      "y": 0.5731,
+      "w": 0.0385,
+      "h": 0.0245,
+      "kind": "control",
+      "score": {
+        "overall": 0.6182,
+        "structure": 0.6871,
+        "color": 0.8664,
+        "colorIntersection": 0.8029,
+        "paletteMatch": 0.9007,
+        "detail": 0.0286,
+        "detailRaw": 0.0807,
+        "detailAdded": 0.1042,
+        "bands": 0.6
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 13,
+          "y": 17,
+          "w": 83,
+          "h": 18
+        },
+        "build": {
+          "x": 0,
+          "y": 19,
+          "w": 111,
+          "h": 2
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-37 is missing (detail 3%, structure 69%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-38",
+      "x": 0.8243,
+      "y": 0.5731,
+      "w": 0.0451,
+      "h": 0.0245,
+      "kind": "control",
+      "score": {
+        "overall": 0.5837,
+        "structure": 0.6228,
+        "color": 0.8488,
+        "colorIntersection": 0.7959,
+        "paletteMatch": 0.8772,
+        "detail": 0.0317,
+        "detailRaw": 0.089,
+        "detailAdded": 0.1146,
+        "bands": 0.35
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 15,
+          "y": 17,
+          "w": 100,
+          "h": 21
+        },
+        "build": {
+          "x": 0,
+          "y": 19,
+          "w": 130,
+          "h": 2
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-38 is missing (detail 3%, structure 62%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-39",
+      "x": 0.8194,
+      "y": 0.6953,
+      "w": 0.0722,
+      "h": 0.0255,
+      "kind": "control",
+      "score": {
+        "overall": 0.6111,
+        "structure": 0.616,
+        "color": 0.8771,
+        "colorIntersection": 0.8024,
+        "paletteMatch": 0.9173,
+        "detail": 0.1347,
+        "detailRaw": 0.2597,
+        "detailAdded": 0.25,
+        "bands": 0.4114
+      },
+      "verdict": "drift",
+      "inkBox": {
+        "comp": {
+          "x": 23,
+          "y": 13,
+          "w": 166,
+          "h": 30
+        },
+        "build": {
+          "x": 0,
+          "y": 0,
+          "w": 208,
+          "h": 52
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "control element-39 drifts to 61% (structure 62%, color 88%): open .impeccable/review/diff/hero/regions/element-39.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification"
+      ],
+      "rawVerdict": "drift"
+    },
+    {
+      "id": "element-40",
+      "x": 0.4,
+      "y": 0.7349,
+      "w": 0.4917,
+      "h": 0.0241,
+      "kind": "text",
+      "score": {
+        "overall": 0.7457,
+        "structure": 0.9257,
+        "color": 0.9714,
+        "colorIntersection": 0.9668,
+        "paletteMatch": 0.9739,
+        "detail": 0,
+        "detailRaw": 0.0141,
+        "detailAdded": 0.0625,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 1,
+          "y": 14,
+          "w": 1414,
+          "h": 24
+        },
+        "build": {
+          "x": 1252,
+          "y": 0,
+          "w": 147,
+          "h": 14
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-40 is missing (detail 0%, structure 93%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-41",
+      "x": 0.4,
+      "y": 0.759,
+      "w": 0.4917,
+      "h": 0.0226,
+      "kind": "text",
+      "score": {
+        "overall": 0.7452,
+        "structure": 0.9245,
+        "color": 0.9717,
+        "colorIntersection": 0.9704,
+        "paletteMatch": 0.9724,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0.0417,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 13,
+          "w": 292,
+          "h": 21
+        },
+        "build": {
+          "x": 5,
+          "y": 46,
+          "w": 1225,
+          "h": 2
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-41 is missing (detail 0%, structure 92%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-42",
+      "x": 0.4,
+      "y": 0.7863,
+      "w": 0.059,
+      "h": 0.0208,
+      "kind": "control",
+      "score": {
+        "overall": 0.4796,
+        "structure": 0.385,
+        "color": 0.8751,
+        "colorIntersection": 0.8364,
+        "paletteMatch": 0.896,
+        "detail": 0,
+        "detailRaw": 0.0067,
+        "detailAdded": 0.3021,
+        "bands": 0
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 2,
+          "y": 15,
+          "w": 165,
+          "h": 18
+        },
+        "build": {
+          "x": 1,
+          "y": 0,
+          "w": 169,
+          "h": 44
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-42 is missing (detail 0%, structure 39%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-43",
+      "x": 0.4701,
+      "y": 0.7863,
+      "w": 0.041,
+      "h": 0.0208,
+      "kind": "control",
+      "score": {
+        "overall": 0.5879,
+        "structure": 0.6407,
+        "color": 0.8559,
+        "colorIntersection": 0.8259,
+        "paletteMatch": 0.872,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0.0625,
+        "bands": 0
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 2,
+          "y": 15,
+          "w": 114,
+          "h": 14
+        },
+        "build": {
+          "x": 0,
+          "y": 0,
+          "w": 109,
+          "h": 44
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-43 is missing (detail 0%, structure 64%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-44",
+      "x": 0.5222,
+      "y": 0.7863,
+      "w": 0.0323,
+      "h": 0.0208,
+      "kind": "control",
+      "score": {
+        "overall": 0.6185,
+        "structure": 0.7031,
+        "color": 0.8633,
+        "colorIntersection": 0.8433,
+        "paletteMatch": 0.874,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 3,
+          "y": 15,
+          "w": 88,
+          "h": 14
+        },
+        "build": null
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-44 is missing (detail 0%, structure 70%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-45",
+      "x": 0.4118,
+      "y": 0.8137,
+      "w": 0.4799,
+      "h": 0.017,
+      "kind": "text",
+      "score": {
+        "overall": 0.6396,
+        "structure": 0.8005,
+        "color": 0.9524,
+        "colorIntersection": 0.9083,
+        "paletteMatch": 0.9761,
+        "detail": 0.0084,
+        "detailRaw": 0.024,
+        "detailAdded": 0.0313,
+        "bands": 0
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 7,
+          "w": 771,
+          "h": 21
+        },
+        "build": {
+          "x": 0,
+          "y": 0,
+          "w": 303,
+          "h": 9
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-45 is missing (detail 1%, structure 80%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-46",
+      "x": 0.4118,
+      "y": 0.833,
+      "w": 0.4799,
+      "h": 0.017,
+      "kind": "text",
+      "score": {
+        "overall": 0.8073,
+        "structure": 0.8842,
+        "color": 0.9449,
+        "colorIntersection": 0.9199,
+        "paletteMatch": 0.9584,
+        "detail": 0.3928,
+        "detailRaw": 0.398,
+        "detailAdded": 0.0104,
+        "bands": 0.7
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 7,
+          "w": 669,
+          "h": 22
+        },
+        "build": {
+          "x": 0,
+          "y": 8,
+          "w": 432,
+          "h": 21
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "element-47",
+      "x": 0.8194,
+      "y": 0.8594,
+      "w": 0.0722,
+      "h": 0.0255,
+      "kind": "control",
+      "score": {
+        "overall": 0.5924,
+        "structure": 0.6576,
+        "color": 0.8471,
+        "colorIntersection": 0.7999,
+        "paletteMatch": 0.8725,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 23,
+          "y": 11,
+          "w": 166,
+          "h": 30
+        },
+        "build": null
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-47 is missing (detail 0%, structure 66%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-48",
+      "x": 0.4,
+      "y": 0.8953,
+      "w": 0.0733,
+      "h": 0.0226,
+      "kind": "control",
+      "score": {
+        "overall": 0.5985,
+        "structure": 0.6531,
+        "color": 0.8703,
+        "colorIntersection": 0.8652,
+        "paletteMatch": 0.8731,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 5,
+          "y": 15,
+          "w": 205,
+          "h": 17
+        },
+        "build": null
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-48 is missing (detail 0%, structure 65%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-49",
+      "x": 0.4,
+      "y": 0.9368,
+      "w": 0.4917,
+      "h": 0.0241,
+      "kind": "text",
+      "score": {
+        "overall": 0.7614,
+        "structure": 0.9762,
+        "color": 0.9331,
+        "colorIntersection": 0.9468,
+        "paletteMatch": 0.9258,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 9,
+          "w": 1416,
+          "h": 41
+        },
+        "build": null
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-49 is missing (detail 0%, structure 98%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-50",
+      "x": 0.4,
+      "y": 0.9703,
+      "w": 0.4917,
+      "h": 0.0241,
+      "kind": "text",
+      "score": {
+        "overall": 0.7257,
+        "structure": 0.8928,
+        "color": 0.957,
+        "colorIntersection": 0.9559,
+        "paletteMatch": 0.9576,
+        "detail": 0,
+        "detailRaw": 0,
+        "detailAdded": 0.0208,
+        "bands": 0.4
+      },
+      "verdict": "missing",
+      "inkBox": {
+        "comp": {
+          "x": 1,
+          "y": 13,
+          "w": 1415,
+          "h": 24
+        },
+        "build": {
+          "x": 35,
+          "y": 0,
+          "w": 198,
+          "h": 1
+        }
+      },
+      "blocking": true,
+      "blockingReasons": [
+        "region element-50 is missing (detail 0%, structure 89%): the comp shows material the build does not"
+      ],
+      "rawVerdict": "missing"
+    },
+    {
+      "id": "element-51",
+      "x": 0.4,
+      "y": 0.9943,
+      "w": 0.4917,
+      "h": 0.0057,
+      "kind": "text",
+      "score": {
+        "overall": 1,
+        "structure": 1,
+        "color": 1,
+        "colorIntersection": 1,
+        "paletteMatch": 1,
+        "detail": 1,
+        "detailRaw": 1,
+        "detailAdded": 0,
+        "bands": 1
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": null,
+        "build": null
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "rail",
+      "x": 0,
+      "y": 0,
+      "w": 0.1486,
+      "h": 1,
+      "kind": "chrome",
+      "score": {
+        "overall": 0.9322,
+        "structure": 0.9478,
+        "color": 0.9973,
+        "colorIntersection": 0.9965,
+        "paletteMatch": 0.9977,
+        "detail": 0.8373,
+        "detailRaw": 0.8477,
+        "detailAdded": 0.0208,
+        "bands": 0.9455
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 32,
+          "y": 72,
+          "w": 364,
+          "h": 2007
+        },
+        "build": {
+          "x": 32,
+          "y": 71,
+          "w": 364,
+          "h": 2006
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "page-head",
+      "x": 0.1486,
+      "y": 0,
+      "w": 0.8514,
+      "h": 0.0906,
+      "kind": "chrome",
+      "score": {
+        "overall": 0.916,
+        "structure": 0.9904,
+        "color": 0.9885,
+        "colorIntersection": 0.9815,
+        "paletteMatch": 0.9922,
+        "detail": 0.8091,
+        "detailRaw": 0.8091,
+        "detailAdded": 0,
+        "bands": 0.8
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 67,
+          "y": 76,
+          "w": 2302,
+          "h": 41
+        },
+        "build": {
+          "x": 67,
+          "y": 74,
+          "w": 2320,
+          "h": 41
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "toolbar",
+      "x": 0.1486,
+      "y": 0.0906,
+      "w": 0.8514,
+      "h": 0.0679,
+      "kind": "chrome",
+      "score": {
+        "overall": 0.8452,
+        "structure": 0.9395,
+        "color": 0.9951,
+        "colorIntersection": 0.9922,
+        "paletteMatch": 0.9966,
+        "detail": 0.5904,
+        "detailRaw": 0.632,
+        "detailAdded": 0.0833,
+        "bands": 0.8
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 105,
+          "y": 32,
+          "w": 2283,
+          "h": 80
+        },
+        "build": {
+          "x": 103,
+          "y": 38,
+          "w": 2285,
+          "h": 68
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "section-panel",
+      "x": 0.1486,
+      "y": 0.1585,
+      "w": 0.1431,
+      "h": 0.8415,
+      "kind": "chrome",
+      "score": {
+        "overall": 0.9121,
+        "structure": 0.9055,
+        "color": 0.9963,
+        "colorIntersection": 0.9942,
+        "paletteMatch": 0.9975,
+        "detail": 0.8016,
+        "detailRaw": 0.8276,
+        "detailAdded": 0.0521,
+        "bands": 0.9714
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 32,
+          "y": 55,
+          "w": 346,
+          "h": 1681
+        },
+        "build": {
+          "x": 38,
+          "y": 57,
+          "w": 334,
+          "h": 1679
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    },
+    {
+      "id": "paper",
+      "x": 0.3681,
+      "y": 0.2255,
+      "w": 0.5556,
+      "h": 0.7745,
+      "kind": "chrome",
+      "score": {
+        "overall": 0.7474,
+        "structure": 0.6905,
+        "color": 0.9891,
+        "colorIntersection": 0.9854,
+        "paletteMatch": 0.9911,
+        "detail": 0.5206,
+        "detailRaw": 0.6195,
+        "detailAdded": 0.1979,
+        "bands": 0.8556
+      },
+      "verdict": "drift",
+      "inkBox": {
+        "comp": {
+          "x": 66,
+          "y": 76,
+          "w": 1468,
+          "h": 1540
+        },
+        "build": {
+          "x": 92,
+          "y": 81,
+          "w": 1416,
+          "h": 1499
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "drift"
+    },
+    {
+      "id": "editing-block",
+      "x": 0.391,
+      "y": 0.5608,
+      "w": 0.5097,
+      "h": 0.1236,
+      "kind": "chrome",
+      "score": {
+        "overall": 0.6346,
+        "structure": 0.7315,
+        "color": 0.9773,
+        "colorIntersection": 0.9583,
+        "paletteMatch": 0.9875,
+        "detail": 0.1471,
+        "detailRaw": 0.4023,
+        "detailAdded": 0.5104,
+        "bands": 0.65
+      },
+      "verdict": "drift",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 0,
+          "w": 1468,
+          "h": 261
+        },
+        "build": {
+          "x": 26,
+          "y": 0,
+          "w": 1416,
+          "h": 262
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "drift"
+    },
+    {
+      "id": "section-add",
+      "x": 0.1597,
+      "y": 0.4934,
+      "w": 0.1201,
+      "h": 0.1236,
+      "kind": "chrome",
+      "score": {
+        "overall": 0.6036,
+        "structure": 0.6847,
+        "color": 0.9841,
+        "colorIntersection": 0.9806,
+        "paletteMatch": 0.9859,
+        "detail": 0.0273,
+        "detailRaw": 0.1992,
+        "detailAdded": 0.3438,
+        "bands": 0.7409
+      },
+      "verdict": "drift",
+      "inkBox": {
+        "comp": {
+          "x": 0,
+          "y": 45,
+          "w": 338,
+          "h": 190
+        },
+        "build": {
+          "x": 8,
+          "y": 85,
+          "w": 322,
+          "h": 177
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "drift"
+    },
+    {
+      "id": "section-list",
+      "x": 0.1597,
+      "y": 0.2594,
+      "w": 0.1201,
+      "h": 0.2142,
+      "kind": "chrome",
+      "score": {
+        "overall": 0.8579,
+        "structure": 0.8883,
+        "color": 0.984,
+        "colorIntersection": 0.9734,
+        "paletteMatch": 0.9898,
+        "detail": 0.7289,
+        "detailRaw": 0.755,
+        "detailAdded": 0.0521,
+        "bands": 0.7919
+      },
+      "verdict": "match",
+      "inkBox": {
+        "comp": {
+          "x": 21,
+          "y": 31,
+          "w": 178,
+          "h": 391
+        },
+        "build": {
+          "x": 21,
+          "y": 35,
+          "w": 178,
+          "h": 418
+        }
+      },
+      "blocking": false,
+      "blockingReasons": [],
+      "rawVerdict": "match"
+    }
+  ],
+  "files": {
+    "sideBySide": "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/side-by-side.png",
+    "heatmap": "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/heatmap.png",
+    "regionFiles": [
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-1.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-2.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-3.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-4.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-5.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-6.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-7.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/page-title.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-8.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-9.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-10.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-11.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-12.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-13.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-14.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-15.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-16.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-17.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-18.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-19.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-20.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-21.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-22.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-23.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-24.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-25.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-26.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-27.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-28.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-29.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-30.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-31.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-32.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-33.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-34.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-35.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-36.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-37.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-38.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-39.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-40.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-41.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-42.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-43.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-44.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-45.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-46.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-47.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-48.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-49.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-50.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/element-51.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/rail.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/page-head.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/toolbar.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/section-panel.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/paper.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/editing-block.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/section-add.png",
+      "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/regions/section-list.png"
+    ]
+  },
+  "interpretation": "hero-gate",
+  "measurementsAvailable": true,
+  "gate": {
+    "ok": false,
+    "reasons": [
+      "region element-18 is missing (detail 0%, structure 82%): the comp shows material the build does not",
+      "region element-19 is missing (detail 0%, structure 88%): the comp shows material the build does not",
+      "region element-20 is missing (detail 0%, structure 62%): the comp shows material the build does not",
+      "region element-21 is missing (detail 0%, structure 74%): the comp shows material the build does not",
+      "region element-26 is missing (detail 0%, structure 58%): the comp shows material the build does not",
+      "region element-27 is missing (detail 0%, structure 75%): the comp shows material the build does not",
+      "region element-28 is missing (detail 10%, structure 96%): the comp shows material the build does not",
+      "region element-29 is missing (detail 0%, structure 88%): the comp shows material the build does not",
+      "region element-31 is missing (detail 0%, structure 31%): the comp shows material the build does not",
+      "region element-32 is missing (detail 0%, structure 65%): the comp shows material the build does not",
+      "region element-33 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+      "region element-34 is missing (detail 3%, structure 61%): the comp shows material the build does not",
+      "region element-35 is missing (detail 12%, structure 82%): the comp shows material the build does not",
+      "region element-36 is missing (detail 13%, structure 86%): the comp shows material the build does not",
+      "region element-37 is missing (detail 3%, structure 69%): the comp shows material the build does not",
+      "region element-38 is missing (detail 3%, structure 62%): the comp shows material the build does not",
+      "region element-40 is missing (detail 0%, structure 93%): the comp shows material the build does not",
+      "region element-41 is missing (detail 0%, structure 92%): the comp shows material the build does not",
+      "region element-42 is missing (detail 0%, structure 39%): the comp shows material the build does not",
+      "region element-43 is missing (detail 0%, structure 64%): the comp shows material the build does not",
+      "region element-44 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+      "region element-45 is missing (detail 1%, structure 80%): the comp shows material the build does not",
+      "region element-47 is missing (detail 0%, structure 66%): the comp shows material the build does not",
+      "region element-48 is missing (detail 0%, structure 65%): the comp shows material the build does not",
+      "region element-49 is missing (detail 0%, structure 98%): the comp shows material the build does not",
+      "region element-50 is missing (detail 0%, structure 89%): the comp shows material the build does not",
+      "region element-1 (text) is contradicted (structure 41%, detail added 23%): the composition of this text region differs from the comp; re-derive it from the spec box",
+      "control element-39 drifts to 61% (structure 62%, color 88%): open .impeccable/review/diff/hero/regions/element-39.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification"
+    ],
+    "advisories": [
+      "(advisory, above the 72% bar) region element-21: its ink sits in a 186x26px box in the comp and 133x13px in the build (padding, row height, or size); match the box, not only the position",
+      "(advisory, unchanged for 3+ attempts) text element-1: cap height 62.1px in the build, 26.5px in the comp (+134%); set font-size so the cap height renders at 26.5px (also element-7, element-12, element-21, element-40, element-42)",
+      "(advisory, unchanged for 3+ attempts) text element-46: letter-spacing is wider than the comp's (gap 0.111 vs 0.060 of the cap height); set letter-spacing to close it by about 1px",
+      "(advisory, unchanged for 3+ attempts) text element-22: 1 line in the build, 2 in the comp; the measure (max-width, font-size, letter-spacing) wraps it differently, so the block is a different shape",
+      "(advisory, unchanged for 3+ attempts) text element-2: the face renders 41% lighter than the comp's (ink density 0.36 vs 0.61); raise a weight step or use the ranked face (also element-16)",
+      "(advisory, unchanged for 3+ attempts) text element-20: ink is #596977 in the build, #1a3939 in the comp; use the comp's colour (also element-40, element-46)",
+      "(advisory, unchanged for 3+ attempts) text element-8: it starts 222px further right than in the comp (also element-40)",
+      "(advisory, unchanged for 3+ attempts) text element-25: its first line starts 14px lower than in the comp (37px vs 23px into the region box); the spacing above it is too large (also element-30, element-40)",
+      "(advisory, unchanged for 3+ attempts) control element-6: its rule sits 1px into the box in the comp and 79px in the build (+78px), so the strip is taller than the comp's; match the height, not only the position",
+      "(advisory, unchanged for 3+ attempts) control element-20: its rule sits 1px into the box in the comp and 41px in the build (+40px), so the strip is taller than the comp's; match the height, not only the position",
+      "(advisory, unchanged for 3+ attempts) control element-27: its rule sits 1px into the box in the comp and 15px in the build (+14px), so the strip is taller than the comp's; match the height, not only the position",
+      "(advisory, unchanged for 3+ attempts) control element-31: its rule sits 27px into the box in the comp and 1px in the build (-26px), so the strip is shorter than the comp's; match the height, not only the position",
+      "(advisory, unchanged for 3+ attempts) control element-39: its rule sits 1px into the box in the comp and 23px in the build (+22px), so the strip is taller than the comp's; match the height, not only the position",
+      "(advisory, unchanged for 3+ attempts) control element-42: its rule sits 27px into the box in the comp and 5px in the build (-22px), so the strip is shorter than the comp's; match the height, not only the position",
+      "(advisory, unchanged for 3+ attempts) chrome editing-block: its rule sits 1px into the box in the comp and 44px in the build (+43px), so the strip is taller than the comp's; match the height, not only the position"
+    ],
+    "unscopedReasons": []
+  },
+  "rawReport": ".impeccable/review/diff/hero/raw-report.json"
+}

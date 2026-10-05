@@ -55,7 +55,7 @@ describe("portable backup export", () => {
     expect(html).toContain("REPLACE SAVED PROFILE");
     expect(html).toContain("ROLL BACK SAVED PROFILE");
     expect(html).toContain("DELETE SAFETY COPY");
-    expect(html).toContain("external exports and backups");
+    expect(html.toLowerCase()).toContain("external exports and backups");
     expect(html).toContain('type="text"');
   });
 

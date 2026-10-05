@@ -5,7 +5,7 @@ import { availableMonitors } from "@tauri-apps/api/window";
 import { PhysicalPosition } from "@tauri-apps/api/dpi";
 import { useEffect, useRef, useState } from "react";
 import type { ResumeDocument } from "@ort/contracts/resume";
-import logo from "../assets/open-frame-icon.svg";
+import logo from "../assets/open-folio-mark.svg";
 import { useApplicationPopup } from "./application-popup";
 import {
   DOCUMENT_STYLE_LABELS,

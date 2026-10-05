@@ -214,304 +214,362 @@ export function BackupPanel({
         : null;
 
   return (
-    <section
-      className="editor-panel backup-panel"
-      aria-labelledby="backup-heading"
-    >
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Data recovery</p>
-          <h2 id="backup-heading">Encrypted portable backup</h2>
-        </div>
-      </div>
-      <p className="description" id="backup-description">
-        This packages saved resume data, settings, published snapshots, PDF
-        render history, and content-free AI activity with pricing provenance.
-        Device keys, provider credentials, and active spending-cap authority are
-        excluded. The passphrase cannot be recovered by ORT. A synced
-        destination receives the encrypted archive, and existing files are never
-        replaced.
-      </p>
-      <p className="description">
-        A restore is prepared in a fresh encrypted profile and activated only
-        after restart. The replaced encrypted profile remains on this device as
-        a safety copy; external exports and backups are never changed.
-      </p>
-      <form
-        className="backup-form"
-        aria-busy={operation === "export"}
-        onSubmit={(event) => void submit(event)}
-      >
-        <label className="field">
-          Backup passphrase
-          <input
-            type="password"
-            value={passphrase}
-            autoComplete="new-password"
-            aria-describedby="backup-description backup-guidance"
-            disabled={blocked || running}
-            onChange={(event) => setPassphrase(event.target.value)}
-          />
-        </label>
-        <label className="field">
-          Confirm passphrase
-          <input
-            type="password"
-            value={confirmation}
-            autoComplete="new-password"
-            aria-describedby={validation ? "backup-validation" : undefined}
-            aria-invalid={validation ? true : undefined}
-            disabled={blocked || running}
-            onChange={(event) => setConfirmation(event.target.value)}
-          />
-        </label>
-        <p className="description backup-guidance" id="backup-guidance">
-          Use a long, unique passphrase and store it separately from the backup.
-          {dirty ? " Save the current edits before creating the backup." : ""}
-        </p>
-        {validation ? (
-          <p className="field-error" id="backup-validation" role="alert">
-            {validation}
+    <section className="backup-workspace" aria-labelledby="backup-heading">
+      <div className="backup-main">
+        <div className="editor-panel backup-panel">
+          <div className="section-heading">
+            <div>
+              <h2 id="backup-heading">Encrypted portable backup</h2>
+            </div>
+          </div>
+          <p className="description" id="backup-description">
+            Create an encrypted archive of saved resume data, settings,
+            published snapshots, PDF render history, and content-free AI
+            activity with pricing provenance. The passphrase cannot be recovered
+            by ORT.
           </p>
-        ) : null}
-        <button type="submit" disabled={!canSubmit}>
-          {operation === "export"
-            ? "Creating encrypted backup…"
-            : "Create encrypted backup"}
-        </button>
-        {operation === "export" ? (
-          <p role="status">
-            Finish or cancel the native Save dialog. Backup encryption may take
-            a moment.
-          </p>
-        ) : null}
-      </form>
-
-      <section
-        className="backup-validation"
-        aria-labelledby="backup-check-heading"
-      >
-        <h3 id="backup-check-heading">Check an existing backup</h3>
-        <p className="description" id="backup-check-description">
-          Select a backup through the native file dialog. ORT reads at most the
-          fixed backup limit, authenticates and validates the complete encrypted
-          archive, and returns only its content-free inventory. This does not
-          replace or write to the active profile.
-        </p>
-        <form
-          className="backup-form"
-          aria-busy={operation === "validate"}
-          onSubmit={(event) => void validate(event)}
-        >
-          <label className="field backup-validation__passphrase">
-            Existing backup passphrase
-            <input
-              type="password"
-              value={validationPassphrase}
-              autoComplete="current-password"
-              aria-describedby="backup-check-description backup-check-guidance"
-              aria-invalid={validationByteCount > MAX_BACKUP_PASSPHRASE_BYTES}
-              disabled={blocked || running}
-              onChange={(event) => setValidationPassphrase(event.target.value)}
-            />
-          </label>
-          <p className="description backup-guidance" id="backup-check-guidance">
-            Wrong passphrases, damaged files, and unsupported backup contents
-            share the same result. The selected path is never returned to this
-            interface.
-          </p>
-          {validationByteCount > MAX_BACKUP_PASSPHRASE_BYTES ? (
-            <p className="field-error" role="alert">
-              The passphrase is over the 1,024-byte limit.
-            </p>
-          ) : null}
-          <button type="submit" disabled={!canValidate}>
-            {operation === "validate"
-              ? "Checking encrypted backup…"
-              : "Select and check encrypted backup"}
-          </button>
-          {operation === "validate" ? (
-            <p role="status">
-              Finish or cancel the native file dialog. Authentication may take a
-              moment.
-            </p>
-          ) : null}
-        </form>
-        {validated ? <ValidatedBackupSummary backup={validated} /> : null}
-      </section>
-
-      <section
-        className="backup-validation"
-        aria-labelledby="backup-recovery-heading"
-      >
-        <h3 id="backup-recovery-heading">Local recovery safety copy</h3>
-        {recoveryError ? (
-          <p role="alert" className="field-error">
-            {recoveryError}
-          </p>
-        ) : recovery ? (
-          <p role="status" className="description">
-            {recovery.restartOperationPending
-              ? "A verified replacement or rollback is waiting for restart."
-              : recovery.safetyCleanupPending
-                ? "Confirmed safety-copy cleanup will resume at startup."
-                : recovery.safetyCopyAvailable
-                  ? "One encrypted safety copy is retained on this device."
-                  : "No retained safety copy is present."}
-          </p>
-        ) : (
-          <p role="status" className="description">
-            Checking local recovery state…
-          </p>
-        )}
-        <p className="description" id="rollback-guidance">
-          Rollback verifies and stages the retained profile for activation after
-          restart. The current profile then becomes the new safety copy.
-        </p>
-        <form
-          className="backup-form"
-          aria-busy={operation === "rollback"}
-          onSubmit={(event) => void rollback(event)}
-        >
-          <label className="field">
-            Type {ROLLBACK_CONFIRMATION_PHRASE} to confirm rollback
-            <input
-              type="text"
-              value={rollbackConfirmation}
-              autoComplete="off"
-              aria-describedby={`rollback-guidance${
-                rollbackConfirmationInvalid ? " rollback-confirmation" : ""
-              }`}
-              aria-invalid={rollbackConfirmationInvalid || undefined}
-              disabled={blocked || running || !recovery?.safetyCopyAvailable}
-              onChange={(event) => setRollbackConfirmation(event.target.value)}
-            />
-          </label>
-          <button type="submit" disabled={!canRollback}>
-            {operation === "rollback"
-              ? "Preparing rollback…"
-              : "Roll back after restart"}
-          </button>
-          {rollbackConfirmationInvalid ? (
-            <p className="field-error" id="rollback-confirmation">
-              Enter the complete rollback phrase exactly as shown.
-            </p>
-          ) : null}
-        </form>
-        <p className="description" id="safety-delete-guidance">
-          Deleting the safety copy is permanent and removes its exact encrypted
-          profile directory and OS-vault key. It does not change the active
-          profile or delete exports and backups saved elsewhere.
-        </p>
-        <form
-          className="backup-form"
-          aria-busy={operation === "delete-safety"}
-          onSubmit={(event) => void removeSafety(event)}
-        >
-          <label className="field">
-            Type {DELETE_SAFETY_CONFIRMATION_PHRASE} to delete it
-            <input
-              type="text"
-              value={deleteConfirmation}
-              autoComplete="off"
-              aria-describedby={`safety-delete-guidance${
-                deleteConfirmationInvalid ? " safety-delete-confirmation" : ""
-              }`}
-              aria-invalid={deleteConfirmationInvalid || undefined}
-              disabled={blocked || running || !recovery?.safetyCopyAvailable}
-              onChange={(event) => setDeleteConfirmation(event.target.value)}
-            />
-          </label>
-          <button type="submit" disabled={!canDeleteSafety}>
-            {operation === "delete-safety"
-              ? "Deleting safety copy…"
-              : "Permanently delete safety copy"}
-          </button>
-          {deleteConfirmationInvalid ? (
-            <p className="field-error" id="safety-delete-confirmation">
-              Enter the complete deletion phrase exactly as shown.
-            </p>
-          ) : null}
-        </form>
-      </section>
-
-      <section
-        className="backup-validation"
-        aria-labelledby="backup-restore-heading"
-      >
-        <h3 id="backup-restore-heading">Replace saved profile from backup</h3>
-        <p className="description" id="backup-restore-description">
-          This replaces the draft, published snapshots, settings, render
-          history, and content-free AI activity after restart. Save current
-          edits first. ORT authenticates the selected archive and imports it
-          into a separately keyed encrypted staging profile before scheduling
-          any replacement.
-        </p>
-        <form
-          className="backup-form"
-          aria-busy={operation === "restore"}
-          onSubmit={(event) => void restore(event)}
-        >
-          <label className="field backup-validation__passphrase">
-            Backup passphrase
-            <input
-              type="password"
-              value={restorePassphrase}
-              autoComplete="current-password"
-              aria-describedby="backup-restore-description backup-restore-guidance"
-              aria-invalid={restoreByteCount > MAX_BACKUP_PASSPHRASE_BYTES}
-              disabled={blocked || running || restoreStaged}
-              onChange={(event) => setRestorePassphrase(event.target.value)}
-            />
-          </label>
-          <label className="field">
-            Type {RESTORE_CONFIRMATION_PHRASE} to confirm
-            <input
-              type="text"
-              value={restoreConfirmation}
-              autoComplete="off"
-              aria-describedby={
-                restoreConfirmationInvalid
-                  ? "backup-restore-guidance restore-confirmation"
-                  : "backup-restore-guidance"
-              }
-              aria-invalid={restoreConfirmationInvalid || undefined}
-              disabled={blocked || running || restoreStaged}
-              onChange={(event) => setRestoreConfirmation(event.target.value)}
-            />
-          </label>
-          <p
-            className="description backup-guidance"
-            id="backup-restore-guidance"
+          <form
+            className="backup-form"
+            aria-busy={operation === "export"}
+            onSubmit={(event) => void submit(event)}
           >
-            Merge restore is not supported. Restart promptly after staging; the
-            current profile remains active until then.
-          </p>
-          {restoreConfirmationInvalid ? (
-            <p className="field-error" id="restore-confirmation">
-              Enter the complete replacement phrase exactly as shown.
+            <label className="field">
+              Backup passphrase
+              <input
+                type="password"
+                value={passphrase}
+                autoComplete="new-password"
+                aria-describedby="backup-description backup-guidance"
+                disabled={blocked || running}
+                onChange={(event) => setPassphrase(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              Confirm passphrase
+              <input
+                type="password"
+                value={confirmation}
+                autoComplete="new-password"
+                aria-describedby={validation ? "backup-validation" : undefined}
+                aria-invalid={validation ? true : undefined}
+                disabled={blocked || running}
+                onChange={(event) => setConfirmation(event.target.value)}
+              />
+            </label>
+            <p className="description backup-guidance" id="backup-guidance">
+              Use a long, unique passphrase and store it separately from the
+              backup.
+              {dirty
+                ? " Save the current edits before creating the backup."
+                : ""}
             </p>
-          ) : null}
-          {restoreByteCount > MAX_BACKUP_PASSPHRASE_BYTES ? (
-            <p className="field-error" role="alert">
-              The passphrase is over the 1,024-byte limit.
+            {validation ? (
+              <p className="field-error" id="backup-validation" role="alert">
+                {validation}
+              </p>
+            ) : null}
+            <button type="submit" disabled={!canSubmit}>
+              {operation === "export"
+                ? "Creating encrypted backup…"
+                : "Create encrypted backup"}
+            </button>
+            {operation === "export" ? (
+              <p role="status">
+                Finish or cancel the native Save dialog. Backup encryption may
+                take a moment.
+              </p>
+            ) : null}
+          </form>
+
+          <section
+            className="backup-validation"
+            aria-labelledby="backup-check-heading"
+          >
+            <h3 id="backup-check-heading">Check an existing backup</h3>
+            <p className="description" id="backup-check-description">
+              Select a backup through the native file dialog. ORT reads at most
+              the fixed backup limit, authenticates and validates the complete
+              encrypted archive, and returns only its content-free inventory.
+              This does not replace or write to the active profile.
             </p>
-          ) : null}
-          <button type="submit" disabled={!canRestore}>
-            {operation === "restore"
-              ? "Preparing encrypted replacement…"
-              : restoreStaged
-                ? "Restart ORT to finish restore"
-                : "Select backup and replace after restart"}
-          </button>
-          {operation === "restore" ? (
-            <p role="status">
-              Finish or cancel the native file dialog. Authentication and
-              encrypted staging may take a moment.
+            <form
+              className="backup-form"
+              aria-busy={operation === "validate"}
+              onSubmit={(event) => void validate(event)}
+            >
+              <label className="field backup-validation__passphrase">
+                Existing backup passphrase
+                <input
+                  type="password"
+                  value={validationPassphrase}
+                  autoComplete="current-password"
+                  aria-describedby="backup-check-description backup-check-guidance"
+                  aria-invalid={
+                    validationByteCount > MAX_BACKUP_PASSPHRASE_BYTES
+                  }
+                  disabled={blocked || running}
+                  onChange={(event) =>
+                    setValidationPassphrase(event.target.value)
+                  }
+                />
+              </label>
+              <p
+                className="description backup-guidance"
+                id="backup-check-guidance"
+              >
+                Wrong passphrases, damaged files, and unsupported backup
+                contents share the same result. The selected path is never
+                returned to this interface.
+              </p>
+              {validationByteCount > MAX_BACKUP_PASSPHRASE_BYTES ? (
+                <p className="field-error" role="alert">
+                  The passphrase is over the 1,024-byte limit.
+                </p>
+              ) : null}
+              <button type="submit" disabled={!canValidate}>
+                {operation === "validate"
+                  ? "Checking encrypted backup…"
+                  : "Select and check encrypted backup"}
+              </button>
+              {operation === "validate" ? (
+                <p role="status">
+                  Finish or cancel the native file dialog. Authentication may
+                  take a moment.
+                </p>
+              ) : null}
+            </form>
+            {validated ? <ValidatedBackupSummary backup={validated} /> : null}
+          </section>
+        </div>
+        <details
+          className="backup-disclosure"
+          open={
+            !!recoveryError ||
+            !!recovery?.restartOperationPending ||
+            !!recovery?.safetyCleanupPending
+          }
+        >
+          <summary>
+            <h3 id="backup-recovery-heading">Local recovery safety copy</h3>
+            <span>Rollback and deletion options</span>
+          </summary>
+          <section
+            className="backup-disclosure-body"
+            aria-labelledby="backup-recovery-heading"
+          >
+            {recoveryError ? (
+              <p role="alert" className="field-error">
+                {recoveryError}
+              </p>
+            ) : recovery ? (
+              <p role="status" className="description">
+                {recovery.restartOperationPending
+                  ? "A verified replacement or rollback is waiting for restart."
+                  : recovery.safetyCleanupPending
+                    ? "Confirmed safety-copy cleanup will resume at startup."
+                    : recovery.safetyCopyAvailable
+                      ? "One encrypted safety copy is retained on this device."
+                      : "No retained safety copy is present."}
+              </p>
+            ) : (
+              <p role="status" className="description">
+                Checking local recovery state…
+              </p>
+            )}
+            <p className="description" id="rollback-guidance">
+              Rollback verifies and stages the retained profile for activation
+              after restart. The current profile then becomes the new safety
+              copy.
             </p>
-          ) : null}
-        </form>
-      </section>
+            <form
+              className="backup-form"
+              aria-busy={operation === "rollback"}
+              onSubmit={(event) => void rollback(event)}
+            >
+              <label className="field">
+                Type {ROLLBACK_CONFIRMATION_PHRASE} to confirm rollback
+                <input
+                  type="text"
+                  value={rollbackConfirmation}
+                  autoComplete="off"
+                  aria-describedby={`rollback-guidance${
+                    rollbackConfirmationInvalid ? " rollback-confirmation" : ""
+                  }`}
+                  aria-invalid={rollbackConfirmationInvalid || undefined}
+                  disabled={
+                    blocked || running || !recovery?.safetyCopyAvailable
+                  }
+                  onChange={(event) =>
+                    setRollbackConfirmation(event.target.value)
+                  }
+                />
+              </label>
+              <button type="submit" disabled={!canRollback}>
+                {operation === "rollback"
+                  ? "Preparing rollback…"
+                  : "Roll back after restart"}
+              </button>
+              {rollbackConfirmationInvalid ? (
+                <p className="field-error" id="rollback-confirmation">
+                  Enter the complete rollback phrase exactly as shown.
+                </p>
+              ) : null}
+            </form>
+            <p className="description" id="safety-delete-guidance">
+              Deleting the safety copy is permanent and removes its exact
+              encrypted profile directory and OS-vault key. It does not change
+              the active profile or delete exports and backups saved elsewhere.
+            </p>
+            <form
+              className="backup-form"
+              aria-busy={operation === "delete-safety"}
+              onSubmit={(event) => void removeSafety(event)}
+            >
+              <label className="field">
+                Type {DELETE_SAFETY_CONFIRMATION_PHRASE} to delete it
+                <input
+                  type="text"
+                  value={deleteConfirmation}
+                  autoComplete="off"
+                  aria-describedby={`safety-delete-guidance${
+                    deleteConfirmationInvalid
+                      ? " safety-delete-confirmation"
+                      : ""
+                  }`}
+                  aria-invalid={deleteConfirmationInvalid || undefined}
+                  disabled={
+                    blocked || running || !recovery?.safetyCopyAvailable
+                  }
+                  onChange={(event) =>
+                    setDeleteConfirmation(event.target.value)
+                  }
+                />
+              </label>
+              <button type="submit" disabled={!canDeleteSafety}>
+                {operation === "delete-safety"
+                  ? "Deleting safety copy…"
+                  : "Permanently delete safety copy"}
+              </button>
+              {deleteConfirmationInvalid ? (
+                <p className="field-error" id="safety-delete-confirmation">
+                  Enter the complete deletion phrase exactly as shown.
+                </p>
+              ) : null}
+            </form>
+          </section>
+        </details>
+        <details className="backup-disclosure" open={restoreStaged}>
+          <summary>
+            <h3 id="backup-restore-heading">
+              Replace saved profile from backup
+            </h3>
+            <span>Authenticate and activate after restart</span>
+          </summary>
+          <section
+            className="backup-disclosure-body"
+            aria-labelledby="backup-restore-heading"
+          >
+            <p className="description" id="backup-restore-description">
+              This replaces the draft, published snapshots, settings, render
+              history, and content-free AI activity after restart. Save current
+              edits first. ORT authenticates the selected archive and imports it
+              into a separately keyed encrypted staging profile before
+              scheduling any replacement.
+            </p>
+            <form
+              className="backup-form"
+              aria-busy={operation === "restore"}
+              onSubmit={(event) => void restore(event)}
+            >
+              <label className="field backup-validation__passphrase">
+                Backup passphrase
+                <input
+                  type="password"
+                  value={restorePassphrase}
+                  autoComplete="current-password"
+                  aria-describedby="backup-restore-description backup-restore-guidance"
+                  aria-invalid={restoreByteCount > MAX_BACKUP_PASSPHRASE_BYTES}
+                  disabled={blocked || running || restoreStaged}
+                  onChange={(event) => setRestorePassphrase(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                Type {RESTORE_CONFIRMATION_PHRASE} to confirm
+                <input
+                  type="text"
+                  value={restoreConfirmation}
+                  autoComplete="off"
+                  aria-describedby={
+                    restoreConfirmationInvalid
+                      ? "backup-restore-guidance restore-confirmation"
+                      : "backup-restore-guidance"
+                  }
+                  aria-invalid={restoreConfirmationInvalid || undefined}
+                  disabled={blocked || running || restoreStaged}
+                  onChange={(event) =>
+                    setRestoreConfirmation(event.target.value)
+                  }
+                />
+              </label>
+              <p
+                className="description backup-guidance"
+                id="backup-restore-guidance"
+              >
+                Merge restore is not supported. Restart promptly after staging;
+                the current profile remains active until then.
+              </p>
+              {restoreConfirmationInvalid ? (
+                <p className="field-error" id="restore-confirmation">
+                  Enter the complete replacement phrase exactly as shown.
+                </p>
+              ) : null}
+              {restoreByteCount > MAX_BACKUP_PASSPHRASE_BYTES ? (
+                <p className="field-error" role="alert">
+                  The passphrase is over the 1,024-byte limit.
+                </p>
+              ) : null}
+              <button type="submit" disabled={!canRestore}>
+                {operation === "restore"
+                  ? "Preparing encrypted replacement…"
+                  : restoreStaged
+                    ? "Restart ORT to finish restore"
+                    : "Select backup and replace after restart"}
+              </button>
+              {operation === "restore" ? (
+                <p role="status">
+                  Finish or cancel the native file dialog. Authentication and
+                  encrypted staging may take a moment.
+                </p>
+              ) : null}
+            </form>
+          </section>
+        </details>
+      </div>
+      <aside
+        className="backup-context"
+        aria-label="Backup and recovery details"
+      >
+        <svg className="workspace-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z" />
+          <path d="m8 12 3 3 5-6" />
+        </svg>
+        <h3>Your data stays yours</h3>
+        <p>
+          Device keys, provider credentials, and active spending-cap authority
+          are excluded from the archive.
+        </p>
+        <p>
+          A synced destination receives the encrypted archive. Existing files
+          are never replaced.
+        </p>
+        <h3>Recovery after restart</h3>
+        <p>
+          A restore is prepared in a fresh encrypted profile and activated only
+          after restart. The replaced encrypted profile stays on this device as
+          a safety copy.
+        </p>
+        <p>External exports and backups are never changed.</p>
+      </aside>
     </section>
   );
 }

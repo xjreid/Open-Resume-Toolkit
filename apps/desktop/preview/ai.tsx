@@ -5,6 +5,7 @@ import { AiWorkspace } from "../src/shared/AiWorkspace";
 import { AppShell } from "../src/shared/AppShell";
 import { type Usage, type UsageBucket } from "../src/shared/AiUsageChart";
 import "../src/shared/app.css";
+import "../src/shared/workspace-theme.css";
 
 type Provider = "openai" | "anthropic" | "gemini";
 type SavedKey = {
@@ -494,8 +495,9 @@ function Preview() {
   const [mode, setMode] = useState<Scenario>("connected");
   const [revision, setRevision] = useState(0);
   return (
-    <>
+    <div className="preview-root">
       <aside
+        className="preview-toolbar"
         style={{
           padding: "10px 24px",
           borderBottom: "1px solid #cbd5e1",
@@ -533,12 +535,14 @@ function Preview() {
       <AppShell
         destination="ai"
         navigationBlocked={true}
+        onOpenApplication={() => {}}
+        overlayVisible={false}
         onNavigate={() => {}}
         status={<span className="ai-badge">Web preview</span>}
       >
         <AiWorkspace key={revision} blocked={false} />
       </AppShell>
-    </>
+    </div>
   );
 }
 createRoot(document.getElementById("root")!).render(<Preview />);

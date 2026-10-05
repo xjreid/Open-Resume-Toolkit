@@ -515,7 +515,7 @@ it("places metric and timeframe controls on the chart and settings below it", as
   expect(settings.textContent).toContain("Clear activity");
   expect(settings.textContent).toContain("Activity retention");
   expect(document.querySelector(".ai-data-heading")?.textContent).toContain(
-    "All keysGeneral activity · Every provider and model",
+    "All keys · General activity · Every provider and model",
   );
   await clickAccessible("Choose view");
   const picker = document.querySelector('[aria-label="Choose activity view"]')!;

@@ -16,8 +16,8 @@ React/TypeScript, Rust, SQLCipher and Typst baseline. The development build supp
 publication, local exports/rendering, portable backup/recovery, storage reporting
 and exact crash-resumable local-profile deletion. The signed metered-Wasm import
 path provides explicit review before it changes a master record; AI, browser
-messaging, updates and release hardening remain later milestones. Quiet Navy/Open Frame is
-the approved application direction. M2 completion includes the complete manual
+messaging, updates and release hardening remain later milestones. Open Folio is
+the user-approved application direction as of October 4, 2026. M2 completion includes the complete manual
 master-editor behavior in the authoritative resume-editor plan and all three
 qualified PDF/DOCX style categories. Historical replay retains immutable structured sources and uses a
 truthfully identified current renderer when the original tuple is unavailable,
@@ -66,7 +66,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - The tailoring operation also produces optional Required Qualification Alerts for explicit mandatory job requirements that map to resume content. Alerts distinguish a confirmed conflict from a qualification not found in the published master, ignore preferred/ambiguous/personal-or-legal requirements, never become a fit score, and never block the user from continuing.
 - One active overlay-owned application workspace has Stage 1 capture/review and Stage 2 Resume/Cover letter/Answers tabs. The main window has no job-specific route.
 - Resume and cover-letter PDF cards provide both Download and temporary operating-system drag-out; expanded preview edits structured source, not PDF bytes.
-- Quiet Navy/Open Frame is the approved universal light-only application/website direction. Resume and cover-letter documents remain visually independent; the default Technical template follows the supplied Jake's Resume reference as licensing permits.
+- Open Folio is the approved light-only application direction; prior Quiet Navy/Open Frame references are archived. Resume and cover-letter documents remain visually independent; the default Technical template follows the supplied Jake's Resume reference as licensing permits.
 - Finish Application optionally creates a local tracker entry with the selected final resume, cover letter, and approved answer set as structured snapshots, then deletes unselected temporary material and resets the workspace.
 - Structured JSON is the canonical document format. PDF, DOCX, and plain text are locally rendered derived artifacts and are not retained by default.
 - There are no ORT plan-based application, import, AI, or storage quotas. Practical safety limits prevent malformed or excessively large inputs, and optional user-defined AI guardrails protect the user's provider budget or subscription quota.
@@ -113,7 +113,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - [Next milestones](<Implementation Plans/Next_Milestones.md>) — completed M3 review route and ordered navigation to M4–M8; the delivery roadmap remains authoritative for scope and exit evidence.
 - [Development and deployment outline](<Implementation Plans/System Documentation/Development_and_Deployment_Outline.md>) — shared desktop/extension source ownership, platform and Store artifacts, environments, CI/release sequence, mandatory gates, rollback, and M0 readiness.
 - Component folders under `Implementation Plans/` — implementation-ready plans for architecture/security/build, desktop, extensions/IPC, local data/migration, AI/document processing, and distribution/updates.
-- [Aesthetic planning](Aesthetic/README.md) — approved Quiet Navy/Open Frame direction, surface responsibilities, document independence, and remaining visual deliverables.
+- [Aesthetic planning](Aesthetic/README.md) — approved Open Folio direction, archived incumbent references, surface responsibilities, document independence, and remaining visual deliverables.
 
 ## Recommended reading routes
 

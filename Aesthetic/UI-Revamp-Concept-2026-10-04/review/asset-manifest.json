@@ -1,0 +1,149 @@
+[
+  {
+    "file": "logo/app-1024.png",
+    "width": 1024,
+    "height": 1024,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/app-128.png",
+    "width": 128,
+    "height": 128,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/app-16.png",
+    "width": 16,
+    "height": 16,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/app-20.png",
+    "width": 20,
+    "height": 20,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/app-24.png",
+    "width": 24,
+    "height": 24,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/app-256.png",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/app-32.png",
+    "width": 32,
+    "height": 32,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/app-40.png",
+    "width": 40,
+    "height": 40,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/app-48.png",
+    "width": 48,
+    "height": 48,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/app-512.png",
+    "width": 512,
+    "height": 512,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/app-64.png",
+    "width": 64,
+    "height": 64,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/logo-presentation.png",
+    "width": 2880,
+    "height": 2000,
+    "mode": "RGB",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/open-folio-lockup.png",
+    "width": 1640,
+    "height": 460,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/open-folio-mark.png",
+    "width": 1024,
+    "height": 887,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "logo/open-folio-reversed.png",
+    "width": 1024,
+    "height": 887,
+    "mode": "RGBA",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "screens/data.png",
+    "width": 2880,
+    "height": 2360,
+    "mode": "RGB",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "screens/edit.png",
+    "width": 2880,
+    "height": 2120,
+    "mode": "RGB",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "screens/keys.png",
+    "width": 2880,
+    "height": 2000,
+    "mode": "RGB",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "screens/overlay.png",
+    "width": 1400,
+    "height": 2062,
+    "mode": "RGB",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "screens/settings.png",
+    "width": 2880,
+    "height": 2000,
+    "mode": "RGB",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  },
+  {
+    "file": "screens/view.png",
+    "width": 2880,
+    "height": 2160,
+    "mode": "RGB",
+    "origin": "Rendered from local HTML/CSS/SVG; original vector and typography artwork. UI data is synthetic. No image generation model used."
+  }
+]

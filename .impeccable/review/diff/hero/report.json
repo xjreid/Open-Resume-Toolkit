@@ -1,0 +1,15 @@
+{
+  "interpretation": "hero-gate",
+  "measurementsAvailable": false,
+  "regions": [],
+  "gate": {
+    "ok": false,
+    "reasons": [
+      "the lead text region element-54 is measured (compressed regular, cap 62.1px) but no face is ranked: run /Users/xavierreid/.codex/skills/impeccable/scripts/impeccable font-match --rank element-54 --text \"<its first words>\" [--candidates \"Family:weight,...\"] and use the USE line."
+    ],
+    "advisories": [],
+    "unscopedReasons": [
+      "the lead text region element-54 is measured (compressed regular, cap 62.1px) but no face is ranked: run /Users/xavierreid/.codex/skills/impeccable/scripts/impeccable font-match --rank element-54 --text \"<its first words>\" [--candidates \"Family:weight,...\"] and use the USE line."
+    ]
+  }
+}

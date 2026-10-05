@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T00:00:00-04:00",
+  "title": "Design System: Open Folio UI Revamp Concept (Review-only proposal)",
+  "extensions": {
+    "colorMeta": {
+      "ink": {"role":"neutral","displayName":"Interface Ink","canonical":"#1C3135","tonalRamp":["#142426","#1B3335","#254447","#2F5558","#446A6C","#668487","#9AAEB0","#D5DFE0"]},
+      "muted": {"role":"neutral","displayName":"Muted Slate","canonical":"#566C70","tonalRamp":["#202B2D","#2D3C3E","#3D4F51","#566C70","#718588","#91A1A3","#B7C2C3","#E1E6E6"]},
+      "teal": {"role":"primary","displayName":"Muted Teal","canonical":"#28676C","tonalRamp":["#123538","#17484C","#1E5A5F","#28676C","#438187","#65999D","#92B5B8","#CFE0E1"]},
+      "deep-teal": {"role":"primary","displayName":"Deep Teal","canonical":"#1D4F53","tonalRamp":["#0D292B","#12393C","#1D4F53","#326368","#557D81","#789699","#A7BDBF","#DCE6E7"]},
+      "navigation-rail": {"role":"secondary","displayName":"Navigation Teal","canonical":"#204D52","tonalRamp":["#0E282A","#153B3E","#204D52","#39666A","#5B8589","#80A3A6","#B0C6C8","#DDE8E9"]},
+      "workspace-ground": {"role":"neutral","displayName":"Workspace Ground","canonical":"#F2F6F7","tonalRamp":["#1D2728","#354142","#596567","#7E898A","#A5AFB0","#C3CBCC","#DFE4E5","#F2F6F7"]},
+      "document-surface": {"role":"neutral","displayName":"Document White","canonical":"#FFFFFF","tonalRamp":["#202020","#414141","#626262","#838383","#A5A5A5","#C6C6C6","#E8E8E8","#FFFFFF"]},
+      "selected-field": {"role":"neutral","displayName":"Selected Field Mint","canonical":"#EDF7F6","tonalRamp":["#193332","#3A5553","#5D7774","#829995","#AABBB8","#C6D4D1","#DCE9E6","#EDF7F6"]},
+      "divider": {"role":"neutral","displayName":"Quiet Divider","canonical":"#D8E3E5","tonalRamp":["#222929","#444D4E","#687273","#8C9798","#AEB8B9","#C2CCCD","#D8E3E5","#EEF3F3"]},
+      "warning": {"role":"tertiary","displayName":"Qualification Amber","canonical":"#775021","tonalRamp":["#2D1908","#47280E","#604016","#775021","#956F3D","#B19367","#D0BA98","#EEE4D5"]},
+      "warning-ground": {"role":"tertiary","displayName":"Warm Warning Ground","canonical":"#FCF4E7","tonalRamp":["#30271A","#514431","#746451","#988875","#BAAB98","#D5CABB","#E9E1D6","#FCF4E7"]}
+    },
+    "typographyMeta": {
+      "display": {"displayName":"Hanken Display","purpose":"Interface page titles in the proposal."},
+      "resume": {"displayName":"Liberation Serif Resume","purpose":"Document artwork only; interface chrome stays Hanken."}
+    },
+    "shadows": [
+      {"name":"paper-lift","value":"0 5px 18px #244E5810","purpose":"Quiet separation for resume papers."},
+      {"name":"selected-segment","value":"0 1px 3px #183C4314","purpose":"Slight lift for active segmented choices."},
+      {"name":"overlay-lift","value":"0 12px 40px #1A474626","purpose":"Floating narrow application overlay."}
+    ],
+    "motion": [
+      {"name":"state-transition","value":"120ms ease","purpose":"Proposed button state transitions in the component examples; the screenshot mockups are static."}
+    ],
+    "breakpoints": [
+      {"name":"compact-desktop","value":"1200px"},
+      {"name":"narrow-desktop","value":"850px"}
+    ]
+  },
+  "components": [
+    {"name":"Primary Button","kind":"button","refersTo":"button-primary","description":"Primary save, publish, export, and create actions.","html":"<button class=\"ds-btn-primary\">Publish</button>","css":".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 15px;border:1px solid #28676C;border-radius:7px;background:#28676C;color:#FFF;font:600 12px/1.5 Hanken,sans-serif;transition:background-color 120ms ease,border-color 120ms ease}.ds-btn-primary:hover{background:#1D4F53;border-color:#1D4F53}.ds-btn-primary:focus-visible{outline:3px solid #469298;outline-offset:3px}"},
+    {"name":"Secondary Button","kind":"button","refersTo":"button-secondary","description":"Low-emphasis action with a document-surface fill.","html":"<button class=\"ds-btn-secondary\">Export Word</button>","css":".ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 15px;border:1px solid #D8E3E5;border-radius:7px;background:#FFF;color:#1C3135;font:600 12px/1.5 Hanken,sans-serif;transition:background-color 120ms ease,border-color 120ms ease}.ds-btn-secondary:hover{background:#EDF4F4}.ds-btn-secondary:focus-visible{outline:3px solid #469298;outline-offset:3px}"},
+    {"name":"Text Field","kind":"input","refersTo":"input","description":"Standard backup, key, and settings text field.","html":"<label class=\"ds-field\"><span>Backup passphrase</span><input placeholder=\"A long unique passphrase\" /></label>","css":".ds-field{display:grid;gap:7px;color:#566C70;font:600 12px/1.5 Hanken,sans-serif}.ds-field input{height:40px;padding:0 12px;border:1px solid #C5D5D8;border-radius:6px;background:#FFF;color:#1C3135;font:400 14px/1.5 Hanken,sans-serif}.ds-field input:focus-visible{outline:3px solid #469298;outline-offset:3px;border-color:#28676C}"},
+    {"name":"Navigation Rail","kind":"nav","refersTo":"navigation-rail","description":"Persistent workspace destinations and overlay access.","html":"<nav class=\"ds-rail\"><a class=\"ds-rail-link ds-active\" href=\"#\">Master resume</a><a class=\"ds-rail-link\" href=\"#\">AI &amp; monitoring</a></nav>","css":".ds-rail{display:grid;gap:7px;width:214px;padding:32px 16px 18px;background:#204D52;color:#FFF}.ds-rail-link{display:flex;align-items:center;min-height:44px;padding:12px;border-radius:7px;color:#D5E5E6;text-decoration:none;font:500 13px/1.5 Hanken,sans-serif}.ds-rail-link:hover,.ds-rail-link.ds-active{background:#37676C;color:#FFF}.ds-rail-link:focus-visible{outline:3px solid #469298;outline-offset:3px}"},
+    {"name":"Status Pill","kind":"chip","refersTo":"pill","description":"Compact saved, paused, local, or warning state indicator.","html":"<span class=\"ds-pill\"><span class=\"ds-dot\"></span>Saved locally</span>","css":".ds-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:20px;background:#E2F0E9;color:#2D624F;font:600 11px/1.5 Hanken,sans-serif}.ds-dot{width:6px;height:6px;border-radius:50%;background:currentColor}"},
+    {"name":"Resume Paper","kind":"card","refersTo":"paper","description":"Quiet document surface for edit and view states.","html":"<article class=\"ds-paper\"><h2>Alex Morgan</h2><p>Senior Software Engineer</p></article>","css":".ds-paper{max-width:800px;padding:34px 46px 42px;background:#FFF;box-shadow:0 5px 18px #244E5810;color:#171717}.ds-paper h2{margin:0;font:700 28px/1.2 ResumeSerif,serif}.ds-paper p{margin:8px 0 0;font:400 11.5px/1.6 ResumeSerif,serif}"}
+  ],
+  "narrative": {
+    "northStar": "The Open Folio",
+    "overview": "The proposal treats the desktop app as a calm document workspace: a deep blue-green rail establishes orientation, quiet white papers hold resume content, and muted blue-green accents identify actions and selected state. Hanken Grotesk carries the interface; the sample resume remains a black Liberation Serif document so the document reads as an artifact inside the tool.\n\nThe system makes the distinction between autosaved draft, deliberately published resume, and the application overlay visible. It favors familiar desktop controls, restrained borders, and tonal layering over decorative effects. Logo and provider marks are intentionally omitted from the six interface images; the independent Open Folio mark is documented as a separate identity deliverable.",
+    "keyCharacteristics": ["Persistent deep teal navigation rail with local-storage status.","Quiet white document surfaces with one visibly active inline editing field.","Muted blue-green action color, warm qualification warning, and restrained dividers.","Four-pixel base rhythm with 6–14px control and surface radii."],
+    "rules": [{"name":"The One Accent Rule","body":"Teal carries action and selection meaning; keep it concentrated so a selected field or primary action is immediately legible.","section":"colors"},{"name":"The Two Voice Rule","body":"Use Hanken for the tool and Liberation Serif for the resume artifact; do not blur document typography into the shell.","section":"typography"},{"name":"The Tonal Layer Rule","body":"Establish hierarchy with surface color and dividers first; use shadow only where a paper or overlay must separate from its canvas.","section":"elevation"}],
+    "dos": ["Do keep the distinction between draft saved locally and published resume visible near resume actions.","Do use teal for action, active selection, and progress so its meaning remains consistent.","Do preserve keyboard focus visibility with a 3px outline and retain existing confirmation semantics for destructive settings actions.","Do keep the qualification alert and provider-billing caveat visible in the overlay and AI data states.","Do omit provider and application logos from the review screens; use the separate Open Folio identity assets where branding is needed."],
+    "donts": ["Don't promote the synthetic data, mockup navigation, or illustrative native window bar into production behavior.","Don't add fit scores, cloud sync, new export formats, or invented resume item operations to this proposal.","Don't use the serif face for interface chrome or use decorative shadows to compensate for weak hierarchy.","Don't canonize the one small desktop selector-clipping issue recorded during review; the finish verdict marked it resolved at the approved single-fix scope."]
+  }
+}

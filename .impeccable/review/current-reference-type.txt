@@ -1,0 +1,31 @@
+MEASURE page-title: capHeight 40.3px, width normal (advX 0.6211), weight bold (densTall 0.5743), tracking 0.0994 over 1 line, 11 glyphs. Set this region's font-size so its cap height renders at 40.3px; choose a normal bold face.
+CATALOG top-5 by fingerprint: Alegreya Sans:700, Biryani:700, Gurajada:400, Ubuntu Sans:700, Yaldevi:700 (from 3076 indexed faces, 48px index)
+CANDIDATES 26: 1 yours + 25 nearest in the catalog index
+RANK Hanken Grotesk:650 distance 0.349  width normal (-1% advX)  weight bold (-1% densTall)  font-size 56px for cap 40.3px
+RANK Andika:700 distance 0.553  width normal (+2% advX)  weight bold (+3% densTall)  font-size 54px for cap 40.3px
+RANK Gurajada:400 distance 0.577  width normal (-1% advX)  weight medium (-3% densTall)  font-size 87px for cap 40.3px
+RANK Alegreya Sans:700 distance 0.590  width normal (+1% advX)  weight bold (-2% densTall)  font-size 61px for cap 40.3px
+RANK Salsa:400 distance 0.600  width condensed (-6% advX)  weight medium (-13% densTall)  font-size 55px for cap 40.3px
+RANK Alatsi:400 distance 0.650  width condensed (-9% advX)  weight medium (-8% densTall)  font-size 56px for cap 40.3px
+RANK Harmattan:700 distance 0.693  width normal (-1% advX)  weight black (+21% densTall)  font-size 73px for cap 40.3px
+RANK Yaldevi:700 distance 0.696  width normal (-1% advX)  weight bold (+3% densTall)  font-size 51px for cap 40.3px
+RANK Biryani:700 distance 0.698  width normal (+3% advX)  weight bold (-0% densTall)  font-size 52px for cap 40.3px
+RANK Mali:700 distance 0.717  width normal (+11% advX)  weight bold (+3% densTall)  font-size 56px for cap 40.3px
+RANK Puritan:700 distance 0.728  width normal (-2% advX)  weight bold (+3% densTall)  font-size 60px for cap 40.3px
+RANK Carlito:700 distance 0.733  width normal (+5% advX)  weight medium (-7% densTall)  font-size 61px for cap 40.3px
+RANK Akatab:700 distance 0.753  width normal (-1% advX)  weight medium (-4% densTall)  font-size 58px for cap 40.3px
+RANK Tirra:700 distance 0.753  width normal (-1% advX)  weight medium (-4% densTall)  font-size 58px for cap 40.3px
+RANK Ubuntu Sans:700 distance 0.783  width normal (+1% advX)  weight bold (-0% densTall)  font-size 57px for cap 40.3px
+RANK Averia Sans Libre:700 distance 0.786  width normal (+10% advX)  weight bold (-0% densTall)  font-size 60px for cap 40.3px
+RANK Cambay:700 distance 0.797  width normal (-1% advX)  weight black (+66% densTall)  font-size 57px for cap 40.3px
+RANK Inconsolata:700 distance 0.824  width normal (+3% advX)  weight medium (-3% densTall)  font-size 63px for cap 40.3px
+RANK Noto Sans HK:700 distance 0.843  width normal (+1% advX)  weight bold (+4% densTall)  font-size 53px for cap 40.3px
+RANK Noto Sans JP:700 distance 0.843  width normal (+1% advX)  weight bold (+4% densTall)  font-size 53px for cap 40.3px
+RANK Noto Sans KR:700 distance 0.843  width normal (+1% advX)  weight bold (+4% densTall)  font-size 53px for cap 40.3px
+RANK Noto Sans SC:700 distance 0.843  width normal (+1% advX)  weight bold (+4% densTall)  font-size 53px for cap 40.3px
+RANK Noto Sans TC:700 distance 0.843  width normal (+1% advX)  weight bold (+4% densTall)  font-size 53px for cap 40.3px
+RANK Ubuntu Sans Mono:700 distance 0.998  width normal (+1% advX)  weight bold (-2% densTall)  font-size 57px for cap 40.3px
+RANK Mukta Malar:700 distance 1.068  width normal (+11% advX)  weight bold (+3% densTall)  font-size 62px for cap 40.3px
+RANK Hammersmith One:400 distance 1.072  width normal (+14% advX)  weight bold (+5% densTall)  font-size 61px for cap 40.3px
+PROOF .impeccable/build/font-match/page-title.png (comp crop, then the top 3 candidates at the comp's cap height; open it before choosing)
+USE font-family: 'Hanken Grotesk'; font-weight: 650; font-size: 56px;

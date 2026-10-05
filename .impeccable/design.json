@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "name": "Open Folio",
+  "sourceOfTruth": "apps/desktop/src/shared/workspace-theme.css",
+  "northStar": "The Quiet Folio",
+  "tokens": {
+    "colors": {
+      "rail": "#204d52",
+      "accent": "#28676c",
+      "accentHover": "#1d4f53",
+      "ink": "#1c3135",
+      "muted": "#566c70",
+      "selection": "#dcedef",
+      "canvas": "#f2f6f7",
+      "surface": "#ffffff",
+      "line": "#d8e3e5",
+      "success": "#2d624f",
+      "warning": "#775021",
+      "danger": "#a13b3b",
+      "focus": "#469298"
+    },
+    "typography": {
+      "family": "Hanken, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+      "display": {
+        "size": "28px",
+        "weight": 650,
+        "lineHeight": 1.2
+      },
+      "headline": {
+        "size": "20px",
+        "weight": 650,
+        "lineHeight": 1.25
+      },
+      "title": {
+        "size": "16px",
+        "weight": 600,
+        "lineHeight": 1.25
+      },
+      "body": {
+        "size": "14px",
+        "weight": 400,
+        "lineHeight": 1.5
+      },
+      "label": {
+        "size": "12px",
+        "weight": 600,
+        "lineHeight": 1.5
+      }
+    },
+    "radius": {
+      "xs": "3px",
+      "sm": "5px",
+      "md": "6px",
+      "button": "7px",
+      "lg": "10px",
+      "xl": "12px",
+      "pill": "20px"
+    },
+    "spacing": {
+      "xs": "4px",
+      "sm": "8px",
+      "md": "12px",
+      "lg": "16px",
+      "xl": "24px",
+      "section": "32px"
+    },
+    "elevation": {
+      "ambientCard": "0 5px 18px rgb(36 78 88 / 6%)",
+      "default": "none"
+    }
+  },
+  "layout": {
+    "nativeDefault": {
+      "width": 1080,
+      "height": 760
+    },
+    "nativeMinimum": {
+      "width": 720,
+      "height": 520,
+      "editorGrid": "148px minmax(0, 1fr)",
+      "viewMode": "stacked-reading-panel"
+    },
+    "overlay": {
+      "width": 360,
+      "height": 760
+    },
+    "rail": {
+      "default": 214,
+      "breakpoints": [
+        {
+          "maxWidth": 1200,
+          "width": 180
+        },
+        {
+          "maxWidth": 850,
+          "width": 148
+        },
+        {
+          "maxWidth": 760,
+          "width": 72
+        }
+      ]
+    },
+    "editor": {
+      "sectionNavigator": 206,
+      "paperTarget": 800,
+      "header": 96,
+      "toolbar": 72
+    },
+    "stickyControls": {
+      "scope": ["Edit", "View", "Import", "AI My Keys", "AI Data"],
+      "top": "0",
+      "scrollPaddingTop": "84px"
+    },
+    "activeField": {
+      "scrollIntoView": true,
+      "layout": "original compact popup; no full-entry expansion"
+    },
+    "pageHeading": {
+      "scrolls": false,
+      "location": "outside app-content"
+    },
+    "sectionNavigator": {
+      "position": "sticky below 72px toolbar",
+      "height": "available scroll-area height minus toolbar",
+      "overflow": "independent vertical scroll"
+    },
+    "workspaceNavigation": {
+      "scrollPosition": "start at top on destination change",
+      "featureState": "keep children mounted"
+    }
+  },
+  "components": {
+    "buttonPrimary": {
+      "background": "{tokens.colors.accent}",
+      "text": "{tokens.colors.surface}",
+      "radius": "{tokens.radius.button}",
+      "minHeight": "40px"
+    },
+    "buttonSecondary": {
+      "background": "{tokens.colors.surface}",
+      "text": "{tokens.colors.ink}",
+      "border": "{tokens.colors.line}",
+      "radius": "{tokens.radius.button}"
+    },
+    "field": {
+      "background": "{tokens.colors.surface}",
+      "text": "{tokens.colors.ink}",
+      "border": "#c5d5d8",
+      "radius": "{tokens.radius.md}",
+      "minHeight": "40px"
+    },
+    "focus": {
+      "outline": "3px solid {tokens.colors.focus}",
+      "offset": "3px"
+    },
+    "resumeEntry": {
+      "order": "Title; Skills/details right; Role below Title; Date/Location/Extra right-aligned stack",
+      "emptyDate": "canvas-field--empty, 11px Hanken muted Add control"
+    },
+    "inlineEditor": {
+      "formatGroup": ["Clear (\u00d7)", "Bold (B)", "Italic (I)", "Link"],
+      "textLayout": "existing Paragraph/Bullet points toggle",
+      "linkValidation": ["Apply"],
+      "dismissal": ["outside click", "Escape with focus restoration"],
+      "autosave": true,
+      "shortcuts": [
+        "Ctrl/Meta+B preserves markdown formatting",
+        "Ctrl/Meta+I preserves markdown formatting"
+      ],
+      "linkPopup": "address contained at minimum width; expanded popup scrolls fully into view"
+    }
+  },
+  "assets": {
+    "font": "apps/desktop/src/assets/fonts/HankenGrotesk.ttf",
+    "logoMark": "apps/desktop/src/assets/open-folio-mark.svg",
+    "logoReversed": "apps/desktop/src/assets/open-folio-reversed.svg"
+  },
+  "review": {
+    "evidence": [
+      ".impeccable/review/edit-desktop.png",
+      ".impeccable/review/view-desktop.png",
+      ".impeccable/review/keys-desktop.png",
+      ".impeccable/review/data-desktop.png",
+      ".impeccable/review/settings-desktop.png",
+      ".impeccable/review/tracker-desktop.png",
+      ".impeccable/review/overlay-native.png",
+      ".impeccable/review/overlay-native-lower.png"
+    ],
+    "implementedFixes": ["current-section-focus", "720-grid"],
+    "humanAcceptance": {
+      "decision": "Approve the implemented layout (Recommended)",
+      "scope": "implemented editor live controls and spacing",
+      "authority": "approved actual edit-desktop reference; supersedes original static edit mockup"
+    },
+    "archivedComparison": "Aesthetic/UI-Revamp-Implementation-2026-10-04/strict-mock-comparison",
+    "status": "approved implemented design; original strict comparison remains open and is not a pixel-pass claim",
+    "automatedWorkflow": "incomplete: mechanical plates guard remains open because human approval was not imported into component-review approval store",
+    "narrowUiRefinement": {
+      "evidence": ".impeccable/review/ui-fixes/after-*.png and after-geometry.json",
+      "interactionGroups": 8,
+      "errors": 0,
+      "status": "implemented; scoped residual review ongoing"
+    }
+  }
+}

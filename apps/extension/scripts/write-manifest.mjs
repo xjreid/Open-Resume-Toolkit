@@ -104,10 +104,7 @@ if (channel !== "dev") {
   mkdirSync(resolve(output, "icons"), { recursive: true });
   for (const size of [16, 32, 48, 128])
     copyFileSync(
-      resolve(
-        packageRoot,
-        `../../Aesthetic/Logo/exports/icons/open-frame-${size}.png`,
-      ),
+      resolve(packageRoot, `../../Aesthetic/Logo/app-${size}.png`),
       resolve(output, `icons/${size}.png`),
     );
   for (const file of [

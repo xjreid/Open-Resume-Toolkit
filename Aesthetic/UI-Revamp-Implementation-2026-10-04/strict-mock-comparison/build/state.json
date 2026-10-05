@@ -1,0 +1,708 @@
+{
+  "tool": "build-phase",
+  "version": 2,
+  "startedAt": "2026-10-05T00:22:53.215Z",
+  "comp": ".impeccable/build/approved-edit-content.png",
+  "direction": null,
+  "breakpoint": "2880x2120",
+  "artifact": "apps/desktop/src/shared/App.tsx",
+  "phase": "hero",
+  "phases": {
+    "comps": {
+      "status": "skipped",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [
+        {
+          "at": "2026-10-05T00:22:53.215Z",
+          "text": "started with an approved comp; the comp round happened before this state (surface round or manual)"
+        }
+      ],
+      "gate": null,
+      "forced": null
+    },
+    "spec": {
+      "status": "closed",
+      "openedAt": "2026-10-05T00:22:53.215Z",
+      "closedAt": "2026-10-05T00:23:40.968Z",
+      "attempts": 4,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "60 regions, 0 plates, 21 text regions measured",
+        "at": "2026-10-05T00:23:40.968Z"
+      },
+      "forced": null
+    },
+    "plates": {
+      "status": "closed",
+      "openedAt": "2026-10-05T00:23:40.968Z",
+      "closedAt": "2026-10-05T00:23:41.024Z",
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "no plates owed",
+        "at": "2026-10-05T00:23:41.024Z"
+      },
+      "forced": null
+    },
+    "hero": {
+      "status": "open",
+      "openedAt": "2026-10-05T00:23:41.024Z",
+      "closedAt": null,
+      "attempts": 4,
+      "notes": [
+        {
+          "at": "2026-10-05T00:59:54.979Z",
+          "text": "User explicitly approved the implemented editor live controls and spacing as the final visual reference in the October 4, 2026 task reply. Approved reference: Aesthetic/UI-Revamp-Implementation-2026-10-04/screens/edit-desktop.png. The original static-mockup strict pixel comparison is superseded for these functional UI adaptations, not claimed as a numeric pass."
+        }
+      ],
+      "gate": {
+        "ok": false,
+        "reasons": [
+          "region element-18 is missing (detail 0%, structure 82%): the comp shows material the build does not",
+          "region element-19 is missing (detail 0%, structure 88%): the comp shows material the build does not",
+          "region element-20 is missing (detail 0%, structure 62%): the comp shows material the build does not",
+          "region element-21 is missing (detail 0%, structure 74%): the comp shows material the build does not",
+          "region element-26 is missing (detail 0%, structure 58%): the comp shows material the build does not",
+          "region element-27 is missing (detail 0%, structure 75%): the comp shows material the build does not",
+          "region element-28 is missing (detail 10%, structure 96%): the comp shows material the build does not",
+          "region element-29 is missing (detail 0%, structure 88%): the comp shows material the build does not",
+          "region element-31 is missing (detail 0%, structure 31%): the comp shows material the build does not",
+          "region element-32 is missing (detail 0%, structure 65%): the comp shows material the build does not",
+          "region element-33 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+          "region element-34 is missing (detail 3%, structure 61%): the comp shows material the build does not",
+          "region element-35 is missing (detail 12%, structure 82%): the comp shows material the build does not",
+          "region element-36 is missing (detail 13%, structure 86%): the comp shows material the build does not",
+          "region element-37 is missing (detail 3%, structure 69%): the comp shows material the build does not",
+          "region element-38 is missing (detail 3%, structure 62%): the comp shows material the build does not",
+          "region element-40 is missing (detail 0%, structure 93%): the comp shows material the build does not",
+          "region element-41 is missing (detail 0%, structure 92%): the comp shows material the build does not",
+          "region element-42 is missing (detail 0%, structure 39%): the comp shows material the build does not",
+          "region element-43 is missing (detail 0%, structure 64%): the comp shows material the build does not",
+          "region element-44 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+          "region element-45 is missing (detail 1%, structure 80%): the comp shows material the build does not",
+          "region element-47 is missing (detail 0%, structure 66%): the comp shows material the build does not",
+          "region element-48 is missing (detail 0%, structure 65%): the comp shows material the build does not",
+          "region element-49 is missing (detail 0%, structure 98%): the comp shows material the build does not",
+          "region element-50 is missing (detail 0%, structure 89%): the comp shows material the build does not",
+          "region element-1 (text) is contradicted (structure 41%, detail added 23%): the composition of this text region differs from the comp; re-derive it from the spec box",
+          "control element-39 drifts to 61% (structure 62%, color 88%): open .impeccable/review/diff/hero/regions/element-39.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification"
+        ],
+        "regionReasons": {
+          "element-18": [
+            "region element-18 is missing (detail 0%, structure 82%): the comp shows material the build does not"
+          ],
+          "element-19": [
+            "region element-19 is missing (detail 0%, structure 88%): the comp shows material the build does not"
+          ],
+          "element-20": [
+            "region element-20 is missing (detail 0%, structure 62%): the comp shows material the build does not"
+          ],
+          "element-21": [
+            "region element-21 is missing (detail 0%, structure 74%): the comp shows material the build does not"
+          ],
+          "element-26": [
+            "region element-26 is missing (detail 0%, structure 58%): the comp shows material the build does not"
+          ],
+          "element-27": [
+            "region element-27 is missing (detail 0%, structure 75%): the comp shows material the build does not"
+          ],
+          "element-28": [
+            "region element-28 is missing (detail 10%, structure 96%): the comp shows material the build does not"
+          ],
+          "element-29": [
+            "region element-29 is missing (detail 0%, structure 88%): the comp shows material the build does not"
+          ],
+          "element-31": [
+            "region element-31 is missing (detail 0%, structure 31%): the comp shows material the build does not"
+          ],
+          "element-32": [
+            "region element-32 is missing (detail 0%, structure 65%): the comp shows material the build does not"
+          ],
+          "element-33": [
+            "region element-33 is missing (detail 0%, structure 70%): the comp shows material the build does not"
+          ],
+          "element-34": [
+            "region element-34 is missing (detail 3%, structure 61%): the comp shows material the build does not"
+          ],
+          "element-35": [
+            "region element-35 is missing (detail 12%, structure 82%): the comp shows material the build does not"
+          ],
+          "element-36": [
+            "region element-36 is missing (detail 13%, structure 86%): the comp shows material the build does not"
+          ],
+          "element-37": [
+            "region element-37 is missing (detail 3%, structure 69%): the comp shows material the build does not"
+          ],
+          "element-38": [
+            "region element-38 is missing (detail 3%, structure 62%): the comp shows material the build does not"
+          ],
+          "element-40": [
+            "region element-40 is missing (detail 0%, structure 93%): the comp shows material the build does not"
+          ],
+          "element-41": [
+            "region element-41 is missing (detail 0%, structure 92%): the comp shows material the build does not"
+          ],
+          "element-42": [
+            "region element-42 is missing (detail 0%, structure 39%): the comp shows material the build does not"
+          ],
+          "element-43": [
+            "region element-43 is missing (detail 0%, structure 64%): the comp shows material the build does not"
+          ],
+          "element-44": [
+            "region element-44 is missing (detail 0%, structure 70%): the comp shows material the build does not"
+          ],
+          "element-45": [
+            "region element-45 is missing (detail 1%, structure 80%): the comp shows material the build does not"
+          ],
+          "element-47": [
+            "region element-47 is missing (detail 0%, structure 66%): the comp shows material the build does not"
+          ],
+          "element-48": [
+            "region element-48 is missing (detail 0%, structure 65%): the comp shows material the build does not"
+          ],
+          "element-49": [
+            "region element-49 is missing (detail 0%, structure 98%): the comp shows material the build does not"
+          ],
+          "element-50": [
+            "region element-50 is missing (detail 0%, structure 89%): the comp shows material the build does not"
+          ],
+          "element-1": [
+            "region element-1 (text) is contradicted (structure 41%, detail added 23%): the composition of this text region differs from the comp; re-derive it from the spec box"
+          ],
+          "element-39": [
+            "control element-39 drifts to 61% (structure 62%, color 88%): open .impeccable/review/diff/hero/regions/element-39.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification"
+          ]
+        },
+        "summary": "hero 77% (drift)",
+        "score": 0.7682,
+        "verdict": "drift",
+        "report": ".impeccable/review/diff/hero/report.json",
+        "sideBySide": "/Users/xavierreid/Open-Resume-Toolkit/.impeccable/review/diff/hero/side-by-side.png",
+        "worst": [
+          "element-31 missing 44%",
+          "element-42 missing 48%",
+          "element-34 missing 53%"
+        ],
+        "worstIds": [
+          "element-31",
+          "element-42",
+          "element-34"
+        ],
+        "worstCrops": [
+          {
+            "id": "element-31",
+            "verdict": "missing",
+            "score": {
+              "overall": 0.4443,
+              "structure": 0.3076,
+              "color": 0.8739,
+              "colorIntersection": 0.8278,
+              "paletteMatch": 0.8987,
+              "detail": 0,
+              "detailRaw": 0.0384,
+              "detailAdded": 0.375,
+              "bands": 0.1417
+            },
+            "file": ".impeccable/review/diff/hero/regions/element-31.png"
+          },
+          {
+            "id": "element-42",
+            "verdict": "missing",
+            "score": {
+              "overall": 0.4796,
+              "structure": 0.385,
+              "color": 0.8751,
+              "colorIntersection": 0.8364,
+              "paletteMatch": 0.896,
+              "detail": 0,
+              "detailRaw": 0.0067,
+              "detailAdded": 0.3021,
+              "bands": 0
+            },
+            "file": ".impeccable/review/diff/hero/regions/element-42.png"
+          },
+          {
+            "id": "element-34",
+            "verdict": "missing",
+            "score": {
+              "overall": 0.5327,
+              "structure": 0.6075,
+              "color": 0.8192,
+              "colorIntersection": 0.8077,
+              "paletteMatch": 0.8254,
+              "detail": 0.0273,
+              "detailRaw": 0.069,
+              "detailAdded": 0.0833,
+              "bands": 0.2
+            },
+            "file": ".impeccable/review/diff/hero/regions/element-34.png"
+          }
+        ],
+        "advisories": [
+          "(advisory, above the 72% bar) region element-21: its ink sits in a 186x26px box in the comp and 133x13px in the build (padding, row height, or size); match the box, not only the position",
+          "(advisory, unchanged for 3+ attempts) text element-1: cap height 62.1px in the build, 26.5px in the comp (+134%); set font-size so the cap height renders at 26.5px (also element-7, element-12, element-21, element-40, element-42)",
+          "(advisory, unchanged for 3+ attempts) text element-46: letter-spacing is wider than the comp's (gap 0.111 vs 0.060 of the cap height); set letter-spacing to close it by about 1px",
+          "(advisory, unchanged for 3+ attempts) text element-22: 1 line in the build, 2 in the comp; the measure (max-width, font-size, letter-spacing) wraps it differently, so the block is a different shape",
+          "(advisory, unchanged for 3+ attempts) text element-2: the face renders 41% lighter than the comp's (ink density 0.36 vs 0.61); raise a weight step or use the ranked face (also element-16)",
+          "(advisory, unchanged for 3+ attempts) text element-20: ink is #596977 in the build, #1a3939 in the comp; use the comp's colour (also element-40, element-46)",
+          "(advisory, unchanged for 3+ attempts) text element-8: it starts 222px further right than in the comp (also element-40)",
+          "(advisory, unchanged for 3+ attempts) text element-25: its first line starts 14px lower than in the comp (37px vs 23px into the region box); the spacing above it is too large (also element-30, element-40)",
+          "(advisory, unchanged for 3+ attempts) control element-6: its rule sits 1px into the box in the comp and 79px in the build (+78px), so the strip is taller than the comp's; match the height, not only the position",
+          "(advisory, unchanged for 3+ attempts) control element-20: its rule sits 1px into the box in the comp and 41px in the build (+40px), so the strip is taller than the comp's; match the height, not only the position",
+          "(advisory, unchanged for 3+ attempts) control element-27: its rule sits 1px into the box in the comp and 15px in the build (+14px), so the strip is taller than the comp's; match the height, not only the position",
+          "(advisory, unchanged for 3+ attempts) control element-31: its rule sits 27px into the box in the comp and 1px in the build (-26px), so the strip is shorter than the comp's; match the height, not only the position",
+          "(advisory, unchanged for 3+ attempts) control element-39: its rule sits 1px into the box in the comp and 23px in the build (+22px), so the strip is taller than the comp's; match the height, not only the position",
+          "(advisory, unchanged for 3+ attempts) control element-42: its rule sits 27px into the box in the comp and 5px in the build (-22px), so the strip is shorter than the comp's; match the height, not only the position",
+          "(advisory, unchanged for 3+ attempts) chrome editing-block: its rule sits 1px into the box in the comp and 44px in the build (+43px), so the strip is taller than the comp's; match the height, not only the position"
+        ],
+        "regionVerdicts": {
+          "element-1": "contradicted",
+          "element-2": "match",
+          "element-3": "match",
+          "element-4": "match",
+          "element-5": "match",
+          "element-6": "match",
+          "element-7": "match",
+          "page-title": "match",
+          "element-8": "drift",
+          "element-9": "match",
+          "element-10": "match",
+          "element-11": "match",
+          "element-12": "drift",
+          "element-13": "drift",
+          "element-14": "match",
+          "element-15": "match",
+          "element-16": "match",
+          "element-17": "match",
+          "element-18": "missing",
+          "element-19": "missing",
+          "element-20": "missing",
+          "element-21": "missing",
+          "element-22": "match",
+          "element-23": "match",
+          "element-24": "drift",
+          "element-25": "drift",
+          "element-26": "missing",
+          "element-27": "missing",
+          "element-28": "missing",
+          "element-29": "missing",
+          "element-30": "drift",
+          "element-31": "missing",
+          "element-32": "missing",
+          "element-33": "missing",
+          "element-34": "missing",
+          "element-35": "missing",
+          "element-36": "missing",
+          "element-37": "missing",
+          "element-38": "missing",
+          "element-39": "drift",
+          "element-40": "missing",
+          "element-41": "missing",
+          "element-42": "missing",
+          "element-43": "missing",
+          "element-44": "missing",
+          "element-45": "missing",
+          "element-46": "match",
+          "element-47": "missing",
+          "element-48": "missing",
+          "element-49": "missing",
+          "element-50": "missing",
+          "element-51": "match",
+          "rail": "match",
+          "page-head": "match",
+          "toolbar": "match",
+          "section-panel": "match",
+          "paper": "drift",
+          "editing-block": "drift",
+          "section-add": "drift",
+          "section-list": "match"
+        },
+        "at": "2026-10-05T00:59:56.246Z"
+      },
+      "forced": null,
+      "readingsSeen": {
+        "text element-1: cap height 62.1px in the build, 26.5px in the comp (+134%); set font-size so the cap height renders at 26.5px (also element-7, element-12, element-21, element-26, element-46)": 1,
+        "text element-30: letter-spacing is wider than the comp's (gap 0.137 vs 0.063 of the cap height); set letter-spacing to close it by about 1px": 1,
+        "text element-41: letter-spacing is wider than the comp's (gap 0.166 vs 0.063 of the cap height); set letter-spacing to close it by about 2px": 1,
+        "text element-22: 1 line in the build, 2 in the comp; the measure (max-width, font-size, letter-spacing) wraps it differently, so the block is a different shape": 5,
+        "text element-2: the face renders 41% lighter than the comp's (ink density 0.36 vs 0.61); raise a weight step or use the ranked face (also element-16, element-19, element-43)": 1,
+        "text element-20: ink is #596977 in the build, #1a3939 in the comp; use the comp's colour (also element-26, element-30, element-46, element-49)": 1,
+        "text element-8: it starts 222px further right than in the comp": 1,
+        "text element-25: its first line starts 14px lower than in the comp (37px vs 23px into the region box); the spacing above it is too large (also element-30, element-41)": 1,
+        "control element-6: its rule sits 1px into the box in the comp and 79px in the build (+78px), so the strip is taller than the comp's; match the height, not only the position": 5,
+        "control element-20: its rule sits 1px into the box in the comp and 41px in the build (+40px), so the strip is taller than the comp's; match the height, not only the position": 5,
+        "control element-26: its ink is 12px tall in the build and 26px in the comp (-14px); match the height, not only the position": 1,
+        "control element-39: its rule sits 1px into the box in the comp and 9px in the build (+8px), so the strip is taller than the comp's; match the height, not only the position": 1,
+        "control element-42: its rule sits 27px into the box in the comp and 35px in the build (+8px), so the strip is taller than the comp's; match the height, not only the position": 1,
+        "chrome editing-block: its rule sits 1px into the box in the comp and 78px in the build (+77px), so the strip is taller than the comp's; match the height, not only the position": 1,
+        "text element-1: cap height 62.1px in the build, 26.5px in the comp (+134%); set font-size so the cap height renders at 26.5px (also element-7, element-12, element-21, element-40, element-42)": 4,
+        "text element-46: letter-spacing is wider than the comp's (gap 0.111 vs 0.060 of the cap height); set letter-spacing to close it by about 1px": 4,
+        "text element-2: the face renders 41% lighter than the comp's (ink density 0.36 vs 0.61); raise a weight step or use the ranked face (also element-16)": 4,
+        "text element-20: ink is #596977 in the build, #1a3939 in the comp; use the comp's colour (also element-40, element-46)": 4,
+        "text element-8: it starts 222px further right than in the comp (also element-40)": 4,
+        "text element-25: its first line starts 14px lower than in the comp (37px vs 23px into the region box); the spacing above it is too large (also element-30, element-40)": 4,
+        "control element-27: its rule sits 1px into the box in the comp and 15px in the build (+14px), so the strip is taller than the comp's; match the height, not only the position": 4,
+        "control element-31: its rule sits 27px into the box in the comp and 1px in the build (-26px), so the strip is shorter than the comp's; match the height, not only the position": 4,
+        "control element-39: its rule sits 1px into the box in the comp and 23px in the build (+22px), so the strip is taller than the comp's; match the height, not only the position": 4,
+        "control element-42: its rule sits 27px into the box in the comp and 5px in the build (-22px), so the strip is shorter than the comp's; match the height, not only the position": 4,
+        "chrome editing-block: its rule sits 1px into the box in the comp and 44px in the build (+43px), so the strip is taller than the comp's; match the height, not only the position": 4
+      },
+      "history": [
+        {
+          "at": "2026-10-05T00:23:42.333Z",
+          "score": 0.7984,
+          "worstIds": [
+            "element-13",
+            "element-39",
+            "element-42"
+          ],
+          "blockingReasons": [
+            "region element-18 is missing (detail 0%, structure 80%): the comp shows material the build does not",
+            "region element-19 is missing (detail 0%, structure 89%): the comp shows material the build does not",
+            "region element-20 is missing (detail 0%, structure 62%): the comp shows material the build does not",
+            "region element-21 is missing (detail 0%, structure 74%): the comp shows material the build does not",
+            "region element-26 is missing (detail 0%, structure 68%): the comp shows material the build does not",
+            "region element-27 is missing (detail 0%, structure 85%): the comp shows material the build does not",
+            "region element-30 is missing (detail 0%, structure 97%): the comp shows material the build does not",
+            "region element-31 is missing (detail 7%, structure 60%): the comp shows material the build does not",
+            "region element-32 is missing (detail 13%, structure 68%): the comp shows material the build does not",
+            "region element-33 is missing (detail 13%, structure 71%): the comp shows material the build does not",
+            "region element-34 is missing (detail 0%, structure 53%): the comp shows material the build does not",
+            "region element-35 is missing (detail 2%, structure 83%): the comp shows material the build does not",
+            "region element-36 is missing (detail 2%, structure 89%): the comp shows material the build does not",
+            "region element-37 is missing (detail 1%, structure 70%): the comp shows material the build does not",
+            "region element-38 is missing (detail 0%, structure 58%): the comp shows material the build does not",
+            "region element-39 is missing (detail 0%, structure 40%): the comp shows material the build does not",
+            "region element-40 is missing (detail 0%, structure 91%): the comp shows material the build does not",
+            "region element-41 is missing (detail 0%, structure 92%): the comp shows material the build does not",
+            "region element-42 is missing (detail 0%, structure 42%): the comp shows material the build does not",
+            "region element-43 is missing (detail 0%, structure 47%): the comp shows material the build does not",
+            "region element-44 is missing (detail 0%, structure 67%): the comp shows material the build does not",
+            "region element-45 is missing (detail 0%, structure 76%): the comp shows material the build does not",
+            "region element-46 is missing (detail 3%, structure 86%): the comp shows material the build does not",
+            "region element-47 is missing (detail 0%, structure 66%): the comp shows material the build does not",
+            "region element-48 is missing (detail 0%, structure 65%): the comp shows material the build does not",
+            "region element-49 is missing (detail 9%, structure 94%): the comp shows material the build does not",
+            "region element-50 is missing (detail 0%, structure 87%): the comp shows material the build does not",
+            "region element-1 (text) is contradicted (structure 41%, detail added 23%): the composition of this text region differs from the comp; re-derive it from the spec box",
+            "region element-13 (control) is contradicted (structure 62%, detail added 15%): this control differs from the comp: inspect its lettering and visible shape separately against the crop and the measured readings; preserve the region's control classification",
+            "control element-16 drifts to 64% (structure 88%, color 40%): open .impeccable/review/diff/hero/regions/element-16.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification"
+          ],
+          "regionVerdicts": {
+            "element-1": "contradicted",
+            "element-2": "match",
+            "element-3": "match",
+            "element-4": "match",
+            "element-5": "match",
+            "element-6": "match",
+            "element-7": "match",
+            "page-title": "match",
+            "element-8": "drift",
+            "element-9": "match",
+            "element-10": "match",
+            "element-11": "match",
+            "element-12": "drift",
+            "element-13": "contradicted",
+            "element-14": "match",
+            "element-15": "match",
+            "element-16": "drift",
+            "element-17": "drift",
+            "element-18": "missing",
+            "element-19": "missing",
+            "element-20": "missing",
+            "element-21": "missing",
+            "element-22": "match",
+            "element-23": "match",
+            "element-24": "drift",
+            "element-25": "drift",
+            "element-26": "missing",
+            "element-27": "missing",
+            "element-28": "drift",
+            "element-29": "drift",
+            "element-30": "missing",
+            "element-31": "missing",
+            "element-32": "missing",
+            "element-33": "missing",
+            "element-34": "missing",
+            "element-35": "missing",
+            "element-36": "missing",
+            "element-37": "missing",
+            "element-38": "missing",
+            "element-39": "missing",
+            "element-40": "missing",
+            "element-41": "missing",
+            "element-42": "missing",
+            "element-43": "missing",
+            "element-44": "missing",
+            "element-45": "missing",
+            "element-46": "missing",
+            "element-47": "missing",
+            "element-48": "missing",
+            "element-49": "missing",
+            "element-50": "missing",
+            "element-51": "match",
+            "rail": "match",
+            "page-head": "match",
+            "toolbar": "match",
+            "section-panel": "match",
+            "paper": "drift",
+            "editing-block": "drift",
+            "section-add": "drift",
+            "section-list": "drift"
+          },
+          "artifactHash": "0ea3307927f2"
+        },
+        {
+          "at": "2026-10-05T00:25:34.847Z",
+          "score": 0.7664,
+          "worstIds": [
+            "element-31",
+            "element-42",
+            "element-34"
+          ],
+          "blockingReasons": [
+            "region element-18 is missing (detail 0%, structure 82%): the comp shows material the build does not",
+            "region element-19 is missing (detail 0%, structure 88%): the comp shows material the build does not",
+            "region element-20 is missing (detail 0%, structure 62%): the comp shows material the build does not",
+            "region element-21 is missing (detail 0%, structure 74%): the comp shows material the build does not",
+            "region element-26 is missing (detail 0%, structure 58%): the comp shows material the build does not",
+            "region element-27 is missing (detail 0%, structure 75%): the comp shows material the build does not",
+            "region element-28 is missing (detail 10%, structure 96%): the comp shows material the build does not",
+            "region element-29 is missing (detail 0%, structure 88%): the comp shows material the build does not",
+            "region element-31 is missing (detail 0%, structure 31%): the comp shows material the build does not",
+            "region element-32 is missing (detail 0%, structure 65%): the comp shows material the build does not",
+            "region element-33 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+            "region element-34 is missing (detail 3%, structure 61%): the comp shows material the build does not",
+            "region element-35 is missing (detail 12%, structure 82%): the comp shows material the build does not",
+            "region element-36 is missing (detail 13%, structure 86%): the comp shows material the build does not",
+            "region element-37 is missing (detail 3%, structure 69%): the comp shows material the build does not",
+            "region element-38 is missing (detail 3%, structure 62%): the comp shows material the build does not",
+            "region element-40 is missing (detail 0%, structure 93%): the comp shows material the build does not",
+            "region element-41 is missing (detail 0%, structure 92%): the comp shows material the build does not",
+            "region element-42 is missing (detail 0%, structure 39%): the comp shows material the build does not",
+            "region element-43 is missing (detail 0%, structure 64%): the comp shows material the build does not",
+            "region element-44 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+            "region element-45 is missing (detail 1%, structure 80%): the comp shows material the build does not",
+            "region element-47 is missing (detail 0%, structure 66%): the comp shows material the build does not",
+            "region element-48 is missing (detail 0%, structure 65%): the comp shows material the build does not",
+            "region element-49 is missing (detail 0%, structure 98%): the comp shows material the build does not",
+            "region element-50 is missing (detail 0%, structure 89%): the comp shows material the build does not",
+            "region element-1 (text) is contradicted (structure 41%, detail added 23%): the composition of this text region differs from the comp; re-derive it from the spec box",
+            "control element-39 drifts to 61% (structure 62%, color 88%): open .impeccable/review/diff/hero/regions/element-39.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification"
+          ],
+          "regionVerdicts": {
+            "element-1": "contradicted",
+            "element-2": "match",
+            "element-3": "match",
+            "element-4": "match",
+            "element-5": "match",
+            "element-6": "match",
+            "element-7": "match",
+            "page-title": "match",
+            "element-8": "drift",
+            "element-9": "match",
+            "element-10": "match",
+            "element-11": "match",
+            "element-12": "drift",
+            "element-13": "drift",
+            "element-14": "match",
+            "element-15": "match",
+            "element-16": "drift",
+            "element-17": "match",
+            "element-18": "missing",
+            "element-19": "missing",
+            "element-20": "missing",
+            "element-21": "missing",
+            "element-22": "match",
+            "element-23": "match",
+            "element-24": "drift",
+            "element-25": "drift",
+            "element-26": "missing",
+            "element-27": "missing",
+            "element-28": "missing",
+            "element-29": "missing",
+            "element-30": "drift",
+            "element-31": "missing",
+            "element-32": "missing",
+            "element-33": "missing",
+            "element-34": "missing",
+            "element-35": "missing",
+            "element-36": "missing",
+            "element-37": "missing",
+            "element-38": "missing",
+            "element-39": "drift",
+            "element-40": "missing",
+            "element-41": "missing",
+            "element-42": "missing",
+            "element-43": "missing",
+            "element-44": "missing",
+            "element-45": "missing",
+            "element-46": "match",
+            "element-47": "missing",
+            "element-48": "missing",
+            "element-49": "missing",
+            "element-50": "missing",
+            "element-51": "match",
+            "rail": "match",
+            "page-head": "match",
+            "toolbar": "match",
+            "section-panel": "match",
+            "paper": "drift",
+            "editing-block": "drift",
+            "section-add": "drift",
+            "section-list": "match"
+          },
+          "artifactHash": "915b374000be"
+        },
+        {
+          "at": "2026-10-05T00:47:25.105Z",
+          "score": 0.7682,
+          "worstIds": [
+            "element-31",
+            "element-42",
+            "element-34"
+          ],
+          "blockingReasons": [
+            "region element-18 is missing (detail 0%, structure 82%): the comp shows material the build does not",
+            "region element-19 is missing (detail 0%, structure 88%): the comp shows material the build does not",
+            "region element-20 is missing (detail 0%, structure 62%): the comp shows material the build does not",
+            "region element-21 is missing (detail 0%, structure 74%): the comp shows material the build does not",
+            "region element-26 is missing (detail 0%, structure 58%): the comp shows material the build does not",
+            "region element-27 is missing (detail 0%, structure 75%): the comp shows material the build does not",
+            "region element-28 is missing (detail 10%, structure 96%): the comp shows material the build does not",
+            "region element-29 is missing (detail 0%, structure 88%): the comp shows material the build does not",
+            "region element-31 is missing (detail 0%, structure 31%): the comp shows material the build does not",
+            "region element-32 is missing (detail 0%, structure 65%): the comp shows material the build does not",
+            "region element-33 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+            "region element-34 is missing (detail 3%, structure 61%): the comp shows material the build does not",
+            "region element-35 is missing (detail 12%, structure 82%): the comp shows material the build does not",
+            "region element-36 is missing (detail 13%, structure 86%): the comp shows material the build does not",
+            "region element-37 is missing (detail 3%, structure 69%): the comp shows material the build does not",
+            "region element-38 is missing (detail 3%, structure 62%): the comp shows material the build does not",
+            "region element-40 is missing (detail 0%, structure 93%): the comp shows material the build does not",
+            "region element-41 is missing (detail 0%, structure 92%): the comp shows material the build does not",
+            "region element-42 is missing (detail 0%, structure 39%): the comp shows material the build does not",
+            "region element-43 is missing (detail 0%, structure 64%): the comp shows material the build does not",
+            "region element-44 is missing (detail 0%, structure 70%): the comp shows material the build does not",
+            "region element-45 is missing (detail 1%, structure 80%): the comp shows material the build does not",
+            "region element-47 is missing (detail 0%, structure 66%): the comp shows material the build does not",
+            "region element-48 is missing (detail 0%, structure 65%): the comp shows material the build does not",
+            "region element-49 is missing (detail 0%, structure 98%): the comp shows material the build does not",
+            "region element-50 is missing (detail 0%, structure 89%): the comp shows material the build does not",
+            "region element-1 (text) is contradicted (structure 41%, detail added 23%): the composition of this text region differs from the comp; re-derive it from the spec box",
+            "control element-39 drifts to 61% (structure 62%, color 88%): open .impeccable/review/diff/hero/regions/element-39.png and compare its lettering and visible shape separately; use the measured readings and preserve the region's control classification"
+          ],
+          "regionVerdicts": {
+            "element-1": "contradicted",
+            "element-2": "match",
+            "element-3": "match",
+            "element-4": "match",
+            "element-5": "match",
+            "element-6": "match",
+            "element-7": "match",
+            "page-title": "match",
+            "element-8": "drift",
+            "element-9": "match",
+            "element-10": "match",
+            "element-11": "match",
+            "element-12": "drift",
+            "element-13": "drift",
+            "element-14": "match",
+            "element-15": "match",
+            "element-16": "match",
+            "element-17": "match",
+            "element-18": "missing",
+            "element-19": "missing",
+            "element-20": "missing",
+            "element-21": "missing",
+            "element-22": "match",
+            "element-23": "match",
+            "element-24": "drift",
+            "element-25": "drift",
+            "element-26": "missing",
+            "element-27": "missing",
+            "element-28": "missing",
+            "element-29": "missing",
+            "element-30": "drift",
+            "element-31": "missing",
+            "element-32": "missing",
+            "element-33": "missing",
+            "element-34": "missing",
+            "element-35": "missing",
+            "element-36": "missing",
+            "element-37": "missing",
+            "element-38": "missing",
+            "element-39": "drift",
+            "element-40": "missing",
+            "element-41": "missing",
+            "element-42": "missing",
+            "element-43": "missing",
+            "element-44": "missing",
+            "element-45": "missing",
+            "element-46": "match",
+            "element-47": "missing",
+            "element-48": "missing",
+            "element-49": "missing",
+            "element-50": "missing",
+            "element-51": "match",
+            "rail": "match",
+            "page-head": "match",
+            "toolbar": "match",
+            "section-panel": "match",
+            "paper": "drift",
+            "editing-block": "drift",
+            "section-add": "drift",
+            "section-list": "match"
+          },
+          "artifactHash": "00f16467e150"
+        }
+      ],
+      "records": 1
+    },
+    "sections": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "motion": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "responsive": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "review": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    }
+  },
+  "finish": null,
+  "sessionId": "01a10942-5697-7f62-a1bf-e2a46c956ceb",
+  "plates": {}
+}
