@@ -30,9 +30,11 @@ const statuses = [
 
 export function TrackerFields({
   entry,
+  disabled = false,
   onChange,
 }: {
   entry: TrackerEntry;
+  disabled?: boolean;
   onChange: (entry: TrackerEntry) => void;
 }) {
   function edit<K extends keyof TrackerEntry>(key: K, value: TrackerEntry[K]) {
@@ -43,6 +45,7 @@ export function TrackerFields({
       <label>
         Company
         <input
+          disabled={disabled}
           maxLength={200}
           value={entry.company}
           onChange={(event) => edit("company", event.target.value)}
@@ -51,6 +54,7 @@ export function TrackerFields({
       <label>
         Job title
         <input
+          disabled={disabled}
           maxLength={200}
           value={entry.title}
           onChange={(event) => edit("title", event.target.value)}
@@ -59,6 +63,7 @@ export function TrackerFields({
       <label>
         Location
         <input
+          disabled={disabled}
           maxLength={200}
           value={entry.location}
           onChange={(event) => edit("location", event.target.value)}
@@ -67,6 +72,7 @@ export function TrackerFields({
       <label>
         Date applied
         <input
+          disabled={disabled}
           type="date"
           value={entry.dateApplied}
           onChange={(event) => edit("dateApplied", event.target.value)}
@@ -75,6 +81,7 @@ export function TrackerFields({
       <label>
         Status
         <select
+          disabled={disabled}
           value={entry.status}
           onChange={(event) =>
             onChange({
@@ -99,6 +106,7 @@ export function TrackerFields({
         <label>
           Custom status
           <input
+            disabled={disabled}
             maxLength={80}
             value={entry.customStatus}
             onChange={(event) => edit("customStatus", event.target.value)}
@@ -108,6 +116,7 @@ export function TrackerFields({
       <label>
         Link or source
         <input
+          disabled={disabled}
           type="text"
           maxLength={4096}
           value={entry.sourceUrl}

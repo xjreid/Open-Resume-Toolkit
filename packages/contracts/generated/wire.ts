@@ -141,6 +141,7 @@ export type ApplicationWorkspace = {
   roleInfo: RoleInfo;
   schemaVersion: number;
   style: DocumentStyle;
+  trackerMetadata?: TrackerMetadata | null;
 };
 export type ApplyImportReviewPayload = {
   decisionsJson: string;

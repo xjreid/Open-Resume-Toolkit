@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Resume Toolkit Chrome Extension — Privacy Policy</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        background: #f2f6f7;
+        color: #1c3135;
+        font:
+          17px/1.6 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 800px;
+        margin: 48px auto;
+        padding: 40px;
+        background: white;
+        border: 1px solid #d8e3e5;
+        border-radius: 10px;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.2;
+      }
+      h2 {
+        font-size: 21px;
+        margin-top: 32px;
+      }
+      a {
+        color: #28676c;
+      }
+      .date {
+        color: #566c70;
+      }
+      @media (max-width: 640px) {
+        main {
+          margin: 0;
+          padding: 24px;
+          border-radius: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Open Resume Toolkit Chrome Extension — Privacy Policy</h1>
+      <p class="date">Effective date: October 6, 2026</p>
+      <p>
+        This policy describes the Open Resume Toolkit Chrome extension and its
+        local connection to the Open Resume Toolkit desktop app. The current
+        private testing release requires the compatible development desktop
+        build and native messaging host on macOS Apple Silicon.
+      </p>
+      <h2>Information handled</h2>
+      <p>
+        When you start Capture from the desktop application overlay and select
+        two corners on the active web page, the extension previews rendered text
+        inside that area. Completing the selection sends the selected text,
+        source page URL, and page title to your local desktop app. Scrolling
+        during selection can include text that has moved off-screen.
+      </p>
+      <p>
+        Selected text may contain personal information visible on the page, such
+        as a recruiter's name or contact details. The extension does not request
+        those details separately. It excludes hidden text and password or
+        editable form values; it does not read cookies, your complete browsing
+        history, resume files, or AI provider keys.
+      </p>
+      <p>
+        The extension removes URL credentials, fragments, and known sensitive or
+        tracking query parameters before delivering the source link. This does
+        not guarantee that every site's URL is free of sensitive information.
+        You can edit the captured text and remove the URL in the desktop app.
+      </p>
+      <h2>Purpose and transfer</h2>
+      <p>
+        Captured content is used to prepare your application workspace for
+        review. The extension maintains a local status and command connection
+        through Chrome native messaging to the registered Open Resume Toolkit
+        host on the same computer. A desktop-authorized capture session is
+        required before it delivers a capture.
+      </p>
+      <p>
+        The extension does not send captures to an Open Resume Toolkit server,
+        advertiser, analytics service, or AI provider. It does not sell user
+        data, use it for advertising, use it for unrelated purposes, or use it
+        for creditworthiness or lending decisions.
+      </p>
+      <p>
+        Capturing does not start AI processing. Any later AI use that you
+        initiate in the desktop app is a separate operation controlled by that
+        app's settings and privacy disclosures. When you choose to use a
+        provider, the desktop app may send the material needed for that
+        operation to the provider you selected.
+      </p>
+      <h2>Storage and retention</h2>
+      <p>
+        The extension holds an active capture temporarily in memory. It does not
+        retain captures in extension storage, queue failed captures for later
+        delivery, or log captured content. Cancelling or finishing a capture
+        ends its active selection. Uninstalling the extension does not delete
+        data already accepted by the desktop app.
+      </p>
+      <p>
+        The desktop app stores accepted captures in its local encrypted
+        application workspace. That data remains under the desktop app's storage
+        controls until it is replaced or removed. You can edit the workspace and
+        use the desktop app's supported local-data deletion controls. Copies you
+        export or back up must be managed separately.
+      </p>
+      <h2>Your controls</h2>
+      <p>
+        You decide when to start Capture and which text to select. Escape or
+        desktop Cancel ends selection; changing pages or tabs, resizing, or
+        session expiry also cancels it. You can review and edit accepted text
+        and its link in the desktop app, restrict site access through Chrome,
+        disable or uninstall the extension, and disable the desktop browser
+        connection.
+      </p>
+      <p>
+        HTTP and HTTPS site access enables requested capture on different job
+        sites. It does not cause automatic background reading of their text. The
+        scripting permission draws the box and reads selected rendered text. The
+        native messaging permission enables local delivery. The alarms
+        permission schedules content-free connection recovery; it does not
+        collect web content.
+      </p>
+      <h2>Development connection</h2>
+      <p>
+        The current development connection must be explicitly enabled in the
+        desktop app. It uses a temporary local authentication key readable by
+        your macOS account; the key is removed on disconnect or normal quit. It
+        trusts processes under that account and does not establish
+        signed-process identity. It does not export database keys or AI provider
+        keys. Production-extension testing uses an explicitly registered
+        development native adapter, which must be replaced when the signed
+        production host is installed.
+      </p>
+      <h2>Limited use</h2>
+      <p>
+        Open Resume Toolkit's use of information received through Chrome APIs
+        follows the Chrome Web Store User Data Policy, including its Limited Use
+        requirements. Information is used only for the disclosed user-facing
+        capture and application-review workflow.
+      </p>
+      <h2>Contact</h2>
+      <p>
+        For support or privacy questions, contact
+        <a href="mailto:xjrspam1@gmail.com">xjrspam1@gmail.com</a>.
+      </p>
+    </main>
+  </body>
+</html>

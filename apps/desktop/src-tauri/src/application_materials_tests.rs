@@ -11,6 +11,7 @@ use tempfile::TempDir;
 fn workspace() -> ApplicationWorkspace {
     ApplicationWorkspace {
         schema_version: SCHEMA_VERSION,
+        tracker_metadata: None,
         published_revision: 1,
         job_description: "Rust required".into(),
         job_url: String::new(),

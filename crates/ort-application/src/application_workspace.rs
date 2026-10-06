@@ -171,6 +171,10 @@ pub fn validate_workspace(workspace: &ApplicationWorkspace) -> Result<(), Storag
         || workspace.job_description.trim().is_empty()
         || workspace.job_description.chars().count() > MAX_JOB_CHARS
         || !ort_domain::valid_application_url(&workspace.job_url)
+        || workspace
+            .tracker_metadata
+            .as_ref()
+            .is_some_and(|metadata| metadata.validate().is_err())
         || [
             &workspace.role_info.company,
             &workspace.role_info.title,

@@ -759,6 +759,16 @@
         },
         "style": {
           "$ref": "#/$defs/DocumentStyle"
+        },
+        "trackerMetadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackerMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

@@ -5,6 +5,8 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import {
   existsSync,
+  cpSync,
+  readFileSync,
   mkdtempSync,
   mkdirSync,
   writeFileSync,
@@ -14,6 +16,10 @@ import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 
 const development = process.argv[2] === "dev-bridge";
+const storeContract = development && process.env.ORT_QA_STORE_CONTRACT === "1";
+const identityFile = storeContract
+  ? "chrome-store-key.json"
+  : "chrome-dev-key.json";
 const qaRoot = process.env.ORT_DEV_QA_ROOT;
 if (development && (!qaRoot || !process.env.ORT_DEV_QA_HOST))
   throw new Error(
@@ -58,11 +64,41 @@ await new Promise((ready, reject) => {
   server.listen(0, "127.0.0.1", ready);
 });
 const profile = mkdtempSync(join(tmpdir(), "ort-chrome-qa-"));
+const nativeHostName = storeContract
+  ? "com.openresumetoolkit"
+  : "com.openresumetoolkit.dev";
+let extensionPath = resolve(
+  root,
+  development
+    ? "apps/extension/dist/chrome-dev-bridge"
+    : "apps/extension/dist/chrome",
+);
+if (storeContract) {
+  // Same production JavaScript and native-host name. Only the public manifest
+  // key is supplied locally, as it will be after the dashboard draft upload.
+  extensionPath = join(profile, "store-extension");
+  cpSync(resolve(root, "apps/extension/dist/chrome"), extensionPath, {
+    recursive: true,
+  });
+  const manifestPath = join(extensionPath, "manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  manifest.key = JSON.parse(
+    readFileSync(
+      resolve(root, `apps/extension/manifest/${identityFile}`),
+      "utf8",
+    ),
+  ).key;
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  assert.match(
+    readFileSync(join(extensionPath, "bridge-config.js"), "utf8"),
+    /"com\.openresumetoolkit"/,
+  );
+}
 if (development) {
   mkdirSync(join(profile, "NativeMessagingHosts"));
   const { key } = JSON.parse(
     (await import("node:fs")).readFileSync(
-      resolve(root, "apps/extension/manifest/chrome-dev-key.json"),
+      resolve(root, `apps/extension/manifest/${identityFile}`),
       "utf8",
     ),
   );
@@ -75,9 +111,9 @@ if (development) {
     .map((byte) => String.fromCharCode(97 + (byte >> 4), 97 + (byte & 15)))
     .join("");
   writeFileSync(
-    join(profile, "NativeMessagingHosts/com.openresumetoolkit.dev.json"),
+    join(profile, `NativeMessagingHosts/${nativeHostName}.json`),
     JSON.stringify({
-      name: "com.openresumetoolkit.dev",
+      name: nativeHostName,
       description: "Isolated development QA",
       path: process.env.ORT_DEV_QA_HOST,
       type: "stdio",
@@ -179,12 +215,7 @@ const onExit = new Promise((ready) =>
 try {
   const version = await send("Browser.getVersion");
   const { id } = await send("Extensions.loadUnpacked", {
-    path: resolve(
-      root,
-      development
-        ? "apps/extension/dist/chrome-dev-bridge"
-        : "apps/extension/dist/chrome",
-    ),
+    path: extensionPath,
   });
   const { targetId } = await send("Target.createTarget", {
     url: `${origin}/job?jobId=42&token=secret&utm_source=qa#section`,
@@ -221,6 +252,12 @@ try {
     await evaluate(
       worker,
       `globalThis.qa={commands:[],captures:[],events:[]};chrome.runtime.connectNative=()=>{let reply,disconnect;return {onMessage:{addListener:fn=>reply=fn},onDisconnect:{addListener:fn=>disconnect=fn},disconnect:()=>disconnect?.(),postMessage:message=>queueMicrotask(()=>{let response={ok:true,protocolVersion:1};if(message.kind==='bridge.poll')response.value={ready:true,commands:qa.commands};if(message.kind==='capture.selection'){qa.captures.push(message);qa.commands=[];response.value={requestId:message.requestId};}if(message.kind==='capture.event'){qa.events.push(message);if(message.phase==='failed'||message.phase==='cancelled')qa.commands=[];}reply(response);})};};`,
+    );
+    // Unpacked extensions may schedule a sub-30-second alarm for this fixture.
+    // Exercise the real worker wake event rather than exposing a test API.
+    await evaluate(
+      worker,
+      `chrome.alarms.create('ort-bridge-reconnect',{delayInMinutes:0.001,periodInMinutes:0.5})`,
     );
   }
   const mark = (name, text = "") => {
@@ -575,11 +612,23 @@ try {
   assert.equal(await evaluate(worker, "typeof chrome.storage"), "undefined");
   assert.deepEqual(exceptions, []);
   writeFileSync(
-    join(output, development ? "chrome-dev-qa.json" : "chrome-qa.json"),
+    join(
+      output,
+      storeContract
+        ? "chrome-store-contract-qa.json"
+        : development
+          ? "chrome-dev-qa.json"
+          : "chrome-qa.json",
+    ),
     JSON.stringify(
       {
         browser: version.product,
         extensionId: id,
+        productionExtensionContract: storeContract,
+        nativeHostName:
+          storeContract || !development
+            ? "com.openresumetoolkit"
+            : nativeHostName,
         scope:
           "Overlay-authorized two-click capture, live exact text highlights including expansion/shrinkage and cleanup without removing page-owned highlights, scroll-anchored rectangle, cancellation after scrolling, whole-page and panel scroll capture including off-screen start/middle text, job/question/partial text, URL cleanup, empty region, same-URL reload, empty extension storage",
         nativeTransport: development

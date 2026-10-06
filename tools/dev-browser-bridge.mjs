@@ -14,10 +14,17 @@ import {
 import { homedir } from "node:os";
 import { resolve, join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { readChromeIdentity } from "./lib/chrome-extension-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const args = process.argv.slice(2);
 const command = args.shift();
+const storeTest = args.includes("--store-test");
+if (storeTest) args.splice(args.indexOf("--store-test"), 1);
+if (storeTest && !["id", "install", "uninstall"].includes(command))
+  throw new Error(
+    "Configure production identity with tools/configure-chrome-store.mjs.",
+  );
 function option(name) {
   const index = args.indexOf(name);
   if (index < 0) return undefined;
@@ -31,12 +38,17 @@ const publicFile = option("--public-key-file");
 const suppliedId = option("--extension-id");
 if (args.length) throw new Error(`Unknown arguments: ${args.join(" ")}`);
 const keyFile = join(root, "apps/extension/manifest/chrome-dev-key.json");
+const storeIdentity = storeTest
+  ? readChromeIdentity(
+      join(root, "apps/extension/manifest/chrome-store-key.json"),
+    )
+  : null;
 const key = publicFile
   ? readFileSync(resolve(publicFile), "utf8").replace(
       /-----[^\n]+-----|\s/g,
       "",
     )
-  : JSON.parse(readFileSync(keyFile, "utf8")).key;
+  : (storeIdentity?.key ?? JSON.parse(readFileSync(keyFile, "utf8")).key);
 const der = Buffer.from(key, "base64");
 createPublicKey({ key: der, type: "spki", format: "der" });
 const keyId = [...createHash("sha256").update(der).digest().subarray(0, 16)]
@@ -74,13 +86,19 @@ if (command === "configure-key") {
     homedir(),
     "Library/Application Support/com.openresumetoolkit.dev/browser-bridge-dev",
   );
-  const binary = join(directory, "ort-native-host-dev");
+  const hostName = storeTest
+    ? "com.openresumetoolkit"
+    : "com.openresumetoolkit.dev";
+  const binary = join(
+    directory,
+    storeTest ? "ort-native-host-store-test" : "ort-native-host-dev",
+  );
   const registration = join(directory, "registration.json");
   const hosts = join(
     homedir(),
     "Library/Application Support/Google/Chrome/NativeMessagingHosts",
   );
-  const manifestPath = join(hosts, "com.openresumetoolkit.dev.json");
+  const manifestPath = join(hosts, `${hostName}.json`);
   function regular(path) {
     if (
       existsSync(path) &&
@@ -91,13 +109,21 @@ if (command === "configure-key") {
   for (const path of [binary, registration, manifestPath]) regular(path);
   if (existsSync(manifestPath)) {
     const prior = JSON.parse(readFileSync(manifestPath, "utf8"));
-    if (prior.name !== "com.openresumetoolkit.dev" || prior.path !== binary)
+    if (prior.name !== hostName || prior.path !== binary)
       throw new Error(
         "Existing development manifest belongs to a different installation.",
       );
   }
   if (command === "uninstall") {
-    for (const path of [manifestPath, registration, binary])
+    if (existsSync(registration)) {
+      const prior = JSON.parse(readFileSync(registration, "utf8"));
+      if (
+        prior.extensionId === id &&
+        (prior.hostName ?? "com.openresumetoolkit.dev") === hostName
+      )
+        unlinkSync(registration);
+    }
+    for (const path of [manifestPath, binary])
       if (existsSync(path)) unlinkSync(path);
     console.log(
       "Development host registration removed. Disable the connection in ORT if it is still running.",
@@ -139,13 +165,23 @@ if (command === "configure-key") {
     copyFileSync(join(root, "target/debug/ort-native-host"), staged, 1);
     chmodSync(staged, 0o700);
     renameSync(staged, binary);
-    atomic(registration, JSON.stringify({ extensionId: id }) + "\n", 0o600);
+    atomic(
+      registration,
+      JSON.stringify({
+        extensionId: id,
+        hostName,
+        mode: storeTest ? "store-test" : "development",
+      }) + "\n",
+      0o600,
+    );
     atomic(
       manifestPath,
       JSON.stringify(
         {
-          name: "com.openresumetoolkit.dev",
-          description: "Open Resume Toolkit opt-in development bridge",
+          name: hostName,
+          description: storeTest
+            ? "Open Resume Toolkit explicit Store extension development test bridge"
+            : "Open Resume Toolkit opt-in development bridge",
           path: binary,
           type: "stdio",
           allowed_origins: [`chrome-extension://${id}/`],
@@ -156,10 +192,10 @@ if (command === "configure-key") {
       0o600,
     );
     console.log(
-      `Registered development host for ${id}. Open or restart the dev app; the connection enables automatically on launch.`,
+      `Registered ${storeTest ? "explicit production-extension development test" : "development"} host for ${id}. Restart the bridge-enabled dev app to load this identity. ${storeTest ? "This uses the current-user development capability, not signed production authentication. Remove it with uninstall --store-test before installing the production host." : ""}`,
     );
   }
 } else
   throw new Error(
-    "Usage: node tools/dev-browser-bridge.mjs id | install | uninstall | configure-key --public-key-file PATH --extension-id ID",
+    "Usage: node tools/dev-browser-bridge.mjs id | install | uninstall [--store-test] | configure-key --public-key-file PATH --extension-id ID",
   );

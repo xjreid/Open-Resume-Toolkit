@@ -67,6 +67,7 @@ function trackerEntryFor(workspace: Workspace): TrackerEntry {
     location: workspace.roleInfo.location,
     dateApplied,
     sourceUrl: workspace.jobUrl,
+    ...workspace.trackerMetadata,
   };
 }
 type StageOne = Wire.StageOneDraft;
@@ -828,6 +829,30 @@ export function ApplicationOverlay() {
       savedRef.current = null;
       draftRef.current = null;
       workspacePending.current = null;
+    });
+  }
+
+  function saveTrackerDetails() {
+    return run(async () => {
+      update((current) => ({
+        ...current,
+        roleInfo: {
+          company: tracking.company,
+          title: tracking.title,
+          location: tracking.location,
+        },
+        trackerMetadata: {
+          company: tracking.company,
+          title: tracking.title,
+          location: tracking.location,
+          dateApplied: tracking.dateApplied,
+          status: tracking.status,
+          customStatus: tracking.customStatus,
+          sourceUrl: tracking.sourceUrl,
+        },
+      }));
+      await flushWorkspace();
+      setFinishMode(null);
     });
   }
 
@@ -1632,7 +1657,12 @@ export function ApplicationOverlay() {
             className="application-dialog"
           >
             <h2>Tracker details</h2>
-            <TrackerFields entry={tracking} onChange={setTracking} />
+            {notice && <p role="alert">{notice}</p>}
+            <TrackerFields
+              entry={tracking}
+              disabled={busy}
+              onChange={setTracking}
+            />
             <div className="application-row">
               <button
                 type="button"
@@ -1645,7 +1675,7 @@ export function ApplicationOverlay() {
                 type="button"
                 className="application-secondary"
                 disabled={busy}
-                onClick={() => setFinishMode(null)}
+                onClick={() => void saveTrackerDetails()}
               >
                 Back
               </button>

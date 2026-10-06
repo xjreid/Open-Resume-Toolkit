@@ -17,6 +17,14 @@ test("dashboard key synchronization rejects mismatched IDs and increments only o
   const root = mkdtempSync(join(tmpdir(), "ort-identity-qa-"));
   try {
     mkdirSync(join(root, "tools"));
+    mkdirSync(join(root, "tools/lib"));
+    copyFileSync(
+      resolve(
+        import.meta.dirname,
+        "../../../tools/lib/chrome-extension-identity.mjs",
+      ),
+      join(root, "tools/lib/chrome-extension-identity.mjs"),
+    );
     mkdirSync(join(root, "apps/extension/manifest"), { recursive: true });
     const script = join(root, "tools/dev-browser-bridge.mjs");
     copyFileSync(

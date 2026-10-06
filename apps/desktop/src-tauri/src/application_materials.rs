@@ -531,6 +531,7 @@ pub async fn start_application(
     };
     let workspace = ApplicationWorkspace {
         schema_version: SCHEMA_VERSION,
+        tracker_metadata: None,
         published_revision: source.revision,
         job_description,
         job_url,
@@ -613,7 +614,10 @@ pub async fn regenerate_application_resume(
         Err(code) => return error(code),
     };
     workspace.resume = result.resume;
-    if let Some(role_info) = result.role_info {
+    if let Some(role_info) = result
+        .role_info
+        .filter(|_| workspace.tracker_metadata.is_none())
+    {
         workspace.role_info = role_info;
     }
     workspace.change_points = result.change_points;

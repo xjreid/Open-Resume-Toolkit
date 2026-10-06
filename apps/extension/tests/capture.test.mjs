@@ -229,6 +229,7 @@ test("oversized, empty, unsafe URL and malformed Unicode content cannot be sent"
     { text: "invalid\ud800" },
     { url: "file:///private/job" },
     { title: "x".repeat(501) },
+    { title: "Invalid\ud800" },
   ]) {
     const h = harness();
     await h.controller.poll();
@@ -239,6 +240,37 @@ test("oversized, empty, unsafe URL and malformed Unicode content cannot be sent"
       false,
     );
   }
+});
+
+test("incompatible progress replies revoke selection before any content delivery", async () => {
+  const h = harness({
+    native: async (message) =>
+      message.kind === "bridge.poll"
+        ? {
+            ok: true,
+            protocolVersion: 1,
+            value: {
+              ready: true,
+              commands: [
+                {
+                  kind: "capture.start",
+                  sessionId: h.id,
+                  target: "job",
+                  expiresAt: Date.now() + 60_000,
+                },
+              ],
+            },
+          }
+        : { ok: true, protocolVersion: 2 },
+  });
+  await h.controller.poll();
+  await h.select();
+  await h.complete();
+  assert.equal(
+    h.calls.some((call) => call.kind === "capture.selection"),
+    false,
+  );
+  assert.equal(h.removed.length, 1);
 });
 test("missing permission and browser-restricted pages produce a safe failure", async () => {
   for (const options of [{ scriptError: true }, { url: "chrome://settings" }]) {

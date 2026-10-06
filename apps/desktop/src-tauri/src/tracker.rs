@@ -98,6 +98,7 @@ mod content_tests {
     fn finish_retains_all_current_materials() {
         let mut workspace = ort_domain::ApplicationWorkspace {
             schema_version: 1,
+            tracker_metadata: None,
             published_revision: 1,
             job_description: "Job".into(),
             job_url: String::new(),

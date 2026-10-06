@@ -11,14 +11,18 @@ export function createNativeClient(api: ChromeApi, timeoutMs = 5_000) {
     timer: ReturnType<typeof setTimeout>;
   } | null = null;
   let queue: Promise<unknown> = Promise.resolve();
+  let pending = 0;
+  let generation = 0;
+  const maxFrameBytes = 256 * 1024;
   function disconnected(active: Port) {
     if (port !== active) return;
     port = null;
+    generation += 1;
     const request = waiting;
     waiting = null;
     if (request) {
       clearTimeout(request.timer);
-      request.reject(new Error("BRIDGE_UNAVAILABLE"));
+      request.reject(new Error("DELIVERY_UNCONFIRMED"));
     }
   }
   function connection() {
@@ -26,7 +30,24 @@ export function createNativeClient(api: ChromeApi, timeoutMs = 5_000) {
     const active = api.runtime.connectNative(NATIVE_HOST);
     port = active;
     active.onMessage.addListener((value) => {
-      if (port !== active || !waiting) return;
+      if (port !== active) return;
+      if (!waiting) {
+        close();
+        return;
+      }
+      try {
+        const encoded = JSON.stringify(value);
+        if (
+          !encoded ||
+          new TextEncoder().encode(encoded).length > maxFrameBytes
+        ) {
+          close();
+          return;
+        }
+      } catch {
+        close();
+        return;
+      }
       const request = waiting;
       waiting = null;
       clearTimeout(request.timer);
@@ -38,16 +59,37 @@ export function createNativeClient(api: ChromeApi, timeoutMs = 5_000) {
     });
     return active;
   }
+  function close() {
+    if (!port) {
+      generation += 1;
+      return;
+    }
+    const active = port;
+    disconnected(active);
+    active.disconnect();
+  }
   function request(message: unknown): Promise<unknown> {
+    try {
+      const encoded = JSON.stringify(message);
+      if (!encoded || new TextEncoder().encode(encoded).length > maxFrameBytes)
+        return Promise.reject(new Error("CAPTURE_TOO_LARGE"));
+    } catch {
+      return Promise.reject(new Error("CAPTURE_INVALID"));
+    }
+    if (pending >= 8) return Promise.reject(new Error("BRIDGE_UNAVAILABLE"));
+    pending += 1;
+    const expectedGeneration = generation;
     const operation = queue.then(
       () =>
         new Promise<unknown>((resolve, reject) => {
           try {
+            // A disconnected/expired connection invalidates its entire queue.
+            // Do not forward queued page content through a fresh connection.
+            if (generation !== expectedGeneration)
+              throw new Error("BRIDGE_UNAVAILABLE");
             const active = connection();
             const timer = setTimeout(() => {
-              disconnected(active);
-              active.disconnect();
-              reject(new Error("DELIVERY_UNCONFIRMED"));
+              close();
             }, timeoutMs);
             waiting = { resolve, reject, timer };
             active.postMessage(message);
@@ -61,8 +103,11 @@ export function createNativeClient(api: ChromeApi, timeoutMs = 5_000) {
           }
         }),
     );
-    queue = operation.catch(() => {});
-    return operation;
+    const settled = operation.finally(() => {
+      pending -= 1;
+    });
+    queue = settled.catch(() => {});
+    return settled;
   }
-  return { request };
+  return { request, close };
 }

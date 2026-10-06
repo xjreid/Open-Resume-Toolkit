@@ -1,4 +1,8 @@
-# Test Chrome with the unsigned ORT development app
+# Test the separate Chrome BETA with the unsigned ORT development app
+
+For the production Chrome ZIP and testing its exact Store identity with the
+development app, use [the production setup](README.md). This guide is only for
+the separate BETA extension.
 
 The BETA extension and the macOS development bridge use the real capture and
 review implementation. Apple Developer enrollment is not required for this
@@ -11,7 +15,7 @@ The prepared outputs are:
 
 - App: `target/release/bundle/macos/Open Resume Toolkit Dev.app`
 - Extension folder: `apps/extension/dist/chrome-dev-bridge`
-- Dashboard upload: `artifacts/extension/chrome/open-resume-toolkit-chrome-dev-0.2.1.zip`
+- Dashboard upload: `artifacts/extension/chrome/open-resume-toolkit-chrome-dev-0.3.0.zip`
 
 1. Open `/Applications/Open Resume Toolkit Dev.app`. The installed app uses your
    existing development profile. Successful job captures automatically replace the
@@ -25,7 +29,7 @@ The prepared outputs are:
    registered on this Mac; rerun after rebuilding the native host or changing
    dashboard identity. It does not launch ORT or enable the app connection.
 4. In ORT, open **Settings → Browser connections → Enable development connection**.
-   Keep ORT running. The connection starts disabled after each app launch. The
+   Keep ORT running. The bridge-enabled app enables a registered connection on launch. The
    overlay's browser badge becomes connected when Chrome is communicating.
 5. Open a normal job page in Chrome. On the ORT overlay, press **Capture**. Click
    the top-left of the desired text, move the pointer to preview the rectangle and
@@ -71,7 +75,7 @@ tracking/authentication fields; check the URL field before tailoring.
    ```
 
    The first command verifies that the key matches the ID and increments the
-   development package version when the key changes (for example, 0.2.1 → 0.2.2).
+   development package version when the key changes (for example, 0.3.0 → 0.2.2).
    No desktop rebuild is needed just to change the extension ID.
 4. Disable the ORT connection. Remove the old unpacked BETA installation from
    Chrome and load the rebuilt `dist/chrome-dev-bridge` folder. Confirm that its

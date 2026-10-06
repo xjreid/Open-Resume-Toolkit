@@ -7,18 +7,22 @@ import {
 import { createSection, moveItem } from "./resume-editor";
 import { SUGGESTED_SECTIONS } from "./starting-profiles";
 
-// The master editor and import review share the same section controls.
+// Resume editors share section controls and their window-local confirmation.
 export function ResumeSectionNavigator({
   document,
   disabled,
   hidden = false,
   currentSection = null,
+  className = "",
+  canUndoRemoval = true,
   onChange,
 }: {
   document: ResumeDocument;
   disabled: boolean;
   hidden?: boolean;
   currentSection?: string | null;
+  className?: string;
+  canUndoRemoval?: boolean;
   onChange: (update: (current: ResumeDocument) => ResumeDocument) => void;
 }) {
   const changeDocument = onChange;
@@ -297,7 +301,7 @@ export function ResumeSectionNavigator({
     <>
       <nav
         ref={sectionNavigator}
-        className={`document-navigator${draggingSection ? " document-navigator--sorting" : ""}`}
+        className={`document-navigator ${className}${draggingSection ? " document-navigator--sorting" : ""}`}
         aria-label="Resume section navigation"
         hidden={hidden}
       >
@@ -398,6 +402,7 @@ export function ResumeSectionNavigator({
                     <button
                       type="button"
                       className="section-nav-title"
+                      title={section.heading || "Untitled section"}
                       disabled={disabled}
                       aria-label={`Rename ${section.heading || "untitled section"}`}
                       aria-describedby={keyboardHelpId}
@@ -417,7 +422,7 @@ export function ResumeSectionNavigator({
                               current.sections,
                               section.id,
                               direction,
-                            ),
+                            ).map((section, order) => ({ ...section, order })),
                           }));
                         }
                       }}
@@ -506,7 +511,8 @@ export function ResumeSectionNavigator({
             <h2 id={dialogTitleId}>Delete this section?</h2>
             <p id={dialogDescriptionId}>
               {pendingSection?.heading || "This section"} and all of its items
-              will be removed. You can undo this change afterward.
+              will be removed.
+              {canUndoRemoval && " You can undo this change afterward."}
             </p>
             <div className="section-delete-dialog__actions">
               <button

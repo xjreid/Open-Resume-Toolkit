@@ -155,7 +155,11 @@ export function createCaptureController(
         return;
       }
       const response = await event(id, "started");
-      if (!record(response) || response.ok !== true)
+      if (
+        !record(response) ||
+        response.protocolVersion !== 1 ||
+        response.ok !== true
+      )
         await fail("CAPTURE_EXPIRED");
     } catch {
       if (active?.id === id) await fail("PAGE_UNAVAILABLE");
@@ -178,7 +182,7 @@ export function createCaptureController(
     await event(id, "cancelled").catch(() => {});
   }
   async function poll() {
-    if (polling) return;
+    if (polling) return false;
     polling = true;
     try {
       const response = await native({
@@ -194,12 +198,12 @@ export function createCaptureController(
         response.value.ready !== true
       ) {
         if (active) await fail("BRIDGE_UNAVAILABLE");
-        return;
+        return false;
       }
       const commands = response.value.commands;
       if (!Array.isArray(commands) || commands.length > 2) {
         await fail("CAPTURE_INVALID");
-        return;
+        return false;
       }
       for (const command of commands) {
         if (!record(command)) continue;
@@ -208,8 +212,10 @@ export function createCaptureController(
       }
       if (active && active.expiresAt <= Date.now())
         await fail("CAPTURE_EXPIRED");
+      return true;
     } catch {
       await fail("BRIDGE_UNAVAILABLE");
+      return false;
     } finally {
       polling = false;
     }
@@ -233,7 +239,11 @@ export function createCaptureController(
       session.phase = "selecting";
       try {
         const response = await event(session.id, "selecting");
-        if (!record(response) || response.ok !== true) {
+        if (
+          !record(response) ||
+          response.protocolVersion !== 1 ||
+          response.ok !== true
+        ) {
           await fail("CAPTURE_EXPIRED");
           return { alive: false };
         }
@@ -265,6 +275,7 @@ export function createCaptureController(
         typeof request.title !== "string" ||
         request.url !== session.url ||
         request.title.length > 500 ||
+        /[\uD800-\uDFFF]/u.test(request.title) ||
         session.expiresAt <= Date.now()
       )
         throw new Error("CAPTURE_INVALID");
@@ -292,7 +303,8 @@ export function createCaptureController(
             frame.documentId === session.documentId &&
             frame.result === session.url,
         ) ||
-        active !== session
+        active !== session ||
+        session.expiresAt <= Date.now()
       )
         throw new Error("PAGE_CHANGED");
       const envelope = {

@@ -70,6 +70,9 @@ it.each(["resume-view", "resume-edit", "cover-view", "cover"] as const)(
         },
       }),
     );
+    expect(host.querySelector(".section-delete-dialog") !== null).toBe(
+      kind === "resume-edit",
+    );
     await act(async () => {
       document.body.click();
       window.dispatchEvent(new Event("blur"));

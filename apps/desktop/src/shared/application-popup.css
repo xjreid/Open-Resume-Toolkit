@@ -74,8 +74,13 @@
   display: block;
   padding: 12px;
 }
-.application-popup__navigator .section-trash-confirmation button {
-  width: auto;
+.application-popup__navigator .section-nav-title {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .application-popup__field {
   display: grid;

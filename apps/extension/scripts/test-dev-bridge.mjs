@@ -5,7 +5,11 @@ if (process.platform !== "darwin")
   throw new Error("Development bridge QA currently supports macOS only.");
 const identity = spawnSync(
   "node",
-  [resolve(root, "tools/dev-browser-bridge.mjs"), "id"],
+  [
+    resolve(root, "tools/dev-browser-bridge.mjs"),
+    "id",
+    ...(process.argv[2] === "store-contract" ? ["--store-test"] : []),
+  ],
   { encoding: "utf8" },
 );
 if (identity.status !== 0)
@@ -13,6 +17,9 @@ if (identity.status !== 0)
 const env = {
   ...process.env,
   ORT_DEV_CHROME_EXTENSION_ID: identity.stdout.trim(),
+  ...(process.argv[2] === "store-contract"
+    ? { ORT_QA_STORE_CONTRACT: "1" }
+    : {}),
 };
 delete env.ORT_CHROME_EXTENSION_ID;
 delete env.ORT_DEV_EDGE_EXTENSION_ID;

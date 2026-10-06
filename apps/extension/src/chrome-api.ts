@@ -14,6 +14,10 @@ export type Port = {
   onDisconnect: { addListener(listener: () => void): void };
 };
 export interface ChromeApi {
+  alarms: {
+    create(name: string, info: { periodInMinutes: number }): Promise<void>;
+    onAlarm: { addListener(listener: (alarm: { name: string }) => void): void };
+  };
   runtime: {
     id: string;
     lastError?: { message?: string };

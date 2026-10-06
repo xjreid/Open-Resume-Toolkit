@@ -188,6 +188,7 @@ pub fn desktop_wire_fixtures() -> std::collections::BTreeMap<String, serde_json:
         serde_json::from_str("\"019a0000-0000-7000-8000-000000000001\"").expect("fixed fixture ID");
     let workspace = ApplicationWorkspace {
         schema_version: 1,
+        tracker_metadata: None,
         published_revision: 1,
         job_description: "Synthetic job".into(),
         job_url: String::new(),

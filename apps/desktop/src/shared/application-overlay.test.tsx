@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { emitTo } from "@tauri-apps/api/event";
 import { createResumeDocument } from "./resume-editor";
 import { ApplicationOverlay } from "./ApplicationOverlay";
+import type * as Wire from "@ort/contracts/wire";
 import type { UseApplicationPopupOptions } from "./application-popup";
 
 const { listeners, popup, dragWindow } = vi.hoisted(() => ({
@@ -79,7 +80,7 @@ const context = {
   ],
   browserConnected: false,
 };
-function workspace() {
+function workspace(): Wire.ApplicationWorkspace {
   return {
     schemaVersion: 1,
     publishedRevision: 1,
@@ -896,6 +897,141 @@ it("edits tracker details before finishing and saves all materials", async () =>
       entry: expect.objectContaining({ company: "Edited Company" }),
     },
   });
+});
+
+it("saves tracker details on Back, restores them after remount, and uses them on direct finish", async () => {
+  const originalJobUrl = ["https:", "", "example.org", "original-job"].join(
+    "/",
+  );
+  let current: Wire.ApplicationWorkspace = {
+    ...workspace(),
+    jobUrl: originalJobUrl,
+  };
+  let revision = 1;
+  vi.mocked(invoke).mockImplementation(async (name, args) => {
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({ revision, workspace: current });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports")
+      return reply({ revision, pdfReady: true, docxReady: true });
+    if (name === "save_application_workspace") {
+      current = (args as { workspace: Wire.ApplicationWorkspace }).workspace;
+      return reply({ revision: ++revision, workspace: current });
+    }
+    if (name === "finish_application") return reply(true);
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const first = await mount();
+  await act(async () => first.button("Edit tracker details").click());
+  const field = (host: HTMLElement, name: string) =>
+    [...host.querySelectorAll(".tracker-fields label")]
+      .find((label) => label.firstChild?.textContent?.trim() === name)!
+      .querySelector<HTMLInputElement>("input")!;
+  const edits = {
+    Company: "Edited Company",
+    "Job title": "Senior Engineer",
+    Location: "Boston",
+    "Date applied": "2026-10-05",
+    "Link or source": "Recruiter referral",
+  };
+  for (const [name, value] of Object.entries(edits))
+    await editField(field(first.host, name), value);
+  await act(async () => {
+    const status = first.host.querySelector<HTMLSelectElement>(
+      ".tracker-fields select",
+    )!;
+    status.value = "other";
+    status.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await editField(field(first.host, "Custom status"), "Recruiter follow-up");
+  await act(async () => first.button("Back").click());
+  expect(first.host.querySelector('[role="dialog"]')).toBeNull();
+  expect(current.trackerMetadata).toEqual({
+    company: "Edited Company",
+    title: "Senior Engineer",
+    location: "Boston",
+    dateApplied: "2026-10-05",
+    status: "other",
+    customStatus: "Recruiter follow-up",
+    sourceUrl: "Recruiter referral",
+  });
+  expect(current.jobUrl).toBe(originalJobUrl);
+  expect(current.jobDescription).toBe("Job");
+  expect(current.roleInfo).toEqual({
+    company: "Edited Company",
+    title: "Senior Engineer",
+    location: "Boston",
+  });
+  expect(invoke).not.toHaveBeenCalledWith(
+    "finish_application",
+    expect.anything(),
+  );
+  await cleanups.shift()!();
+  const reopened = await mount();
+  await act(async () => reopened.button("Edit tracker details").click());
+  for (const [name, value] of Object.entries(edits))
+    expect(field(reopened.host, name).value).toBe(value);
+  expect(
+    reopened.host.querySelector<HTMLSelectElement>(".tracker-fields select")!
+      .value,
+  ).toBe("other");
+  expect(field(reopened.host, "Custom status").value).toBe(
+    "Recruiter follow-up",
+  );
+  await act(async () => reopened.button("Back").click());
+  await act(async () => reopened.button("Finish Application").click());
+  expect(invoke).toHaveBeenCalledWith("finish_application", {
+    expectedRevision: revision,
+    selection: { entry: expect.objectContaining(current.trackerMetadata) },
+  });
+});
+
+it("keeps tracker edits open when Back cannot save them", async () => {
+  const saving = deferred<unknown>();
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({ revision: 1, workspace: workspace() });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
+    if (name === "save_application_workspace") return saving.promise;
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  await act(async () => button("Edit tracker details").click());
+  await editField(
+    host.querySelector<HTMLInputElement>(".tracker-fields input")!,
+    "Unsaved Company",
+  );
+  await act(async () => button("Back").click());
+  expect(button("Back").disabled).toBe(true);
+  expect(
+    host.querySelector<HTMLInputElement>(".tracker-fields input")!.disabled,
+  ).toBe(true);
+  await act(async () =>
+    saving.resolve({
+      ok: false,
+      error: {
+        code: "SAVE_FAILED",
+        messageKey: "errors.saveFailed",
+        retryable: true,
+        details: {},
+      },
+    }),
+  );
+  const dialog = host.querySelector(
+    '[role="dialog"][aria-label="Edit tracker details"]',
+  )!;
+  expect(dialog).not.toBeNull();
+  expect(dialog.querySelector("input")!.value).toBe("Unsaved Company");
+  expect(dialog.querySelector('[role="alert"]')!.textContent).toContain(
+    "SAVE_FAILED",
+  );
+  expect(button("Back").disabled).toBe(false);
 });
 
 it("confirms discarding the application without a tracker entry", async () => {

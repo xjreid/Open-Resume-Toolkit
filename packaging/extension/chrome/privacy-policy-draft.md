@@ -1,8 +1,10 @@
 # Open Resume Toolkit Chrome extension — privacy policy draft
 
-This is a draft for the integrated extension and development BETA. Fill in the
-public contact information and effective date, verify the disclosures for the
-chosen distribution, and host this policy before store submission.
+This is background material for the integrated extension and development BETA.
+The October 6 dashboard task prepared [privacy-policy.html](privacy-policy.html)
+with the publisher-supplied contact and effective date. Use that standalone page
+for hosting, and [dashboard-fields.md](dashboard-fields.md) for the form entries.
+It must still be hosted publicly before store submission.
 
 ## Data handled
 
@@ -43,7 +45,8 @@ rules, which must be described in its privacy documentation.
 
 The extension has no popup or capture buttons. The desktop overlay arms capture
 and cancels it; Escape also cancels the box. Navigation, tab changes, resizing,
-or timeout cancel selection. Scrolling keeps selection active and updates highlights. HTTP/HTTPS site
+or timeout cancel selection. Scrolling keeps selection active and updates highlights. The alarms permission schedules content-free connection recovery after disconnection
+or worker suspension. HTTP/HTTPS site
 permission enables on-demand capture; it does not cause background page reading.
 You can restrict site access in Chrome, avoid capture, edit or discard a
 capture in desktop review, disable or uninstall the extension in Chrome, and use
@@ -56,10 +59,12 @@ explicitly enable its connection in the ORT app. A temporary authentication key
 is stored in a private file readable by your own macOS account while enabled.
 It is removed on disconnect or normal quit. This development connection trusts
 programs running under that account and does not authenticate signed processes.
-It does not export your database key or AI provider keys. The production host
-and extension use a separate identity.
+It does not export your database key or AI provider keys. The BETA extension uses a separate identity. The production extension can
+be tested against an explicitly registered development adapter under its normal
+host name; this does not establish signed process identity. That adapter must be
+removed before production native-host installation.
 
 ## Contact and effective date
 
-- Public support email: **to be supplied by the publisher**
-- Effective date: **to be set for the integrated release**
+- Public support email: **xjrspam1@gmail.com**
+- Effective date of the prepared publishing page: **October 6, 2026**

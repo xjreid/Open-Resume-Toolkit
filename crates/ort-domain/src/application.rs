@@ -1,4 +1,4 @@
-use crate::{ApprovedAnswer, DocumentStyle, EntityId, ResumeDocument};
+use crate::{ApprovedAnswer, DocumentStyle, EntityId, ResumeDocument, TrackerMetadata};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
@@ -77,6 +77,8 @@ pub struct ApplicationWorkspace {
     pub job_url: String,
     #[serde(default)]
     pub role_info: RoleInfo,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tracker_metadata: Option<TrackerMetadata>,
     pub resume: ResumeDocument,
     pub change_points: Vec<String>,
     pub alerts: Vec<QualificationAlert>,

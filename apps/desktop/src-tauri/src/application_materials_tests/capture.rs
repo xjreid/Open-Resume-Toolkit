@@ -234,11 +234,14 @@ fn development_chrome_native_roundtrip() {
         .join("../../..")
         .canonicalize()
         .unwrap();
-    let output = std::process::Command::new("node")
+    let mut identity = std::process::Command::new("node");
+    identity
         .arg(root.join("tools/dev-browser-bridge.mjs"))
-        .arg("id")
-        .output()
-        .unwrap();
+        .arg("id");
+    if std::env::var("ORT_QA_STORE_CONTRACT").as_deref() == Ok("1") {
+        identity.arg("--store-test");
+    }
+    let output = identity.output().unwrap();
     assert!(output.status.success());
     let id = String::from_utf8(output.stdout).unwrap();
     let store = Arc::new(

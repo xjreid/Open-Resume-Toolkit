@@ -110,6 +110,59 @@ fn encrypted_workspace_persists_and_rejects_stale_writes() {
 }
 
 #[test]
+fn edited_tracker_details_survive_restart_without_changing_capture_provenance() {
+    let temp = TempDir::new().unwrap();
+    let vault = MemoryDatabaseKeyVault::new();
+    let store =
+        ort_storage::EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+    let original = workspace();
+    // Existing saved workspaces omit the new optional field.
+    let legacy = serde_json::to_value(&original).unwrap();
+    assert!(legacy.get("trackerMetadata").is_none());
+    let mut edited: ApplicationWorkspace = serde_json::from_value(legacy).unwrap();
+    let saved = save(&store, None, &original).unwrap();
+    edited.tracker_metadata = Some(ort_domain::TrackerMetadata {
+        company: "Edited company".into(),
+        title: "Senior engineer".into(),
+        location: "Boston".into(),
+        date_applied: "2026-10-05".into(),
+        status: "other".into(),
+        custom_status: "Recruiter follow-up".into(),
+        source_url: "Recruiter referral".into(),
+    });
+    edited.role_info.company = "Edited company".into();
+    let saved = save_reviewed(&store, saved.revision, &edited).unwrap();
+    drop(store);
+    let reopened =
+        ort_storage::EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+    let loaded = load(&reopened).unwrap().unwrap();
+    assert_eq!(loaded.revision, saved.revision);
+    assert_eq!(
+        serde_json::to_value(&loaded.workspace.tracker_metadata).unwrap(),
+        serde_json::to_value(&edited.tracker_metadata).unwrap()
+    );
+    assert_eq!(loaded.workspace.job_url, original.job_url);
+    assert_eq!(loaded.workspace.job_description, original.job_description);
+    edited.job_url = "https://example.org/replaced-provenance".into();
+    assert!(matches!(
+        save_reviewed(&reopened, saved.revision, &edited),
+        Err(StorageError::InvalidData)
+    ));
+    edited.job_url = original.job_url;
+    edited.tracker_metadata.as_mut().unwrap().date_applied = "2026-02-30".into();
+    assert!(matches!(
+        save_reviewed(&reopened, saved.revision, &edited),
+        Err(StorageError::InvalidData)
+    ));
+    edited.tracker_metadata.as_mut().unwrap().date_applied = "2026-10-05".into();
+    edited.tracker_metadata.as_mut().unwrap().status = "applied".into();
+    assert!(matches!(
+        save_reviewed(&reopened, saved.revision, &edited),
+        Err(StorageError::InvalidData)
+    ));
+}
+
+#[test]
 fn resume_prompt_contract_makes_headers_read_only_for_all_providers() {
     for instructions in [TAILOR_SYSTEM, REFINE_SYSTEM] {
         let prompt = resume_system(instructions);

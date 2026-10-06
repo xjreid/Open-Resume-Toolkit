@@ -7,6 +7,7 @@ import {
 } from "node:fs";
 import { createHash, createPublicKey } from "node:crypto";
 import { resolve } from "node:path";
+import { readChromeIdentity } from "../../../tools/lib/chrome-extension-identity.mjs";
 
 const target = process.argv[2];
 const channel = process.argv[3] ?? "dev";
@@ -15,7 +16,7 @@ if (!new Set(["chrome", "edge"]).has(target)) {
   process.exit(2);
 }
 if (
-  !["dev", "store", "dev-bridge"].includes(channel) ||
+  !["dev", "store", "dev-bridge", "store-test"].includes(channel) ||
   (channel !== "dev" && target !== "chrome")
 ) {
   throw new Error("Only Chrome supports a store package in this milestone.");
@@ -29,6 +30,13 @@ const manifest =
   channel !== "dev"
     ? readJson(resolve(packageRoot, "manifest/chrome-store.json"))
     : { ...base, ...targetFields };
+
+if (channel === "store-test") {
+  const identity = readChromeIdentity(
+    resolve(packageRoot, "manifest/chrome-store-key.json"),
+  );
+  manifest.key = identity.key;
+}
 
 if (channel === "dev-bridge") {
   const configuration = readJson(
@@ -76,7 +84,7 @@ if (
 if (
   channel !== "dev" &&
   JSON.stringify(manifest.permissions) !==
-    JSON.stringify(["scripting", "nativeMessaging"])
+    JSON.stringify(["scripting", "nativeMessaging", "alarms"])
 ) {
   throw new Error(
     "Chrome package requires exactly the approved capture permissions.",
@@ -85,7 +93,7 @@ if (
 
 const output = resolve(
   packageRoot,
-  `dist/${target}${channel === "dev-bridge" ? "-dev-bridge" : target === "chrome" && channel === "dev" ? "-dev" : ""}`,
+  `dist/${target}${channel === "store-test" ? "-store-test" : channel === "dev-bridge" ? "-dev-bridge" : target === "chrome" && channel === "dev" ? "-dev" : ""}`,
 );
 if (process.argv[4] === "prepare") {
   rmSync(output, { recursive: true, force: true });
@@ -98,7 +106,7 @@ writeFileSync(
 );
 writeFileSync(
   resolve(output, "bridge-config.js"),
-  `export const NATIVE_HOST = ${JSON.stringify(channel === "store" ? "com.openresumetoolkit" : "com.openresumetoolkit.dev")};\nexport const BROWSER = ${JSON.stringify(target)};\n`,
+  `export const NATIVE_HOST = ${JSON.stringify(channel === "store" || channel === "store-test" ? "com.openresumetoolkit" : "com.openresumetoolkit.dev")};\nexport const BROWSER = ${JSON.stringify(target)};\n`,
 );
 if (channel !== "dev") {
   mkdirSync(resolve(output, "icons"), { recursive: true });

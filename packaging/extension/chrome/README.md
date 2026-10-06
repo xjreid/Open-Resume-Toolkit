@@ -1,94 +1,98 @@
-# Chrome packaging
+# Chrome Web Store package and development testing
 
-Chrome's Manifest V3 package is built from `apps/extension/manifest/chrome-store.json`.
-See `apps/extension/README.md` for build/test commands and current limitations.
+The production Chrome extension is built from repository TypeScript and
+`apps/extension/manifest/chrome-store.json`. Its stable native-host name is
+`com.openresumetoolkit`, and its current package version is 0.3.0.
 
-The isolated **unsigned macOS BETA connection is now implemented**. Follow
-[`development-testing.md`](development-testing.md) to test it immediately and
-create a private Chrome dashboard item. The prerequisites below apply to the
-production channel.
+The supplied Store ID is now configured and the installed development app/native
+adapter were updated without launching the app. Follow
+[local-store-test-setup.md](local-store-test-setup.md) for the current ready-to-test
+installation and unpacked extension. The general setup below remains reproducible.
 
-## Draft upload and identity
+## First upload
 
-Run `pnpm --filter @ort/extension package:chrome`. Upload the resulting
-`artifacts/extension/chrome/open-resume-toolkit-chrome-0.2.1.zip` through the Chrome
-Web Store Developer Dashboard's Add new item flow, and leave the item as a draft.
-This provides the final Chrome extension ID before enabling native integration.
-Record that ID and the public key from the package page. A public extension key
-is safe to use for matching an unpacked test installation's identity; never put
-private signing material in the extension.
+Build with `pnpm_config_verify_deps_before_run=false pnpm --filter @ort/extension package:chrome`.
+Upload `artifacts/extension/chrome/open-resume-toolkit-chrome-0.3.0.zip` using the
+Chrome Web Store Developer Dashboard's **New item** flow. Keep it as a draft.
+Google accepts a ZIP with `manifest.json` at its root; a locally signed CRX is
+not needed for dashboard upload. Google assigns the Item ID. In **Package → View
+public key**, copy the public key and Item ID. Neither is an account credential.
+Do not provide a private key, password or publisher token.
 
-The package uses the stable native-host name `com.openresumetoolkit`.
-The explicit development BETA package uses `com.openresumetoolkit.dev`. Desktop/native
-host channel identities must agree; the store extension does not fall back to a
-development host. `ORT_CHROME_EXTENSION_ID` is the compile-time store-origin input
-to the native host. Development origins have separate existing compile-time
-variables. No origin is enabled by default, and origin checks precede frame reads.
+Official instructions:
+[upload/publish](https://developer.chrome.com/docs/webstore/publish/) and
+[matching development identity](https://developer.chrome.com/docs/extensions/reference/manifest/key).
 
-## Desktop prerequisites before submission
+## Configure the same extension for the development app
 
-1. Implement and qualify protected desktop/native-host transport: exact process
-   identities, installation-scoped vault authentication, expiry/replay checks,
-   bounded framing, and no content logs or plaintext secret fallback.
-2. Sign the macOS app and native host and prove the narrow shared Keychain access.
-   Default builds remain gated; the explicitly opted-in development BETA uses a
-   separate, current-user capability and cannot qualify this production gate.
-3. Implement user-initiated Connect/Repair/Disconnect in Browser connections,
-   registering an absolute host path and exact store extension origin.
-4. Deliver captures through `accept_authenticated_capture`, emit
-   `ort:browser-capture`, and focus desktop review. Check offline launch,
-   version mismatch, and pending-capture conflicts on the supported macOS path.
-5. Run a real Chrome → installed host → desktop review walkthrough with the final
-   extension ID. The development browser test exercises real native delivery in a disposable
-   profile; installed GUI and production identity still require this gate.
+After obtaining the dashboard ID/key, save the PUBLIC key to a local text file
+(PEM headers/newlines are accepted). From the repository root:
 
-Signing credentials alone do not complete these prerequisites. Other browsers
-and Windows integration remain separate milestones.
-
-## Native response contract
-
-A persistent native port polls `bridge.poll` with a client UUID. The desktop
-returns repeated idempotent start/cancel commands for its own capture session.
-`capture.event` reports first-corner progress or safe failure codes. Cancel
-revokes desktop authority before browser cleanup. Only the matching active
-selecting session and target may submit `capture.selection`. Poll/event messages
-are strict and content-free.
-
-
-Content-free readiness request:
-
-```json
-{"protocolVersion":1,"kind":"bridge.status"}
+```sh
+node tools/configure-chrome-store.mjs --public-key-file /absolute/path/chrome-public-key.txt --extension-id YOUR_ITEM_ID
+pnpm_config_verify_deps_before_run=false pnpm --filter @ort/extension build:chrome:store-test
+node tools/dev-browser-bridge.mjs install --store-test
 ```
 
-A connected host returns `ok: true`, protocol version 1, and `value.ready: true`
-only after confirming its authenticated desktop capability. Capture responses
-return `value.requestId` matching the request UUID on acceptance. Failure responses
-return `ok: false` and a safe error code such as `CAPTURE_PENDING`,
-`PROTOCOL_INCOMPATIBLE`, or `BRIDGE_UNAVAILABLE`. A default host without the production transport answers the
-probe with `SIGNED_BRIDGE_REQUIRED` and `value.ready: false`; it never forwards
-captures. The extension doesn't infer delivery from a bare `ok: true`.
+The first command verifies that the RSA public key actually hashes to the Item ID
+and records the public identity in `apps/extension/manifest/chrome-store-key.json`.
+The upload build excludes that key; the local `dist/chrome-store-test` build adds
+it so **Load unpacked** uses Google's assigned ID. Both builds have identical
+extension logic and the same production native-host name. Do not create a second
+Store item or replace this package with a BETA package for testing.
 
-## Store submission materials
+The third command explicitly builds an origin-restricted development native host
+and registers it as `com.openresumetoolkit` for the configured ID. It refuses to
+overwrite a host owned by another installation. Its executable lives in the ORT
+DEVELOPMENT data directory, and its registration clearly identifies `store-test`.
+It uses only the temporary current-user development capability. This opt-in
+native registration is the test adapter; the extension contains no fallback or
+runtime switch. Only one extension ID is active in the development app at a time.
 
-Prepare the listing description, screenshots, support contact, public source
-release, privacy policy URL, and review instructions for installing the supported
-desktop app. The listing must say that the desktop app is required and explain
-the supported operating system and visible-text rectangle capture limitations.
+The desktop app must have been built with `--features dev-browser-bridge`, plus
+the normal parser-helper packaging inputs. The currently installed default build
+may need rebuilding with that feature; confirm before testing. Once ready,
+restart ORT to load the registration, load `apps/extension/dist/chrome-store-test`
+unpacked in Chrome, and verify that its ID matches the dashboard Item ID. Remove
+or disable the old BETA extension while testing this identity. Allow site access
+in Chrome. The bridge-enabled dev app enables its registered connection on launch;
+Settings → Browser connections can disable it. Recovery after starting ORT may
+take 30 seconds or longer if Chrome delays the alarm.
 
-Permissions to justify in the Privacy tab:
+A short walkthrough should cover Capture, the two corners/live highlights,
+scrolling, Cancel/Escape, cleaned URL, editable received text, no automatic AI,
+and Continue/Finish/reopen in the tracker. Store-installed and signed-production
+walkthroughs remain separate checks; an unpacked draft is not Store-installed.
 
-- HTTP/HTTPS host access: overlay clicks cannot grant `activeTab`; access enables
-  injection only after the user arms capture in the desktop overlay.
-- `scripting`: render the two-corner box and live highlights, support scrolling, and read
-  the enclosed rendered DOM text in the
-  current main frame, in Chrome's isolated world.
-- `nativeMessaging`: send the bounded capture to the locally installed ORT host.
+To remove the explicit adapter **before installing the signed production host**:
 
-Use `privacy-policy-draft.md` as an implementation-specific starting point, verify
-it against the finished desktop bridge, and publish it at an accessible URL before
-submission. Local processing still requires a data-handling disclosure.
+```sh
+node tools/dev-browser-bridge.mjs uninstall --store-test
+```
 
-Begin with Private visibility and designated trusted testers. Private distribution
-still requires store review. Obtain approval and test the store-installed package
-before switching to Public. No package has been uploaded or submitted by this task.
+Quit/disable the development connection before changing identities. The script
+removes only its own registration and host, and does not change browser profiles,
+resume data, provider credentials or a different host registration.
+
+## M7 replacement boundary
+
+Replace the test adapter with the signed production native host and desktop
+installation, retaining native-host name and [protocol v1](native-protocol-v1.md).
+Implement and verify signed peer/application identity, scoped Keychain access,
+installation-secret authentication, bounded framing, expiry/replay rejection,
+Connect/Repair/Disconnect and version compatibility. These changes stay in the
+native code. Default production native builds fail closed until these gates pass.
+Signing credentials alone do not complete the bridge.
+
+Final Store publication, Chrome review, installed production capture and app/host
+installation/repair are M7 work. Do not advertise public production desktop
+compatibility before it is verified. Extension source is complete for the Chrome
+M5 browser contract; Edge qualification remains separate.
+
+## Submission materials
+
+Use [store-listing.md](store-listing.md) for the single-purpose description,
+permission explanations, testing notes and checklist. Complete the public privacy
+policy URL/support contact and current desktop screenshots before submission.
+Use [privacy-policy-draft.md](privacy-policy-draft.md) as a factual starting point.
+Initial draft upload does not require claiming production bridge readiness.

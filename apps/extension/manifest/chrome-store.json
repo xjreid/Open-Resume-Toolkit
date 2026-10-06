@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Open Resume Toolkit",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Capture visible page text and its link with a two-click box controlled entirely from the Open Resume Toolkit desktop overlay.",
   "minimum_chrome_version": "120",
   "background": {
@@ -14,7 +14,7 @@
     "48": "icons/48.png",
     "128": "icons/128.png"
   },
-  "permissions": ["scripting", "nativeMessaging"],
+  "permissions": ["scripting", "nativeMessaging", "alarms"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'; base-uri 'none'"
   },

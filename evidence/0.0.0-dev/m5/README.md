@@ -20,6 +20,22 @@ development trust boundary, and
 [development testing](../../../packaging/extension/chrome/development-testing.md)
 for installed-app and Chrome setup. Earlier checks below are historical records.
 
+## Chrome Store extension implementation — October 6, 2026
+
+Chrome 0.3.0 completes the browser-facing implementation/package for the existing
+silent, overlay-controlled rectangle workflow. Source, deterministic ZIP tooling,
+identity synchronization, and regression tests are in `apps/extension` and `tools`.
+See [the Chrome implementation record](chrome-store-extension.md) and
+[production package/setup instructions](../../../packaging/extension/chrome/README.md).
+
+The production package always calls `com.openresumetoolkit`. An explicit local
+`--store-test` registration allows the same extension code and host protocol to
+exercise the current-user development app. It does not add a fallback to the
+extension or claim signed identity. The native protocol remains the M7 replacement
+boundary. Final dashboard identity and installed walkthrough await the user's
+initial draft upload; Edge, signed production transport, installation/repair and
+Store/public release qualification remain outstanding. M5 is still in progress.
+
 ## Implemented in source
 
 - Encrypted tracker records with optimistic revisions, local list/edit/delete, and a single SQL transaction that saves selected materials and clears the temporary application workspace.

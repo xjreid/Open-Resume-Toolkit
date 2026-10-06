@@ -13,6 +13,8 @@
     "lint": "tsc --noEmit",
     "test": "pnpm build:chrome && pnpm build:chrome:dev-bridge && node --test tests/*.test.mjs",
     "package:chrome": "pnpm build:chrome && node scripts/package-chrome.mjs",
+    "build:chrome:store-test": "node scripts/write-manifest.mjs chrome store-test prepare && tsc -p tsconfig.json --outDir dist/chrome-store-test && node scripts/write-manifest.mjs chrome store-test",
+    "test:browser:store-contract": "pnpm build:chrome && node scripts/test-dev-bridge.mjs store-contract",
     "test:browser": "pnpm build:chrome && node scripts/smoke-chrome.mjs",
     "build:chrome:dev-bridge": "node scripts/write-manifest.mjs chrome dev-bridge prepare && tsc -p tsconfig.json --outDir dist/chrome-dev-bridge && node scripts/write-manifest.mjs chrome dev-bridge",
     "package:chrome:dev": "pnpm build:chrome:dev-bridge && node scripts/package-chrome.mjs dev-bridge",

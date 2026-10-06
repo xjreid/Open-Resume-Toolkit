@@ -28,7 +28,11 @@ test("Chrome store manifest grants only deliberate capture and native delivery",
   const manifest = load("chrome-store");
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.name, "Open Resume Toolkit");
-  assert.deepEqual(manifest.permissions, ["scripting", "nativeMessaging"]);
+  assert.deepEqual(manifest.permissions, [
+    "scripting",
+    "nativeMessaging",
+    "alarms",
+  ]);
   assert.deepEqual(manifest.host_permissions, ["http://*/*", "https://*/*"]);
   assert.equal(manifest.optional_host_permissions, undefined);
   assert.equal(manifest.content_scripts, undefined);
