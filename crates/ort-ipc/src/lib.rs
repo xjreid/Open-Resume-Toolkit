@@ -42,7 +42,7 @@ pub enum BridgeError {
     Unavailable,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CaptureEnvelope {
     pub protocol_version: u16,
@@ -52,7 +52,7 @@ pub struct CaptureEnvelope {
     pub payload: CapturePayload,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CapturePayload {
     pub text: String,
@@ -75,7 +75,7 @@ pub enum NativeRequest {
 /// # Errors
 /// Rejects malformed requests and incompatible protocol versions.
 pub fn validate_native_request(bytes: &[u8], now_ms: i64) -> Result<NativeRequest, BridgeError> {
-    #[derive(Deserialize)]
+    #[derive(Deserialize, schemars::JsonSchema)]
     #[serde(rename_all = "camelCase", deny_unknown_fields)]
     struct StatusRequest {
         protocol_version: u16,

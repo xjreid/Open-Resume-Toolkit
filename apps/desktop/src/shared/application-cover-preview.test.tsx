@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
+import type { PdfPreview } from "@ort/contracts/pdf";
 import { ApplicationCoverPreview } from "./ApplicationCoverPreview";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -22,6 +23,25 @@ vi.mock("./PdfPreview", () => ({
     </div>
   ),
 }));
+const preview: PdfPreview = {
+  renderId: "019a0000-0000-7000-8000-000000000001",
+  source: "saved_draft",
+  revision: 1,
+  generatedAtUnixMs: 1000,
+  pdfBase64: "JVBERi0=",
+  receipt: {
+    documentSha256: "a".repeat(64),
+    documentSchemaVersion: 1,
+    pdfSha256: "b".repeat(64),
+    rendererVersion: "typst-0.15.1/ort-1",
+    templateId: "plain_pdf_v1",
+    templateSha256: "c".repeat(64),
+    fontBundleId: "libertinus-serif/typst-assets-0.15.1",
+    fontBundleSha256: "d".repeat(64),
+    pageCount: 1,
+    byteCount: 5,
+  },
+};
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
@@ -49,7 +69,7 @@ async function mount(revision?: number) {
 it("loads the exact cover revision for the PDF canvas with readable text", async () => {
   vi.mocked(invoke).mockResolvedValue({
     ok: true,
-    value: { revision: 9, pdfBase64: "PDF-bytes" },
+    value: { ...preview, revision: 9, pdfBase64: "PDF-bytes" },
   });
   const { host } = await mount(9);
   expect(invoke).toHaveBeenCalledWith("preview_application_pdf", {
@@ -70,7 +90,7 @@ it("loads the exact cover revision for the PDF canvas with readable text", async
 
 it.each([
   { ok: false, error: { code: "EXPORT_NOT_PREPARED" } },
-  { ok: true, value: { revision: 8, pdfBase64: "Old PDF" } },
+  { ok: true, value: { ...preview, revision: 8, pdfBase64: "Old PDF" } },
 ])("does not display a failed or mismatched saved revision", async (result) => {
   vi.mocked(invoke).mockResolvedValue(result);
   const { host } = await mount(9);
@@ -85,7 +105,7 @@ it("requires a saved revision and hides a PDF if canvas verification fails", asy
   expect(invoke).not.toHaveBeenCalled();
   vi.mocked(invoke).mockResolvedValue({
     ok: true,
-    value: { revision: 9, pdfBase64: "PDF" },
+    value: { ...preview, revision: 9, pdfBase64: "PDF" },
   });
   await act(async () =>
     root.render(<ApplicationCoverPreview revision={9} text="Current" />),
@@ -110,13 +130,16 @@ it("ignores a late response from a previous saved revision", async () => {
   const { host, root } = await mount(9);
   vi.mocked(invoke).mockResolvedValue({
     ok: true,
-    value: { revision: 10, pdfBase64: "New PDF" },
+    value: { ...preview, revision: 10, pdfBase64: "New PDF" },
   });
   await act(async () =>
     root.render(<ApplicationCoverPreview revision={10} text="New text" />),
   );
   await act(async () =>
-    finish({ ok: true, value: { revision: 9, pdfBase64: "Old PDF" } }),
+    finish({
+      ok: true,
+      value: { ...preview, revision: 9, pdfBase64: "Old PDF" },
+    }),
   );
   expect(host.querySelector('[data-pdf="New PDF"]')).toBeTruthy();
   expect(host.querySelector('[data-pdf="Old PDF"]')).toBeNull();

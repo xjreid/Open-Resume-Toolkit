@@ -1,4 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
+import { SaveCoordinator } from "./save-coordinator";
+import { desktopCommand as command } from "./desktop-client";
+import type * as Wire from "@ort/contracts/wire";
 import { emitTo } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { availableMonitors } from "@tauri-apps/api/window";
@@ -22,34 +24,9 @@ import {
 
 type Tab = "resume" | "cover" | "answers";
 type MaterialKind = "resume" | "cover_letter";
-type Alert = {
-  id: string;
-  kind: "not_found" | "confirmed_mismatch";
-  category: string;
-  requirement: string;
-  target?: string;
-  jobExcerpt: string;
-  resumeEvidence: { fieldId: string; value: string } | null;
-};
-type Workspace = {
-  schemaVersion: number;
-  publishedRevision: number;
-  jobDescription: string;
-  jobUrl: string;
-  roleInfo: { company: string; title: string; location: string };
-  resume: ResumeDocument;
-  changePoints: string[];
-  alerts: Alert[];
-  alertsTruncated: boolean;
-  dismissedAlertIds: string[];
-  ignoreAllAlerts: boolean;
-  coverLetter: string | null;
-  question: string;
-  answer: string;
-  approvedAnswers: { question: string; answer: string }[];
-  style: "technical" | "professional" | "modern" | "plain";
-};
-type Saved = { revision: number; workspace: Workspace };
+type Alert = Wire.QualificationAlert;
+type Workspace = Wire.ApplicationWorkspace;
+type Saved = Wire.SavedWorkspace;
 type FinishMode = "edit" | "discard" | null;
 
 function qualificationPoint(alert: Alert): string {
@@ -92,58 +69,17 @@ function trackerEntryFor(workspace: Workspace): TrackerEntry {
     sourceUrl: workspace.jobUrl,
   };
 }
-type StageOne = {
-  jobDescription: string;
-  jobUrl: string;
-  style: Workspace["style"];
-};
-type SavedStageOne = { revision: number; draft: StageOne };
-type SavedPendingCapture = {
-  revision: number;
-  capture: {
-    requestId: string;
-    payload: {
-      text: string;
-      url: string;
-      title: string;
-      target: "job" | "question";
-    };
-  };
-};
+type StageOne = Wire.StageOneDraft;
+type SavedStageOne = Wire.SavedStageOneDraft;
+type SavedPendingCapture = Wire.SavedPendingCapture;
 type Preset = "economy" | "balanced" | "quality";
-type Context = {
-  publishedRevision: number | null;
-  aiLabel: string;
-  aiReady: boolean;
-  aiBusy: boolean;
-  selectedKeyId: string | null;
-  preset: Preset | null;
-  presetOptions: { preset: Preset; label: string; model: string | null }[];
-  browserConnected: boolean;
-};
-type CaptureMode = {
-  phase: "idle" | "waiting" | "selecting";
-  sessionId: string | null;
-  error: string | null;
-};
+type Context = Wire.ApplicationContext;
+type CaptureMode = Wire.CaptureStatus;
 const idleCapture: CaptureMode = {
   phase: "idle",
   sessionId: null,
   error: null,
 };
-type Response<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: { code: string; messageKey: string } };
-
-async function command<T>(
-  name: string,
-  args: Record<string, unknown> = {},
-): Promise<T> {
-  const result = await invoke<Response<T>>(name, args);
-  if (!result.ok) throw new Error(result.error.code);
-  return result.value;
-}
-
 const errors: Record<string, string> = {
   BROWSER_CAPTURE_UNAVAILABLE:
     "Enable Browser connections in ORT Settings and reload the Chrome extension.",
@@ -288,10 +224,60 @@ export function ApplicationOverlay() {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">(
     "saved",
   );
+  const contextRef = useRef(context);
+  contextRef.current = context;
   const savedRef = useRef<Saved | null>(null);
   const draftRef = useRef<Workspace | null>(null);
   const workspacePending = useRef<Workspace | null>(null);
   const workspaceFlush = useRef<Promise<void> | null>(null);
+  const stageOneCoordinator = useRef<SaveCoordinator<
+    StageOne,
+    SavedStageOne
+  > | null>(null);
+  const workspaceCoordinator = useRef<SaveCoordinator<Workspace, Saved> | null>(
+    null,
+  );
+  useEffect(() => {
+    stageOneCoordinator.current = new SaveCoordinator(
+      stageOnePending,
+      stageOneFlush,
+      (draft) =>
+        command("save_application_stage_one", {
+          expectedRevision: stageOneRevision.current,
+          expectedProfileId: contextRef.current!.profileId,
+          draft,
+        }),
+      (result) => {
+        stageOneRevision.current = result.revision;
+        stageOneSaved.current = result.draft;
+      },
+      setStageOneStatus,
+    );
+    workspaceCoordinator.current = new SaveCoordinator(
+      workspacePending,
+      workspaceFlush,
+      (workspace) =>
+        command("save_application_workspace", {
+          expectedRevision: savedRef.current!.revision,
+          expectedProfileId: contextRef.current!.profileId,
+          workspace,
+        }),
+      (result, submitted) => {
+        savedRef.current = result;
+        setSaved(result);
+        if (draftRef.current === submitted) {
+          draftRef.current = result.workspace;
+          setDraft(result.workspace);
+        }
+      },
+      setSaveStatus,
+      () => savedRef.current !== null,
+    );
+    return () => {
+      stageOneCoordinator.current?.dispose();
+      workspaceCoordinator.current?.dispose();
+    };
+  }, []);
   const [finishMode, setFinishMode] = useState<FinishMode>(null);
   const [tracking, setTracking] = useState<TrackerEntry>(emptyTrackerEntry);
   const dirty =
@@ -388,11 +374,11 @@ export function ApplicationOverlay() {
 
   useEffect(() => {
     void Promise.all([
-      command<Context>("application_context"),
-      command<Saved | null>("load_application_workspace"),
-      command<SavedStageOne | null>("load_application_stage_one"),
-      command<SavedPendingCapture | null>("load_application_capture"),
-      command<CaptureMode | null>("application_capture_status"),
+      command("application_context"),
+      command("load_application_workspace"),
+      command("load_application_stage_one"),
+      command("load_application_capture"),
+      command("application_capture_status"),
     ])
       .then(([nextContext, current, stageOne, capture, mode]) => {
         setCaptureMode(mode ?? idleCapture);
@@ -420,9 +406,9 @@ export function ApplicationOverlay() {
     const refreshContext = () => {
       const epoch = ++captureRefreshEpoch.current;
       void Promise.all([
-        command<SavedPendingCapture | null>("load_application_capture"),
-        command<Context>("application_context"),
-        command<CaptureMode | null>("application_capture_status"),
+        command("load_application_capture"),
+        command("application_context"),
+        command("application_capture_status"),
       ])
         .then(([capture, nextContext, mode]) => {
           if (active && epoch === captureRefreshEpoch.current) {
@@ -453,41 +439,7 @@ export function ApplicationOverlay() {
   }, []);
 
   async function flushStageOne(): Promise<void> {
-    if (stageOneFlush.current) {
-      await stageOneFlush.current;
-      if (stageOnePending.current) await flushStageOne();
-      return;
-    }
-    const operation = (async () => {
-      while (stageOnePending.current) {
-        const next = stageOnePending.current;
-        stageOnePending.current = null;
-        setStageOneStatus("saving");
-        try {
-          const savedDraft = await command<SavedStageOne>(
-            "save_application_stage_one",
-            {
-              expectedRevision: stageOneRevision.current,
-              draft: next,
-            },
-          );
-          stageOneRevision.current = savedDraft.revision;
-          stageOneSaved.current = savedDraft.draft;
-          setStageOneStatus("saved");
-        } catch (error) {
-          stageOnePending.current ??= next;
-          setStageOneStatus("error");
-          throw error;
-        }
-      }
-    })();
-    stageOneFlush.current = operation;
-    try {
-      await operation;
-    } finally {
-      if (stageOneFlush.current === operation) stageOneFlush.current = null;
-    }
-    if (stageOnePending.current) await flushStageOne();
+    await stageOneCoordinator.current?.flush();
   }
 
   useEffect(() => {
@@ -539,13 +491,10 @@ export function ApplicationOverlay() {
         // Finish earlier local edits before applying the browser result. This
         // keeps their revision from racing the atomic capture transaction.
         await flushStageOne();
-        const updated = await command<SavedStageOne>(
-          "apply_application_job_capture",
-          {
-            requestId: capture.capture.requestId,
-            expectedRevision: stageOneRevision.current,
-          },
-        );
+        const updated = await command("apply_application_job_capture", {
+          requestId: capture.capture.requestId,
+          expectedRevision: stageOneRevision.current,
+        });
         captureRefreshEpoch.current++;
         stageOneRevision.current = updated.revision;
         stageOneSaved.current = updated.draft;
@@ -599,42 +548,7 @@ export function ApplicationOverlay() {
     }
   }
   async function flushWorkspace(): Promise<void> {
-    if (workspaceFlush.current) {
-      await workspaceFlush.current;
-      if (workspacePending.current) await flushWorkspace();
-      return;
-    }
-    const operation = (async () => {
-      while (workspacePending.current && savedRef.current) {
-        const next = workspacePending.current;
-        workspacePending.current = null;
-        setSaveStatus("saving");
-        try {
-          const updated = await command<Saved>("save_application_workspace", {
-            expectedRevision: savedRef.current.revision,
-            workspace: next,
-          });
-          savedRef.current = updated;
-          setSaved(updated);
-          // A save acknowledgement must never replace more recent typing.
-          if (draftRef.current === next) {
-            draftRef.current = updated.workspace;
-            setDraft(updated.workspace);
-          }
-          setSaveStatus(workspacePending.current ? "saving" : "saved");
-        } catch (error) {
-          workspacePending.current ??= next;
-          setSaveStatus("error");
-          throw error;
-        }
-      }
-    })();
-    workspaceFlush.current = operation;
-    try {
-      await operation;
-    } finally {
-      if (workspaceFlush.current === operation) workspaceFlush.current = null;
-    }
+    await workspaceCoordinator.current?.flush();
   }
   function save() {
     void flushWorkspace().catch((error: unknown) => setNotice(message(error)));
@@ -673,7 +587,7 @@ export function ApplicationOverlay() {
     if (!saved || dirty || !instruction.trim()) return;
     void run(async () => {
       apply(
-        await command<Saved>("regenerate_application_resume", {
+        await command("regenerate_application_resume", {
           expectedRevision: saved.revision,
           correctionInstruction: instruction.trim(),
         }),
@@ -686,7 +600,7 @@ export function ApplicationOverlay() {
     void run(
       async () =>
         apply(
-          await command<Saved>("generate_application_cover_letter", {
+          await command("generate_application_cover_letter", {
             expectedRevision: saved.revision,
             instruction: coverInstruction.trim(),
           }),
@@ -699,7 +613,7 @@ export function ApplicationOverlay() {
     void run(
       async () =>
         apply(
-          await command<Saved>("generate_application_answer", {
+          await command("generate_application_answer", {
             expectedRevision: saved.revision,
             question: question.trim(),
           }),
@@ -711,7 +625,7 @@ export function ApplicationOverlay() {
     if (!saved || dirty || !draft?.answer || !answerInstruction.trim()) return;
     void run(async () => {
       apply(
-        await command<Saved>("refine_application_answer", {
+        await command("refine_application_answer", {
           expectedRevision: saved.revision,
           instruction: answerInstruction.trim(),
         }),
@@ -746,7 +660,7 @@ export function ApplicationOverlay() {
   function download(kind: MaterialKind) {
     if (!saved || !exportReady) return;
     void run(async () => {
-      await command<boolean>("download_application_export", {
+      await command("download_application_export", {
         expectedRevision: saved.revision,
         kind,
         format,
@@ -756,7 +670,7 @@ export function ApplicationOverlay() {
   }
   function drag(kind: MaterialKind) {
     if (!saved || !exportReady) return;
-    void command<boolean>("drag_application_export", {
+    void command("drag_application_export", {
       expectedRevision: saved.revision,
       kind,
       format,
@@ -896,7 +810,7 @@ export function ApplicationOverlay() {
           : mode === "edited"
             ? tracking
             : null;
-      await command<boolean>("finish_application", {
+      await command("finish_application", {
         expectedRevision: current.revision,
         selection: entry ? { entry } : null,
       });
@@ -923,11 +837,11 @@ export function ApplicationOverlay() {
       captureRefreshEpoch.current++;
       let nextMode: CaptureMode;
       if (capturing && captureMode.sessionId) {
-        nextMode = await command<CaptureMode>("cancel_application_capture", {
+        nextMode = await command("cancel_application_capture", {
           sessionId: captureMode.sessionId,
         });
       } else {
-        nextMode = await command<CaptureMode>("request_application_capture", {
+        nextMode = await command("request_application_capture", {
           target,
         });
       }
@@ -950,7 +864,7 @@ export function ApplicationOverlay() {
         stageOnePending.current = { jobDescription: job, jobUrl, style };
         await flushStageOne();
       }
-      await command<boolean>("resolve_application_capture", {
+      await command("resolve_application_capture", {
         requestId: capture.capture.requestId,
         accept,
         reviewedText: accept ? captureText : null,
@@ -965,9 +879,7 @@ export function ApplicationOverlay() {
       setPendingCapture(null);
       if (!accept) return;
       if (capture.capture.payload.target === "job") {
-        const updated = await command<SavedStageOne | null>(
-          "load_application_stage_one",
-        );
+        const updated = await command("load_application_stage_one");
         stageOneRevision.current = updated?.revision ?? null;
         stageOneSaved.current = updated?.draft ?? null;
         setJob(updated?.draft.jobDescription ?? "");
@@ -975,9 +887,7 @@ export function ApplicationOverlay() {
         setStyle(updated?.draft.style ?? "technical");
         setStageOneStatus("saved");
       } else {
-        const updated = await command<Saved | null>(
-          "load_application_workspace",
-        );
+        const updated = await command("load_application_workspace");
         if (updated) apply(updated);
         setTab("answers");
       }
@@ -1089,11 +999,11 @@ export function ApplicationOverlay() {
               void run(async () => {
                 await command("set_ai_key_preset", {
                   request: {
-                    credentialId: context?.selectedKeyId,
+                    credentialId: context!.selectedKeyId!,
                     preset: event.target.value,
                   },
                 });
-                setContext(await command<Context>("application_context"));
+                setContext(await command("application_context"));
               })
             }
           >
@@ -1124,7 +1034,7 @@ export function ApplicationOverlay() {
                 type="button"
                 className="application-stop"
                 onClick={() =>
-                  void command<boolean>("cancel_application_generation").catch(
+                  void command("cancel_application_generation").catch(
                     (error: unknown) => setNotice(message(error)),
                   )
                 }
@@ -1215,7 +1125,7 @@ export function ApplicationOverlay() {
                       };
                       await flushStageOne();
                       apply(
-                        await command<Saved>("start_application", {
+                        await command("start_application", {
                           jobDescription: jobRef.current.trim(),
                           jobUrl: sanitizeCaptureUrl(jobUrlRef.current),
                           style,

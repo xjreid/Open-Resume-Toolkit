@@ -8,7 +8,6 @@ pub const DOCX_FORMAT_VERSION: u16 = 1;
 pub const DOCX_TEMPLATE_ID: &str = "plain_docx_v1";
 pub const MAX_DOCX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_XML_BYTES: usize = 1024 * 1024;
-const PARAGRAPH_FIELD_LABEL: &str = "__ort_body_paragraph__";
 const CONTENT_INDENT_TWIPS: u16 = 210;
 const TECHNICAL_TAB_TWIPS: u16 = 10_710;
 const PROFESSIONAL_TAB_TWIPS: u16 = 10_470;
@@ -90,13 +89,11 @@ pub fn render_docx_with_style(
                 entry,
                 tab_position(style),
             )?;
-            if let Some(body_text) = entry
-                .fields
-                .iter()
-                .find(|field| field.label == PARAGRAPH_FIELD_LABEL)
-                .map(|field| field.value.as_str())
-                .filter(|value| !value.trim().is_empty())
+            for field in entry
+                .fields_for_role(ort_domain::FieldRole::Paragraph)
+                .filter(|field| !field.value.trim().is_empty())
             {
+                let body_text = &field.value;
                 rich_paragraph(
                     &mut entries,
                     &mut relationships,
@@ -108,7 +105,8 @@ pub fn render_docx_with_style(
                     false,
                     true,
                 )?;
-            } else {
+            }
+            {
                 for bullet in &entry.bullets {
                     rich_paragraph(
                         &mut entries,
@@ -333,13 +331,10 @@ fn entry_rows(
     tab_position: u16,
 ) -> Result<(), DocxExportError> {
     let mut title = spans(&entry.heading, true, false)?;
-    if let Some(details) = entry.fields.iter().find(|field| {
-        field.label != PARAGRAPH_FIELD_LABEL
-            && !field.label.trim().eq_ignore_ascii_case("extra")
-            && !field.value.trim().is_empty()
-    }) {
+    let details = entry.field_text(ort_domain::FieldRole::Details, " | ");
+    if !details.is_empty() {
         append_separator(&mut title, " | ");
-        title.extend(spans(&details.value, false, false)?);
+        title.extend(spans(&details, false, false)?);
     }
     let mut date_lines = Vec::new();
     if !entry.date_range.trim().is_empty() {
@@ -353,15 +348,7 @@ fn entry_rows(
             .map(ort_domain::ResumeDate::display_text),
     );
     let dates = date_lines.join("\n");
-    let extras = entry
-        .fields
-        .iter()
-        .filter(|field| {
-            field.label.trim().eq_ignore_ascii_case("extra") && !field.value.trim().is_empty()
-        })
-        .map(|field| field.value.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
+    let extras = entry.field_text(ort_domain::FieldRole::Extra, "\n");
     let mut right_rows = [entry.location.as_str(), dates.as_str(), extras.as_str()]
         .into_iter()
         .map(|value| spans(value, false, false))

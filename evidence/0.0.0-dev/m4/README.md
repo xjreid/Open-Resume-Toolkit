@@ -1,5 +1,10 @@
 # M4 implementation evidence
 
+Status: complete for macOS Apple Silicon development. The user accepted M4 on
+October 5, 2026, after many full walkthroughs of the implemented materials.
+See the [acceptance closure](closure.md). The checks and testing limitations below
+describe the earlier September 22 implementation session.
+
 The overlay adds a recoverable application-material workspace while leaving the
 published master and main resume editor in place. Direct AI requests use the
 existing credential, catalog, cap, cancellation, and accounting boundary.

@@ -54,15 +54,28 @@ vi.mock("./application-popup", () => ({
 }));
 const idleCapture = { phase: "idle", sessionId: null, error: null };
 const context = {
+  profileId: "01992187-74f7-7000-8000-000000000001",
+  selectedKeyReady: true,
+  presetLabel: "Balanced",
   publishedRevision: 1,
   aiLabel: "Balanced: Gemini test",
   aiReady: true,
   aiBusy: false,
-  selectedKeyId: "key-one",
+  selectedKeyId: "019a0000-0000-7000-8000-000000000006",
   preset: "balanced",
   presetOptions: [
-    { preset: "economy", label: "Economy: Gemini small", model: "small" },
-    { preset: "balanced", label: "Balanced: Gemini test", model: "test" },
+    {
+      available: true,
+      preset: "economy",
+      label: "Economy: Gemini small",
+      model: "small",
+    },
+    {
+      available: true,
+      preset: "balanced",
+      label: "Balanced: Gemini test",
+      model: "test",
+    },
   ],
   browserConnected: false,
 };
@@ -91,6 +104,12 @@ function reply(value: unknown) {
 }
 
 const qualificationAlert = {
+  jobStart: 0,
+  jobEnd: 15,
+  publishedRevision: 1,
+  validationVersion: 1,
+  mandatoryReason: "Required",
+  target: "Python",
   id: "qualification-python",
   kind: "not_found" as const,
   category: "named_skill_or_technology",
@@ -111,7 +130,8 @@ it.each([false, true])(
           workspace: { ...workspace(), alertsTruncated },
         });
       if (name.startsWith("load_application_")) return reply(null);
-      if (name === "prepare_application_exports") return reply({});
+      if (name === "prepare_application_exports")
+        return reply({ revision: 1, pdfReady: true, docxReady: true });
       throw new Error(`Unexpected command: ${name}`);
     });
     const { host } = await mount();
@@ -139,7 +159,8 @@ it("shows a static list even when saved alerts were previously hidden or dismiss
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
-    if (name === "prepare_application_exports") return reply({});
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host } = await mount();
@@ -164,8 +185,12 @@ it.each(["startup", "browser event"])(
     const capture = {
       revision: 1,
       capture: {
-        requestId: "job-capture",
+        kind: "capture.selection",
+        protocolVersion: 2,
+        sentAt: "2026-09-15T00:00:00Z",
+        requestId: "019a0000-0000-7000-8000-000000000010",
         payload: {
+          browser: "chrome",
           target: "job",
           text: "Captured description\n".repeat(60),
           url: "https" + "://example.test/new-job",
@@ -225,7 +250,7 @@ it.each(["startup", "browser event"])(
     ).toBe(capture.capture.payload.url);
     expect(host.querySelector('[role="dialog"]')).toBeNull();
     expect(invoke).toHaveBeenCalledWith("apply_application_job_capture", {
-      requestId: "job-capture",
+      requestId: "019a0000-0000-7000-8000-000000000010",
       expectedRevision: 4,
     });
     expect(invoke).not.toHaveBeenCalledWith(
@@ -244,6 +269,7 @@ it.each(["startup", "browser event"])(
         ),
     ).toHaveLength(1);
     expect(invoke).toHaveBeenCalledWith("save_application_stage_one", {
+      expectedProfileId: context.profileId,
       expectedRevision: 5,
       draft: {
         ...stageOne.draft,
@@ -259,8 +285,12 @@ it("waits for an in-flight job save before applying the capture at its new revis
   const capture = {
     revision: 1,
     capture: {
-      requestId: "next-job",
+      kind: "capture.selection",
+      protocolVersion: 2,
+      sentAt: "2026-09-15T00:00:00Z",
+      requestId: "019a0000-0000-7000-8000-000000000011",
       payload: {
+        browser: "chrome",
         target: "job",
         text: "New capture",
         url: "https" + "://example.test/new",
@@ -315,7 +345,7 @@ it("waits for an in-flight job save before applying the capture at its new revis
     ),
   );
   expect(invoke).toHaveBeenCalledWith("apply_application_job_capture", {
-    requestId: "next-job",
+    requestId: "019a0000-0000-7000-8000-000000000011",
     expectedRevision: 1,
   });
   await act(async () => vi.advanceTimersByTimeAsync(1000));
@@ -376,6 +406,7 @@ it.each(["", "Original"])(
       ),
     );
     expect(invoke).toHaveBeenCalledWith("save_application_stage_one", {
+      expectedProfileId: context.profileId,
       expectedRevision: 2,
       draft: { jobDescription: original, jobUrl: "", style: "technical" },
     });
@@ -388,8 +419,12 @@ it("keeps the original job and captured payload on failure, with an inline retry
   const capture = {
     revision: 1,
     capture: {
-      requestId: "retry-job",
+      kind: "capture.selection",
+      protocolVersion: 2,
+      sentAt: "2026-09-15T00:00:00Z",
+      requestId: "019a0000-0000-7000-8000-000000000012",
       payload: {
+        browser: "chrome",
         target: "job",
         text: "Replacement",
         url: "https" + "://example.test/job",
@@ -411,7 +446,15 @@ it("keeps the original job and captured payload on failure, with an inline retry
       });
     if (name === "apply_application_job_capture") {
       if (++attempts === 1)
-        return { ok: false, error: { code: "STORAGE_UNAVAILABLE" } };
+        return {
+          ok: false,
+          error: {
+            code: "STORAGE_UNAVAILABLE",
+            messageKey: "errors.storage",
+            retryable: true,
+            details: {},
+          },
+        };
       pending = null;
       return reply({
         revision: 2,
@@ -472,7 +515,10 @@ it.each([
       target: "2027",
       category: "graduation_date",
       kind: "confirmed_mismatch",
-      resumeEvidence: { fieldId: "year", value: "2028" },
+      resumeEvidence: {
+        fieldId: "01992187-74f7-7000-8000-000000000001",
+        value: "2028",
+      },
     },
     "Need graduation in 2027",
   ],
@@ -486,7 +532,8 @@ it.each([
         workspace: { ...workspace(), alerts: [alert] },
       });
     if (name.startsWith("load_application_")) return reply(null);
-    if (name === "prepare_application_exports") return reply({});
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host } = await mount();
@@ -506,7 +553,8 @@ it("displays alerts immediately from a successful tailoring response", async () 
       });
     if (name === "start_application")
       return reply({ revision: 1, workspace: tailored });
-    if (name === "prepare_application_exports") return reply({});
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host, button } = await mount();
@@ -624,7 +672,8 @@ it("keeps Answers available without a question capture button", async () => {
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: workspace() });
     if (name.startsWith("load_application_")) return reply(null);
-    if (name === "prepare_application_exports") return reply({});
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host, button } = await mount();
@@ -646,7 +695,8 @@ it("opens the cover PDF with View and the current cover text with Edit", async (
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
-    if (name === "prepare_application_exports") return reply({});
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
     if (name === "save_application_workspace")
       return reply({
         revision: 2,
@@ -699,7 +749,8 @@ it("refines an answer and saves only its final version on reset", async () => {
     if (name === "load_application_workspace")
       return reply({ revision, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
-    if (name === "prepare_application_exports") return reply({});
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
     if (name === "refine_application_answer") {
       current = { ...current, answer: "Final answer" };
       revision += 1;
@@ -768,7 +819,8 @@ it("finishes directly and saves the final answer with tracker details", async ()
     if (name === "load_application_workspace")
       return reply({ revision, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
-    if (name === "prepare_application_exports") return reply({});
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
     if (name === "save_application_workspace") {
       current = input.workspace as typeof current;
       revision += 1;
@@ -808,7 +860,8 @@ it("edits tracker details before finishing and saves all materials", async () =>
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
-    if (name === "prepare_application_exports") return reply({});
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
     if (name === "finish_application") return reply(true);
     throw new Error(`Unexpected command: ${name}`);
   });
@@ -852,7 +905,8 @@ it("confirms discarding the application without a tracker entry", async () => {
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: workspace() });
     if (name.startsWith("load_application_")) return reply(null);
-    if (name === "prepare_application_exports") return reply({});
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
     if (name === "finish_application") return reply(true);
     throw new Error(`Unexpected command: ${name}`);
   });
@@ -942,7 +996,15 @@ it.each([
         draft: (args as Record<string, unknown>).draft,
       });
     if (name === "start_application")
-      return { ok: false, error: { code, messageKey: "errors.application" } };
+      return {
+        ok: false,
+        error: {
+          code,
+          messageKey: "errors.application",
+          retryable: false,
+          details: {},
+        },
+      };
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host, button } = await mount();
@@ -967,7 +1029,8 @@ it("places Finish Application directly below the header when no role was found",
     if (name === "load_application_workspace")
       return reply({ revision: 1, workspace: draft });
     if (name.startsWith("load_application_")) return reply(null);
-    if (name === "prepare_application_exports") return reply({});
+    if (name === "prepare_application_exports")
+      return reply({ revision: 1, pdfReady: true, docxReady: true });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host, button } = await mount();
@@ -989,7 +1052,11 @@ it("requires an active key even when a job exists and routes connected capture +
     if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context") return reply(activeContext);
     if (name === "request_application_capture")
-      return reply({ phase: "waiting", sessionId: "capture-one", error: null });
+      return reply({
+        phase: "waiting",
+        sessionId: "019a0000-0000-7000-8000-000000000013",
+        error: null,
+      });
     if (name.startsWith("load_application_")) return reply(null);
     return reply(true);
   });
@@ -1012,7 +1079,10 @@ it("requires an active key even when a job exists and routes connected capture +
     selector.dispatchEvent(new Event("change", { bubbles: true }));
   });
   expect(invoke).toHaveBeenCalledWith("set_ai_key_preset", {
-    request: { credentialId: "key-one", preset: "economy" },
+    request: {
+      credentialId: "019a0000-0000-7000-8000-000000000006",
+      preset: "economy",
+    },
   });
 });
 
@@ -1030,7 +1100,9 @@ it("autosaves without losing newer typing and only exports the latest prepared r
       return reply({ revision: 1, workspace: latest });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return input.expectedRevision === 1 ? reply({}) : newExports.promise;
+      return input.expectedRevision === 1
+        ? reply({ revision: 1, pdfReady: true, docxReady: true })
+        : newExports.promise;
     if (name === "save_application_workspace") {
       latest = input.workspace as ReturnType<typeof workspace>;
       saves += 1;
@@ -1060,11 +1132,14 @@ it("autosaves without losing newer typing and only exports the latest prepared r
   expect(latest.resume.title).toBe("Latest edit");
   expect(popup.options?.resume?.title).toBe("Latest edit");
   expect(invoke).toHaveBeenCalledWith("save_application_workspace", {
+    expectedProfileId: context.profileId,
     expectedRevision: 2,
     workspace: latest,
   });
   expect(button("Download").disabled).toBe(true);
-  await act(async () => newExports.resolve(reply({})));
+  await act(async () =>
+    newExports.resolve(reply({ revision: 1, pdfReady: true, docxReady: true })),
+  );
   expect(button("Download").disabled).toBe(false);
   const preparationCalls = vi
     .mocked(invoke)
@@ -1121,13 +1196,21 @@ it("shows working/stop in the persistent header and retains dirty edits after sa
       return reply({ revision: 1, workspace: workspace() });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "save_application_workspace")
-      return { ok: false, error: { code: "REVISION_CONFLICT" } };
+      return {
+        ok: false,
+        error: {
+          code: "REVISION_CONFLICT",
+          messageKey: "errors.conflict",
+          retryable: false,
+          details: {},
+        },
+      };
     return reply(true);
   });
   const { host, button } = await mount();
   expect(host.querySelector("header")?.textContent).toContain("Working");
   await act(async () => button("Stop").click());
-  expect(invoke).toHaveBeenCalledWith("cancel_application_generation", {});
+  expect(invoke).toHaveBeenCalledWith("cancel_application_generation");
   await act(async () =>
     popup.options?.onResumeChange({
       ...workspace().resume,
@@ -1167,7 +1250,11 @@ it("uses the overlay button to start, switch to Cancel after the first corner, a
     }
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "request_application_capture") {
-      mode = { phase: "waiting", sessionId: "capture-one", error: null };
+      mode = {
+        phase: "waiting",
+        sessionId: "019a0000-0000-7000-8000-000000000013",
+        error: null,
+      };
       return reply(mode);
     }
     if (name === "cancel_application_capture") {
@@ -1180,7 +1267,11 @@ it("uses the overlay button to start, switch to Cancel after the first corner, a
   await act(async () => button("Capture").click());
   expect(button("Capture").getAttribute("aria-pressed")).toBe("true");
   expect(host.textContent).toContain("top-left corner");
-  mode = { phase: "selecting", sessionId: "capture-one", error: null };
+  mode = {
+    phase: "selecting",
+    sessionId: "019a0000-0000-7000-8000-000000000013",
+    error: null,
+  };
   await act(async () =>
     listeners.get("ort:capture-mode")?.({ payload: { phase: "forged" } }),
   );
@@ -1191,7 +1282,7 @@ it("uses the overlay button to start, switch to Cancel after the first corner, a
   await act(async () => listeners.get("ort:capture-mode")?.({ payload: null }));
   await act(async () => button("Cancel").click());
   expect(invoke).toHaveBeenCalledWith("cancel_application_capture", {
-    sessionId: "capture-one",
+    sessionId: "019a0000-0000-7000-8000-000000000013",
   });
   expect(button("Capture").getAttribute("aria-pressed")).toBe("false");
   await act(async () => resolveStaleStatus!(reply(staleMode)));

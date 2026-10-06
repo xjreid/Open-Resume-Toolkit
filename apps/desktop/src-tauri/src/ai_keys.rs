@@ -14,20 +14,30 @@ use crate::{DesktopState, ai_request::AiRequestGate, storage_unavailable, window
 const SETTING: &str = "ai.connection.v1";
 const STORAGE: &str = "STORAGE_UNAVAILABLE";
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+enum CredentialProvider {
+    Openai,
+    Anthropic,
+    Gemini,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SavedAiKey {
     pub credential_id: Uuid,
     pub created_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[schemars(with = "CredentialProvider")]
     pub provider: String,
+    #[schemars(with = "ort_ai::Preset")]
     pub preset: String,
     pub paused: bool,
     pub removed: bool,
     pub cleanup_required: bool,
 }
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AiKeyRegistry {
     pub keys: Vec<SavedAiKey>,
@@ -106,8 +116,8 @@ impl AiKeyRegistry {
     fn validate(&self) -> Result<(), StorageError> {
         let mut ids = std::collections::HashSet::new();
         for key in &self.keys {
-            if !matches!(key.provider.as_str(), "openai" | "anthropic" | "gemini")
-                || !matches!(key.preset.as_str(), "economy" | "balanced" | "quality")
+            if serde_json::from_value::<CredentialProvider>(json!(key.provider)).is_err()
+                || serde_json::from_value::<ort_ai::Preset>(json!(key.preset)).is_err()
                 || !ids.insert(key.credential_id)
                 || key.created_at.parse::<jiff::Timestamp>().is_err()
                 || key.name.as_ref().is_some_and(|name| !valid_key_name(name))
@@ -275,7 +285,7 @@ pub(crate) fn suspend_for_deletion(store: &EncryptedStore) -> Result<(), Storage
         .map(|_| ())
         .map_err(|_| StorageError::Unavailable)
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AddAiKeyRequest {
     provider: String,
@@ -283,7 +293,7 @@ pub struct AddAiKeyRequest {
     #[serde(default)]
     name: Option<String>,
 }
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AiKeyAction {
     SelectPrimary,
@@ -291,20 +301,20 @@ pub enum AiKeyAction {
     Unpause,
     Remove,
 }
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ChangeAiKeyRequest {
     credential_id: Uuid,
     action: AiKeyAction,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DeleteRemovedKeyDataRequest {
     credential_ids: Vec<Uuid>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteRemovedKeyDataResult {
     registry: AiKeyRegistry,
@@ -487,13 +497,13 @@ fn valid_key_name(name: &str) -> bool {
         && name.chars().count() <= 80
         && !name.chars().any(char::is_control)
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RenameAiKeyRequest {
     credential_id: Uuid,
     name: String,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SetAiKeyPresetRequest {
     credential_id: Uuid,

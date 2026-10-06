@@ -1,20 +1,12 @@
-import { invoke } from "@tauri-apps/api/core";
+import {
+  invokeDesktop as invoke,
+  type DesktopResponse,
+} from "./desktop-client";
+import type * as Wire from "@ort/contracts/wire";
 import { useEffect, useState } from "react";
 
-type Cap = {
-  limitMicros: number;
-  countedMicros: number;
-  reservedMicros: number;
-  unresolvedMicros: number;
-  revision: number;
-  currency: string;
-};
-type Settings = {
-  cap: Cap | null;
-  lifetimeSpendByCurrencyMicros: Record<string, number>;
-  lifetimeSpendPartial?: boolean;
-};
-type Reply<T> = { ok: true; value: T } | { ok: false; error: { code: string } };
+type Cap = Wire.AiCapPolicySummary;
+type Settings = Wire.AiGeneralSettings;
 const format = (micros: number, currency = "USD") =>
   currency === "USD"
     ? `$${(micros / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`
@@ -42,7 +34,7 @@ export function AiGeneralSpending({
     let current = true;
     setLoading(true);
     setError(false);
-    void invoke<Reply<Settings>>("load_ai_general_settings")
+    void invoke("load_ai_general_settings")
       .then((response) => {
         if (!current) return;
         if (response.ok) {
@@ -78,7 +70,7 @@ export function AiGeneralSpending({
   const percent = cap ? Math.floor((exposure / cap.limitMicros) * 100) : 0;
   const disabled = blocked || loading || !settings;
   async function refresh(
-    action: () => Promise<Reply<unknown>>,
+    action: () => Promise<DesktopResponse<unknown>>,
     success: string,
   ) {
     setWorking(true);

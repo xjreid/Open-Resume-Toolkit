@@ -17,7 +17,7 @@ use crate::text_export::ExportState;
 const RETENTION_SETTING: &str = "ai.history_retention.v1";
 const MAX_UNIX_MS: i64 = 8_640_000_000_000_000;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiActivityMonth {
     label: String,
@@ -135,14 +135,14 @@ mod key_budget_tests {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiRetentionSummary {
     policy: String,
     removed_operations: u64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SaveAiCapRequest {
     credential_id: Uuid,
@@ -152,7 +152,7 @@ pub struct SaveAiCapRequest {
     expected_revision: Option<u64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AiCapActionRequest {
     credential_id: Uuid,
@@ -310,14 +310,14 @@ pub(crate) fn unified_cap(
         .into_iter()
         .find(|cap| cap.period == AiPeriod::AllTime))
 }
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiKeySettings {
     cap: Option<AiCapPolicySummary>,
     lifetime_spend_by_currency_micros: std::collections::BTreeMap<String, u64>,
     lifetime_spend_partial: bool,
 }
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiGeneralSettings {
     cap: Option<AiCapPolicySummary>,

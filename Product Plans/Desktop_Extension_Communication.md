@@ -23,6 +23,15 @@ Browser content can never directly read local records, access credentials, chang
 
 ## Native messaging and local IPC
 
+M5 qualifies functional Chrome/Edge integration with the clearly identified
+current-user development app/host; paid Apple app signing is not required before
+M7. M7 qualifies signed production desktop/helper identity, identity-scoped vault
+access, final Store identities/publication and Store-installed integration.
+Authenticated messages, exact origins, permission/capture authorization, bounds,
+replay rejection and safe failure remain requirements at both stages. Testing
+Store-ready extension code against the development app uses an explicit test
+configuration, never an automatic fallback from production to development.
+
 - The native host validates the exact extension origins, protocol version, action, message identifier, schema, size, and freshness.
 - Production manifests allowlist the published Chrome and Edge extension identifiers; wildcard origins are prohibited.
 - Development and production use different identifiers, host names, manifests, and IPC endpoints.

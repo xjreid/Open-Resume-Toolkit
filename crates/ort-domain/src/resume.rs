@@ -309,6 +309,40 @@ pub struct ResumeEntry {
     pub links: Vec<Link>,
 }
 
+/// Typed presentation of legacy labels. Classification never rewrites persisted fields.
+pub const PARAGRAPH_FIELD_LABEL: &str = "__ort_body_paragraph__";
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldRole {
+    Details,
+    Extra,
+    Paragraph,
+}
+impl NamedField {
+    #[must_use]
+    pub fn role(&self) -> FieldRole {
+        if self.label == PARAGRAPH_FIELD_LABEL {
+            FieldRole::Paragraph
+        } else if self.label.trim().eq_ignore_ascii_case("extra") {
+            FieldRole::Extra
+        } else {
+            FieldRole::Details
+        }
+    }
+}
+impl ResumeEntry {
+    pub fn fields_for_role(&self, role: FieldRole) -> impl Iterator<Item = &NamedField> {
+        self.fields.iter().filter(move |field| field.role() == role)
+    }
+    #[must_use]
+    pub fn field_text(&self, role: FieldRole, separator: &str) -> String {
+        self.fields_for_role(role)
+            .filter(|field| !field.value.trim().is_empty())
+            .map(|field| field.value.as_str())
+            .collect::<Vec<_>>()
+            .join(separator)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NamedField {

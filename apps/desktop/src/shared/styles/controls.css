@@ -1,0 +1,36 @@
+.button--compact {
+  min-height: 31px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.button--icon {
+  padding: 0;
+  font-size: 20px;
+  width: 34px;
+  min-height: 34px;
+}
+
+.button--quiet {
+  border-style: solid;
+}
+:is(.button--secondary, .button--quiet, .application-secondary) {
+  background: white;
+  color: var(--ink);
+  border-color: var(--line);
+}
+:is(.button--secondary, .button--quiet, .application-secondary):hover:not(
+    :disabled
+  ) {
+  color: var(--accent-hover);
+  background: #edf4f4;
+  border-color: #9abfc3;
+}
+.button--danger {
+  color: var(--danger);
+  border-color: #dcb7b7;
+  background: white;
+}
+.button--danger:hover:not(:disabled) {
+  background: #fff2f2;
+}

@@ -1,15 +1,16 @@
 //! Shared tracker snapshot schema and validation for desktop commands and backups.
 use crate::{ContactDetails, DocumentLimits, DocumentStyle, ResumeDocument};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ApprovedAnswer {
     pub question: String,
     pub answer: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TrackerEntry {
     pub company: String,
@@ -25,6 +26,32 @@ pub struct TrackerEntry {
     pub cover_contact: Option<ContactDetails>,
     pub answers: Vec<ApprovedAnswer>,
     pub style: DocumentStyle,
+}
+
+/// Editable metadata, deliberately separate from immutable retained documents.
+#[derive(Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TrackerMetadata {
+    pub company: String,
+    pub title: String,
+    pub location: String,
+    pub date_applied: String,
+    pub status: String,
+    pub custom_status: String,
+    pub source_url: String,
+}
+
+impl TrackerMetadata {
+    /// Applies only editable fields; retained documents never cross this boundary.
+    pub fn apply_to(self, entry: &mut TrackerEntry) {
+        entry.company = self.company;
+        entry.title = self.title;
+        entry.location = self.location;
+        entry.date_applied = self.date_applied;
+        entry.status = self.status;
+        entry.custom_status = self.custom_status;
+        entry.source_url = self.source_url;
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

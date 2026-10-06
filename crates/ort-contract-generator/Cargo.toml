@@ -7,6 +7,9 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+ort-desktop = { path = "../../apps/desktop/src-tauri" }
+syn = { version = "=2.0.119", features = ["full"] }
+ort-backup = { path = "../ort-backup" }
 ort-domain = { path = "../ort-domain" }
 schemars.workspace = true
 serde_json.workspace = true

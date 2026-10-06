@@ -1,0 +1,347 @@
+.resume-canvas__contact .canvas-field--bold .canvas-field__value {
+  font-size: 25px;
+}
+.canvas-field__button {
+  display: flex;
+  align-items: baseline;
+  width: 100%;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: inherit;
+}
+.canvas-field__label {
+  margin-right: 8px;
+  font-family: Hanken, ui-sans-serif, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.canvas-field__value:empty,
+.canvas-field__button .canvas-field__value {
+  min-width: 0;
+}
+.canvas-field__button .canvas-field__value:not(:empty) {
+  overflow-wrap: anywhere;
+}
+.canvas-field__button .canvas-field__value {
+  color: #4d5968;
+}
+.canvas-field--bold .canvas-field__button .canvas-field__value {
+  color: #202020;
+  font-weight: 700;
+}
+.canvas-field__button .canvas-field__value::first-line {
+  color: inherit;
+}
+.canvas-field--editing {
+  text-align: left;
+}
+.canvas-field--editing input,
+.canvas-field--editing textarea {
+  width: 100%;
+  margin-top: 6px;
+  background: #fff;
+}
+.canvas-field__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #34465d;
+  font-size: 12px;
+  font-weight: 700;
+}
+.canvas-field__formatting {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-left: auto;
+}
+.canvas-field__formatting input {
+  min-height: 27px;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .canvas-entry__details,
+  .canvas-entry > .canvas-field:last-child {
+    grid-column: 1;
+  }
+}
+.resume-canvas__contact .canvas-field:first-child .canvas-field__button {
+  font-size: 27px;
+  line-height: 1.15;
+}
+.canvas-entry__title-line > .canvas-field:first-child {
+  flex: 0 1 42%;
+}
+.canvas-entry__title-line > .canvas-field:last-child {
+  flex: 1 1 58%;
+}
+.canvas-entry > .canvas-field:last-child {
+  grid-area: body;
+  width: 100%;
+  margin-left: 0;
+  margin-top: 2px;
+}
+.canvas-entry > .canvas-field--bullets:last-child {
+  width: calc(100% - 18px);
+  margin-left: 18px;
+}
+.canvas-field__label {
+  color: #65758a;
+  font-size: 8.5px;
+}
+.canvas-field__value {
+  white-space: pre-wrap;
+}
+.canvas-field__value--bullets,
+.formatted-bullet {
+  display: block;
+}
+.canvas-field--editing {
+  position: relative;
+  z-index: 4;
+  grid-column: auto;
+  border: 1px solid #89a5c3;
+  border-radius: 8px;
+}
+.canvas-field--singleline.canvas-field--editing {
+  padding: 7px;
+  border-radius: 6px;
+}
+.canvas-field--singleline.canvas-field--editing .canvas-field__toolbar {
+  gap: 4px;
+  padding-bottom: 5px;
+}
+.canvas-field--singleline.canvas-field--editing
+  .canvas-field__toolbar
+  > span:first-child {
+  display: none;
+}
+.canvas-field--singleline.canvas-field--editing .button--compact {
+  min-height: 26px;
+  padding-inline: 7px;
+  font-size: 10px;
+}
+.canvas-field--editing input:not([aria-label="Link address"]),
+.canvas-field--editing textarea {
+  margin-top: 10px;
+  border-radius: 6px;
+}
+.canvas-field--singleline.canvas-field--editing
+  input:not([aria-label="Link address"]) {
+  min-height: 32px;
+  margin-top: 6px;
+  padding: 6px 8px;
+}
+.canvas-field--editing textarea {
+  resize: vertical;
+}
+.canvas-field__toolbar {
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid #d6e0eb;
+}
+.canvas-field__toolbar > span:first-child {
+  margin-right: auto;
+}
+.canvas-field__formatting {
+  flex-wrap: wrap;
+}
+.canvas-field__formatting input {
+  width: min(210px, 30vw);
+}
+.canvas-field__formatting button {
+  min-width: 28px;
+}
+.canvas-field--editing .is-typing-bold {
+  font-weight: 700;
+}
+.canvas-field--editing .is-typing-italic {
+  font-style: italic;
+}
+.canvas-field__link-popover {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 7px;
+  border: 1px solid #c4d2e0;
+  border-radius: 6px;
+}
+.canvas-field__link-selection {
+  flex-basis: 100%;
+  overflow: hidden;
+  color: #566c70;
+  font-size: 10px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.canvas-field__link-selection mark {
+  padding: 1px 3px;
+}
+.canvas-field__link-popover input {
+  flex: 1 1 auto;
+  min-height: 32px;
+  padding: 5px 8px;
+}
+.canvas-field__link-popover button {
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .canvas-entry__title-line > .canvas-field:first-child,
+  .canvas-entry__title-line > .canvas-field:last-child {
+    flex: 1 1 42%;
+  }
+}
+.resume-canvas__contact .canvas-field__button {
+  justify-content: flex-start;
+  background: #f5f9f9;
+  padding: 8px 10px;
+}
+.resume-canvas__contact .canvas-field:first-child .canvas-field__value {
+  font-size: 28px;
+  line-height: 1.2;
+}
+.canvas-field__button {
+  min-height: 26px;
+  padding: 3px 0;
+  color: #171717;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-family: inherit;
+}
+.canvas-field__button:hover:not(:disabled) {
+  color: #171717;
+  border-color: #a7c9cc;
+  background: #f3f9f9;
+}
+.canvas-field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.canvas-field--empty .canvas-field__button {
+  color: var(--muted);
+  font:
+    11px/1.5 Hanken,
+    sans-serif;
+}
+.canvas-field--editing {
+  padding: 12px 13px;
+  border-color: #a7c9cc;
+  background: #f3f9f9;
+  box-shadow: none;
+}
+.canvas-field__toolbar {
+  border-bottom-color: #d3e5e7;
+}
+.canvas-field__toolbar > span:first-child {
+  font-family: Hanken, sans-serif;
+  color: #607a7f;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.canvas-field--editing input:not([aria-label="Link address"]),
+.canvas-field--editing textarea {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #171717;
+  font-family: inherit;
+  line-height: 1.5;
+}
+.canvas-field__formatting button {
+  min-height: 28px;
+  background: white;
+  color: var(--ink);
+  border-color: var(--line);
+}
+.canvas-field__formatting button[aria-pressed="true"] {
+  background: var(--selection);
+  color: var(--accent-hover);
+}
+.canvas-entry .canvas-field__button {
+  color: #171717;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+.canvas-entry .canvas-field--bold .canvas-field__button {
+  font-weight: 700;
+}
+.canvas-entry .canvas-field--empty .canvas-field__button {
+  color: var(--muted);
+  font:
+    11px/1.5 Hanken,
+    sans-serif;
+}
+.canvas-entry__title-line > .canvas-field:first-child,
+.canvas-entry__title-line > .canvas-field:last-child {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.canvas-entry__title-line > .canvas-field.canvas-field--editing {
+  flex-grow: 1;
+  min-width: min(100%, 180px);
+}
+.canvas-entry__dates > .canvas-field > .canvas-field__button {
+  justify-content: flex-end;
+  text-align: right;
+}
+.canvas-entry > .canvas-field:last-child {
+  grid-column: 1 / -1;
+}
+.canvas-entry .canvas-field--editing textarea {
+  font: inherit;
+  color: #171717;
+}
+.canvas-entry .canvas-field--editing textarea:focus-visible {
+  outline: 2px solid #469298;
+  outline-offset: 3px;
+}
+.canvas-entry .canvas-field__value {
+  color: #171717;
+}
+.canvas-entry .canvas-field--empty .canvas-field__value {
+  color: var(--muted);
+}
+.canvas-field--editing {
+  font-family: inherit;
+}
+.canvas-field__toolbar {
+  font-family: Hanken, sans-serif;
+}
+.canvas-entry > .canvas-field--bullets.canvas-field--editing:last-child {
+  width: 100%;
+  margin-left: 0;
+}
+.canvas-field--editing textarea {
+  min-height: 65px;
+}
+
+.canvas-field__link-popover {
+  border-color: #b6cace;
+  background: #edf4f4;
+  font-family: Hanken, sans-serif;
+}
+.canvas-field__link-popover input {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+.canvas-field__link-selection mark {
+  background: var(--selection);
+  color: var(--accent-hover);
+}

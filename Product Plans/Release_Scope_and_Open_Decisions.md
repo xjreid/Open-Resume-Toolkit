@@ -18,6 +18,22 @@ This is the central register for implementation gates, unresolved validation/rel
 - A feature remains disabled on every platform whose security gate has not passed. In particular, document import cannot be enabled merely because shared or CI tests pass.
 - During local development, a locally created self-signed Code Signing identity may be used to test stable code requirements and macOS Keychain access across rebuilds. It is not a Developer ID, is not suitable for distribution, and does not satisfy notarization or stable-release gates. Ad-hoc signing remains acceptable only for tests that do not require identity continuity.
 
+## Milestone signing boundary — accepted 2026-10-05
+
+M0–M6 develop and qualify functionality on the active macOS Apple Silicon
+configuration without requiring paid Apple signing. M5 includes Chrome/Edge
+native messaging using a clearly identified current-user development bridge,
+exact extension origins, authenticated bounded messages and explicit capture
+sessions. It does not claim signed process isolation. Store-ready extension code
+and packages can be tested before M7; public Store publication is not an M5 gate.
+M7 is the production milestone and requires Developer ID signing of ORT and its
+native helpers, notarization/stapling, production IPC identity/Keychain controls,
+and final Store identities/publication and installed integration qualification.
+Local ad-hoc/self-signed integrity mechanisms and all existing import, provider,
+external-runtime, data and authentication protections remain required where
+applicable. This boundary does not authorize removing runtime checks or making
+unsigned test transport a silent production fallback.
+
 ## Initial release capabilities
 
 1. Free open-source macOS Apple Silicon desktop application with one local profile per operating-system user; Windows and Intel Mac are deferred platform expansions.
@@ -60,7 +76,7 @@ The current selections and module-level acceptance criteria are documented under
 10. **[IMPLEMENTATION]** Specify the native-messaging protocol, IPC authentication, per-user installation, desktop launch, version window, repair, and uninstall behavior.
 11. **[LATER]** Prove the preferred direct Windows installer, per-user native-host registration, repair, signed update handoff, and uninstall behavior; separately prove how fallback Microsoft Store MSIX first-run setup writes browser-visible registrations and keeps paths valid after updates.
 12. **[LATER]** Define the Windows GitHub packaging/signing path, reproducible source-to-binary CI, checksums, SBOM/provenance, public code-signing policy, release roles, and SignPath application readiness. Define the Microsoft Store MSIX contingency if SignPath is declined or unavailable.
-13. **[IMPLEMENTATION]** Select the unsigned macOS preview package format, checksum/provenance and authenticated update-notification design, Gatekeeper guidance, and native-messaging installation behavior. Define measurable adoption, support-burden, and funding triggers for later Developer ID signing/notarization and stable status.
+13. **[IMPLEMENTATION]** Select the unsigned macOS preview package format, checksum/provenance and authenticated update-notification design, Gatekeeper guidance, and native-messaging installation behavior. Developer ID signing/notarization and stable production qualification are required in M7; paid enrollment is not a pre-M7 development prerequisite.
 14. **[IMPLEMENTATION]** Define channel-specific update metadata, signature verification, release provenance, schema-safe update order, and recovery.
 15. **[IMPLEMENTATION]** Define safe local diagnostic bundles without centralized telemetry.
 16. **[IMPLEMENTATION]** Freeze protective limits for import size/pages, extracted text, native messages, document pages, collections, backups, provider requests, and exports.

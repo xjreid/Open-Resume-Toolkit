@@ -1,19 +1,7 @@
+import type * as Wire from "@ort/contracts/wire";
 import type { ContactDetails, ResumeDocument } from "@ort/contracts/resume";
 
-export type TrackerEntry = {
-  company: string;
-  title: string;
-  location: string;
-  dateApplied: string;
-  status: string;
-  customStatus: string;
-  sourceUrl: string;
-  resume: ResumeDocument | null;
-  coverLetter: string | null;
-  coverContact: ContactDetails | null;
-  answers: { question: string; answer: string }[];
-  style: "technical" | "professional" | "modern" | "plain";
-};
+export type TrackerEntry = Wire.TrackerEntry;
 
 export const emptyTrackerEntry = (): TrackerEntry => ({
   company: "",

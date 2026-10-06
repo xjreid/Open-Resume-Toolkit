@@ -22,7 +22,6 @@ pub const FONT_BUNDLE_ID: &str = "libertinus-serif/typst-assets-0.15.1";
 const TEMPLATE: &str = include_str!("../../../templates/resume/plain_pdf_v1.typ");
 const MAX_LAYOUT_BLOCKS: usize = 800;
 const MAX_HARD_BREAKS: usize = 200;
-const PARAGRAPH_FIELD_LABEL: &str = "__ort_body_paragraph__";
 static RENDER_LOCK: Mutex<()> = Mutex::new(());
 static SOURCE: LazyLock<Source> = LazyLock::new(|| Source::detached(TEMPLATE));
 static TECHNICAL_SOURCE: LazyLock<Source> =
@@ -280,15 +279,14 @@ fn paragraphs(
             let entry_start = entries.len();
             entry_header(&mut entries, entry, style);
             let body_start = entries.len();
-            if let Some(body) = entry
-                .fields
-                .iter()
-                .find(|field| field.label == PARAGRAPH_FIELD_LABEL)
-                .map(|field| field.value.as_str())
-                .filter(|value| !value.trim().is_empty())
+            for field in entry
+                .fields_for_role(ort_domain::FieldRole::Paragraph)
+                .filter(|field| !field.value.trim().is_empty())
             {
+                let body = &field.value;
                 add(&mut entries, "text", body);
-            } else {
+            }
+            {
                 for bullet in &entry.bullets {
                     add(&mut entries, "bullet", &bullet.text);
                 }
@@ -381,14 +379,11 @@ fn entry_header(
 ) {
     let mut title = inline_runs(&entry.heading, true, false);
     let mut details_runs = vec![];
-    if let Some(details) = entry.fields.iter().find(|field| {
-        field.label != PARAGRAPH_FIELD_LABEL
-            && !field.label.trim().eq_ignore_ascii_case("extra")
-            && !field.value.trim().is_empty()
-    }) {
-        details_runs = inline_runs(&details.value, false, false);
+    let details = entry.field_text(ort_domain::FieldRole::Details, " | ");
+    if !details.is_empty() {
+        details_runs = inline_runs(&details, false, false);
         append_separator(&mut title, " | ");
-        append_runs(&mut title, &details.value, false, false);
+        append_runs(&mut title, &details, false, false);
     }
     let dates = if style == DocumentStyle::Plain && !entry.date_range.trim().is_empty() {
         entry.date_range.clone()
@@ -405,15 +400,7 @@ fn entry_header(
             .collect::<Vec<_>>()
             .join("\n")
     };
-    let extras = entry
-        .fields
-        .iter()
-        .filter(|field| {
-            field.label.trim().eq_ignore_ascii_case("extra") && !field.value.trim().is_empty()
-        })
-        .map(|field| field.value.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
+    let extras = entry.field_text(ort_domain::FieldRole::Extra, "\n");
     if style != DocumentStyle::Plain {
         let right = [entry.location.as_str(), dates.as_str(), extras.as_str()]
             .into_iter()

@@ -10,5 +10,8 @@
       ]
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": [
+    "pendingAttempt"
+  ]
 }

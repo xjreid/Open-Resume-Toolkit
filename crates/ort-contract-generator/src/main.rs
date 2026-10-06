@@ -1,3 +1,4 @@
+mod wire;
 use std::{fs, path::PathBuf};
 
 use ort_domain::{
@@ -11,7 +12,6 @@ use ort_domain::{
     SaveResumeRequest, StorageUsageRequest, StorageUsageResponse, ValidateBackupRequest,
     ValidateBackupResponse, VersionedResumeResponse,
 };
-use schemars::schema_for;
 
 const TYPESCRIPT: &str = include_str!("health.ts.template");
 const RESUME_TYPESCRIPT: &str = include_str!("resume.ts.template");
@@ -65,10 +65,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(output.join("health.ts"), TYPESCRIPT)?;
     fs::write(
         output.join("resume.ts"),
-        RESUME_TYPESCRIPT.replace(
-            "__MAX_RESUME_DATES__",
-            &ort_domain::MAX_RESUME_DATES.to_string(),
-        ),
+        RESUME_TYPESCRIPT
+            .replace(
+                "__PARAGRAPH_FIELD_LABEL__",
+                ort_domain::PARAGRAPH_FIELD_LABEL,
+            )
+            .replace(
+                "__MAX_RESUME_DATES__",
+                &ort_domain::MAX_RESUME_DATES.to_string(),
+            ),
     )?;
     write_schema::<StorageUsageRequest>(&output.join("storage.usage.request.schema.json"))?;
     write_schema::<StorageUsageResponse>(&output.join("storage.usage.response.schema.json"))?;
@@ -103,6 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     fs::write(output.join("compatibility.json"), COMPATIBILITY)?;
 
+    wire::write(&root, &output)?;
     println!("Generated development contracts in {}", output.display());
     Ok(())
 }
@@ -190,6 +196,10 @@ fn write_backup_contracts(output: &std::path::Path) -> Result<(), Box<dyn std::e
         output.join("backup.ts"),
         include_str!("backup.ts.template")
             .replace(
+                "__BACKUP_FORMAT_MINOR__",
+                &ort_backup::FORMAT_MINOR.to_string(),
+            )
+            .replace(
                 "__MAX_BACKUP_BYTES__",
                 &ort_domain::MAX_BACKUP_BYTES.to_string(),
             )
@@ -216,7 +226,13 @@ fn write_backup_contracts(output: &std::path::Path) -> Result<(), Box<dyn std::e
 fn write_schema<T: schemars::JsonSchema>(
     destination: &std::path::Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = schema_for!(T);
+    let settings = schemars::generate::SchemaSettings::default();
+    let settings = if destination.to_string_lossy().contains(".request.") {
+        settings.for_deserialize()
+    } else {
+        settings.for_serialize()
+    };
+    let schema = settings.into_generator().into_root_schema_for::<T>();
     let schema_json = format!("{}\n", serde_json::to_string_pretty(&schema)?);
     fs::write(destination, schema_json)?;
     Ok(())

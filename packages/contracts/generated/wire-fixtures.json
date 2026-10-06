@@ -1,0 +1,122 @@
+{
+  "export_portable_backup": {
+    "byteCount": 1000,
+    "cleanupPending": false,
+    "durabilityUnconfirmed": false,
+    "formatMajor": 1,
+    "formatMinor": 6,
+    "status": "exported"
+  },
+  "get_tracker_entry": {
+    "id": "019a0000-0000-7000-8000-000000000002",
+    "revision": 1,
+    "value": {
+      "answers": [],
+      "company": "Synthetic",
+      "coverContact": null,
+      "coverLetter": null,
+      "customStatus": "",
+      "dateApplied": "2026-10-06",
+      "location": "",
+      "resume": {
+        "contact": {
+          "email": "",
+          "fullName": "",
+          "links": [],
+          "location": "",
+          "phone": ""
+        },
+        "documentId": "019a0000-0000-7000-8000-000000000001",
+        "schemaVersion": 1,
+        "sections": [],
+        "title": "Wire fixture"
+      },
+      "sourceUrl": "",
+      "status": "applied",
+      "style": "technical",
+      "title": "Engineer"
+    }
+  },
+  "load_ai_connection": {
+    "keys": [],
+    "primaryCredentialId": null
+  },
+  "load_ai_monitoring": {
+    "attempts": 0,
+    "byCredentialId": {},
+    "byModel": {},
+    "byOperationType": {},
+    "byPreset": {},
+    "byProvider": {},
+    "byStatus": {},
+    "costByCurrencyMicros": {},
+    "currency": null,
+    "estimatedCostMicros": 0,
+    "logicalOperations": 0,
+    "partial": false,
+    "timeBuckets": [],
+    "totalTokens": 0,
+    "unknownCount": 0,
+    "unresolvedReservedMicros": 0,
+    "usage": {
+      "cacheWriteTokens": 0,
+      "cachedInputTokens": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "reasoningTokens": 0
+    }
+  },
+  "load_application_workspace": {
+    "revision": 1,
+    "workspace": {
+      "alerts": [],
+      "alertsTruncated": false,
+      "answer": "",
+      "approvedAnswers": [],
+      "changePoints": [],
+      "coverLetter": null,
+      "dismissedAlertIds": [],
+      "ignoreAllAlerts": false,
+      "jobDescription": "Synthetic job",
+      "jobUrl": "",
+      "publishedRevision": 1,
+      "question": "",
+      "resume": {
+        "contact": {
+          "email": "",
+          "fullName": "",
+          "links": [],
+          "location": "",
+          "phone": ""
+        },
+        "documentId": "019a0000-0000-7000-8000-000000000001",
+        "schemaVersion": 1,
+        "sections": [],
+        "title": "Wire fixture"
+      },
+      "roleInfo": {
+        "company": "",
+        "location": "",
+        "title": ""
+      },
+      "schemaVersion": 1,
+      "style": "technical"
+    }
+  },
+  "validate_portable_backup": {
+    "aiAttempts": 20001,
+    "aiOperations": 10001,
+    "appVersion": "0.0.0-dev",
+    "byteCount": 1000,
+    "createdAt": "2026-10-06T12:00:00Z",
+    "databaseSchema": 5,
+    "documentSchema": 2,
+    "formatMajor": 1,
+    "formatMinor": 6,
+    "masterDrafts": 1,
+    "publishedResumes": 101,
+    "renderManifests": 0,
+    "settings": 0,
+    "status": "validated"
+  }
+}

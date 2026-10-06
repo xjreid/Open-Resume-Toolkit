@@ -50,23 +50,11 @@ const MAX_RENDER_MANIFESTS: i64 = 100;
 const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 const MAX_MANIFEST_BYTES: u64 = 16 * 1_024;
 const MAX_SETTING_BYTES: usize = 64 * 1_024;
-const MAX_APPLICATION_WORKSPACE_BYTES: usize = 1_024 * 1_024;
-const MAX_APPLICATION_STAGE_ONE_BYTES: usize = 256 * 1_024;
-const MAX_APPLICATION_CAPTURE_PENDING_BYTES: usize = 256 * 1_024;
-const APPLICATION_WORKSPACE_SETTING_KEY: &str = "application.workspace.v1";
-const APPLICATION_STAGE_ONE_SETTING_KEY: &str = "application.stage1.v1";
-const APPLICATION_CAPTURE_PENDING_SETTING_KEY: &str = "application.capture.pending.v1";
-
+const APPLICATION_WORKSPACE_SETTING_KEY: &str = ort_domain::APPLICATION_WORKSPACE_KEY;
+const APPLICATION_STAGE_ONE_SETTING_KEY: &str = ort_domain::APPLICATION_STAGE_ONE_KEY;
+const APPLICATION_CAPTURE_PENDING_SETTING_KEY: &str = ort_domain::APPLICATION_CAPTURE_KEY;
 fn setting_size_limit(key: &str) -> usize {
-    if key == APPLICATION_WORKSPACE_SETTING_KEY {
-        MAX_APPLICATION_WORKSPACE_BYTES
-    } else if key == APPLICATION_STAGE_ONE_SETTING_KEY {
-        MAX_APPLICATION_STAGE_ONE_BYTES
-    } else if key == APPLICATION_CAPTURE_PENDING_SETTING_KEY {
-        MAX_APPLICATION_CAPTURE_PENDING_BYTES
-    } else {
-        MAX_SETTING_BYTES
-    }
+    ort_domain::application_record_size_limit(key).unwrap_or(MAX_SETTING_BYTES)
 }
 const AI_CONNECTION_SETTING_KEY: &str = "ai.connection.v1";
 const MIGRATION_V1_SQL: &str = "CREATE TABLE schema_migrations (

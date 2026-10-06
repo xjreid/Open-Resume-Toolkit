@@ -1,0 +1,111 @@
+.import-page .workspace-data {
+  padding-top: 12px;
+}
+
+.import-review {
+  margin-inline: auto;
+}
+.import-review-block {
+  margin-block: 1.25rem;
+  padding: 1rem;
+  min-width: 0;
+}
+.import-review-block label,
+.import-review-block select,
+.import-review-block textarea,
+.import-review-block input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-block: 0.5rem;
+}
+.import-review-source {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  padding: 0.75rem;
+  border-inline-start: 3px solid currentColor;
+}
+.import-review {
+  max-width: 980px;
+  padding: 22px;
+}
+.import-review-block {
+  border: 1px solid #d2dae3;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.import-review-editor__fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.import-review-editor__legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.import-review-editor__workspace {
+  min-height: 0;
+}
+.import-review-editor .document-navigator {
+  height: calc(100dvh - 176px);
+}
+.import-review-editor__save-note {
+  margin: 8px 0 0;
+  color: #566c70;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.import-review-editor__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px;
+}
+.import-review-editor__issues {
+  padding: 0 16px;
+}
+@media (max-width: 760px) {
+  .import-review-editor__workspace {
+    grid-template-columns: 1fr;
+  }
+  .import-review-editor .document-navigator {
+    position: static;
+    height: auto;
+    max-height: 44vh;
+    border-right: 0;
+  }
+  .import-review-editor__actions {
+    flex-wrap: wrap;
+  }
+}
+
+.import-page .workspace-data:has(.import-review-editor) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.resume-import:has(.import-review-editor),
+.resume-import > .import-review-editor {
+  padding: 0;
+  border: 0;
+}
+@media (max-width: 760px) {
+  .import-review-editor .document-navigator > div {
+    display: block;
+  }
+  .import-review-editor .document-navigator {
+    grid-row: auto;
+  }
+}
+@media (max-width: 760px) {
+  .import-review-editor .resume-display-header__title-row,
+  .import-review-editor .resume-display-header__title {
+    flex-wrap: wrap;
+  }
+}

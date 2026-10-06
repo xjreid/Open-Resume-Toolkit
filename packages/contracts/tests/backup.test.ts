@@ -248,7 +248,23 @@ it("accepts explicit current exports but refuses future backup formats", () => {
   expect(
     isExportBackupCommandResponse({
       ok: true,
-      value: { ...receipt, formatMinor: 5 },
+      value: { ...receipt, formatMinor: 7 },
     }),
   ).toBe(false);
+});
+
+it("accepts native current-format inventory beyond legacy count limits", async () => {
+  const { default: fixtures } = await import("../generated/wire-fixtures.json");
+  expect(
+    isExportBackupCommandResponse({
+      ok: true,
+      value: fixtures.export_portable_backup,
+    }),
+  ).toBe(true);
+  expect(
+    isValidateBackupCommandResponse({
+      ok: true,
+      value: fixtures.validate_portable_backup,
+    }),
+  ).toBe(true);
 });

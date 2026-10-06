@@ -21,7 +21,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 const MAGIC: &[u8; 4] = b"ORTB";
 const FORMAT_MAJOR: u16 = 1;
-const FORMAT_MINOR: u16 = 5;
+pub const FORMAT_MINOR: u16 = 6;
 const DATABASE_SCHEMA_V1_0: u16 = 1;
 const DATABASE_SCHEMA_V1_1: u16 = 2;
 const DATABASE_SCHEMA_V1_2: u16 = 3;
@@ -41,17 +41,11 @@ const MAX_MEMORY_KIB: u32 = 256 * 1_024;
 const MIN_ITERATIONS: u32 = 3;
 const MAX_ITERATIONS: u32 = 10;
 const MAX_PAYLOAD_BYTES: usize = 64 * 1_024 * 1_024;
-const MAX_PUBLISHED_RESUMES: usize = 100;
 const MAX_RENDER_MANIFESTS: usize = 100;
-const MAX_AI_OPERATIONS: usize = 10_000;
-const MAX_AI_ATTEMPTS: usize = 20_000;
 const MAX_SETTINGS: usize = 128;
 const MAX_TRACKER_ENTRIES: usize = 100_000;
 const MAX_TRACKER_ENTRY_BYTES: usize = 1_024 * 1_024;
 const MAX_SETTING_BYTES: usize = 64 * 1_024;
-const MAX_APPLICATION_WORKSPACE_BYTES: usize = 1_024 * 1_024;
-const MAX_APPLICATION_STAGE_ONE_BYTES: usize = 256 * 1_024;
-const MAX_APPLICATION_CAPTURE_PENDING_BYTES: usize = 256 * 1_024;
 const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -208,16 +202,16 @@ pub struct PortableProfileV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BackupInventoryV1 {
     pub master_drafts: u16,
-    pub published_resumes: u16,
+    pub published_resumes: u32,
     pub settings: u16,
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub tracker_entries: u32,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub render_manifests: u16,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub ai_operations: u16,
-    #[serde(default, skip_serializing_if = "is_zero")]
-    pub ai_attempts: u16,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub ai_operations: u32,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub ai_attempts: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -329,7 +323,7 @@ fn create_backup_with_entropy_for_format(
         || (matches!(format_minor, 1 | 2) && database_schema == DATABASE_SCHEMA_V1_1)
         || (format_minor == 3 && database_schema == DATABASE_SCHEMA_V1_2)
         || (format_minor == 4 && database_schema == DATABASE_SCHEMA_V1_3)
-        || (format_minor == 5 && database_schema == DATABASE_SCHEMA_V1_4);
+        || (matches!(format_minor, 5 | 6) && database_schema == DATABASE_SCHEMA_V1_4);
     let supported_writer = supported_writer
         && (format_minor >= 5 || request.profile.tracker_entries.is_empty())
         && ((format_minor <= 1 && document_schema == 1)
@@ -586,7 +580,7 @@ fn validate_payload(
         1 | 2 => DATABASE_SCHEMA_V1_1,
         3 => DATABASE_SCHEMA_V1_2,
         4 => DATABASE_SCHEMA_V1_3,
-        5 => DATABASE_SCHEMA_V1_4,
+        5 | 6 => DATABASE_SCHEMA_V1_4,
         _ => return Err(BackupError::InvalidBackup),
     };
     if payload.manifest.format_major != FORMAT_MAJOR
@@ -653,12 +647,9 @@ fn profile_document_schema(profile: &PortableProfileV1) -> u16 {
 }
 
 fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
-    if profile.published_resumes.len() > MAX_PUBLISHED_RESUMES
-        || profile.render_manifests.len() > MAX_RENDER_MANIFESTS
+    if profile.render_manifests.len() > MAX_RENDER_MANIFESTS
         || profile.settings.len() > MAX_SETTINGS
         || profile.tracker_entries.len() > MAX_TRACKER_ENTRIES
-        || profile.ai_operations.len() > MAX_AI_OPERATIONS
-        || profile.ai_attempts.len() > MAX_AI_ATTEMPTS
     {
         return Err(BackupError::InvalidContent);
     }
@@ -939,15 +930,7 @@ fn validate_setting(key: &str, value: &Value) -> Result<(), BackupError> {
             .iter()
             .any(|forbidden| normalized.contains(forbidden));
     let serialized = serde_json::to_vec(value).map_err(|_| BackupError::InvalidContent)?;
-    let limit = if key == "application.workspace.v1" {
-        MAX_APPLICATION_WORKSPACE_BYTES
-    } else if key == "application.stage1.v1" {
-        MAX_APPLICATION_STAGE_ONE_BYTES
-    } else if key == "application.capture.pending.v1" {
-        MAX_APPLICATION_CAPTURE_PENDING_BYTES
-    } else {
-        MAX_SETTING_BYTES
-    };
+    let limit = ort_domain::application_record_size_limit(key).unwrap_or(MAX_SETTING_BYTES);
     if !valid_key || serialized.len() > limit {
         return Err(BackupError::InvalidContent);
     }
@@ -957,16 +940,16 @@ fn validate_setting(key: &str, value: &Value) -> Result<(), BackupError> {
 fn inventory_for(profile: &PortableProfileV1) -> Result<BackupInventoryV1, BackupError> {
     Ok(BackupInventoryV1 {
         master_drafts: u16::from(profile.master_draft.is_some()),
-        published_resumes: u16::try_from(profile.published_resumes.len())
+        published_resumes: u32::try_from(profile.published_resumes.len())
             .map_err(|_| BackupError::InvalidContent)?,
         settings: u16::try_from(profile.settings.len()).map_err(|_| BackupError::InvalidContent)?,
         tracker_entries: u32::try_from(profile.tracker_entries.len())
             .map_err(|_| BackupError::InvalidContent)?,
         render_manifests: u16::try_from(profile.render_manifests.len())
             .map_err(|_| BackupError::InvalidContent)?,
-        ai_operations: u16::try_from(profile.ai_operations.len())
+        ai_operations: u32::try_from(profile.ai_operations.len())
             .map_err(|_| BackupError::InvalidContent)?,
-        ai_attempts: u16::try_from(profile.ai_attempts.len())
+        ai_attempts: u32::try_from(profile.ai_attempts.len())
             .map_err(|_| BackupError::InvalidContent)?,
     })
 }
@@ -1149,7 +1132,7 @@ mod tests {
             create_backup_with_entropy(&passphrase, request, [0x11; 16], [0x22; 24]).unwrap();
         let header = inspect_backup(&bytes).unwrap();
         let mut payload = restore_backup(&bytes, &passphrase).unwrap();
-        assert_eq!(header.format_minor, 5);
+        assert_eq!(header.format_minor, 6);
         assert_eq!(payload.manifest.database_schema, 5);
         assert_eq!(payload.manifest.document_schema, 2);
         payload.manifest.document_schema = 1;
@@ -1168,7 +1151,7 @@ mod tests {
         let digest = hex::encode(Sha256::digest(&backup));
         assert_eq!(
             digest,
-            "a689c09ccbbaeeb381dd443abdd2c806faa6533109e09cf02ec4897625ca47f4"
+            "93bea2f949c31e7b89f53f698a9a1c35fc7e18a7a90f4d25add4aeb7995f6ab4"
         );
         let restored = restore_backup(&backup, &passphrase).expect("restore vector");
         assert_eq!(

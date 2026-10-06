@@ -1,9 +1,11 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeDesktop as invoke } from "./desktop-client";
+import type * as Wire from "@ort/contracts/wire";
 import { emitTo } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DOCUMENT_LIMITS } from "@ort/contracts/resume";
-import { PublishedResume, ResumeCanvas } from "./App";
+import { PublishedResume } from "./PublishedResume";
+import { ResumeCanvas } from "./ResumeCanvas";
 import type {
   ApplicationPopupChange,
   ApplicationPopupSnapshot,
@@ -56,9 +58,7 @@ export function ApplicationPopup() {
       const update = finalUpdate();
       if (update)
         await emitTo("overlay", "ort:application-popup-close", update);
-      const result = await invoke<{ ok: boolean; error?: { code: string } }>(
-        "hide_application_popup",
-      );
+      const result = await invoke("hide_application_popup");
       if (result?.ok === false)
         throw new Error(result.error?.code ?? "Could not close popup");
     } catch (error) {

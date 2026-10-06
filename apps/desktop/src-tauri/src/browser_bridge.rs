@@ -57,7 +57,7 @@ impl BrowserBridgeState {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionStatus {
     available: bool,

@@ -1,5 +1,6 @@
 //! Versioned application-material responses. Generated prose is user-reviewed;
 //! validation enforces response shape and document bounds, not factual truth.
+pub use ort_domain::{AlertCategory, AlertEvidence, AlertKind, QualificationAlert, RoleInfo};
 mod resume_draft;
 
 pub use resume_draft::{gemini_resume_output_schema, resume_context, resume_output_schema};
@@ -39,25 +40,6 @@ pub struct TailorResponse {
     pub role_info: Option<RoleInfo>,
     #[serde(default)]
     pub alerts: Vec<AlertCandidate>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RoleInfo {
-    #[serde(default)]
-    pub company: String,
-    #[serde(default)]
-    pub title: String,
-    #[serde(default)]
-    pub location: String,
-}
-
-impl RoleInfo {
-    fn valid(&self) -> bool {
-        [&self.company, &self.title, &self.location]
-            .into_iter()
-            .all(|value| value.chars().count() <= 200)
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -266,26 +248,6 @@ fn materialize_selection(
     Ok(resume)
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AlertKind {
-    NotFound,
-    ConfirmedMismatch,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AlertCategory {
-    DegreeLevel,
-    FieldOfStudy,
-    GraduationDate,
-    CertificationOrProfessionalLicense,
-    NamedSkillOrTechnology,
-    LanguageProficiency,
-    ExperienceDuration,
-    PortfolioOrWorkSample,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AlertCandidate {
@@ -295,32 +257,6 @@ pub struct AlertCandidate {
     pub target: String,
     pub job_excerpt: String,
     pub resume_evidence: Option<AlertEvidence>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct AlertEvidence {
-    pub field_id: EntityId,
-    pub value: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QualificationAlert {
-    pub id: String,
-    pub kind: AlertKind,
-    pub category: AlertCategory,
-    pub requirement: String,
-    // Older saved workspaces did not retain the validated qualification target.
-    #[serde(default)]
-    pub target: String,
-    pub job_excerpt: String,
-    pub job_start: usize,
-    pub job_end: usize,
-    pub mandatory_reason: String,
-    pub resume_evidence: Option<AlertEvidence>,
-    pub validation_version: u16,
-    pub published_revision: i64,
 }
 
 #[derive(Clone, Debug, Serialize)]

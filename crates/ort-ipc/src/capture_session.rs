@@ -7,14 +7,14 @@ use uuid::Uuid;
 pub const CAPTURE_MODE_TTL_MS: i64 = 120_000;
 const HEARTBEAT_TTL_MS: i64 = 3_000;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PollRequest {
     pub protocol_version: u16,
     pub kind: String,
     pub client_id: Uuid,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EventRequest {
     pub protocol_version: u16,
@@ -24,7 +24,7 @@ pub struct EventRequest {
     pub phase: EventPhase,
     pub code: Option<FailureCode>,
 }
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EventPhase {
     Started,
@@ -32,7 +32,7 @@ pub enum EventPhase {
     Cancelled,
     Failed,
 }
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum FailureCode {
     PageUnavailable,
@@ -44,7 +44,7 @@ pub enum FailureCode {
     BridgeUnavailable,
     DeliveryUnconfirmed,
 }
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureStatus {
     pub phase: &'static str,

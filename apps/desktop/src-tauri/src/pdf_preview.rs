@@ -86,7 +86,7 @@ impl PortablePdfState {
         true
     }
 
-    fn clear(&self) -> bool {
+    pub(crate) fn clear(&self) -> bool {
         let Ok(mut slot) = self.0.lock() else {
             return false;
         };

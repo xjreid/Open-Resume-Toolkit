@@ -1,3 +1,5 @@
+mod application;
+pub use application::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -19,7 +21,9 @@ mod resume_commands;
 mod storage_usage;
 mod text_export;
 mod tracker;
-pub use tracker::{ApprovedAnswer, TrackerEntry, TrackerValidationError, validate_tracker_entry};
+pub use tracker::{
+    ApprovedAnswer, TrackerEntry, TrackerMetadata, TrackerValidationError, validate_tracker_entry,
+};
 
 pub use document_style::{DocumentStyle, StyledExportPayload, StyledExportRequest};
 
@@ -54,8 +58,8 @@ pub use lifecycle::{
 };
 
 pub use resume::{
-    Bullet, ContactDetails, DocumentLimits, EntityId, Link, MAX_RESUME_DATES, NamedField,
-    ResumeDocument, ResumeEntry, ResumeSection, ValidationError,
+    Bullet, ContactDetails, DocumentLimits, EntityId, FieldRole, Link, MAX_RESUME_DATES,
+    NamedField, PARAGRAPH_FIELD_LABEL, ResumeDocument, ResumeEntry, ResumeSection, ValidationError,
 };
 pub use resume_commands::{
     EmptyPayload, LoadResumeRequest, PublishResumePayload, PublishResumeRequest,

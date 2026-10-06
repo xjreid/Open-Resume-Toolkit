@@ -1,19 +1,14 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invokeDesktop as invoke } from "./desktop-client";
+import type * as Wire from "@ort/contracts/wire";
 
-type Status = { available: boolean; connected: boolean };
-type Response<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: { code: string } };
-
+type Status = Wire.ConnectionStatus;
 export function BrowserConnectionSettings() {
   const [status, setStatus] = useState<Status>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function refresh() {
-    const response = await invoke<Response<Status>>(
-      "browser_connection_status",
-    );
+    const response = await invoke("browser_connection_status");
     if (!response.ok) throw new Error(response.error.code);
     setStatus(response.value);
   }
@@ -26,7 +21,7 @@ export function BrowserConnectionSettings() {
     setBusy(true);
     setError("");
     try {
-      const response = await invoke<Response<boolean>>(
+      const response = await invoke(
         status?.connected
           ? "disconnect_development_browser"
           : "connect_development_browser",

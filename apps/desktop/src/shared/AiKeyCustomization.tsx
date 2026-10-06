@@ -1,4 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeDesktop as invoke } from "./desktop-client";
+import type * as Wire from "@ort/contracts/wire";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   keyDisplayName,
@@ -7,23 +8,8 @@ import {
 } from "./AiKeyPresentation";
 import type { Catalog, KeyRegistry, SavedKey } from "./AiWorkspace";
 
-type Cap = {
-  credentialId: string;
-  period: "all_time";
-  currency: string;
-  timeZone: string;
-  limitMicros: number;
-  countedMicros: number;
-  reservedMicros: number;
-  unresolvedMicros: number;
-  revision: number;
-};
-type Settings = {
-  cap: Cap | null;
-  lifetimeSpendByCurrencyMicros: Record<string, number>;
-  lifetimeSpendPartial?: boolean;
-};
-type Reply<T> = { ok: true; value: T } | { ok: false; error: { code: string } };
+type Cap = Wire.AiCapPolicySummary;
+type Settings = Wire.AiKeySettings;
 const number = (micros: number) =>
   (micros / 1_000_000).toLocaleString(undefined, {
     minimumFractionDigits: 2,
@@ -66,7 +52,7 @@ export function AiKeyCustomization({
     let current = true;
     setRefreshing(true);
     setError(false);
-    void invoke<Reply<Settings>>("load_ai_key_settings", { credentialId: id })
+    void invoke("load_ai_key_settings", { credentialId: id })
       .then((response) => {
         if (!current) return;
         if (response.ok) {
@@ -131,7 +117,7 @@ export function AiKeyCustomization({
     if (micros === cap?.limitMicros) return;
     setWorking(true);
     try {
-      const response = await invoke<Reply<Cap>>("save_ai_cap", {
+      const response = await invoke("save_ai_cap", {
         request: {
           credentialId: id,
           period: "all_time",
@@ -164,7 +150,7 @@ export function AiKeyCustomization({
     setConfirm(null);
     setWorking(true);
     try {
-      const response = await invoke<Reply<boolean>>(
+      const response = await invoke(
         action === "reset" ? "reset_ai_cap" : "disable_ai_cap",
         { request: { credentialId: id, period: "all_time" } },
       );
@@ -187,7 +173,7 @@ export function AiKeyCustomization({
     if (disabled) return;
     setWorking(true);
     try {
-      const response = await invoke<Reply<KeyRegistry>>("set_ai_key_preset", {
+      const response = await invoke("set_ai_key_preset", {
         request: { credentialId: id, preset },
       });
       if (response.ok) {

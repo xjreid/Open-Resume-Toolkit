@@ -75,6 +75,9 @@ jobs:
       - name: Independently verify PDF/text bytes, geometry, tags and links
         run: cargo run --locked -p ort-render --example pdf_fixtures -- target/pdf-ci-fixtures && node tools/verify-pdf-fixtures.mjs target/pdf-ci-fixtures
 
+      - name: Verify lossless fields and mixed paragraph/bullet bodies
+        run: cargo run --locked -p ort-render --example field_preservation -- target/field-preservation-ci && node tools/verify-field-preservation.mjs target/field-preservation-ci && python3 tools/verify-field-preservation.py target/field-preservation-ci
+
       - name: Verify all three PDF/DOCX styles with v1 and v2 sources
         run: python3 tools/check-style-output.py
 

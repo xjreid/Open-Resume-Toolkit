@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { DocumentStyle } from "@ort/contracts/export";
 import { DOCUMENT_LIMITS, type ResumeDocument } from "@ort/contracts/resume";
-import { ResumeCanvas } from "./App";
+import { ResumeCanvas } from "./ResumeCanvas";
 import { ResumeSectionNavigator } from "./ResumeSectionNavigator";
 import { UndoIcon, RedoIcon } from "./ResumeHistoryIcons";
 import { normalizeDocument } from "./resume-editor";

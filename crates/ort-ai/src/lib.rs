@@ -6,12 +6,7 @@ use base64::Engine as _;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    fmt,
-    sync::Mutex,
-};
-use uuid::Uuid;
+use std::{collections::BTreeMap, fmt};
 use zeroize::Zeroize;
 
 pub const ENABLED: bool = true;
@@ -39,7 +34,7 @@ pub fn builtin_catalog(now: &str, previous_id: Option<&str>) -> Result<Catalog, 
     )
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Provider {
     OpenAi,
@@ -57,7 +52,7 @@ impl Provider {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Preset {
     Economy,
@@ -65,7 +60,7 @@ pub enum Preset {
     Quality,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OperationType {
     TailorResume,
@@ -76,27 +71,9 @@ pub enum OperationType {
     CredentialTest,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AttemptStatus {
-    Reserved,
-    Dispatching,
-    Streaming,
-    Succeeded,
-    Failed,
-    Cancelled,
-    OutcomeUnknown,
-}
-impl AttemptStatus {
-    const fn terminal(self) -> bool {
-        matches!(
-            self,
-            Self::Succeeded | Self::Failed | Self::Cancelled | Self::OutcomeUnknown
-        )
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Usage {
     pub input_tokens: u64,
@@ -104,21 +81,6 @@ pub struct Usage {
     pub cache_write_tokens: u64,
     pub output_tokens: u64,
     pub reasoning_tokens: u64,
-}
-impl Usage {
-    fn checked_add(self, other: Self) -> Option<Self> {
-        Some(Self {
-            input_tokens: self.input_tokens.checked_add(other.input_tokens)?,
-            cached_input_tokens: self
-                .cached_input_tokens
-                .checked_add(other.cached_input_tokens)?,
-            cache_write_tokens: self
-                .cache_write_tokens
-                .checked_add(other.cache_write_tokens)?,
-            output_tokens: self.output_tokens.checked_add(other.output_tokens)?,
-            reasoning_tokens: self.reasoning_tokens.checked_add(other.reasoning_tokens)?,
-        })
-    }
 }
 
 /// Secret material whose formatting is always redacted and whose buffer clears on drop.
@@ -177,7 +139,7 @@ pub enum AiError {
     Unavailable,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PriceCategory {
     Input,
@@ -186,13 +148,13 @@ pub enum PriceCategory {
     Output,
     Reasoning,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Price {
     pub micros_per_million: u64,
     pub category: PriceCategory,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogEntry {
     pub provider: Provider,
@@ -209,7 +171,7 @@ pub struct CatalogEntry {
     pub effective_to: Option<String>,
     pub disabled: bool,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Catalog {
     pub format_version: u16,
@@ -666,7 +628,17 @@ fn gemini_usage(v: &Value) -> Result<Usage, AiError> {
 /// # Errors
 /// Missing applicable prices fail closed instead of becoming zero.
 pub fn estimate_cost(entry: &CatalogEntry, usage: Usage) -> Result<u64, AiError> {
-    if entry.provider == Provider::OpenAi && usage.reasoning_tokens > usage.output_tokens {
+    estimate_priced_cost(entry.provider, &entry.prices, usage)
+}
+/// Prices billing evidence independently of content acceptance.
+/// # Errors
+/// Rejects invalid usage, missing categories, and arithmetic overflow.
+pub fn estimate_priced_cost(
+    provider: Provider,
+    prices: &[Price],
+    usage: Usage,
+) -> Result<u64, AiError> {
+    if provider == Provider::OpenAi && usage.reasoning_tokens > usage.output_tokens {
         return Err(AiError::InvalidResponse);
     }
     let values = [
@@ -678,7 +650,7 @@ pub fn estimate_cost(entry: &CatalogEntry, usage: Usage) -> Result<u64, AiError>
         // already priced in full. Gemini reports thinking tokens separately.
         (
             PriceCategory::Reasoning,
-            if entry.provider == Provider::OpenAi {
+            if provider == Provider::OpenAi {
                 0
             } else {
                 usage.reasoning_tokens
@@ -689,8 +661,7 @@ pub fn estimate_cost(entry: &CatalogEntry, usage: Usage) -> Result<u64, AiError>
         .into_iter()
         .filter(|(_, q)| *q > 0)
         .try_fold(0_u64, |total, (category, quantity)| {
-            let rate = entry
-                .prices
+            let rate = prices
                 .iter()
                 .find(|p| p.category == category)
                 .ok_or(AiError::CostUnavailable)?
@@ -702,401 +673,6 @@ pub fn estimate_cost(entry: &CatalogEntry, usage: Usage) -> Result<u64, AiError>
                 / 1_000_000;
             total.checked_add(value).ok_or(AiError::Arithmetic)
         })
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CapPeriod {
-    Week,
-    Month,
-    Year,
-    AllTime,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Cap {
-    pub period: CapPeriod,
-    pub limit_micros: u64,
-    pub starts_at_unix: i64,
-    pub ends_at_unix: Option<i64>,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ErrorCategory {
-    Authentication,
-    RateLimit,
-    Transient,
-    Safety,
-    InvalidOutput,
-    Timeout,
-    Cancelled,
-    Provider,
-}
-impl ErrorCategory {
-    #[must_use]
-    pub const fn retryable(self) -> bool {
-        matches!(self, Self::RateLimit | Self::Transient | Self::Timeout)
-    }
-}
-#[derive(Clone, Debug)]
-pub struct Attempt {
-    pub id: Uuid,
-    pub operation_id: Uuid,
-    pub provider: Provider,
-    pub credential_id: Uuid,
-    pub requested_model: String,
-    pub effective_model: Option<String>,
-    pub catalog_id: String,
-    pub status: AttemptStatus,
-    pub started_at_unix: i64,
-    pub ended_at_unix: Option<i64>,
-    pub reserved_micros: u64,
-    pub settled_micros: Option<u64>,
-    pub currency: String,
-    pub usage: Option<Usage>,
-    pub usage_complete: bool,
-    pub retry_of: Option<Uuid>,
-    pub error: Option<ErrorCategory>,
-}
-#[derive(Clone, Debug)]
-pub struct Operation {
-    pub id: Uuid,
-    pub kind: OperationType,
-    pub started_at_unix: i64,
-    pub ended_at_unix: Option<i64>,
-    pub cancelled: bool,
-}
-#[derive(Default)]
-struct State {
-    operations: HashMap<Uuid, Operation>,
-    attempts: HashMap<Uuid, Attempt>,
-    caps: HashMap<Uuid, Vec<Cap>>,
-    guardrail_carry: HashMap<(Uuid, String), u64>,
-}
-#[derive(Default)]
-pub struct AccountingLedger {
-    state: Mutex<State>,
-}
-impl AccountingLedger {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-    /// # Errors
-    /// Rejects malformed or duplicate-period policy.
-    pub fn set_caps(&self, credential: Uuid, caps: Vec<Cap>) -> Result<(), AiError> {
-        let mut periods = HashSet::new();
-        if caps.iter().any(|c| {
-            c.limit_micros == 0
-                || !periods.insert(c.period)
-                || c.ends_at_unix.is_some_and(|e| e <= c.starts_at_unix)
-        }) {
-            return Err(AiError::InvalidState);
-        }
-        self.state
-            .lock()
-            .map_err(|_| AiError::Unavailable)?
-            .caps
-            .insert(credential, caps);
-        Ok(())
-    }
-    /// # Errors
-    /// Enforces one active remote operation.
-    pub fn begin_operation(&self, kind: OperationType, now: i64) -> Result<Uuid, AiError> {
-        let mut s = self.state.lock().map_err(|_| AiError::Unavailable)?;
-        if s.operations.values().any(|o| o.ended_at_unix.is_none()) {
-            return Err(AiError::OperationBusy);
-        }
-        let id = Uuid::now_v7();
-        s.operations.insert(
-            id,
-            Operation {
-                id,
-                kind,
-                started_at_unix: now,
-                ended_at_unix: None,
-                cancelled: false,
-            },
-        );
-        Ok(id)
-    }
-    /// Atomically records the reservation before dispatch.
-    /// # Errors
-    /// Enabled caps reject over-budget or unpriceable calls.
-    #[allow(clippy::too_many_arguments)]
-    pub fn reserve(
-        &self,
-        operation: Uuid,
-        provider: Provider,
-        credential: Uuid,
-        model: &str,
-        catalog: &str,
-        currency: &str,
-        maximum: u64,
-        now: i64,
-        retry_of: Option<Uuid>,
-    ) -> Result<Uuid, AiError> {
-        let mut s = self.state.lock().map_err(|_| AiError::Unavailable)?;
-        if s.operations
-            .get(&operation)
-            .is_none_or(|o| o.ended_at_unix.is_some())
-        {
-            return Err(AiError::NotFound);
-        }
-        if model.is_empty() || catalog.is_empty() || currency.len() != 3 || maximum == 0 {
-            return Err(AiError::CostUnavailable);
-        }
-        let mut counted = *s
-            .guardrail_carry
-            .get(&(credential, currency.into()))
-            .unwrap_or(&0);
-        for a in s
-            .attempts
-            .values()
-            .filter(|a| a.credential_id == credential && a.currency == currency)
-        {
-            counted = counted
-                .checked_add(a.settled_micros.unwrap_or(a.reserved_micros))
-                .ok_or(AiError::Arithmetic)?;
-        }
-        for cap in s
-            .caps
-            .get(&credential)
-            .into_iter()
-            .flatten()
-            .filter(|c| c.starts_at_unix <= now && c.ends_at_unix.is_none_or(|e| now < e))
-        {
-            if counted.checked_add(maximum).ok_or(AiError::Arithmetic)? > cap.limit_micros {
-                return Err(AiError::CapExceeded);
-            }
-        }
-        let id = Uuid::now_v7();
-        s.attempts.insert(
-            id,
-            Attempt {
-                id,
-                operation_id: operation,
-                provider,
-                credential_id: credential,
-                requested_model: model.into(),
-                effective_model: None,
-                catalog_id: catalog.into(),
-                status: AttemptStatus::Reserved,
-                started_at_unix: now,
-                ended_at_unix: None,
-                reserved_micros: maximum,
-                settled_micros: None,
-                currency: currency.into(),
-                usage: None,
-                usage_complete: false,
-                retry_of,
-                error: None,
-            },
-        );
-        Ok(id)
-    }
-    /// # Errors
-    /// Only reserved→dispatching→streaming transitions are accepted.
-    pub fn transition(&self, id: Uuid, next: AttemptStatus) -> Result<(), AiError> {
-        let mut s = self.state.lock().map_err(|_| AiError::Unavailable)?;
-        let a = s.attempts.get_mut(&id).ok_or(AiError::NotFound)?;
-        if !matches!(
-            (a.status, next),
-            (AttemptStatus::Reserved, AttemptStatus::Dispatching)
-                | (AttemptStatus::Dispatching, AttemptStatus::Streaming)
-        ) {
-            return Err(AiError::InvalidState);
-        }
-        a.status = next;
-        Ok(())
-    }
-    /// Unknown outcomes retain their full reservation.
-    /// # Errors
-    /// Terminal or pre-dispatch attempts cannot be settled twice.
-    #[allow(clippy::too_many_arguments)]
-    pub fn settle(
-        &self,
-        id: Uuid,
-        status: AttemptStatus,
-        effective: Option<&str>,
-        usage: Option<Usage>,
-        actual: Option<u64>,
-        complete: bool,
-        error: Option<ErrorCategory>,
-        now: i64,
-    ) -> Result<(), AiError> {
-        if !status.terminal() {
-            return Err(AiError::InvalidState);
-        }
-        let mut s = self.state.lock().map_err(|_| AiError::Unavailable)?;
-        let a = s.attempts.get_mut(&id).ok_or(AiError::NotFound)?;
-        if a.status.terminal()
-            || a.status == AttemptStatus::Reserved
-            || status == AttemptStatus::Succeeded && (effective.is_none() || usage.is_none())
-        {
-            return Err(AiError::InvalidState);
-        }
-        a.status = status;
-        a.effective_model = effective.map(str::to_owned);
-        a.usage = usage;
-        a.usage_complete = complete;
-        a.error = error;
-        a.ended_at_unix = Some(now);
-        if status != AttemptStatus::OutcomeUnknown {
-            a.settled_micros = actual;
-        }
-        Ok(())
-    }
-    /// # Errors
-    /// Missing operations cannot be cancelled.
-    pub fn cancel(&self, id: Uuid) -> Result<(), AiError> {
-        self.state
-            .lock()
-            .map_err(|_| AiError::Unavailable)?
-            .operations
-            .get_mut(&id)
-            .ok_or(AiError::NotFound)?
-            .cancelled = true;
-        Ok(())
-    }
-    /// # Errors
-    /// An operation with an in-flight attempt cannot finish.
-    pub fn finish_operation(&self, id: Uuid, now: i64) -> Result<(), AiError> {
-        let mut s = self.state.lock().map_err(|_| AiError::Unavailable)?;
-        if s.attempts
-            .values()
-            .any(|a| a.operation_id == id && !a.status.terminal())
-        {
-            return Err(AiError::InvalidState);
-        }
-        s.operations
-            .get_mut(&id)
-            .ok_or(AiError::NotFound)?
-            .ended_at_unix = Some(now);
-        Ok(())
-    }
-    /// Converts crash-interrupted calls to conservative unknown outcomes.
-    /// # Errors
-    /// Returns `Unavailable` if the ledger lock is poisoned.
-    pub fn recover_interrupted(&self, now: i64) -> Result<usize, AiError> {
-        let mut s = self.state.lock().map_err(|_| AiError::Unavailable)?;
-        let mut n = 0;
-        for a in s.attempts.values_mut().filter(|a| {
-            matches!(
-                a.status,
-                AttemptStatus::Dispatching | AttemptStatus::Streaming
-            )
-        }) {
-            a.status = AttemptStatus::OutcomeUnknown;
-            a.ended_at_unix = Some(now);
-            a.error = Some(ErrorCategory::Provider);
-            n += 1;
-        }
-        for o in s
-            .operations
-            .values_mut()
-            .filter(|o| o.ended_at_unix.is_none())
-        {
-            o.ended_at_unix = Some(now);
-        }
-        Ok(n)
-    }
-    /// Clears monitoring history while carrying counted spend forward separately.
-    /// # Errors
-    /// Rejects an invalid range.
-    pub fn clear_activity(&self, from: i64, to: i64) -> Result<usize, AiError> {
-        if from >= to {
-            return Err(AiError::InvalidState);
-        }
-        let mut s = self.state.lock().map_err(|_| AiError::Unavailable)?;
-        let ids: Vec<_> = s
-            .attempts
-            .values()
-            .filter(|a| a.started_at_unix >= from && a.started_at_unix < to && a.status.terminal())
-            .map(|a| a.id)
-            .collect();
-        for id in &ids {
-            if let Some(a) = s.attempts.remove(id) {
-                let key = (a.credential_id, a.currency);
-                let value = a.settled_micros.unwrap_or(a.reserved_micros);
-                let old = s.guardrail_carry.get(&key).copied().unwrap_or(0);
-                s.guardrail_carry
-                    .insert(key, old.checked_add(value).ok_or(AiError::Arithmetic)?);
-            }
-        }
-        Ok(ids.len())
-    }
-    /// # Errors
-    /// Aggregation overflow or unavailable state is reported.
-    pub fn summary(&self, from: i64, to: i64) -> Result<MonitoringSummary, AiError> {
-        let s = self.state.lock().map_err(|_| AiError::Unavailable)?;
-        let rows: Vec<_> = s
-            .attempts
-            .values()
-            .filter(|a| a.started_at_unix >= from && a.started_at_unix < to)
-            .collect();
-        let usage = rows
-            .iter()
-            .filter_map(|a| a.usage)
-            .try_fold(Usage::default(), Usage::checked_add)
-            .ok_or(AiError::Arithmetic)?;
-        let cost = rows
-            .iter()
-            .filter_map(|a| a.settled_micros)
-            .try_fold(0_u64, u64::checked_add)
-            .ok_or(AiError::Arithmetic)?;
-        let unknown = rows
-            .iter()
-            .filter(|a| !a.usage_complete || a.settled_micros.is_none())
-            .count();
-        Ok(MonitoringSummary {
-            logical_operations: rows
-                .iter()
-                .map(|a| a.operation_id)
-                .collect::<HashSet<_>>()
-                .len(),
-            attempts: rows.len(),
-            usage,
-            estimated_micros: cost,
-            partial: unknown > 0,
-            unknown_count: unknown,
-        })
-    }
-    /// Ordinary export contains aggregate metadata only.
-    /// # Errors
-    /// Propagates summary errors.
-    pub fn export_csv(&self, from: i64, to: i64) -> Result<String, AiError> {
-        let s = self.summary(from, to)?;
-        Ok(format!(
-            "from_unix,to_unix,logical_operations,attempts,input_tokens,cached_input_tokens,cache_write_tokens,output_tokens,reasoning_tokens,estimated_cost_micros,partial,unknown_count\n{from},{to},{},{},{},{},{},{},{},{},{},{}\n",
-            s.logical_operations,
-            s.attempts,
-            s.usage.input_tokens,
-            s.usage.cached_input_tokens,
-            s.usage.cache_write_tokens,
-            s.usage.output_tokens,
-            s.usage.reasoning_tokens,
-            s.estimated_micros,
-            s.partial,
-            s.unknown_count
-        ))
-    }
-    #[must_use]
-    pub fn should_retry(&self, id: Uuid) -> bool {
-        let Ok(s) = self.state.lock() else {
-            return false;
-        };
-        let Some(a) = s.attempts.get(&id) else {
-            return false;
-        };
-        a.error.is_some_and(ErrorCategory::retryable) && a.retry_of.is_none()
-    }
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MonitoringSummary {
-    pub logical_operations: usize,
-    pub attempts: usize,
-    pub usage: Usage,
-    pub estimated_micros: u64,
-    pub partial: bool,
-    pub unknown_count: usize,
 }
 
 #[cfg(test)]

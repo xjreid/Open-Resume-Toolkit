@@ -19,6 +19,7 @@ dev-browser-bridge = ["ort-ipc/dev-browser-bridge"]
 tauri-build.workspace = true
 
 [dependencies]
+schemars.workspace = true
 ort-application = { path = "../../../crates/ort-application" }
 ort-backup = { path = "../../../crates/ort-backup" }
 ort-render = { path = "../../../crates/ort-render" }

@@ -1,0 +1,5972 @@
+{
+  "$defs": {
+    "AddAiKeyRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "apiKey": {
+          "type": "string"
+        },
+        "name": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "apiKey"
+      ],
+      "title": "AddAiKeyRequest",
+      "type": "object"
+    },
+    "AiActivityMonth": {
+      "properties": {
+        "fromUnixMs": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "label": {
+          "type": "string"
+        },
+        "toUnixMs": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "label",
+        "fromUnixMs",
+        "toUnixMs"
+      ],
+      "title": "AiActivityMonth",
+      "type": "object"
+    },
+    "AiCapActionRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "credentialId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "period": {
+          "$ref": "#/$defs/AiPeriod"
+        }
+      },
+      "required": [
+        "credentialId",
+        "period"
+      ],
+      "title": "AiCapActionRequest",
+      "type": "object"
+    },
+    "AiCapPolicySummary": {
+      "properties": {
+        "activatedAtUnixMs": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "countedMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "credentialId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "limitMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "period": {
+          "$ref": "#/$defs/AiPeriod"
+        },
+        "periodEndUnixMs": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "periodStartUnixMs": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "reservedMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "unresolvedMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "credentialId",
+        "period",
+        "currency",
+        "timeZone",
+        "limitMicros",
+        "activatedAtUnixMs",
+        "periodStartUnixMs",
+        "periodEndUnixMs",
+        "countedMicros",
+        "reservedMicros",
+        "unresolvedMicros",
+        "revision"
+      ],
+      "type": "object"
+    },
+    "AiGeneralSettings": {
+      "$defs": {},
+      "properties": {
+        "cap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AiCapPolicySummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lifetimeSpendByCurrencyMicros": {
+          "additionalProperties": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "lifetimeSpendPartial": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "cap",
+        "lifetimeSpendByCurrencyMicros",
+        "lifetimeSpendPartial"
+      ],
+      "title": "AiGeneralSettings",
+      "type": "object"
+    },
+    "AiKeyAction": {
+      "enum": [
+        "select_primary",
+        "pause",
+        "unpause",
+        "remove"
+      ],
+      "type": "string"
+    },
+    "AiKeyRegistry": {
+      "additionalProperties": false,
+      "properties": {
+        "keys": {
+          "items": {
+            "$ref": "#/$defs/SavedAiKey"
+          },
+          "type": "array"
+        },
+        "primaryCredentialId": {
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "keys",
+        "primaryCredentialId"
+      ],
+      "type": "object"
+    },
+    "AiKeySettings": {
+      "$defs": {},
+      "properties": {
+        "cap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AiCapPolicySummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lifetimeSpendByCurrencyMicros": {
+          "additionalProperties": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "lifetimeSpendPartial": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "cap",
+        "lifetimeSpendByCurrencyMicros",
+        "lifetimeSpendPartial"
+      ],
+      "title": "AiKeySettings",
+      "type": "object"
+    },
+    "AiMonitoringBucket": {
+      "properties": {
+        "attempts": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "costByCurrencyMicros": {
+          "additionalProperties": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "label": {
+          "type": "string"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "totalTokens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unknownCount": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "required": [
+        "label",
+        "attempts",
+        "usage",
+        "totalTokens",
+        "costByCurrencyMicros",
+        "partial",
+        "unknownCount"
+      ],
+      "type": "object"
+    },
+    "AiMonitoringSummary": {
+      "$defs": {},
+      "properties": {
+        "attempts": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "byCredentialId": {
+          "additionalProperties": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "default": {},
+          "type": "object"
+        },
+        "byModel": {
+          "additionalProperties": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "byOperationType": {
+          "additionalProperties": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "byPreset": {
+          "additionalProperties": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "byProvider": {
+          "additionalProperties": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "byStatus": {
+          "additionalProperties": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "costByCurrencyMicros": {
+          "additionalProperties": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "estimatedCostMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "logicalOperations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "timeBuckets": {
+          "items": {
+            "$ref": "#/$defs/AiMonitoringBucket"
+          },
+          "type": "array"
+        },
+        "totalTokens": {
+          "description": "Provider-normalized total; `OpenAI` reasoning is already part of output.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unknownCount": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unresolvedReservedMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "required": [
+        "logicalOperations",
+        "attempts",
+        "usage",
+        "totalTokens",
+        "estimatedCostMicros",
+        "unresolvedReservedMicros",
+        "currency",
+        "costByCurrencyMicros",
+        "partial",
+        "unknownCount",
+        "byProvider",
+        "byCredentialId",
+        "byStatus",
+        "byModel",
+        "byPreset",
+        "byOperationType",
+        "timeBuckets"
+      ],
+      "title": "AiMonitoringSummary",
+      "type": "object"
+    },
+    "AiPeriod": {
+      "enum": [
+        "week",
+        "month",
+        "year",
+        "all_time"
+      ],
+      "type": "string"
+    },
+    "AiProgress": {
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "text"
+      ],
+      "title": "AiProgress",
+      "type": "object"
+    },
+    "AiRetentionSummary": {
+      "properties": {
+        "policy": {
+          "type": "string"
+        },
+        "removedOperations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "policy",
+        "removedOperations"
+      ],
+      "title": "AiRetentionSummary",
+      "type": "object"
+    },
+    "AiTestPreview": {
+      "properties": {
+        "credentialId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "estimatedInputTokens": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maximumCostMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentialId",
+        "provider",
+        "model",
+        "currency",
+        "estimatedInputTokens",
+        "maximumCostMicros"
+      ],
+      "title": "AiTestPreview",
+      "type": "object"
+    },
+    "AiTestResult": {
+      "$defs": {},
+      "properties": {
+        "attemptId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "confirmed": {
+          "type": "boolean"
+        },
+        "effectiveModel": {
+          "type": "string"
+        },
+        "estimatedCostMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        },
+        "usageComplete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "attemptId",
+        "effectiveModel",
+        "usage",
+        "estimatedCostMicros",
+        "usageComplete",
+        "confirmed"
+      ],
+      "title": "AiTestResult",
+      "type": "object"
+    },
+    "AlertCategory": {
+      "enum": [
+        "degree_level",
+        "field_of_study",
+        "graduation_date",
+        "certification_or_professional_license",
+        "named_skill_or_technology",
+        "language_proficiency",
+        "experience_duration",
+        "portfolio_or_work_sample"
+      ],
+      "type": "string"
+    },
+    "AlertEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "fieldId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fieldId",
+        "value"
+      ],
+      "type": "object"
+    },
+    "AlertKind": {
+      "enum": [
+        "not_found",
+        "confirmed_mismatch"
+      ],
+      "type": "string"
+    },
+    "ApplicationContext": {
+      "$defs": {},
+      "properties": {
+        "aiBusy": {
+          "type": "boolean"
+        },
+        "aiLabel": {
+          "type": "string"
+        },
+        "aiReady": {
+          "type": "boolean"
+        },
+        "browserConnected": {
+          "type": "boolean"
+        },
+        "preset": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "presetLabel": {
+          "type": "string"
+        },
+        "presetOptions": {
+          "items": {
+            "$ref": "#/$defs/ApplicationPresetOption"
+          },
+          "type": "array"
+        },
+        "profileId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "publishedRevision": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "selectedKeyId": {
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selectedKeyReady": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "profileId",
+        "publishedRevision",
+        "aiLabel",
+        "aiReady",
+        "aiBusy",
+        "selectedKeyReady",
+        "selectedKeyId",
+        "preset",
+        "presetLabel",
+        "presetOptions",
+        "browserConnected"
+      ],
+      "title": "ApplicationContext",
+      "type": "object"
+    },
+    "ApplicationExportFormat": {
+      "enum": [
+        "pdf",
+        "docx"
+      ],
+      "title": "ApplicationExportFormat",
+      "type": "string"
+    },
+    "ApplicationPopupKind": {
+      "enum": [
+        "job",
+        "url",
+        "resume-view",
+        "resume-edit",
+        "cover",
+        "cover-view"
+      ],
+      "title": "ApplicationPopupKind",
+      "type": "string"
+    },
+    "ApplicationPresetOption": {
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preset": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "preset",
+        "label",
+        "model",
+        "available"
+      ],
+      "title": "ApplicationPresetOption",
+      "type": "object"
+    },
+    "ApplicationWorkspace": {
+      "additionalProperties": false,
+      "properties": {
+        "alerts": {
+          "items": {
+            "$ref": "#/$defs/QualificationAlert"
+          },
+          "type": "array"
+        },
+        "alertsTruncated": {
+          "type": "boolean"
+        },
+        "answer": {
+          "type": "string"
+        },
+        "approvedAnswers": {
+          "items": {
+            "$ref": "#/$defs/ApprovedAnswer"
+          },
+          "type": "array"
+        },
+        "changePoints": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "coverLetter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dismissedAlertIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ignoreAllAlerts": {
+          "type": "boolean"
+        },
+        "jobDescription": {
+          "type": "string"
+        },
+        "jobUrl": {
+          "default": "",
+          "type": "string"
+        },
+        "publishedRevision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "question": {
+          "type": "string"
+        },
+        "resume": {
+          "$ref": "#/$defs/ResumeDocument"
+        },
+        "roleInfo": {
+          "$ref": "#/$defs/RoleInfo",
+          "default": {
+            "company": "",
+            "location": "",
+            "title": ""
+          }
+        },
+        "schemaVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "style": {
+          "$ref": "#/$defs/DocumentStyle"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "publishedRevision",
+        "jobDescription",
+        "jobUrl",
+        "roleInfo",
+        "resume",
+        "changePoints",
+        "alerts",
+        "alertsTruncated",
+        "dismissedAlertIds",
+        "ignoreAllAlerts",
+        "coverLetter",
+        "question",
+        "answer",
+        "approvedAnswers",
+        "style"
+      ],
+      "type": "object"
+    },
+    "ApplyImportReviewPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "decisionsJson": {
+          "description": "Encoded decision-only payload, bounded before its native decode.",
+          "type": "string"
+        },
+        "reviewId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewId",
+        "decisionsJson"
+      ],
+      "type": "object"
+    },
+    "ApplyImportReviewRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/ApplyImportReviewPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "ApplyImportReviewRequest",
+      "type": "object"
+    },
+    "ApprovedAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "answer"
+      ],
+      "type": "object"
+    },
+    "BackupRecoveryStatusPayload": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "BackupRecoveryStatusRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/BackupRecoveryStatusPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "BackupRecoveryStatusRequest",
+      "type": "object"
+    },
+    "BackupRecoveryStatusResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "restartOperationPending": {
+          "type": "boolean"
+        },
+        "safetyCleanupPending": {
+          "type": "boolean"
+        },
+        "safetyCopyAvailable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "safetyCopyAvailable",
+        "restartOperationPending",
+        "safetyCleanupPending"
+      ],
+      "title": "BackupRecoveryStatusResponse",
+      "type": "object"
+    },
+    "BeginImportPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedRevision": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "BeginImportRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/BeginImportPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "BeginImportRequest",
+      "type": "object"
+    },
+    "Bullet": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "order": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "order",
+        "text"
+      ],
+      "type": "object"
+    },
+    "CalendarDate": {
+      "additionalProperties": false,
+      "description": "Precision is explicit: an absent month is a year, never an inferred January.",
+      "properties": {
+        "expected": {
+          "type": "boolean"
+        },
+        "month": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "year": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "year",
+        "month",
+        "expected"
+      ],
+      "type": "object"
+    },
+    "CaptureEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/CapturePayload"
+        },
+        "protocolVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "requestId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "sentAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "requestId",
+        "sentAt",
+        "kind",
+        "payload"
+      ],
+      "type": "object"
+    },
+    "CapturePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "browser": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "url",
+        "title",
+        "browser",
+        "target"
+      ],
+      "type": "object"
+    },
+    "CaptureStatus": {
+      "properties": {
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phase": {
+          "type": "string"
+        },
+        "sessionId": {
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "phase",
+        "sessionId",
+        "error"
+      ],
+      "title": "CaptureStatus",
+      "type": "object"
+    },
+    "Catalog": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "catalogId": {
+          "type": "string"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/CatalogEntry"
+          },
+          "type": "array"
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "formatVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "issuedAt": {
+          "type": "string"
+        },
+        "minimumAppVersion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "formatVersion",
+        "catalogId",
+        "issuedAt",
+        "expiresAt",
+        "minimumAppVersion",
+        "entries"
+      ],
+      "title": "Catalog",
+      "type": "object"
+    },
+    "CatalogEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "effectiveFrom": {
+          "type": "string"
+        },
+        "effectiveTo": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maxInputTokens": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maxOutputTokens": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model": {
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "$ref": "#/$defs/OperationType"
+          },
+          "type": "array"
+        },
+        "preset": {
+          "$ref": "#/$defs/Preset"
+        },
+        "prices": {
+          "items": {
+            "$ref": "#/$defs/Price"
+          },
+          "type": "array"
+        },
+        "provider": {
+          "$ref": "#/$defs/Provider"
+        },
+        "source": {
+          "type": "string"
+        },
+        "verifiedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "preset",
+        "operations",
+        "maxInputTokens",
+        "maxOutputTokens",
+        "currency",
+        "prices",
+        "source",
+        "verifiedAt",
+        "effectiveFrom",
+        "effectiveTo",
+        "disabled"
+      ],
+      "type": "object"
+    },
+    "ChangeAiKeyRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/AiKeyAction"
+        },
+        "credentialId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentialId",
+        "action"
+      ],
+      "title": "ChangeAiKeyRequest",
+      "type": "object"
+    },
+    "CloseDecision": {
+      "enum": [
+        "cancel",
+        "quit"
+      ],
+      "type": "string"
+    },
+    "CloseStatusRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/EmptyPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "LoadResumeRequest",
+      "type": "object"
+    },
+    "CloseStatusResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "pendingAttempt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "pendingAttempt"
+      ],
+      "title": "CloseStatusResponse",
+      "type": "object"
+    },
+    "ConnectionStatus": {
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "connected": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "available",
+        "connected"
+      ],
+      "title": "ConnectionStatus",
+      "type": "object"
+    },
+    "ContactDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "type": "array"
+        },
+        "location": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fullName",
+        "email",
+        "phone",
+        "location",
+        "links"
+      ],
+      "type": "object"
+    },
+    "CredentialProvider": {
+      "enum": [
+        "openai",
+        "anthropic",
+        "gemini"
+      ],
+      "type": "string"
+    },
+    "DateEnd": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "present",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "date",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/CalendarDate"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DeleteAllLocalDataPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "confirmation"
+      ],
+      "type": "object"
+    },
+    "DeleteAllLocalDataRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/DeleteAllLocalDataPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "DeleteAllLocalDataRequest",
+      "type": "object"
+    },
+    "DeleteAllLocalDataResponse": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "freshProfileReady": {
+              "type": "boolean"
+            },
+            "status": {
+              "const": "deleted",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "freshProfileReady"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "restartRequired": {
+              "type": "boolean"
+            },
+            "status": {
+              "const": "cleanup_pending",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "restartRequired"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "DeleteAllLocalDataResponse"
+    },
+    "DeleteRemovedKeyDataRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "credentialIds": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "credentialIds"
+      ],
+      "title": "DeleteRemovedKeyDataRequest",
+      "type": "object"
+    },
+    "DeleteRemovedKeyDataResult": {
+      "$defs": {},
+      "properties": {
+        "clearedOperations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "registry": {
+          "$ref": "#/$defs/AiKeyRegistry"
+        }
+      },
+      "required": [
+        "registry",
+        "clearedOperations"
+      ],
+      "title": "DeleteRemovedKeyDataResult",
+      "type": "object"
+    },
+    "DeleteSafetyCopyRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/SafetyCopyActionPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "DeleteSafetyCopyRequest",
+      "type": "object"
+    },
+    "DeleteSafetyCopyResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "deleted"
+      ],
+      "title": "DeleteSafetyCopyResponse",
+      "type": "object"
+    },
+    "DocumentStyle": {
+      "description": "Reviewed, bundled presentation choices. This is never a path or template source.\nPlain remains the default for requests created before style selection existed.",
+      "enum": [
+        "plain",
+        "technical",
+        "professional",
+        "modern"
+      ],
+      "type": "string"
+    },
+    "EmptyPayload": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ErrorEnvelope": {
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "messageKey": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "messageKey",
+        "retryable",
+        "details"
+      ],
+      "title": "ErrorEnvelope",
+      "type": "object"
+    },
+    "ExportBackupPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "passphrase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "passphrase"
+      ],
+      "type": "object"
+    },
+    "ExportBackupRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/ExportBackupPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "ExportBackupRequest",
+      "type": "object"
+    },
+    "ExportBackupResponse": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "cancelled",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "byteCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "cleanupPending": {
+              "type": "boolean"
+            },
+            "durabilityUnconfirmed": {
+              "type": "boolean"
+            },
+            "formatMajor": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "formatMinor": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "const": "exported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "byteCount",
+            "formatMajor",
+            "formatMinor",
+            "cleanupPending",
+            "durabilityUnconfirmed"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ExportBackupResponse"
+    },
+    "ExportDocxRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/StyledExportPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "StyledExportRequest",
+      "type": "object"
+    },
+    "ExportDocxResponse": {
+      "$defs": {},
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "cancelled",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "byteCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "cleanupPending": {
+              "type": "boolean"
+            },
+            "durabilityUnconfirmed": {
+              "type": "boolean"
+            },
+            "formatVersion": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "revision": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "source": {
+              "$ref": "#/$defs/ExportSource"
+            },
+            "status": {
+              "const": "exported",
+              "type": "string"
+            },
+            "templateId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "source",
+            "revision",
+            "byteCount",
+            "formatVersion",
+            "cleanupPending",
+            "durabilityUnconfirmed"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ExportDocxResponse"
+    },
+    "ExportSource": {
+      "enum": [
+        "saved_draft",
+        "published_snapshot"
+      ],
+      "type": "string"
+    },
+    "ExportTextPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedRevision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/ExportSource"
+        }
+      },
+      "required": [
+        "source",
+        "expectedRevision"
+      ],
+      "type": "object"
+    },
+    "ExportTextRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/ExportTextPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "ExportTextRequest",
+      "type": "object"
+    },
+    "ExportTextResponse": {
+      "$defs": {},
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "cancelled",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "byteCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "cleanupPending": {
+              "type": "boolean"
+            },
+            "durabilityUnconfirmed": {
+              "type": "boolean"
+            },
+            "formatVersion": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "revision": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "source": {
+              "$ref": "#/$defs/ExportSource"
+            },
+            "status": {
+              "const": "exported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "source",
+            "revision",
+            "byteCount",
+            "formatVersion",
+            "cleanupPending",
+            "durabilityUnconfirmed"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ExportTextResponse"
+    },
+    "FinishSelection": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/TrackerEntry"
+        }
+      },
+      "required": [
+        "entry"
+      ],
+      "title": "FinishSelection",
+      "type": "object"
+    },
+    "HealthPayload": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "HealthRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/HealthPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "HealthRequest",
+      "type": "object"
+    },
+    "HealthResponse": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "appVersion": {
+          "type": "string"
+        },
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "profile": {
+          "$ref": "#/$defs/RuntimeProfile"
+        },
+        "status": {
+          "$ref": "#/$defs/HealthStatus"
+        },
+        "storageStatus": {
+          "$ref": "#/$defs/StorageStatus"
+        }
+      },
+      "required": [
+        "status",
+        "appVersion",
+        "profile",
+        "storageStatus",
+        "contractVersion"
+      ],
+      "title": "HealthResponse",
+      "type": "object"
+    },
+    "HealthStatus": {
+      "enum": [
+        "ok"
+      ],
+      "type": "string"
+    },
+    "ImportChoice": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "pending",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "reject",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "heading": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "section",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/ImportSectionTarget"
+            }
+          },
+          "required": [
+            "kind",
+            "heading",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "$ref": "#/$defs/ImportContactField"
+            },
+            "kind": {
+              "const": "contact",
+              "type": "string"
+            },
+            "mode": {
+              "$ref": "#/$defs/ImportContactMode"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "field",
+            "value",
+            "mode"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "bullet": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "text",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/ImportTextTarget"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "text",
+            "bullet",
+            "target"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ImportChoices": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "choices": {
+          "items": {
+            "$ref": "#/$defs/ImportChoice"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "choices"
+      ],
+      "title": "ImportChoices",
+      "type": "object"
+    },
+    "ImportContactField": {
+      "enum": [
+        "fullName",
+        "email",
+        "phone",
+        "location"
+      ],
+      "type": "string"
+    },
+    "ImportContactMode": {
+      "enum": [
+        "fillEmpty",
+        "replace",
+        "keepExisting"
+      ],
+      "type": "string"
+    },
+    "ImportReviewBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "explanation": {
+          "type": "string"
+        },
+        "page": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "proposedSection": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string"
+        },
+        "suggestedTarget": {
+          "$ref": "#/$defs/ImportReviewTarget"
+        },
+        "suggestedValue": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "page",
+        "explanation",
+        "suggestedTarget",
+        "suggestedValue",
+        "proposedSection"
+      ],
+      "type": "object"
+    },
+    "ImportReviewContacts": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fullName",
+        "email",
+        "phone",
+        "location"
+      ],
+      "type": "object"
+    },
+    "ImportReviewPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "reviewId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewId"
+      ],
+      "type": "object"
+    },
+    "ImportReviewRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/ImportReviewPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "ImportReviewRequest",
+      "type": "object"
+    },
+    "ImportReviewSection": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "heading"
+      ],
+      "type": "object"
+    },
+    "ImportReviewSnapshot": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "baseRevision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "blocks": {
+          "items": {
+            "$ref": "#/$defs/ImportReviewBlock"
+          },
+          "type": "array"
+        },
+        "contacts": {
+          "$ref": "#/$defs/ImportReviewContacts"
+        },
+        "id": {
+          "type": "string"
+        },
+        "importedDocument": {
+          "$ref": "#/$defs/ResumeDocument",
+          "description": "Separate editable import candidate, never the saved draft."
+        },
+        "mappingVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/ImportReviewSection"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "baseRevision",
+        "mappingVersion",
+        "blocks",
+        "sections",
+        "contacts",
+        "importedDocument"
+      ],
+      "title": "ImportReviewSnapshot",
+      "type": "object"
+    },
+    "ImportReviewTarget": {
+      "enum": [
+        "section",
+        "text",
+        "bullet",
+        "fullName",
+        "email",
+        "phone",
+        "location"
+      ],
+      "type": "string"
+    },
+    "ImportSectionTarget": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "new",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "kind": {
+              "const": "existing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ImportTextTarget": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "index": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "const": "proposed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "kind": {
+              "const": "existing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "heading": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "new",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "heading"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Link": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "order": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "url"
+      ],
+      "type": "object"
+    },
+    "LoadResumeRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/EmptyPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "LoadResumeRequest",
+      "type": "object"
+    },
+    "MapImportReviewPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "documentJson": {
+          "description": "Bounded before decoding the edited resume.",
+          "type": "string"
+        },
+        "reviewId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewId",
+        "documentJson"
+      ],
+      "type": "object"
+    },
+    "MapImportReviewRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "description": "The editor may rearrange or add content; native session and revision remain authoritative.",
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/MapImportReviewPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "MapImportReviewRequest",
+      "type": "object"
+    },
+    "MaterialKind": {
+      "enum": [
+        "resume",
+        "cover_letter"
+      ],
+      "title": "MaterialKind",
+      "type": "string"
+    },
+    "MaterialPdf": {
+      "properties": {
+        "base64": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "base64",
+        "filename"
+      ],
+      "title": "MaterialPdf",
+      "type": "object"
+    },
+    "NamedField": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "isSkill": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string"
+        },
+        "order": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "order",
+        "label",
+        "value",
+        "isSkill"
+      ],
+      "type": "object"
+    },
+    "OpenPortablePdfHistoryPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "passphrase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "passphrase"
+      ],
+      "type": "object"
+    },
+    "OpenPortablePdfHistoryRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/OpenPortablePdfHistoryPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "OpenPortablePdfHistoryRequest",
+      "type": "object"
+    },
+    "OperationType": {
+      "enum": [
+        "tailor_resume",
+        "refine_resume",
+        "cover_letter",
+        "answer_question",
+        "import_mapping",
+        "credential_test"
+      ],
+      "type": "string"
+    },
+    "PdfExportResponse": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "cancelled",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "byteCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "cleanupPending": {
+              "type": "boolean"
+            },
+            "durabilityUnconfirmed": {
+              "type": "boolean"
+            },
+            "pdfSha256": {
+              "type": "string"
+            },
+            "renderId": {
+              "type": "string"
+            },
+            "status": {
+              "const": "exported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "renderId",
+            "pdfSha256",
+            "byteCount",
+            "cleanupPending",
+            "durabilityUnconfirmed"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "PdfExportResponse"
+    },
+    "PdfPreviewResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "generatedAtUnixMs": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pdfBase64": {
+          "type": "string"
+        },
+        "receipt": {
+          "$ref": "#/$defs/PdfRenderReceipt"
+        },
+        "renderId": {
+          "type": "string"
+        },
+        "revision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/ExportSource"
+        }
+      },
+      "required": [
+        "renderId",
+        "source",
+        "revision",
+        "generatedAtUnixMs",
+        "receipt",
+        "pdfBase64"
+      ],
+      "type": "object"
+    },
+    "PdfRegeneratePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "manifestId": {
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/DocumentStyle"
+        }
+      },
+      "required": [
+        "manifestId",
+        "style"
+      ],
+      "type": "object"
+    },
+    "PdfRegenerateRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/PdfRegeneratePayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "PdfRegenerateRequest",
+      "type": "object"
+    },
+    "PdfReleaseResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "released": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "released"
+      ],
+      "title": "PdfReleaseResponse",
+      "type": "object"
+    },
+    "PdfRenderHistoryRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/EmptyPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "PdfRenderHistoryRequest",
+      "type": "object"
+    },
+    "PdfRenderHistoryResponse": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "manifests": {
+          "items": {
+            "$ref": "#/$defs/PdfRenderManifest"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "manifests"
+      ],
+      "title": "PdfRenderHistoryResponse",
+      "type": "object"
+    },
+    "PdfRenderManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "generatedAtUnixMs": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lastGeneratedAtUnixMs": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "manifestId": {
+          "type": "string"
+        },
+        "receipt": {
+          "$ref": "#/$defs/PdfRenderReceipt"
+        },
+        "renderCount": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/ExportSource"
+        },
+        "sourceRevision": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "manifestId",
+        "source",
+        "sourceRevision",
+        "generatedAtUnixMs",
+        "lastGeneratedAtUnixMs",
+        "renderCount",
+        "receipt"
+      ],
+      "type": "object"
+    },
+    "PdfRenderReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "byteCount": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "documentSchemaVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "documentSha256": {
+          "type": "string"
+        },
+        "fontBundleId": {
+          "type": "string"
+        },
+        "fontBundleSha256": {
+          "type": "string"
+        },
+        "pageCount": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pdfSha256": {
+          "type": "string"
+        },
+        "rendererVersion": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        },
+        "templateSha256": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentSha256",
+        "documentSchemaVersion",
+        "pdfSha256",
+        "rendererVersion",
+        "templateId",
+        "templateSha256",
+        "fontBundleId",
+        "fontBundleSha256",
+        "pageCount",
+        "byteCount"
+      ],
+      "type": "object"
+    },
+    "PdfReplayPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "manifestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "manifestId"
+      ],
+      "type": "object"
+    },
+    "PdfReplayRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/PdfReplayPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "PdfReplayRequest",
+      "type": "object"
+    },
+    "PdfReplayResponse": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "accessibleText": {
+          "description": "Bounded plain text from the exact retained source, used when an older\npublished revision is no longer present in the editor's current state.",
+          "type": "string"
+        },
+        "preview": {
+          "$ref": "#/$defs/PdfPreviewResponse"
+        }
+      },
+      "required": [
+        "preview",
+        "accessibleText"
+      ],
+      "title": "PdfReplayResponse",
+      "type": "object"
+    },
+    "PdfTicketPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "renderId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "renderId"
+      ],
+      "type": "object"
+    },
+    "PdfTicketRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/PdfTicketPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "PdfTicketRequest",
+      "type": "object"
+    },
+    "PortablePdfArchivePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "archiveId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "archiveId"
+      ],
+      "type": "object"
+    },
+    "PortablePdfArchiveRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/PortablePdfArchivePayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "PortablePdfArchiveRequest",
+      "type": "object"
+    },
+    "PortablePdfHistoryResponse": {
+      "$defs": {},
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "cancelled",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "archiveId": {
+              "type": "string"
+            },
+            "expiresAtUnixMs": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "incompatibleReceipts": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "manifests": {
+              "items": {
+                "$ref": "#/$defs/PdfRenderManifest"
+              },
+              "type": "array"
+            },
+            "status": {
+              "const": "opened",
+              "type": "string"
+            },
+            "totalManifests": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unavailableSources": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "status",
+            "archiveId",
+            "expiresAtUnixMs",
+            "totalManifests",
+            "unavailableSources",
+            "incompatibleReceipts",
+            "manifests"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "PortablePdfHistoryResponse"
+    },
+    "PortablePdfRegeneratePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "archiveId": {
+          "type": "string"
+        },
+        "manifestId": {
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/DocumentStyle"
+        }
+      },
+      "required": [
+        "archiveId",
+        "manifestId",
+        "style"
+      ],
+      "type": "object"
+    },
+    "PortablePdfRegenerateRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/PortablePdfRegeneratePayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "PortablePdfRegenerateRequest",
+      "type": "object"
+    },
+    "PortablePdfReplayPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "archiveId": {
+          "type": "string"
+        },
+        "manifestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "archiveId",
+        "manifestId"
+      ],
+      "type": "object"
+    },
+    "PortablePdfReplayRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/PortablePdfReplayPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "PortablePdfReplayRequest",
+      "type": "object"
+    },
+    "PreparedApplicationExport": {
+      "properties": {
+        "docxReady": {
+          "type": "boolean"
+        },
+        "pdfReady": {
+          "type": "boolean"
+        },
+        "revision": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision",
+        "pdfReady",
+        "docxReady"
+      ],
+      "title": "PreparedApplicationExport",
+      "type": "object"
+    },
+    "Preset": {
+      "enum": [
+        "economy",
+        "balanced",
+        "quality"
+      ],
+      "type": "string"
+    },
+    "Price": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/PriceCategory"
+        },
+        "microsPerMillion": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "microsPerMillion",
+        "category"
+      ],
+      "type": "object"
+    },
+    "PriceCategory": {
+      "enum": [
+        "input",
+        "cached_input",
+        "cache_write",
+        "output",
+        "reasoning"
+      ],
+      "type": "string"
+    },
+    "Provider": {
+      "enum": [
+        "open_ai",
+        "anthropic",
+        "gemini"
+      ],
+      "type": "string"
+    },
+    "PublishResumePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedDraftRevision": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "expectedDraftRevision"
+      ],
+      "type": "object"
+    },
+    "PublishResumeRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/PublishResumePayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "PublishResumeRequest",
+      "type": "object"
+    },
+    "PublishResumeResponse": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "draftRevision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "published": {
+          "$ref": "#/$defs/VersionedResumeResponse"
+        }
+      },
+      "required": [
+        "draftRevision",
+        "published"
+      ],
+      "title": "PublishResumeResponse",
+      "type": "object"
+    },
+    "QualificationAlert": {
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/AlertCategory"
+        },
+        "id": {
+          "type": "string"
+        },
+        "jobEnd": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "jobExcerpt": {
+          "type": "string"
+        },
+        "jobStart": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/AlertKind"
+        },
+        "mandatoryReason": {
+          "type": "string"
+        },
+        "publishedRevision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "resumeEvidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AlertEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target": {
+          "default": "",
+          "type": "string"
+        },
+        "validationVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "category",
+        "requirement",
+        "target",
+        "jobExcerpt",
+        "jobStart",
+        "jobEnd",
+        "mandatoryReason",
+        "resumeEvidence",
+        "validationVersion",
+        "publishedRevision"
+      ],
+      "type": "object"
+    },
+    "RenameAiKeyRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "credentialId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentialId",
+        "name"
+      ],
+      "title": "RenameAiKeyRequest",
+      "type": "object"
+    },
+    "ResolveClosePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/$defs/CloseDecision"
+        }
+      },
+      "required": [
+        "attempt",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "ResolveCloseRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/ResolveClosePayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "ResolveCloseRequest",
+      "type": "object"
+    },
+    "RestoreBackupPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmation": {
+          "type": "string"
+        },
+        "passphrase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "passphrase",
+        "confirmation"
+      ],
+      "type": "object"
+    },
+    "RestoreBackupRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/RestoreBackupPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "RestoreBackupRequest",
+      "type": "object"
+    },
+    "RestoreBackupResponse": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "cancelled",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "restartRequired": {
+              "type": "boolean"
+            },
+            "safetyCopyRetained": {
+              "type": "boolean"
+            },
+            "status": {
+              "const": "staged",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "restartRequired",
+            "safetyCopyRetained"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "RestoreBackupResponse"
+    },
+    "ResumeDate": {
+      "additionalProperties": false,
+      "description": "One stable, ordered date or range. Either endpoint may be omitted. The label\ncan describe graduation, certification, or another optional date detail.",
+      "properties": {
+        "end": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateEnd"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "order": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CalendarDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "order",
+        "label",
+        "start",
+        "end"
+      ],
+      "type": "object"
+    },
+    "ResumeDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "contact": {
+          "$ref": "#/$defs/ContactDetails"
+        },
+        "documentId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/ResumeSection"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "documentId",
+        "title",
+        "contact",
+        "sections"
+      ],
+      "type": "object"
+    },
+    "ResumeEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "bullets": {
+          "items": {
+            "$ref": "#/$defs/Bullet"
+          },
+          "type": "array"
+        },
+        "dateRange": {
+          "type": "string"
+        },
+        "dates": {
+          "items": {
+            "$ref": "#/$defs/ResumeDate"
+          },
+          "type": "array"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/NamedField"
+          },
+          "type": "array"
+        },
+        "heading": {
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "type": "array"
+        },
+        "location": {
+          "type": "string"
+        },
+        "order": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "subheading": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "order",
+        "heading",
+        "subheading",
+        "dateRange",
+        "location",
+        "fields",
+        "bullets",
+        "links"
+      ],
+      "type": "object"
+    },
+    "ResumeSection": {
+      "additionalProperties": false,
+      "properties": {
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/ResumeEntry"
+          },
+          "type": "array"
+        },
+        "heading": {
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "order": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "order",
+        "heading",
+        "entries"
+      ],
+      "type": "object"
+    },
+    "ResumeWorkspaceResponse": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "draft": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VersionedResumeResponse"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "latestPublished": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VersionedResumeResponse"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "draft",
+        "latestPublished"
+      ],
+      "title": "ResumeWorkspaceResponse",
+      "type": "object"
+    },
+    "RoleInfo": {
+      "properties": {
+        "company": {
+          "default": "",
+          "type": "string"
+        },
+        "location": {
+          "default": "",
+          "type": "string"
+        },
+        "title": {
+          "default": "",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company",
+        "title",
+        "location"
+      ],
+      "type": "object"
+    },
+    "RollbackSafetyCopyRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/SafetyCopyActionPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "RollbackSafetyCopyRequest",
+      "type": "object"
+    },
+    "RollbackSafetyCopyResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "currentProfileRetained": {
+          "type": "boolean"
+        },
+        "restartRequired": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "restartRequired",
+        "currentProfileRetained"
+      ],
+      "title": "RollbackSafetyCopyResponse",
+      "type": "object"
+    },
+    "RuntimeProfile": {
+      "enum": [
+        "development"
+      ],
+      "type": "string"
+    },
+    "SafetyCopyActionPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "confirmation"
+      ],
+      "type": "object"
+    },
+    "SaveAiCapRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "credentialId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedRevision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "limitMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "period": {
+          "$ref": "#/$defs/AiPeriod"
+        },
+        "timeZone": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentialId",
+        "period",
+        "limitMicros",
+        "timeZone"
+      ],
+      "title": "SaveAiCapRequest",
+      "type": "object"
+    },
+    "SaveResumePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "document": {
+          "$ref": "#/$defs/ResumeDocument"
+        },
+        "expectedRevision": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "document"
+      ],
+      "type": "object"
+    },
+    "SaveResumeRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/SaveResumePayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "SaveResumeRequest",
+      "type": "object"
+    },
+    "SavedAiKey": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "cleanupRequired": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "credentialId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "paused": {
+          "type": "boolean"
+        },
+        "preset": {
+          "$ref": "#/$defs/Preset"
+        },
+        "provider": {
+          "$ref": "#/$defs/CredentialProvider"
+        },
+        "removed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "credentialId",
+        "createdAt",
+        "provider",
+        "preset",
+        "paused",
+        "removed",
+        "cleanupRequired"
+      ],
+      "title": "SavedAiKey",
+      "type": "object"
+    },
+    "SavedPendingCapture": {
+      "$defs": {},
+      "properties": {
+        "capture": {
+          "$ref": "#/$defs/CaptureEnvelope"
+        },
+        "revision": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision",
+        "capture"
+      ],
+      "title": "SavedPendingCapture",
+      "type": "object"
+    },
+    "SavedStageOneDraft": {
+      "$defs": {},
+      "properties": {
+        "draft": {
+          "$ref": "#/$defs/StageOneDraft"
+        },
+        "revision": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision",
+        "draft"
+      ],
+      "title": "SavedStageOneDraft",
+      "type": "object"
+    },
+    "SavedTrackerEntry": {
+      "$defs": {},
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "revision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "value": {
+          "$ref": "#/$defs/TrackerEntry"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "value"
+      ],
+      "title": "SavedTrackerEntry",
+      "type": "object"
+    },
+    "SavedWorkspace": {
+      "$defs": {},
+      "properties": {
+        "revision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "workspace": {
+          "$ref": "#/$defs/ApplicationWorkspace"
+        }
+      },
+      "required": [
+        "revision",
+        "workspace"
+      ],
+      "title": "SavedWorkspace",
+      "type": "object"
+    },
+    "SetAiKeyPresetRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "credentialId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "preset": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentialId",
+        "preset"
+      ],
+      "title": "SetAiKeyPresetRequest",
+      "type": "object"
+    },
+    "StageOneDraft": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "jobDescription": {
+          "type": "string"
+        },
+        "jobUrl": {
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/DocumentStyle"
+        }
+      },
+      "required": [
+        "jobDescription",
+        "jobUrl",
+        "style"
+      ],
+      "title": "StageOneDraft",
+      "type": "object"
+    },
+    "StorageStatus": {
+      "enum": [
+        "ready",
+        "development_gated",
+        "unavailable"
+      ],
+      "type": "string"
+    },
+    "StorageUsagePayload": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "StorageUsageRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/StorageUsagePayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "StorageUsageRequest",
+      "type": "object"
+    },
+    "StorageUsageResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "databaseBytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "databaseSchema": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "diagnosticEvents": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "drafts": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "manifestBytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "publishedSnapshots": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recoveryMetadataBytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "renderManifests": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "settings": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sharedMemoryBytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "totalProfileBytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "trackerEntries": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "walBytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "databaseSchema",
+        "drafts",
+        "publishedSnapshots",
+        "settings",
+        "trackerEntries",
+        "renderManifests",
+        "diagnosticEvents",
+        "databaseBytes",
+        "walBytes",
+        "sharedMemoryBytes",
+        "manifestBytes",
+        "recoveryMetadataBytes",
+        "totalProfileBytes"
+      ],
+      "title": "StorageUsageResponse",
+      "type": "object"
+    },
+    "StyledExportPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedRevision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/ExportSource"
+        },
+        "style": {
+          "$ref": "#/$defs/DocumentStyle",
+          "default": "plain"
+        }
+      },
+      "required": [
+        "source",
+        "expectedRevision"
+      ],
+      "type": "object"
+    },
+    "StyledExportRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/StyledExportPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "StyledExportRequest",
+      "type": "object"
+    },
+    "TrackerEntry": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "answers": {
+          "items": {
+            "$ref": "#/$defs/ApprovedAnswer"
+          },
+          "type": "array"
+        },
+        "company": {
+          "type": "string"
+        },
+        "coverContact": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContactDetails"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "coverLetter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "customStatus": {
+          "type": "string"
+        },
+        "dateApplied": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "resume": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResumeDocument"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/DocumentStyle"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "company",
+        "title",
+        "location",
+        "dateApplied",
+        "status",
+        "customStatus",
+        "sourceUrl",
+        "resume",
+        "coverLetter",
+        "coverContact",
+        "answers",
+        "style"
+      ],
+      "title": "TrackerEntry",
+      "type": "object"
+    },
+    "TrackerMetadata": {
+      "additionalProperties": false,
+      "description": "Editable metadata, deliberately separate from immutable retained documents.",
+      "properties": {
+        "company": {
+          "type": "string"
+        },
+        "customStatus": {
+          "type": "string"
+        },
+        "dateApplied": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "sourceUrl": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "company",
+        "title",
+        "location",
+        "dateApplied",
+        "status",
+        "customStatus",
+        "sourceUrl"
+      ],
+      "type": "object"
+    },
+    "TrackerRecord": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "revision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "value": true
+      },
+      "required": [
+        "id",
+        "revision",
+        "value"
+      ],
+      "title": "TrackerRecord",
+      "type": "object"
+    },
+    "TrackerSummary": {
+      "$defs": {},
+      "properties": {
+        "answerCount": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hasCoverLetter": {
+          "type": "boolean"
+        },
+        "hasResume": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "revision": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "value": {
+          "$ref": "#/$defs/TrackerMetadata"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "value",
+        "hasResume",
+        "hasCoverLetter",
+        "answerCount"
+      ],
+      "title": "TrackerSummary",
+      "type": "object"
+    },
+    "Usage": {
+      "additionalProperties": false,
+      "properties": {
+        "cacheWriteTokens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cachedInputTokens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "inputTokens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outputTokens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reasoningTokens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "inputTokens",
+        "cachedInputTokens",
+        "cacheWriteTokens",
+        "outputTokens",
+        "reasoningTokens"
+      ],
+      "type": "object"
+    },
+    "ValidateBackupPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "passphrase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "passphrase"
+      ],
+      "type": "object"
+    },
+    "ValidateBackupRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "$ref": "#/$defs/ValidateBackupPayload"
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "requestId",
+        "payload"
+      ],
+      "title": "ValidateBackupRequest",
+      "type": "object"
+    },
+    "ValidateBackupResponse": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "cancelled",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "aiAttempts": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "aiOperations": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "appVersion": {
+              "type": "string"
+            },
+            "byteCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "databaseSchema": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "documentSchema": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "formatMajor": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "formatMinor": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "masterDrafts": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "publishedResumes": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "renderManifests": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "settings": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "const": "validated",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "byteCount",
+            "formatMajor",
+            "formatMinor",
+            "appVersion",
+            "databaseSchema",
+            "documentSchema",
+            "createdAt",
+            "masterDrafts",
+            "publishedResumes",
+            "settings",
+            "renderManifests",
+            "aiOperations",
+            "aiAttempts"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ValidateBackupResponse"
+    },
+    "VersionedResumeResponse": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "document": {
+          "$ref": "#/$defs/ResumeDocument"
+        },
+        "revision": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision",
+        "document"
+      ],
+      "title": "VersionedResumeResponse",
+      "type": "object"
+    }
+  },
+  "commands": {
+    "add_ai_key": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/AddAiKeyRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiKeyRegistry"
+      }
+    },
+    "application_capture_status": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/CaptureStatus"
+      }
+    },
+    "application_context": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/ApplicationContext"
+      }
+    },
+    "application_overlay_visibility": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "apply_application_job_capture": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/SavedStageOneDraft"
+      }
+    },
+    "browser_connection_status": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/ConnectionStatus"
+      }
+    },
+    "cancel_ai_test": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "cancel_application_capture": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/CaptureStatus"
+      }
+    },
+    "cancel_application_generation": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "change_ai_key": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/ChangeAiKeyRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiKeyRegistry"
+      }
+    },
+    "clear_ai_monitoring": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "credentialIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "months": {
+            "items": {
+              "$ref": "#/$defs/AiActivityMonth"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "months"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "integer"
+      }
+    },
+    "clear_ai_primary": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiKeyRegistry"
+      }
+    },
+    "close_status": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/CloseStatusRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/CloseStatusResponse"
+      }
+    },
+    "connect_development_browser": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "delete_removed_ai_key_data": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/DeleteRemovedKeyDataRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/DeleteRemovedKeyDataResult"
+      }
+    },
+    "delete_safety_copy": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/DeleteSafetyCopyRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/DeleteSafetyCopyResponse"
+      }
+    },
+    "delete_tracker_entry": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "expectedRevision"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "disable_ai_cap": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/AiCapActionRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "disable_ai_general_cap": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "disconnect_development_browser": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "download_application_export": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "format": {
+            "$ref": "#/$defs/ApplicationExportFormat"
+          },
+          "kind": {
+            "$ref": "#/$defs/MaterialKind"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "kind",
+          "format"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "drag_application_export": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "format": {
+            "$ref": "#/$defs/ApplicationExportFormat"
+          },
+          "kind": {
+            "$ref": "#/$defs/MaterialKind"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "kind",
+          "format"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "export_ai_monitoring": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "credentialIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "months": {
+            "items": {
+              "$ref": "#/$defs/AiActivityMonth"
+            },
+            "type": "array"
+          },
+          "timeZone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "months",
+          "timeZone"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "string"
+      }
+    },
+    "export_portable_backup": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/ExportBackupRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/ExportBackupResponse"
+      }
+    },
+    "finish_application": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/FinishSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expectedRevision"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "generate_application_answer": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "question": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "question"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/SavedWorkspace"
+      }
+    },
+    "generate_application_cover_letter": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "instruction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "instruction"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/SavedWorkspace"
+      }
+    },
+    "get_tracker_entry": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/SavedTrackerEntry"
+      }
+    },
+    "health": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/HealthRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/HealthResponse"
+      }
+    },
+    "hide_application_popup": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "list_tracker_entries": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "search": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "items": {
+          "$ref": "#/$defs/TrackerSummary"
+        },
+        "type": "array"
+      }
+    },
+    "load_ai_caps": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "credentialId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "items": {
+          "$ref": "#/$defs/AiCapPolicySummary"
+        },
+        "type": "array"
+      }
+    },
+    "load_ai_catalog": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/Catalog"
+      }
+    },
+    "load_ai_connection": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiKeyRegistry"
+      }
+    },
+    "load_ai_general_settings": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiGeneralSettings"
+      }
+    },
+    "load_ai_key_settings": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "credentialId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "credentialId"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiKeySettings"
+      }
+    },
+    "load_ai_monitoring": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "bucketSize": {
+            "type": "string"
+          },
+          "credentialId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fromUnixMs": {
+            "type": "integer"
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "toUnixMs": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fromUnixMs",
+          "toUnixMs",
+          "timeZone",
+          "bucketSize"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiMonitoringSummary"
+      }
+    },
+    "load_ai_retention": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiRetentionSummary"
+      }
+    },
+    "load_application_capture": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/SavedPendingCapture"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "load_application_stage_one": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/SavedStageOneDraft"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "load_application_workspace": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/SavedWorkspace"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "load_backup_recovery_status": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/BackupRecoveryStatusRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/BackupRecoveryStatusResponse"
+      }
+    },
+    "load_resume": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/LoadResumeRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/ResumeWorkspaceResponse"
+      }
+    },
+    "load_storage_usage": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/StorageUsageRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/StorageUsageResponse"
+      }
+    },
+    "open_tracker_link": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "prepare_application_exports": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/$defs/MaterialKind"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/PreparedApplicationExport"
+      }
+    },
+    "preview_ai_test": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "credentialId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "credentialId"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiTestPreview"
+      }
+    },
+    "preview_application_pdf": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/$defs/MaterialKind"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/PdfPreviewResponse"
+      }
+    },
+    "preview_tracker_pdf": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/$defs/MaterialKind"
+          }
+        },
+        "required": [
+          "id",
+          "expectedRevision",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/MaterialPdf"
+      }
+    },
+    "publish_resume": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/PublishResumeRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/PublishResumeResponse"
+      }
+    },
+    "refine_application_answer": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "instruction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "instruction"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/SavedWorkspace"
+      }
+    },
+    "regenerate_application_resume": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "correctionInstruction": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "correctionInstruction"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/SavedWorkspace"
+      }
+    },
+    "rename_ai_key": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/RenameAiKeyRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiKeyRegistry"
+      }
+    },
+    "request_application_capture": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/CaptureStatus"
+      }
+    },
+    "reset_ai_cap": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/AiCapActionRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "reset_ai_general_cap": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "resolve_application_capture": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "accept": {
+            "type": "boolean"
+          },
+          "expectedRevision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "reviewedText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewedUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "accept"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "resolve_close": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/ResolveCloseRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/CloseStatusResponse"
+      }
+    },
+    "restore_portable_backup": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/RestoreBackupRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/RestoreBackupResponse"
+      }
+    },
+    "retry_storage": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "rollback_safety_copy": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/RollbackSafetyCopyRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/RollbackSafetyCopyResponse"
+      }
+    },
+    "save_ai_cap": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/SaveAiCapRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiCapPolicySummary"
+      }
+    },
+    "save_ai_general_cap": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limitMicros": {
+            "type": "integer"
+          },
+          "timeZone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "limitMicros",
+          "timeZone"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiCapPolicySummary"
+      }
+    },
+    "save_ai_retention": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiRetentionSummary"
+      }
+    },
+    "save_application_stage_one": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "draft": {
+            "$ref": "#/$defs/StageOneDraft"
+          },
+          "expectedProfileId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expectedProfileId",
+          "draft"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/SavedStageOneDraft"
+      }
+    },
+    "save_application_workspace": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedProfileId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "workspace": {
+            "$ref": "#/$defs/ApplicationWorkspace"
+          }
+        },
+        "required": [
+          "expectedProfileId",
+          "expectedRevision",
+          "workspace"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/SavedWorkspace"
+      }
+    },
+    "save_resume": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/SaveResumeRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/VersionedResumeResponse"
+      }
+    },
+    "save_tracker_entry": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "entry": {
+            "$ref": "#/$defs/TrackerEntry"
+          },
+          "expectedRevision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "entry"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/TrackerSummary"
+      }
+    },
+    "save_tracker_metadata": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/$defs/TrackerMetadata"
+          }
+        },
+        "required": [
+          "id",
+          "expectedRevision",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/TrackerSummary"
+      }
+    },
+    "set_ai_key_preset": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/SetAiKeyPresetRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiKeyRegistry"
+      }
+    },
+    "show_application_popup": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/ApplicationPopupKind"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "start_application": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "jobDescription": {
+            "type": "string"
+          },
+          "jobUrl": {
+            "type": "string"
+          },
+          "style": {
+            "$ref": "#/$defs/DocumentStyle"
+          }
+        },
+        "required": [
+          "jobDescription",
+          "jobUrl",
+          "style"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/SavedWorkspace"
+      }
+    },
+    "test_ai_connection": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "credentialId": {
+            "type": "string"
+          },
+          "expectedMaximumCostMicros": {
+            "type": "integer"
+          },
+          "expectedModel": {
+            "type": "string"
+          },
+          "onProgress": {}
+        },
+        "required": [
+          "onProgress",
+          "credentialId",
+          "expectedModel",
+          "expectedMaximumCostMicros"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/AiTestResult"
+      }
+    },
+    "toggle_application_overlay": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
+      }
+    },
+    "validate_portable_backup": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/ValidateBackupRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/ValidateBackupResponse"
+      }
+    }
+  }
+}

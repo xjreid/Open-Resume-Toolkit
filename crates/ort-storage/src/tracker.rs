@@ -15,7 +15,7 @@ use crate::{
 
 const MAX_ENTRY_BYTES: usize = 1_024 * 1_024;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackerRecord {
     pub id: String,
@@ -40,6 +40,86 @@ fn valid_id(id: &str) -> Result<(), StorageError> {
 }
 
 impl EncryptedStore {
+    /// Retrieves one record using its profile-scoped primary key.
+    /// # Errors
+    /// Rejects invalid IDs and unavailable or corrupt storage.
+    pub fn tracker_get(&self, id: &str) -> Result<Option<TrackerRecord>, StorageError> {
+        valid_id(id)?;
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let row = connection.query_row(
+            "SELECT revision, entry_json FROM tracker_entries WHERE profile_id = ?1 AND entry_id = ?2",
+            params![self.manifest.profile_id.to_string(), id],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?)),
+        ).optional().map_err(|_| StorageError::Unavailable)?;
+        row.map(|(revision, bytes)| {
+            Ok(TrackerRecord {
+                id: id.into(),
+                revision,
+                value: serde_json::from_slice(&bytes).map_err(|_| StorageError::InvalidData)?,
+            })
+        })
+        .transpose()
+    }
+
+    /// A bounded metadata projection. Search includes retained text inside SQLite,
+    /// but retained documents are never allocated or transferred for the table.
+    /// # Errors
+    /// Rejects invalid bounds and unavailable or corrupt storage.
+    pub fn tracker_summaries(
+        &self,
+        offset: u32,
+        limit: u32,
+        search: &str,
+        status: &str,
+    ) -> Result<Vec<TrackerSummary>, StorageError> {
+        if !(1..=100).contains(&limit) || search.len() > 4096 || status.len() > 40 {
+            return Err(StorageError::InvalidData);
+        }
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let mut statement = connection.prepare(
+            "SELECT entry_id, revision, json_object('company',json_extract(CAST(entry_json AS TEXT),'$.company'),'title',json_extract(CAST(entry_json AS TEXT),'$.title'),'location',json_extract(CAST(entry_json AS TEXT),'$.location'),'dateApplied',json_extract(CAST(entry_json AS TEXT),'$.dateApplied'),'status',json_extract(CAST(entry_json AS TEXT),'$.status'),'customStatus',json_extract(CAST(entry_json AS TEXT),'$.customStatus'),'sourceUrl',json_extract(CAST(entry_json AS TEXT),'$.sourceUrl')), json_type(CAST(entry_json AS TEXT),'$.resume') = 'object', json_type(CAST(entry_json AS TEXT),'$.coverLetter') = 'text', coalesce(json_array_length(CAST(entry_json AS TEXT),'$.answers'),0) FROM tracker_entries WHERE profile_id = ?1 AND (?2 = '' OR instr(lower(CAST(entry_json AS TEXT)),lower(?2)) > 0) AND (?3 = '' OR json_extract(CAST(entry_json AS TEXT),'$.status') = ?3) ORDER BY updated_at DESC, entry_id DESC LIMIT ?4 OFFSET ?5"
+        ).map_err(|_| StorageError::Unavailable)?;
+        statement
+            .query_map(
+                params![
+                    self.manifest.profile_id.to_string(),
+                    search,
+                    status,
+                    limit,
+                    offset
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, Option<bool>>(3)?.unwrap_or(false),
+                        row.get::<_, Option<bool>>(4)?.unwrap_or(false),
+                        row.get::<_, u32>(5)?,
+                    ))
+                },
+            )
+            .map_err(|_| StorageError::Unavailable)?
+            .map(|row| {
+                let (id, revision, json, has_resume, has_cover_letter, answer_count) =
+                    row.map_err(|_| StorageError::Unavailable)?;
+                Ok(TrackerSummary {
+                    id,
+                    revision,
+                    value: serde_json::from_str(&json).map_err(|_| StorageError::InvalidData)?,
+                    has_resume,
+                    has_cover_letter,
+                    answer_count,
+                })
+            })
+            .collect()
+    }
     /// Lists encrypted tracker entries for the active profile.
     /// # Errors
     /// Returns an error if storage or a stored record is invalid.
@@ -202,6 +282,17 @@ impl EncryptedStore {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackerSummary {
+    pub id: String,
+    pub revision: i64,
+    pub value: ort_domain::TrackerMetadata,
+    pub has_resume: bool,
+    pub has_cover_letter: bool,
+    pub answer_count: u32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,6 +300,40 @@ mod tests {
     use ort_vault::testing::MemoryDatabaseKeyVault;
     use serde_json::json;
     use tempfile::TempDir;
+
+    #[test]
+    fn indexed_get_and_bounded_summaries_preserve_retained_content() {
+        let root = TempDir::new().unwrap();
+        let mut store =
+            EncryptedStore::open_or_initialize(root.path(), "test", &MemoryDatabaseKeyVault::new())
+                .unwrap();
+        let id = Uuid::now_v7().to_string();
+        let value = json!({"company":"Synthetic","title":"Engineer","location":"Remote","dateApplied":"2026-10-06","status":"applied","customStatus":"","sourceUrl":"","resume":{"retained":"x".repeat(100_000)},"coverLetter":"Retained search marker","answers":[{"question":"Q","answer":"A"}]});
+        store.tracker_save(&id, None, &value).unwrap();
+        let second_id = Uuid::now_v7().to_string();
+        let mut second = value.clone();
+        second["company"] = json!("Other");
+        second["status"] = json!("interview");
+        store.tracker_save(&second_id, None, &second).unwrap();
+        assert_eq!(store.tracker_get(&id).unwrap().unwrap().value, value);
+        let summaries = store
+            .tracker_summaries(0, 1, "retained search marker", "applied")
+            .unwrap();
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].id, id);
+        assert!(summaries[0].has_resume && summaries[0].has_cover_letter);
+        assert_eq!(summaries[0].answer_count, 1);
+        assert!(serde_json::to_vec(&summaries).unwrap().len() < 1_000);
+        assert_eq!(store.tracker_summaries(0, 1, "", "").unwrap().len(), 1);
+        assert_eq!(store.tracker_summaries(1, 1, "", "").unwrap().len(), 1);
+        assert!(store.tracker_summaries(2, 1, "", "").unwrap().is_empty());
+        assert!(store.tracker_summaries(0, 101, "", "").is_err());
+        assert!(store.tracker_get("invalid ID").is_err());
+        // The same connection must never expose a different profile's rows.
+        store.manifest.profile_id = Uuid::now_v7();
+        assert!(store.tracker_get(&id).unwrap().is_none());
+        assert!(store.tracker_summaries(0, 100, "", "").unwrap().is_empty());
+    }
 
     #[test]
     fn finish_is_atomic_and_preserves_workspace_after_failure() {

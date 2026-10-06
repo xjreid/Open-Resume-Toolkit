@@ -40,8 +40,7 @@ pub(crate) async fn delete_all_local_data(
             &OsProviderCredentialVault::new(),
         );
         if matches!(result, CommandResponse::Success { .. }) {
-            app.state::<super::application_materials::DragFiles>()
-                .clear();
+            super::profile_lifetime::retire(&app);
         }
         result
     })

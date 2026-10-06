@@ -9,6 +9,7 @@ export default defineConfig({
     host: host ?? "127.0.0.1",
     port: 1420,
     strictPort: true,
+    fs: { allow: [resolve(import.meta.dirname, "../..")] },
     hmr: host
       ? {
           protocol: "ws",

@@ -3840,6 +3840,7 @@ dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
  "ort-domain",
+ "schemars 1.2.2",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -3851,6 +3852,7 @@ dependencies = [
 name = "ort-application"
 version = "0.0.0-dev"
 dependencies = [
+ "ort-ai",
  "ort-backup",
  "ort-documents",
  "ort-domain",
@@ -3886,9 +3888,12 @@ dependencies = [
 name = "ort-contract-generator"
 version = "0.0.0-dev"
 dependencies = [
+ "ort-backup",
+ "ort-desktop",
  "ort-domain",
  "schemars 1.2.2",
  "serde_json",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -3910,6 +3915,7 @@ dependencies = [
  "ort-storage",
  "ort-vault",
  "reqwest",
+ "schemars 1.2.2",
  "serde",
  "serde_json",
  "tauri",
@@ -3974,6 +3980,7 @@ dependencies = [
  "hmac",
  "jiff",
  "rustix",
+ "schemars 1.2.2",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -4068,6 +4075,7 @@ dependencies = [
  "ort-domain",
  "ort-vault",
  "rusqlite",
+ "schemars 1.2.2",
  "security-framework",
  "serde",
  "serde_json",

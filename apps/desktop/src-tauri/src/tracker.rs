@@ -2,62 +2,27 @@
 #![allow(clippy::needless_pass_by_value)] // Tauri command parameters are owned by the IPC adapter.
 
 use base64::{Engine, engine::general_purpose::STANDARD};
-use ort_ai::materials::RoleInfo;
 use ort_domain::{CommandResponse, ResumeDocument};
-use ort_storage::{StorageError, tracker::TrackerRecord};
+use ort_storage::{
+    StorageError,
+    tracker::{TrackerRecord, TrackerSummary},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{Manager, WebviewWindow};
 use uuid::Uuid;
 
-use crate::{DesktopState, application_materials, storage_failure, window_not_authorized};
+use crate::{DesktopState, application_exports, storage_failure, window_not_authorized};
 
 pub use ort_domain::TrackerEntry;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FinishSelection {
     pub entry: TrackerEntry,
 }
 
-pub(crate) fn valid_url(value: &str) -> bool {
-    if value.is_empty() {
-        return true;
-    }
-    if value.len() > 4_096 {
-        return false;
-    }
-    let Ok(url) = url::Url::parse(value) else {
-        return false;
-    };
-    matches!(url.scheme(), "http" | "https")
-        && url.host_str().is_some()
-        && url.username().is_empty()
-        && url.password().is_none()
-        && url.fragment().is_none()
-        && !url.query_pairs().any(|(key, _)| {
-            let lower = key.to_ascii_lowercase();
-            lower.starts_with("utm_")
-                || matches!(
-                    lower.as_str(),
-                    "token"
-                        | "access_token"
-                        | "auth"
-                        | "session"
-                        | "code"
-                        | "utm_source"
-                        | "utm_medium"
-                        | "utm_campaign"
-                        | "utm_term"
-                        | "utm_content"
-                        | "gclid"
-                        | "fbclid"
-                        | "msclkid"
-                        | "mc_cid"
-                        | "mc_eid"
-                )
-        })
-}
+pub use ort_domain::valid_application_url as valid_url;
 
 fn validate(entry: &TrackerEntry) -> Result<(), StorageError> {
     ort_domain::validate_tracker_entry(entry).map_err(|_| StorageError::InvalidData)
@@ -84,7 +49,7 @@ fn same_retained_content(before: &TrackerEntry, after: &TrackerEntry) -> bool {
 #[cfg(test)]
 mod content_tests {
     use super::*;
-    use ort_domain::{ApprovedAnswer, DocumentStyle};
+    use ort_domain::{ApprovedAnswer, DocumentStyle, RoleInfo};
 
     fn entry() -> TrackerEntry {
         TrackerEntry {
@@ -131,7 +96,7 @@ mod content_tests {
 
     #[test]
     fn finish_retains_all_current_materials() {
-        let mut workspace = application_materials::ApplicationWorkspace {
+        let mut workspace = ort_domain::ApplicationWorkspace {
             schema_version: 1,
             published_revision: 1,
             job_description: "Job".into(),
@@ -178,11 +143,15 @@ fn has_retained_content(entry: &TrackerEntry) -> bool {
         || !entry.answers.is_empty()
 }
 
-fn decode(record: TrackerRecord) -> Result<TrackerRecord, StorageError> {
+fn decode(record: TrackerRecord) -> Result<SavedTrackerEntry, StorageError> {
     let entry: TrackerEntry =
         serde_json::from_value(record.value.clone()).map_err(|_| StorageError::InvalidData)?;
     validate(&entry)?;
-    Ok(record)
+    Ok(SavedTrackerEntry {
+        id: record.id,
+        revision: record.revision,
+        value: entry,
+    })
 }
 
 fn tracker_failure<T: Serialize>(error: &StorageError) -> CommandResponse<T> {
@@ -197,16 +166,94 @@ fn tracker_failure<T: Serialize>(error: &StorageError) -> CommandResponse<T> {
     }
 }
 
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedTrackerEntry {
+    pub id: String,
+    pub revision: i64,
+    pub value: TrackerEntry,
+}
+
+fn summary(record: TrackerRecord) -> Result<TrackerSummary, StorageError> {
+    let saved = decode(record)?;
+    let entry = saved.value;
+    Ok(TrackerSummary {
+        id: saved.id,
+        revision: saved.revision,
+        value: ort_domain::TrackerMetadata {
+            company: entry.company,
+            title: entry.title,
+            location: entry.location,
+            date_applied: entry.date_applied,
+            status: entry.status,
+            custom_status: entry.custom_status,
+            source_url: entry.source_url,
+        },
+        has_resume: entry.resume.is_some(),
+        has_cover_letter: entry.cover_letter.is_some(),
+        answer_count: u32::try_from(entry.answers.len()).map_err(|_| StorageError::InvalidData)?,
+    })
+}
+
 #[tauri::command]
-pub fn list_tracker_entries(window: WebviewWindow) -> CommandResponse<Vec<TrackerRecord>> {
+pub fn list_tracker_entries(
+    window: WebviewWindow,
+    offset: Option<u32>,
+    limit: Option<u32>,
+    search: Option<String>,
+    status: Option<String>,
+) -> CommandResponse<Vec<TrackerSummary>> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    match window.state::<DesktopState>().with_store(|store| {
+        store.tracker_summaries(
+            offset.unwrap_or(0),
+            limit.unwrap_or(100),
+            search.as_deref().unwrap_or(""),
+            status.as_deref().unwrap_or(""),
+        )
+    }) {
+        Ok(entries) => CommandResponse::success(entries),
+        Err(error) => tracker_failure(&error),
+    }
+}
+
+#[tauri::command]
+pub fn get_tracker_entry(window: WebviewWindow, id: String) -> CommandResponse<SavedTrackerEntry> {
     if window.label() != "main" {
         return window_not_authorized();
     }
     match window
         .state::<DesktopState>()
-        .with_store(|store| store.tracker_list()?.into_iter().map(decode).collect())
+        .with_store(|store| decode(store.tracker_get(&id)?.ok_or(StorageError::NotFound)?))
     {
-        Ok(entries) => CommandResponse::success(entries),
+        Ok(record) => CommandResponse::success(record),
+        Err(error) => tracker_failure(&error),
+    }
+}
+
+#[tauri::command]
+pub fn save_tracker_metadata(
+    window: WebviewWindow,
+    id: String,
+    expected_revision: i64,
+    metadata: ort_domain::TrackerMetadata,
+) -> CommandResponse<TrackerSummary> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    match window.state::<DesktopState>().with_store(|store| {
+        let mut saved = decode(store.tracker_get(&id)?.ok_or(StorageError::NotFound)?)?;
+        if saved.revision != expected_revision {
+            return Err(StorageError::RevisionConflict);
+        }
+        metadata.apply_to(&mut saved.value);
+        validate(&saved.value)?;
+        let value = serde_json::to_value(saved.value).map_err(|_| StorageError::InvalidData)?;
+        summary(store.tracker_save(&id, Some(expected_revision), &value)?)
+    }) {
+        Ok(record) => CommandResponse::success(record),
         Err(error) => tracker_failure(&error),
     }
 }
@@ -217,7 +264,7 @@ pub fn save_tracker_entry(
     id: Option<String>,
     expected_revision: Option<i64>,
     entry: TrackerEntry,
-) -> CommandResponse<TrackerRecord> {
+) -> CommandResponse<TrackerSummary> {
     if window.label() != "main" {
         return window_not_authorized();
     }
@@ -230,11 +277,7 @@ pub fn save_tracker_entry(
     };
     match window.state::<DesktopState>().with_store(|store| {
         if let Some(revision) = expected_revision {
-            let current = store
-                .tracker_list()?
-                .into_iter()
-                .find(|record| record.id == id)
-                .ok_or(StorageError::NotFound)?;
+            let current = store.tracker_get(&id)?.ok_or(StorageError::NotFound)?;
             if current.revision != revision {
                 return Err(StorageError::RevisionConflict);
             }
@@ -246,7 +289,7 @@ pub fn save_tracker_entry(
         } else if has_retained_content(&entry) {
             return Err(StorageError::InvalidData);
         }
-        store.tracker_save(&id, expected_revision, &value)
+        summary(store.tracker_save(&id, expected_revision, &value)?)
     }) {
         Ok(record) => CommandResponse::success(record),
         Err(error) => tracker_failure(&error),
@@ -309,24 +352,20 @@ pub fn preview_tracker_pdf(
     window: WebviewWindow,
     id: String,
     expected_revision: i64,
-    kind: application_materials::MaterialKind,
-) -> CommandResponse<application_materials::MaterialPdf> {
+    kind: ort_domain::MaterialKind,
+) -> CommandResponse<application_exports::MaterialPdf> {
     if window.label() != "main" {
         return window_not_authorized();
     }
     let prepared = window.state::<DesktopState>().with_store(|store| {
-        let record = store
-            .tracker_list()?
-            .into_iter()
-            .find(|record| record.id == id)
-            .ok_or(StorageError::NotFound)?;
+        let record = store.tracker_get(&id)?.ok_or(StorageError::NotFound)?;
         if record.revision != expected_revision {
             return Err(StorageError::RevisionConflict);
         }
         let entry: TrackerEntry =
             serde_json::from_value(record.value).map_err(|_| StorageError::InvalidData)?;
         validate(&entry)?;
-        if matches!(kind, application_materials::MaterialKind::Resume) && entry.resume.is_none() {
+        if matches!(kind, ort_domain::MaterialKind::Resume) && entry.resume.is_none() {
             return Err(StorageError::NotFound);
         }
         let resume = entry.resume.unwrap_or_else(|| {
@@ -336,25 +375,9 @@ pub fn preview_tracker_pdf(
             }
             document
         });
-        let document = application_materials::document_for(
-            &application_materials::ApplicationWorkspace {
-                schema_version: 1,
-                published_revision: 1,
-                job_description: "Retained application".into(),
-                job_url: String::new(),
-                role_info: RoleInfo::default(),
-                resume,
-                change_points: Vec::new(),
-                alerts: Vec::new(),
-                alerts_truncated: false,
-                dismissed_alert_ids: Vec::new(),
-                ignore_all_alerts: false,
-                cover_letter: entry.cover_letter,
-                question: String::new(),
-                answer: String::new(),
-                approved_answers: Vec::new(),
-                style: entry.style,
-            },
+        let document = ort_application::material_document::document_for(
+            &resume,
+            entry.cover_letter.as_deref(),
             kind,
         )?;
         Ok((document, entry.style))
@@ -364,11 +387,11 @@ pub fn preview_tracker_pdf(
         Err(error) => return tracker_failure(&error),
     };
     match ort_render::render_pdf_with_style(&document, style) {
-        Ok(pdf) => CommandResponse::success(application_materials::MaterialPdf {
+        Ok(pdf) => CommandResponse::success(application_exports::MaterialPdf {
             base64: STANDARD.encode(&pdf.bytes),
             filename: match kind {
-                application_materials::MaterialKind::Resume => "tailored-resume.pdf",
-                application_materials::MaterialKind::CoverLetter => "cover-letter.pdf",
+                ort_domain::MaterialKind::Resume => "tailored-resume.pdf",
+                ort_domain::MaterialKind::CoverLetter => "cover-letter.pdf",
             }
             .into(),
         }),
@@ -386,7 +409,7 @@ pub fn finish_with_selection(
     }
     let result = window.state::<DesktopState>().with_store(|store| {
         let current =
-            application_materials::load_for_tracker(store)?.ok_or(StorageError::NotFound)?;
+            ort_application::application_workspace::load(store)?.ok_or(StorageError::NotFound)?;
         if current.revision != expected_revision {
             return Err(StorageError::RevisionConflict);
         }
@@ -405,9 +428,9 @@ pub fn finish_with_selection(
     });
     match result {
         Ok(()) => {
-            window.state::<application_materials::DragFiles>().clear();
+            window.state::<application_exports::DragFiles>().clear();
             window
-                .state::<application_materials::ApplicationExportState>()
+                .state::<application_exports::ApplicationExportState>()
                 .clear();
             CommandResponse::success(true)
         }
@@ -417,7 +440,7 @@ pub fn finish_with_selection(
 
 fn selected_snapshot(
     mut selection: FinishSelection,
-    workspace: &application_materials::ApplicationWorkspace,
+    workspace: &ort_domain::ApplicationWorkspace,
 ) -> Result<TrackerEntry, StorageError> {
     validate(&selection.entry)?;
     selection.entry.resume = Some(workspace.resume.clone());
@@ -431,7 +454,7 @@ fn selected_snapshot(
         .as_ref()
         .map(|_| workspace.resume.contact.clone());
     let mut final_workspace = workspace.clone();
-    application_materials::retain_current_answer(&mut final_workspace)?;
+    ort_application::application_workspace::retain_current_answer(&mut final_workspace)?;
     selection.entry.answers = final_workspace.approved_answers;
     selection.entry.style = workspace.style;
     if selection.entry.source_url.is_empty() {

@@ -1,3 +1,4 @@
+mod profile_lifetime;
 use ort_domain::{
     CONTRACT_VERSION, CloseDecision, CloseStatusRequest, CloseStatusResponse, CommandResponse,
     HealthRequest, HealthResponse, HealthStatus, LoadResumeRequest, PublishResumeRequest,
@@ -14,9 +15,12 @@ use tauri::{
     WebviewWindow, WindowEvent,
 };
 
+mod wire_contracts;
+pub use wire_contracts::{desktop_wire_fixtures, desktop_wire_schemas};
 mod ai_keys;
 mod ai_request;
 mod ai_settings;
+mod application_exports;
 mod application_materials;
 mod backup_export;
 mod browser_bridge;
@@ -487,9 +491,9 @@ fn signed_dimension(value: u32) -> i32 {
     i32::try_from(value).unwrap_or(i32::MAX)
 }
 
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
-enum ApplicationPopupKind {
+pub(crate) enum ApplicationPopupKind {
     Job,
     Url,
     ResumeView,
@@ -616,8 +620,8 @@ pub fn run() {
         .manage(pdf_preview::PdfState::default())
         .manage(pdf_preview::PortablePdfState::default())
         .manage(ai_request::AiRequestGate::default())
-        .manage(application_materials::DragFiles::default())
-        .manage(application_materials::ApplicationExportState::default())
+        .manage(application_exports::DragFiles::default())
+        .manage(application_exports::ApplicationExportState::default())
         .plugin(tauri_plugin_dialog::init())
         .menu(menu::editor_menu)
         .on_menu_event(|app, event| {
@@ -628,7 +632,7 @@ pub fn run() {
         .setup(|app| {
             #[cfg(target_os = "macos")]
             {
-                application_materials::DragFiles::sweep_stale();
+                application_exports::DragFiles::sweep_stale();
                 let handle = app.handle().clone();
                 if !ort_macos_lifecycle::install(move || request_native_close(&handle)) {
                     return Err(
@@ -674,14 +678,14 @@ pub fn run() {
             application_materials::refine_application_answer,
             application_materials::save_application_workspace,
             application_materials::finish_application,
-            application_materials::preview_application_pdf,
-            application_materials::prepare_application_exports,
-            application_materials::download_application_export,
-            application_materials::drag_application_export,
-            application_materials::download_application_pdf,
-            application_materials::drag_application_pdf,
+            application_exports::preview_application_pdf,
+            application_exports::prepare_application_exports,
+            application_exports::download_application_export,
+            application_exports::drag_application_export,
             tracker::list_tracker_entries,
             tracker::save_tracker_entry,
+            tracker::get_tracker_entry,
+            tracker::save_tracker_metadata,
             tracker::delete_tracker_entry,
             tracker::open_tracker_link,
             tracker::preview_tracker_pdf,

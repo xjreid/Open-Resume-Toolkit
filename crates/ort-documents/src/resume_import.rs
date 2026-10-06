@@ -5,7 +5,7 @@ use crate::import::{
 };
 use ort_domain::{Bullet, EntityId, NamedField, ResumeDocument, ResumeEntry, ResumeSection};
 
-const BODY: &str = "__ort_body_paragraph__";
+use ort_domain::PARAGRAPH_FIELD_LABEL as BODY;
 
 #[derive(Clone, Copy)]
 struct Line<'a> {

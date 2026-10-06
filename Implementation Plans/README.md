@@ -2,7 +2,7 @@
 
 ## Status
 
-These plans select the architecture, module boundaries, durable records, protocols, security controls, test strategy, and release workflow. M0–M3 are complete for the macOS Apple Silicon development scope; see the [M2 acceptance closure](../evidence/0.0.0-dev/m2-acceptance-closure.md), [M2.5 closure](../evidence/0.0.0-dev/m2.5/closure.md), and [M3 evidence](../evidence/0.0.0-dev/m3/README.md). M4 is next. The approved visual direction remains owned by `../Aesthetic/`.
+These plans select the architecture, module boundaries, durable records, protocols, security controls, test strategy, and release workflow. M0–M4 are complete for the macOS Apple Silicon development scope; see the [M2 acceptance closure](../evidence/0.0.0-dev/m2-acceptance-closure.md), [M2.5 closure](../evidence/0.0.0-dev/m2.5/closure.md), [M3 evidence](../evidence/0.0.0-dev/m3/README.md), and [M4 closure](../evidence/0.0.0-dev/m4/closure.md). M5 remains in progress. The approved visual direction remains owned by `../Aesthetic/`.
 
 Implementation may refine library versions and internal names without changing product behavior. Any change to privacy promises, supported AI modes, data ownership, release channels, or the user-visible lifecycle must first be approved in `../Product Plans/`.
 

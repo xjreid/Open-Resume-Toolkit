@@ -2,6 +2,9 @@
 //! returned only to the initiating main webview; accounting stores no prompt
 //! or response bytes.
 
+#[path = "ai_execution.rs"]
+mod execution;
+
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -9,15 +12,12 @@ use std::sync::{
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ort_ai::{
-    AnthropicAdapter, ApiKey, GeminiAdapter, HttpRequest, MAX_STREAM_BYTES, NormalizedRequest,
-    OpenAiAdapter, OperationType, Preset, Provider, ProviderAdapter, StreamEvent, Usage,
-    builtin_catalog, estimate_cost,
+    AnthropicAdapter, ApiKey, GeminiAdapter, HttpRequest, NormalizedRequest, OpenAiAdapter,
+    OperationType, Preset, Provider, ProviderAdapter, StreamEvent, Usage, builtin_catalog,
+    estimate_cost,
 };
 use ort_domain::CommandResponse;
-use ort_storage::{
-    StorageError,
-    ai_activity::{AiAttemptPreflight, AiAttemptSettlement, AiTerminalStatus},
-};
+use ort_storage::ai_activity::AiAttemptPreflight;
 use ort_vault::{OsProviderCredentialVault, ProviderCredentialReference, ProviderCredentialVault};
 use reqwest::{Client, Method, Url, redirect::Policy};
 use serde::Serialize;
@@ -116,7 +116,7 @@ impl AiRequestGate {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTestResult {
     pub attempt_id: Uuid,
@@ -127,7 +127,7 @@ pub struct AiTestResult {
     pub confirmed: bool,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTestPreview {
     pub credential_id: Uuid,
@@ -138,7 +138,7 @@ pub struct AiTestPreview {
     pub maximum_cost_micros: u64,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiProgress {
     pub kind: &'static str,
@@ -194,10 +194,6 @@ fn pinned_url(provider: Provider, requested_model: &str, request: &HttpRequest) 
         ),
     };
     (url.as_str() == expected).then_some(url)
-}
-
-fn http_client() -> Result<Client, ()> {
-    http_client_with_timeout(Duration::from_secs(60))
 }
 
 fn http_client_with_timeout(timeout: Duration) -> Result<Client, ()> {
@@ -325,27 +321,6 @@ impl SyntheticStreamState {
     }
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn settle(state: &DesktopState, result: AiAttemptSettlement) -> bool {
-    state
-        .with_store(|store| store.settle_ai_attempt(&result))
-        .is_ok()
-}
-
-fn fail_after_settlement(
-    state: &DesktopState,
-    result: AiAttemptSettlement,
-    code: &'static str,
-    message_key: &'static str,
-    retryable: bool,
-) -> CommandResponse<AiTestResult> {
-    if settle(state, result) {
-        CommandResponse::failure(code, message_key, retryable)
-    } else {
-        storage_unavailable()
-    }
-}
-
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn preview_ai_test(
@@ -440,7 +415,7 @@ pub async fn test_ai_connection(
     let app = window.app_handle().clone();
     let state = app.state::<DesktopState>();
     let gate = app.state::<AiRequestGate>();
-    let mut attempt_id = Uuid::now_v7();
+    let attempt_id = Uuid::now_v7();
     let operation_id = Uuid::now_v7();
     let Some(lease) = gate.begin(operation_id) else {
         return CommandResponse::failure("AI_BUSY", "errors.aiBusy", true);
@@ -544,7 +519,7 @@ pub async fn test_ai_connection(
             false,
         );
     }
-    let Some(mut started) = now_unix_ms() else {
+    let Some(started) = now_unix_ms() else {
         return storage_unavailable();
     };
     let preflight = AiAttemptPreflight {
@@ -571,447 +546,41 @@ pub async fn test_ai_connection(
         currency: entry.currency.clone(),
         retry_of: None,
     };
-    if let Err(error) = state.with_store(|store| store.reserve_ai_attempt(&preflight)) {
-        return match error {
-            StorageError::RevisionConflict => {
-                CommandResponse::failure("AI_BUSY", "errors.aiBusy", true)
-            }
-            StorageError::InvalidData => {
-                CommandResponse::failure("AI_CAP_REJECTED", "errors.aiCapRejected", false)
-            }
-            _ => storage_unavailable(),
-        };
-    }
-    if lease.signal.is_cancelled() {
-        if state
-            .with_store(|store| {
-                store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
-            })
-            .is_err()
-        {
-            return storage_unavailable();
-        }
-        return CommandResponse::failure("AI_CANCELLED", "errors.aiCancelled", false);
-    }
-    let Ok(client) = http_client() else {
-        if state
-            .with_store(|store| {
-                store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
-            })
-            .is_err()
-        {
-            return storage_unavailable();
-        }
-        return CommandResponse::failure(
-            "AI_PROVIDER_UNAVAILABLE",
-            "errors.aiProviderUnavailable",
-            true,
-        );
-    };
-    let Ok(outbound) = outbound(&client, url, &http_request) else {
-        if state
-            .with_store(|store| {
-                store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
-            })
-            .is_err()
-        {
-            return storage_unavailable();
-        }
-        return CommandResponse::failure("AI_PROVIDER_INVALID", "errors.aiProviderInvalid", false);
-    };
-    drop(http_request);
-    let retry_outbound = outbound.try_clone();
-    if state
-        .with_store(|store| store.mark_ai_dispatching(attempt_id))
-        .is_err()
-    {
-        let _ = state.with_store(|store| {
-            store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
-        });
-        return storage_unavailable();
-    }
-    let response = tokio::select! {
-        response = outbound.send() => response,
-        () = lease.signal.wait() => {
-            let ended = now_unix_ms().unwrap_or(started);
-            return fail_after_settlement(&state, AiAttemptSettlement { attempt_id, status: AiTerminalStatus::Cancelled,
-                effective_model: None, usage: None, settled_cost_micros: None, usage_complete: false,
-                error_category: Some("cancelled".into()), ended_at_unix_ms: ended,
-                keep_operation_active: false },
-                "AI_CANCELLED", "errors.aiCancelled", false);
-        }
-    };
-    let Ok(mut response) = response else {
-        let ended = now_unix_ms().unwrap_or(started);
-        return fail_after_settlement(
-            &state,
-            AiAttemptSettlement {
-                attempt_id,
-                status: AiTerminalStatus::OutcomeUnknown,
-                effective_model: None,
-                usage: None,
-                settled_cost_micros: None,
-                usage_complete: false,
-                error_category: Some("transient".into()),
-                ended_at_unix_ms: ended,
-                keep_operation_active: false,
-            },
-            "AI_PROVIDER_UNAVAILABLE",
-            "errors.aiProviderUnavailable",
-            true,
-        );
-    };
-    if response.status().is_server_error()
-        && let Some(retry_outbound) = retry_outbound
-    {
-        let ended = now_unix_ms().unwrap_or(started);
-        if !settle(
-            &state,
-            AiAttemptSettlement {
-                attempt_id,
-                status: AiTerminalStatus::Failed,
-                effective_model: None,
-                usage: None,
-                settled_cost_micros: None,
-                usage_complete: false,
-                error_category: Some("transient".into()),
-                ended_at_unix_ms: ended,
-                keep_operation_active: true,
-            },
-        ) {
-            return storage_unavailable();
-        }
-        if lease.signal.is_cancelled() {
-            if state
-                .with_store(|store| {
-                    store.finish_ai_operation(operation_id, AiTerminalStatus::Cancelled, ended)
-                })
-                .is_err()
-            {
-                return storage_unavailable();
-            }
-            return CommandResponse::failure("AI_CANCELLED", "errors.aiCancelled", false);
-        }
-        tokio::select! {
-            () = tokio::time::sleep(Duration::from_secs(1)) => {},
-            () = lease.signal.wait() => {
-                if state.with_store(|store| {
-                    store.finish_ai_operation(operation_id, AiTerminalStatus::Cancelled, now_unix_ms().unwrap_or(ended))
-                }).is_err() {
-                    return storage_unavailable();
-                }
-                return CommandResponse::failure("AI_CANCELLED", "errors.aiCancelled", false);
-            }
-        }
-        let previous_attempt = attempt_id;
-        attempt_id = Uuid::now_v7();
-        started = now_unix_ms().unwrap_or(ended);
-        let mut retry_preflight = preflight.clone();
-        retry_preflight.attempt_id = attempt_id;
-        retry_preflight.started_at_unix_ms = started;
-        retry_preflight.retry_of = Some(previous_attempt);
-        if state
-            .with_store(|store| store.reserve_ai_attempt(&retry_preflight))
-            .is_err()
-        {
-            if state
-                .with_store(|store| {
-                    store.finish_ai_operation(operation_id, AiTerminalStatus::Failed, started)
-                })
-                .is_err()
-            {
-                return storage_unavailable();
-            }
-            return CommandResponse::failure("AI_RETRY_BLOCKED", "errors.aiRetryBlocked", false);
-        }
-        if lease.signal.is_cancelled() {
-            if state
-                .with_store(|store| {
-                    store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
-                })
-                .is_err()
-            {
-                return storage_unavailable();
-            }
-            return CommandResponse::failure("AI_CANCELLED", "errors.aiCancelled", false);
-        }
-        if state
-            .with_store(|store| store.mark_ai_dispatching(attempt_id))
-            .is_err()
-        {
-            let _ = state.with_store(|store| {
-                store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
-            });
-            return storage_unavailable();
-        }
-        let _ = on_progress.send(AiProgress {
-            kind: "retry",
-            text: String::new(),
-        });
-        let second = tokio::select! {
-            response = retry_outbound.send() => response,
-            () = lease.signal.wait() => {
-                let ended = now_unix_ms().unwrap_or(started);
-                return fail_after_settlement(&state, AiAttemptSettlement {
-                    attempt_id, status: AiTerminalStatus::Cancelled, effective_model: None,
-                    usage: None, settled_cost_micros: None, usage_complete: false,
-                    error_category: Some("cancelled".into()), ended_at_unix_ms: ended,
-                    keep_operation_active: false,
-                }, "AI_CANCELLED", "errors.aiCancelled", false);
-            }
-        };
-        let Ok(second) = second else {
-            let ended = now_unix_ms().unwrap_or(started);
-            return fail_after_settlement(
-                &state,
-                AiAttemptSettlement {
-                    attempt_id,
-                    status: AiTerminalStatus::OutcomeUnknown,
-                    effective_model: None,
-                    usage: None,
-                    settled_cost_micros: None,
-                    usage_complete: false,
-                    error_category: Some("transient".into()),
-                    ended_at_unix_ms: ended,
-                    keep_operation_active: false,
-                },
-                "AI_PROVIDER_UNAVAILABLE",
-                "errors.aiProviderUnavailable",
-                true,
-            );
-        };
-        response = second;
-    }
-    if !response.status().is_success() {
-        let error = category(response.status());
-        let (code, retryable) = provider_failure(response.status());
-        let ended = now_unix_ms().unwrap_or(started);
-        return fail_after_settlement(
-            &state,
-            AiAttemptSettlement {
-                attempt_id,
-                status: AiTerminalStatus::Failed,
-                effective_model: None,
-                usage: None,
-                settled_cost_micros: None,
-                usage_complete: false,
-                error_category: Some(error.into()),
-                ended_at_unix_ms: ended,
-                keep_operation_active: false,
-            },
-            code,
-            "errors.aiProviderFailed",
-            retryable,
-        );
-    }
-    if state
-        .with_store(|store| store.mark_ai_streaming(attempt_id))
-        .is_err()
-    {
-        let ended = now_unix_ms().unwrap_or(started);
-        return fail_after_settlement(
-            &state,
-            AiAttemptSettlement {
-                attempt_id,
-                status: AiTerminalStatus::OutcomeUnknown,
-                effective_model: None,
-                usage: None,
-                settled_cost_micros: None,
-                usage_complete: false,
-                error_category: Some("provider".into()),
-                ended_at_unix_ms: ended,
-                keep_operation_active: false,
-            },
-            "AI_STORAGE_UNAVAILABLE",
-            "errors.storageUnavailable",
-            true,
-        );
-    }
-    let mut raw = Vec::new();
-    let mut scan = 0_usize;
-    loop {
-        let next = tokio::select! { next = response.chunk() => next,
-            () = lease.signal.wait() => {
-                let ended = now_unix_ms().unwrap_or(started);
-                return fail_after_settlement(&state, AiAttemptSettlement { attempt_id, status: AiTerminalStatus::Cancelled,
-                    effective_model: None, usage: None, settled_cost_micros: None, usage_complete: false,
-                    error_category: Some("cancelled".into()), ended_at_unix_ms: ended,
-                    keep_operation_active: false },
-                    "AI_CANCELLED", "errors.aiCancelled", false);
-            }
-        };
-        let chunk = match next {
-            Ok(Some(chunk)) => chunk,
-            Ok(None) => break,
-            Err(_) => {
-                let ended = now_unix_ms().unwrap_or(started);
-                return fail_after_settlement(
-                    &state,
-                    AiAttemptSettlement {
-                        attempt_id,
-                        status: AiTerminalStatus::OutcomeUnknown,
-                        effective_model: None,
-                        usage: None,
-                        settled_cost_micros: None,
-                        usage_complete: false,
-                        error_category: Some("transient".into()),
-                        ended_at_unix_ms: ended,
-                        keep_operation_active: false,
-                    },
-                    "AI_PROVIDER_UNAVAILABLE",
-                    "errors.aiProviderUnavailable",
-                    true,
-                );
-            }
-        };
-        if raw
-            .len()
-            .checked_add(chunk.len())
-            .is_none_or(|size| size > MAX_STREAM_BYTES)
-        {
-            let ended = now_unix_ms().unwrap_or(started);
-            return fail_after_settlement(
-                &state,
-                AiAttemptSettlement {
-                    attempt_id,
-                    status: AiTerminalStatus::Failed,
-                    effective_model: None,
-                    usage: None,
-                    settled_cost_micros: None,
-                    usage_complete: false,
-                    error_category: Some("invalid_output".into()),
-                    ended_at_unix_ms: ended,
-                    keep_operation_active: false,
-                },
-                "AI_OUTPUT_INVALID",
-                "errors.aiOutputInvalid",
-                false,
-            );
-        }
-        raw.extend_from_slice(&chunk);
-        while let Some(relative) = raw[scan..].iter().position(|byte| *byte == b'\n') {
-            let end = scan + relative + 1;
-            if let Ok(events) = provider_adapter.parse_stream(&raw[scan..end]) {
-                for event in events {
-                    if let StreamEvent::Text(text) = event {
-                        let _ = on_progress.send(AiProgress {
-                            kind: "delta",
-                            text,
-                        });
-                    }
-                }
-            }
-            scan = end;
-        }
-    }
-    let parsed = provider_adapter.parse_stream(&raw);
-    let ended = now_unix_ms().unwrap_or(started);
-    let Ok(events) = parsed else {
-        return fail_after_settlement(
-            &state,
-            AiAttemptSettlement {
-                attempt_id,
-                status: AiTerminalStatus::Failed,
-                effective_model: None,
-                usage: None,
-                settled_cost_micros: None,
-                usage_complete: false,
-                error_category: Some("invalid_output".into()),
-                ended_at_unix_ms: ended,
-                keep_operation_active: false,
-            },
-            "AI_OUTPUT_INVALID",
-            "errors.aiOutputInvalid",
-            false,
-        );
-    };
-    let synthetic = SyntheticStreamState::from_events(events);
-    let valid = synthetic.valid(&entry.model);
-    let usage = synthetic.usage;
-    let effective_model = synthetic.effective_model;
-    if !valid {
-        // A provider can report complete usage even when it produced no usable
-        // content (for example, Gemini exhausting its thinking/output limit).
-        // Price that usage only when the serving model matches the signed entry.
-        let cost = if effective_model.as_deref() == Some(entry.model.as_str()) {
-            usage
-                .and_then(|value| estimate_cost(&entry, value).ok())
-                .filter(|amount| *amount <= maximum_cost_micros)
-        } else {
-            None
-        };
-        return fail_after_settlement(
-            &state,
-            AiAttemptSettlement {
-                attempt_id,
-                status: AiTerminalStatus::Failed,
-                effective_model,
-                usage,
-                settled_cost_micros: cost,
-                usage_complete: cost.is_some(),
-                error_category: Some("invalid_output".into()),
-                ended_at_unix_ms: ended,
-                keep_operation_active: false,
-            },
-            "AI_OUTPUT_INVALID",
-            "errors.aiOutputInvalid",
-            false,
-        );
-    }
-    let Some(usage) = usage else {
-        return fail_after_settlement(
-            &state,
-            AiAttemptSettlement {
-                attempt_id,
-                status: AiTerminalStatus::OutcomeUnknown,
-                effective_model,
-                usage: None,
-                settled_cost_micros: None,
-                usage_complete: false,
-                error_category: Some("provider".into()),
-                ended_at_unix_ms: ended,
-                keep_operation_active: false,
-            },
-            "AI_USAGE_UNKNOWN",
-            "errors.aiUsageUnknown",
-            true,
-        );
-    };
-    // Never release a guardrail reservation into a larger counted amount.
-    // Keep unexpected provider usage unresolved for reconciliation instead.
-    let cost = estimate_cost(&entry, usage)
-        .ok()
-        .filter(|amount| *amount <= maximum_cost_micros);
-    let model = effective_model.unwrap_or(entry.model);
-    let saved = settle(
+    match execution::execute(
         &state,
-        AiAttemptSettlement {
-            attempt_id,
-            status: AiTerminalStatus::Succeeded,
-            effective_model: Some(model.clone()),
-            usage: Some(usage),
-            settled_cost_micros: cost,
-            usage_complete: cost.is_some(),
-            error_category: None,
-            ended_at_unix_ms: ended,
-            keep_operation_active: false,
+        &lease.signal,
+        preflight,
+        http_request,
+        url,
+        &*provider_adapter,
+        execution::Policy {
+            timeout: Duration::from_secs(60),
+            retry_server_error: true,
         },
-    );
-    if !saved {
-        return storage_unavailable();
+        |kind, text| {
+            let _ = on_progress.send(AiProgress { kind, text });
+        },
+        |output| {
+            if !output.valid(&entry.model) {
+                return Err("AI_OUTPUT_INVALID");
+            }
+            output.usage.ok_or("AI_USAGE_UNKNOWN")
+        },
+    )
+    .await
+    {
+        Ok(completed) => CommandResponse::success(AiTestResult {
+            attempt_id: completed.attempt_id,
+            effective_model: entry.model,
+            usage: completed.value,
+            estimated_cost_micros: completed.cost,
+            usage_complete: completed.cost.is_some(),
+            confirmed: true,
+        }),
+        Err(error) => {
+            CommandResponse::failure(error.code, "errors.aiProviderFailed", error.retryable)
+        }
     }
-    let _ = on_progress.send(AiProgress {
-        kind: "finished",
-        text: String::new(),
-    });
-    CommandResponse::success(AiTestResult {
-        attempt_id,
-        effective_model: model,
-        usage,
-        estimated_cost_micros: cost,
-        usage_complete: cost.is_some(),
-        confirmed: true,
-    })
 }
 
 fn material_schema_bytes(
@@ -1035,325 +604,13 @@ fn material_schema_bytes(
 }
 
 #[cfg(test)]
-#[allow(clippy::items_after_test_module)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn material_failures_distinguish_completion_model_and_format() {
-        let mut output = SyntheticStreamState::default();
-        assert_eq!(
-            output.material_error("gemini-3.6-flash"),
-            Some("AI_OUTPUT_INCOMPLETE")
-        );
-        output.finished = true;
-        assert_eq!(
-            output.material_error("gemini-3.6-flash"),
-            Some("AI_MODEL_MISMATCH")
-        );
-        output.effective_model = Some("gemini-3.6-flash".into());
-        assert_eq!(output.material_error("gemini-3.6-flash"), None);
-        output.failed = true;
-        assert_eq!(
-            output.material_error("gemini-3.6-flash"),
-            Some("AI_OUTPUT_INVALID")
-        );
-    }
-
-    #[test]
-    fn material_cap_reservations_include_both_provider_schemas() {
-        for provider in [Provider::OpenAi, Provider::Gemini] {
-            for operation in [OperationType::TailorResume, OperationType::RefineResume] {
-                let bytes = material_schema_bytes(provider, operation).unwrap();
-                assert!(bytes > 1000);
-                let key = ApiKey::new(b"SYNTHETIC_SECRET_VALUE").unwrap();
-                let request = NormalizedRequest {
-                    operation,
-                    model: "gemini-3.6-flash".into(),
-                    system: "JSON".into(),
-                    input: json!({}),
-                    max_output_tokens: 6000,
-                };
-                let built = adapter(provider).build_request(&request, &key).unwrap();
-                let body: Value = serde_json::from_slice(&built.body).unwrap();
-                let schema = match provider {
-                    Provider::OpenAi => &body["text"]["format"]["schema"],
-                    Provider::Gemini => {
-                        &body["generationConfig"]["responseFormat"]["text"]["schema"]
-                    }
-                    Provider::Anthropic => unreachable!(),
-                };
-                assert_eq!(bytes, serde_json::to_vec(schema).unwrap().len());
-            }
-            assert_eq!(
-                material_schema_bytes(provider, OperationType::CoverLetter).unwrap(),
-                0
-            );
-        }
-    }
-
-    fn resume_stream_fixture(provider: Provider, text: &str, split: usize) -> String {
-        use std::fmt::Write;
-        let (first, last) = text.split_at(split);
-        let values = match provider {
-            Provider::OpenAi => vec![
-                json!({"type":"response.created","response":{"model":"fixture-model"}}),
-                json!({"type":"response.output_text.delta","delta":first}),
-                json!({"type":"response.output_text.delta","delta":last}),
-                json!({"type":"response.completed","response":{"usage":{"input_tokens":20,"output_tokens":100}}}),
-            ],
-            Provider::Anthropic => vec![
-                json!({"type":"message_start","message":{"model":"fixture-model","usage":{"input_tokens":20,"output_tokens":0}}}),
-                json!({"type":"content_block_delta","delta":{"text":first}}),
-                json!({"type":"content_block_delta","delta":{"text":last}}),
-                json!({"type":"message_delta","usage":{"output_tokens":100}}),
-                json!({"type":"message_stop"}),
-            ],
-            Provider::Gemini => vec![
-                json!({"modelVersion":"gemini-3.6-flash","candidates":[{"content":{"parts":[{"thought":true,"text":"private reasoning"},{"text":first}]}}]}),
-                json!({"modelVersion":"gemini-3.6-flash","candidates":[{"content":{"parts":[{"text":last}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":20,"candidatesTokenCount":100,"thoughtsTokenCount":10}}),
-            ],
-        };
-        values.iter().fold(String::new(), |mut raw, value| {
-            write!(raw, "data: {value}\n\n").unwrap();
-            raw
-        })
-    }
-
-    #[test]
-    fn all_provider_streams_apply_header_free_resume_consistently() {
-        use ort_domain::{
-            Bullet, EntityId, NamedField, ResumeDocument, ResumeEntry, ResumeSection,
-        };
-        let mut source = ResumeDocument::empty("Master");
-        source.contact.full_name = "Alex Rivera".into();
-        let section_id = EntityId::new();
-        let entry_id = EntityId::new();
-        source.sections.push(ResumeSection {
-            id: section_id,
-            order: 0,
-            heading: "Experience".into(),
-            entries: vec![ResumeEntry {
-                id: entry_id,
-                order: 0,
-                heading: "North Co".into(),
-                subheading: "Engineer".into(),
-                date_range: "2021 - 2024".into(),
-                dates: None,
-                location: "Boston".into(),
-                fields: vec![NamedField {
-                    id: EntityId::new(),
-                    order: 0,
-                    label: "Technologies".into(),
-                    value: "Rust, SQL".into(),
-                    is_skill: true,
-                }],
-                bullets: vec![Bullet {
-                    id: EntityId::new(),
-                    order: 0,
-                    text: "Built Rust tools for support teams.".into(),
-                }],
-                links: vec![],
-            }],
-        });
-        let text = json!({"schemaVersion":5,"tailoringPlan":["Emphasize Rust support tools for the tooling role."],"roleInfo":null,"alerts":[],
-            "templateSections":[{"sectionId":section_id,"entries":[{"entryId":entry_id,"sourceEntryIds":[entry_id],"mainInfo":{"format":"bullets","items":["Developed Rust tools for support teams."]}}]}]}).to_string();
-        let mut expected = None;
-        for provider in [Provider::OpenAi, Provider::Anthropic, Provider::Gemini] {
-            let model = if provider == Provider::Gemini {
-                "gemini-3.6-flash"
-            } else {
-                "fixture-model"
-            };
-            for split in [1, text.len() / 2, text.len() - 1] {
-                let raw = resume_stream_fixture(provider, &text, split);
-                let output = SyntheticStreamState::from_events(
-                    adapter(provider).parse_stream(raw.as_bytes()).unwrap(),
-                );
-                assert_eq!(output.material_error(model), None);
-                assert_eq!(output.text, text);
-                let material = ort_ai::materials::validate_template_tailoring(
-                    &source,
-                    "Rust tooling role",
-                    &output.text,
-                    1,
-                )
-                .unwrap();
-                assert_eq!(
-                    material.resume.sections[0].entries[0].fields,
-                    source.sections[0].entries[0].fields
-                );
-                assert_eq!(
-                    material.resume.sections[0].entries[0].date_range,
-                    "2021 - 2024"
-                );
-                let context = ort_ai::materials::resume_context(&material.resume);
-                if let Some(expected) = &expected {
-                    assert_eq!(&context, expected);
-                } else {
-                    expected = Some(context);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn provider_failures_preserve_retryable_server_status() {
-        assert_eq!(
-            provider_failure(reqwest::StatusCode::SERVICE_UNAVAILABLE),
-            ("AI_PROVIDER_SERVICE_UNAVAILABLE", true)
-        );
-        assert_eq!(
-            provider_failure(reqwest::StatusCode::INTERNAL_SERVER_ERROR),
-            ("AI_PROVIDER_TEMPORARY", true)
-        );
-        assert_eq!(
-            provider_failure(reqwest::StatusCode::BAD_REQUEST),
-            ("AI_PROVIDER_BAD_REQUEST", false)
-        );
-        assert_eq!(
-            provider_failure(reqwest::StatusCode::NOT_FOUND),
-            ("AI_MODEL_UNAVAILABLE", false)
-        );
-        assert_eq!(
-            provider_failure(reqwest::StatusCode::UNAUTHORIZED),
-            ("AI_AUTHENTICATION_FAILED", false)
-        );
-    }
-
-    #[test]
-    fn request_gate_can_cancel_and_reuse_without_cross_request_signal() {
-        let gate = AiRequestGate::default();
-        let first = gate.begin(Uuid::now_v7()).unwrap();
-        assert!(gate.begin(Uuid::now_v7()).is_none());
-        assert!(gate.cancel());
-        assert!(first.signal.is_cancelled());
-        drop(first);
-        let second = gate.begin(Uuid::now_v7()).unwrap();
-        assert!(!second.signal.is_cancelled());
-    }
-
-    #[test]
-    fn provider_url_and_secret_headers_are_pinned_and_redacted() {
-        let key = ApiKey::new(b"SYNTHETIC-TEST-SECRET").unwrap();
-        let adapter = OpenAiAdapter;
-        let request = NormalizedRequest {
-            operation: OperationType::CredentialTest,
-            model: "fixture-model".into(),
-            system: "Return JSON".into(),
-            input: json!({"fixture":true}),
-            max_output_tokens: 10,
-        };
-        let mut built = adapter.build_request(&request, &key).unwrap();
-        assert!(pinned_url(Provider::OpenAi, "fixture-model", &built).is_some());
-        let client = http_client().unwrap();
-        let outbound = outbound(
-            &client,
-            pinned_url(Provider::OpenAi, "fixture-model", &built).unwrap(),
-            &built,
-        )
-        .unwrap()
-        .build()
-        .unwrap();
-        assert!(
-            outbound
-                .headers()
-                .get("authorization")
-                .unwrap()
-                .is_sensitive()
-        );
-        assert!(!format!("{outbound:?}").contains("SYNTHETIC-TEST-SECRET"));
-        built.url = "https://api.openai.com.attacker.invalid/v1/responses".into();
-        assert!(pinned_url(Provider::OpenAi, "fixture-model", &built).is_none());
-        built.url = "https://api.openai.com/v1/responses?redirect=https://attacker.invalid".into();
-        assert!(pinned_url(Provider::OpenAi, "fixture-model", &built).is_none());
-    }
-
-    #[test]
-    fn bundled_balanced_test_has_a_nonzero_conservative_reservation() {
-        let catalog = builtin_catalog("2026-09-23T00:00:00Z", None).unwrap();
-        assert_eq!(test_output_limit(Provider::Gemini), 512);
-        assert_eq!(test_output_limit(Provider::OpenAi), 64);
-        for provider in [Provider::OpenAi, Provider::Anthropic, Provider::Gemini] {
-            let entry = catalog
-                .resolve(provider, Preset::Balanced, OperationType::CredentialTest)
-                .unwrap();
-            let reserved = maximum_cost(entry, provider).unwrap();
-            assert!(reserved > 0);
-            for price in &entry.prices {
-                let mut usage = Usage::default();
-                match price.category {
-                    ort_ai::PriceCategory::Input => {
-                        usage.input_tokens = u64::from(TEST_INPUT_RESERVATION_BOUND);
-                    }
-                    ort_ai::PriceCategory::CachedInput => {
-                        usage.cached_input_tokens = u64::from(TEST_INPUT_RESERVATION_BOUND);
-                    }
-                    ort_ai::PriceCategory::CacheWrite => {
-                        usage.cache_write_tokens = u64::from(TEST_INPUT_RESERVATION_BOUND);
-                    }
-                    ort_ai::PriceCategory::Output => {
-                        usage.output_tokens = u64::from(test_output_limit(provider));
-                    }
-                    ort_ai::PriceCategory::Reasoning => {
-                        usage.reasoning_tokens = u64::from(test_output_limit(provider));
-                    }
-                }
-                assert!(reserved >= estimate_cost(entry, usage).unwrap());
-            }
-        }
-    }
-
-    #[test]
-    fn synthetic_stream_requires_exact_serving_model_json_and_terminal_event() {
-        let raw = br#"data: {"type":"response.created","response":{"model":"fixture-model"}}
-data: {"type":"response.output_text.delta","delta":"{\"ok\":true}"}
-data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":3}}}
-"#;
-        let parsed = SyntheticStreamState::from_events(OpenAiAdapter.parse_stream(raw).unwrap());
-        assert!(parsed.valid("fixture-model"));
-        assert_eq!(parsed.usage.unwrap().output_tokens, 3);
-        assert!(!parsed.valid("other-model"));
-        let incomplete = SyntheticStreamState::from_events(vec![
-            StreamEvent::Model("fixture-model".into()),
-            StreamEvent::Text("{\"ok\":true}".into()),
-        ]);
-        assert!(!incomplete.valid("fixture-model"));
-        let failed = SyntheticStreamState::from_events(vec![
-            StreamEvent::Model("fixture-model".into()),
-            StreamEvent::Text("{\"ok\":true}".into()),
-            StreamEvent::ProviderFailure,
-            StreamEvent::Finished,
-        ]);
-        assert!(!failed.valid("fixture-model"));
-
-        let gemini = br#"data: {"candidates":[{"content":{"parts":[{"text":"{\"ok\":true}"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":20,"candidatesTokenCount":6,"thoughtsTokenCount":17},"modelVersion":"gemini-3.6-flash"}
-"#;
-        let parsed = SyntheticStreamState::from_events(GeminiAdapter.parse_stream(gemini).unwrap());
-        assert!(parsed.valid("gemini-3.6-flash"));
-        assert_eq!(parsed.usage.unwrap().reasoning_tokens, 17);
-        let incomplete = std::str::from_utf8(gemini)
-            .unwrap()
-            .replace(",\"finishReason\":\"STOP\"", "");
-        let parsed = SyntheticStreamState::from_events(
-            GeminiAdapter.parse_stream(incomplete.as_bytes()).unwrap(),
-        );
-        assert!(!parsed.valid("gemini-3.6-flash"));
-        let blocked = std::str::from_utf8(gemini)
-            .unwrap()
-            .replace("STOP", "SAFETY");
-        let parsed = SyntheticStreamState::from_events(
-            GeminiAdapter.parse_stream(blocked.as_bytes()).unwrap(),
-        );
-        assert!(!parsed.valid("gemini-3.6-flash"));
-    }
-}
+#[path = "ai_request_tests.rs"]
+mod tests;
 
 /// Sends one user-initiated application-material request through the same
 /// credential, pinned-host, cancellation, and accounting boundary as tests.
 /// The caller validates the returned structured text before making it current.
 #[allow(
-    clippy::items_after_test_module,
     clippy::too_many_lines,
     clippy::manual_let_else,
     clippy::single_match_else
@@ -1485,149 +742,26 @@ pub(crate) async fn execute_material<T>(
         currency: entry.currency.clone(),
         retry_of: None,
     };
-    state
-        .with_store(|store| store.reserve_ai_attempt(&preflight))
-        .map_err(|error| match error {
-            StorageError::InvalidData => "AI_CAP_REJECTED",
-            StorageError::RevisionConflict => "AI_BUSY",
-            _ => "STORAGE_UNAVAILABLE",
-        })?;
-    let fail = |status, category: &'static str| {
-        state
-            .with_store(|store| {
-                store.settle_ai_attempt(&AiAttemptSettlement {
-                    attempt_id,
-                    status,
-                    effective_model: None,
-                    usage: None,
-                    settled_cost_micros: None,
-                    usage_complete: false,
-                    error_category: Some(category.into()),
-                    ended_at_unix_ms: now_unix_ms().unwrap_or(started),
-                    keep_operation_active: false,
-                })
-            })
-            .is_ok()
-    };
-    if lease.signal.is_cancelled() {
-        let _ = state.with_store(|store| {
-            store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
-        });
-        return Err("AI_CANCELLED");
-    }
-    let client = match http_client_with_timeout(Duration::from_secs(120)) {
-        Ok(client) => client,
-        Err(()) => {
-            let _ = state.with_store(|store| {
-                store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
-            });
-            return Err("AI_PROVIDER_UNAVAILABLE");
-        }
-    };
-    let outgoing = match outbound(&client, url, &http_request) {
-        Ok(request) => request,
-        Err(()) => {
-            let _ = state.with_store(|store| {
-                store.cancel_reserved_ai_attempt(attempt_id, now_unix_ms().unwrap_or(started))
-            });
-            return Err("AI_PROVIDER_INVALID");
-        }
-    };
-    drop(http_request);
-    state
-        .with_store(|store| store.mark_ai_dispatching(attempt_id))
-        .map_err(|_| "STORAGE_UNAVAILABLE")?;
-    let response = tokio::select! { result = outgoing.send() => result,
-        () = lease.signal.wait() => { if !fail(AiTerminalStatus::Cancelled, "cancelled") { return Err("STORAGE_UNAVAILABLE"); } return Err("AI_CANCELLED"); }
-    };
-    let mut response = match response {
-        Ok(response) => response,
-        Err(_) => {
-            if !fail(AiTerminalStatus::OutcomeUnknown, "transient") {
-                return Err("STORAGE_UNAVAILABLE");
+    execution::execute(
+        &state,
+        &lease.signal,
+        preflight,
+        http_request,
+        url,
+        &*provider_adapter,
+        execution::Policy {
+            timeout: Duration::from_secs(120),
+            retry_server_error: false,
+        },
+        |_, _| {},
+        |output| {
+            if let Some(code) = output.material_error(&entry.model) {
+                return Err(code);
             }
-            return Err("AI_PROVIDER_UNAVAILABLE");
-        }
-    };
-    if !response.status().is_success() {
-        let code = provider_failure(response.status()).0;
-        if !fail(AiTerminalStatus::Failed, category(response.status())) {
-            return Err("STORAGE_UNAVAILABLE");
-        }
-        return Err(code);
-    }
-    state
-        .with_store(|store| store.mark_ai_streaming(attempt_id))
-        .map_err(|_| "STORAGE_UNAVAILABLE")?;
-    let mut raw = Vec::new();
-    loop {
-        let next = tokio::select! { result = response.chunk() => result,
-            () = lease.signal.wait() => { if !fail(AiTerminalStatus::Cancelled, "cancelled") { return Err("STORAGE_UNAVAILABLE"); } return Err("AI_CANCELLED"); }
-        };
-        match next {
-            Ok(Some(chunk))
-                if raw
-                    .len()
-                    .checked_add(chunk.len())
-                    .is_some_and(|size| size <= MAX_STREAM_BYTES) =>
-            {
-                raw.extend_from_slice(&chunk);
-            }
-            Ok(None) => break,
-            Ok(Some(_)) => {
-                if !fail(AiTerminalStatus::Failed, "invalid_output") {
-                    return Err("STORAGE_UNAVAILABLE");
-                }
-                return Err("AI_OUTPUT_INVALID");
-            }
-            Err(_) => {
-                if !fail(AiTerminalStatus::OutcomeUnknown, "transient") {
-                    return Err("STORAGE_UNAVAILABLE");
-                }
-                return Err("AI_PROVIDER_UNAVAILABLE");
-            }
-        }
-    }
-    let events = match provider_adapter.parse_stream(&raw) {
-        Ok(events) => events,
-        Err(_) => {
-            if !fail(AiTerminalStatus::Failed, "invalid_output") {
-                return Err("STORAGE_UNAVAILABLE");
-            }
-            return Err("AI_OUTPUT_INVALID");
-        }
-    };
-    let output = SyntheticStreamState::from_events(events);
-    if let Some(code) = output.material_error(&entry.model) {
-        if !fail(AiTerminalStatus::Failed, "invalid_output") {
-            return Err("STORAGE_UNAVAILABLE");
-        }
-        return Err(code);
-    }
-    let cost = output
-        .usage
-        .and_then(|usage| estimate_cost(&entry, usage).ok())
-        .filter(|cost| *cost <= maximum_cost_micros);
-    let validated = validate(&output.text);
-    let status = if validated.is_ok() {
-        AiTerminalStatus::Succeeded
-    } else {
-        AiTerminalStatus::Failed
-    };
-    state
-        .with_store(|store| {
-            store.settle_ai_attempt(&AiAttemptSettlement {
-                attempt_id,
-                status,
-                effective_model: output.effective_model,
-                usage: output.usage,
-                settled_cost_micros: cost,
-                usage_complete: cost.is_some(),
-                error_category: validated.is_err().then(|| "invalid_output".into()),
-                ended_at_unix_ms: now_unix_ms().unwrap_or(started),
-                keep_operation_active: false,
-            })
-        })
-        .map_err(|_| "STORAGE_UNAVAILABLE")?;
-    validated.map_err(|()| "AI_MATERIAL_INVALID")
+            validate(&output.text).map_err(|()| "AI_OUTPUT_INVALID")
+        },
+    )
+    .await
+    .map(|completed| completed.value)
+    .map_err(|error| error.code)
 }

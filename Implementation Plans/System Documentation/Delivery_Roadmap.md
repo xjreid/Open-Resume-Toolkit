@@ -9,7 +9,7 @@
 | M2 | Complete | Offline editing, reviewed import, publication and export |
 | M2.5 | Complete | Usable desktop layout, approved aesthetic and professional resume designs |
 | M3 | Complete | Direct AI foundation |
-| M4 | Planned | Tailoring, alerts and application materials |
+| M4 | Complete | Tailoring, alerts and application materials |
 | M5 | In progress | Workspace, tracker and browser bridge |
 | M6 | Optional | External Codex integration |
 | M7 | Planned | Distribution and stable hardening |
@@ -30,6 +30,19 @@ accepted limitations, and the user's closure decision are recorded in the
 M3 completed on September 16 for macOS Apple Silicon development. The
 [M3 implementation record](../../evidence/0.0.0-dev/m3/README.md) includes its
 automated audit, signed native walkthrough, and documented no-credential exception.
+
+M4 completed on October 5, 2026, for macOS Apple Silicon development after the
+user confirmed many full application-material walkthroughs and authorized sign-off.
+The [M4 closure](../../evidence/0.0.0-dev/m4/closure.md) records that acceptance
+and its scope. M5 remains in progress; this closure does not qualify its browser
+bridge or public distribution.
+
+On October 5, 2026, the user moved production qualification and paid application
+signing to M7. M0–M6 do not require Apple Developer ID signing or notarization of
+ORT. M5 qualifies the declared current-user development bridge on the active Mac;
+M7 qualifies the production app, native host, and store-distributed extensions.
+Local ad-hoc signing, executable integrity checks, authenticated IPC, and official
+external-runtime verification remain applicable; they are not waived.
 
 ## Testing approach
 
@@ -92,12 +105,17 @@ persist. No broad adversarial benchmark or per-preset statistical threshold gate
 
 **Deliver:** workspace/tracker transitions; atomic Finish Application; Stage 1
 capture/review; retained snapshots, search/filter/reopen; authenticated Chrome/Edge
-native messaging, install/repair/status and version handling. Optional overlay
-initiation stays separately gated by its documented permission model.
+native messaging within the declared current-user development boundary;
+development install/repair/status and version handling. Store-ready extension
+code/packages may be developed and tested without paid ORT app signing. Final
+store publication and signed production bridge qualification belong to M7 and
+are not M5 exit requirements. Optional overlay initiation remains separately
+gated by its documented permission model.
 
 **Minimum checks:** one capture-to-tracker walkthrough in Chrome and a short Edge
-smoke check on the active Mac; save/reopen and failed-save preservation; representative
-wrong-client, replay/oversized message, desktop-absent and version-mismatch rejection.
+smoke check on the active Mac using the development app and host; save/reopen
+and failed-save preservation; representative wrong-client, replay/oversized
+message, desktop-absent and version-mismatch rejection.
 Confirm capture does not start AI automatically. No full browser/profile/OS matrix.
 
 ## M6 — optional external Codex
@@ -118,17 +136,25 @@ M6 may be deferred without blocking M7.
 
 ## M7 — distribution and stable hardening
 
-**Deliver:** the active macOS preview package and later-signing readiness; signed
-updater metadata where updates are enabled; release channels and recovery;
-checksums, dependency/license inventory and provenance; extension Store packages
-and compatibility sequencing; support/diagnostic runbooks. Windows NSIS, SignPath
-and Store work remains deferred until that platform is explicitly activated.
+**Deliver:** production qualification of the active macOS Apple Silicon channel,
+including required Developer ID application/native-helper signing, hardened
+runtime, notarization and stapling; signed production desktop/native-host
+identity verification and identity-scoped IPC-secret access; final Chrome/Edge
+extension identities, Store review/publication and compatibility sequencing;
+signed updater metadata where updates are enabled; release channels and recovery;
+checksums, dependency/license inventory and provenance; support/diagnostic runbooks.
+Windows NSIS, SignPath and Store work remains deferred until that platform is
+explicitly activated. Paid enrollment is performed when undertaking M7 production
+qualification, not as a prerequisite to M0–M6 development.
 
 **Minimum checks:** one install/launch/update-or-reinstall/uninstall cycle for the
 channel being shipped; one representative supported-version migration/backup reopen;
-artifact hash/signature or documented unsigned-preview identity; invalid updater
-metadata rejection where applicable; keyboard and brief screen-reader/readability
-spot check of the main journey. Review new dependencies/notices and known critical
+production artifact signature/notarization and desktop/helper identity checks;
+a signed Chrome capture-to-tracker walkthrough and Edge smoke check covering
+IPC-secret access, Store-installed behavior and install/repair/version handling;
+invalid updater metadata rejection where applicable; keyboard and brief
+screen-reader/readability spot check of the main journey. Review new
+dependencies/notices and known critical
 issues. No multi-VM matrix, full accessibility campaign or performance soak gate.
 
 Publish the exact checked artifacts and truthful limitations. Unsupported update
@@ -160,5 +186,5 @@ or load-testing campaign for the static site.
 
 Windows/Intel native qualification; Linux/mobile; cloud sync/accounts/hosted keys
 or resume storage; locally hosted models; Safari/Firefox; automatic job submission;
-macOS signing/notarization until the approved trigger; additional themes/dark mode.
+macOS signing/notarization before M7; additional themes/dark mode.
 The approved light aesthetic and three document styles remain product scope.

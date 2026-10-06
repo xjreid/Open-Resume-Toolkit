@@ -1,7 +1,7 @@
 # Portable backup container v1 prototype
 
 - Extension: `.ort-backup`
-- Writer format: 1.4 (reader also accepts 1.0–1.3)
+- Writer format: 1.6 (reader also accepts 1.0–1.5)
 - Status: native export, read-only authenticated validation, restart-staged
   replace-restore, rollback, and exact safety-copy cleanup commands integrated;
   native cross-platform dialogs/vaults, low-disk injection, and hostile-input
@@ -16,7 +16,7 @@ associated data.
 | ---: | ---: | --- | --- |
 | 0 | 4 | magic | `ORTB` |
 | 4 | 2 | format major | `1` |
-| 6 | 2 | format minor | writer `4`; reader `0`–`4` |
+| 6 | 2 | format minor | writer `6`; reader `0`–`6` |
 | 8 | 1 | KDF identifier | `1` = Argon2id v1.3 |
 | 9 | 3 | reserved | zero |
 | 12 | 4 | memory KiB | writer 65,536; reader 65,536–262,144 |
@@ -48,13 +48,20 @@ counters are not transferred to a new credential identity by restore. Version
 1.4 uses database schema 4 and adds each attempt's catalog effective date and
 exact bounded pricing components so historical cost provenance survives restore.
 
+Version 1.5 adds retained tracker records and application state. Version 1.6
+removes count-based publication and AI-activity limits. Storage retains every
+publication; backup never silently prunes that history. The authenticated
+payload and container still have the shared 64 MiB size budget, and oversized
+exports fail explicitly. Earlier readers reject the new minor version rather
+than attempting an archive outside their count policy.
+
 Reader validation is ordered: fixed header length/magic, versions and reserved
 bytes, KDF policy, ciphertext length/exact file length, Argon2id derivation, AEAD
 authentication, bounded JSON parsing, manifest/hash/inventory validation, then
 domain validation. The authenticated header version must match the encrypted
 manifest; version 1.0 requires database schema 1 and no render history, while
 1.1–1.2 require database schema 2, 1.3 requires database schema 3, and 1.4
-requires database schema 4. Wrong passphrase, ciphertext modification,
+requires database schema 4; 1.5–1.6 require database schema 5. Wrong passphrase, ciphertext modification,
 truncation, and malformed encrypted content return the same invalid-backup
 category.
 
@@ -64,8 +71,8 @@ category.
 - Salt: sixteen `0x11` bytes
 - Nonce: twenty-four `0x22` bytes
 - Created time: `2026-09-01T12:00:00Z`
-- Version 1.4 SHA-256 of the complete container:
-  `e8f30a5393d77308c4dcbc28d56761a0e14b88c3d83e9dba27f4aa2ef56ac9f6`
+- Version 1.6 SHA-256 of the complete container:
+  `93bea2f949c31e7b89f53f698a9a1c35fc7e18a7a90f4d25add4aeb7995f6ab4`
 - Legacy version 1.0 SHA-256 (still read and verified):
   `bad075c8e1369c6aa67f4b41d422826e84cde14070e43724caa063cae26e90aa`
 
@@ -75,7 +82,7 @@ vector change.
 
 ## Native export boundary
 
-The desktop command creates format 1.4 only from the already-open encrypted
+The desktop command creates format 1.6 only from the already-open encrypted
 profile. Its generated IPC request contains bounded request metadata and the
 user-entered passphrase, but no path, profile records, overwrite flag, key, or
 vault reference. The request types deliberately do not implement `Debug` or

@@ -38,7 +38,7 @@ completion. A shared CI build is not a supported distribution.
 
 - Initial macOS packages may be published through canonical GitHub Releases only as clearly labeled unsigned previews. Each preview includes checksums, source/build provenance, authenticated release metadata, accurate Gatekeeper and manual-opening instructions, and documented native-messaging or update limitations.
 - An unsigned macOS artifact is not a stable broadly trusted release, even when it is project-controlled and its checksum is valid.
-- Stable direct macOS distribution requires Apple Developer ID signing, hardened runtime, and Apple notarization. The project adopts the required paid Apple Developer Program membership when sustained macOS use, recurring Gatekeeper support burden, organizational adoption, or available project funding justifies the ongoing cost.
+- Stable direct macOS distribution requires Apple Developer ID signing, hardened runtime, and Apple notarization. The project adopts the required paid Apple Developer Program membership for M7 production qualification. M0–M6 development and functional acceptance do not require paid ORT signing.
 - Automatic application updating must not be enabled for unsigned previews unless an independently secure signature system is implemented, threat-reviewed, and clearly explained. Manual update notification may still point to the canonical release page.
 
 ## Update behavior
@@ -52,6 +52,13 @@ completion. A shared CI build is not a supported distribution.
 - Desktop, native host, extension, document schema, renderer, backup, provider catalog, and external Codex app-server protocol/runtime compatibility versions are evaluated together before release.
 
 ## Browser-extension stores
+
+Store-ready extension code and packages may be developed and tested with the
+explicit unsigned/ad-hoc development app and native host before M7. This tests
+functionality within the documented current-user boundary, not signed production
+identity. M7 owns final Store publication, Developer ID/Keychain integration and
+qualification of the exact distributed desktop/host/extension combination. A
+Store extension does not download or install its required native host by itself.
 
 - Chrome is distributed through Chrome Web Store.
 - Edge is distributed through Microsoft Edge Add-ons.

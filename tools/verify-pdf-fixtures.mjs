@@ -117,14 +117,14 @@ const expectedVisibleText = (source, documentStyle) => {
         : section.heading,
     );
     for (const entry of section.entries) {
-      const details = entry.fields.find(
+      const details = entry.fields.filter(
         (field) =>
           field.label !== "__ort_body_paragraph__" &&
           field.label.trim().toLowerCase() !== "extra" &&
           field.value.trim(),
       );
       add(
-        [entry.heading, details?.value]
+        [entry.heading, ...details.map((field) => field.value)]
           .filter((value) => value?.trim())
           .join(" | "),
       );
@@ -147,12 +147,10 @@ const expectedVisibleText = (source, documentStyle) => {
         add(entry.subheading);
         rightRows.forEach(add);
       }
-      const body = entry.fields.find(
-        (field) =>
-          field.label === "__ort_body_paragraph__" && field.value.trim(),
-      );
-      if (body) add(body.value);
-      else entry.bullets.forEach((bullet) => add(bullet.text));
+      entry.fields
+        .filter((field) => field.label === "__ort_body_paragraph__")
+        .forEach((field) => add(field.value));
+      entry.bullets.forEach((bullet) => add(bullet.text));
       entry.links.forEach((link) => add(visibleLink(link)));
     }
   }

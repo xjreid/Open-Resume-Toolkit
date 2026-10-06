@@ -14,6 +14,7 @@ default = []
 dev-browser-bridge = ["dep:getrandom", "dep:zeroize", "dep:rustix"]
 
 [dependencies]
+schemars.workspace = true
 hmac.workspace = true
 jiff.workspace = true
 serde.workspace = true

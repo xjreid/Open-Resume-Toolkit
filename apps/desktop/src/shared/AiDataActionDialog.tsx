@@ -1,4 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeDesktop as invoke } from "./desktop-client";
+import type * as Wire from "@ort/contracts/wire";
 import { useEffect, useRef, useState } from "react";
 import { dataKeyDescription } from "./AiDataKeyPicker";
 import { formatKeyCreatedAt, ProviderLogo } from "./AiKeyPresentation";
@@ -12,13 +13,6 @@ export type ActivityMonth = {
   toUnixMs: number;
   attempts: number;
 };
-
-type MonthResponse =
-  | {
-      ok: true;
-      value: { timeBuckets: Array<{ label: string; attempts: number }> };
-    }
-  | { ok: false };
 
 function monthRange(label: string, attempts: number): ActivityMonth | null {
   const match = /^(\d{4})-(\d{2})$/.exec(label);
@@ -88,7 +82,7 @@ export function AiDataActionDialog({
       : selectedKeys;
     void Promise.all(
       scopes.map((credentialId) =>
-        invoke<MonthResponse>("load_ai_monitoring", {
+        invoke("load_ai_monitoring", {
           fromUnixMs: 0,
           toUnixMs: Date.now() + 1,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,

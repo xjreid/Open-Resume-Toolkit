@@ -67,6 +67,7 @@
       "additionalProperties": false,
       "required": [
         "year",
+        "month",
         "expected"
       ]
     },
@@ -235,7 +236,9 @@
       "required": [
         "id",
         "order",
-        "label"
+        "label",
+        "start",
+        "end"
       ]
     },
     "ResumeDocument": {

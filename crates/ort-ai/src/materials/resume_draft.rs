@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 
 use super::{AlertCandidate, MaterialError, RoleInfo, TailoredMaterial, validate_alerts};
 
-const PARAGRAPH: &str = "__ort_body_paragraph__";
+use ort_domain::PARAGRAPH_FIELD_LABEL as PARAGRAPH;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -65,28 +65,6 @@ fn date_text(entry: &ResumeEntry) -> String {
         .join("\n")
 }
 
-fn details_text(entry: &ResumeEntry) -> String {
-    entry
-        .fields
-        .iter()
-        .filter(|field| {
-            field.label != PARAGRAPH && !field.label.trim().eq_ignore_ascii_case("extra")
-        })
-        .map(|field| field.value.as_str())
-        .collect::<Vec<_>>()
-        .join(" | ")
-}
-
-fn extra_text(entry: &ResumeEntry) -> String {
-    entry
-        .fields
-        .iter()
-        .filter(|field| field.label.trim().eq_ignore_ascii_case("extra"))
-        .map(|field| field.value.as_str())
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
 /// Presents protected headers and editable bodies in the output vocabulary.
 /// Keeps every source field and link available as evidence, including fields
 /// not currently visible in the template. Internal ordering/UUID metadata for
@@ -99,19 +77,17 @@ pub fn resume_context(document: &ResumeDocument) -> Value {
             "sectionId": section.id,
             "heading": section.heading,
             "entries": section.entries.iter().map(|entry| {
-                let paragraph = entry.fields.iter().find(|field| field.label == PARAGRAPH);
+                let paragraphs: Vec<_> = entry.fields_for_role(ort_domain::FieldRole::Paragraph).filter(|field| !field.value.trim().is_empty()).map(|field| &field.value).collect();
                 json!({
                     "entryId": entry.id,
                     "title": entry.heading,
                     "role": entry.subheading,
-                    "details": details_text(entry),
+                    "details": entry.field_text(ort_domain::FieldRole::Details, " | "),
                     "date": date_text(entry),
                     "location": entry.location,
-                    "extra": extra_text(entry),
-                    "mainInfo": match paragraph.filter(|field| !field.value.trim().is_empty()) {
-                        Some(field) => json!({"format":"paragraph","items":[field.value]}),
-                        None => json!({"format":"bullets","items":entry.bullets.iter().map(|bullet| &bullet.text).collect::<Vec<_>>()})
-                    },
+                    "extra": entry.field_text(ort_domain::FieldRole::Extra, "\n"),
+                    "mainInfo": if paragraphs.is_empty() { json!({"format":"bullets","items":entry.bullets.iter().map(|bullet| &bullet.text).collect::<Vec<_>>()}) } else { json!({"format":"paragraph","items":paragraphs}) },
+                    "sourceBullets": entry.bullets.iter().map(|bullet| &bullet.text).collect::<Vec<_>>(),
                     "sourceFields": entry.fields.iter().map(|field| json!({"fieldId":field.id,"label":field.label,"value":field.value,"isSkill":field.is_skill})).collect::<Vec<_>>(),
                     "links": entry.links.iter().map(|link| json!({"label":link.label,"url":link.url})).collect::<Vec<_>>()
                 })

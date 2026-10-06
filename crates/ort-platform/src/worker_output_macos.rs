@@ -191,6 +191,25 @@ mod tests {
         time::Instant,
     };
 
+    // macOS process creation can temporarily inherit another thread's pipe ends
+    // before exec applies CLOEXEC. Each pipe scenario runs in its own process so
+    // EOF/EPIPE assertions measure this driver, not unrelated concurrent forks.
+    // The parent test suite still runs all scenarios and export crash tests in parallel.
+    fn run_in_child(name: &str) -> bool {
+        const CHILD: &str = "ORT_PIPE_TEST_CHILD";
+        if std::env::var(CHILD).as_deref() == Ok(name) {
+            return false;
+        }
+        let test = format!("worker_output_macos::tests::{name}");
+        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .args(["--exact", &test, "--nocapture"])
+            .env(CHILD, name)
+            .output()
+            .expect("isolated pipe test");
+        assert!(output.status.success(), "{name} failed: {output:?}");
+        true
+    }
+
     fn next(reader: &mut MacosWorkerOutput) -> NativeWorkerEvent {
         reader
             .receive(Duration::ZERO)
@@ -200,6 +219,9 @@ mod tests {
 
     #[test]
     fn real_pipes_are_fair_redacted_bounded_and_drained_before_single_eof() {
+        if run_in_child("real_pipes_are_fair_redacted_bounded_and_drained_before_single_eof") {
+            return;
+        }
         let (out, mut out_write) = pipe().expect("stdout");
         let (err, mut err_write) = pipe().expect("stderr");
         let mut reader = MacosWorkerOutput::new(out.into(), err.into()).expect("reader");
@@ -233,6 +255,9 @@ mod tests {
 
     #[test]
     fn silent_wait_is_clamped_and_explicit_close_is_terminal() {
+        if run_in_child("silent_wait_is_clamped_and_explicit_close_is_terminal") {
+            return;
+        }
         let (out, _out_write) = pipe().expect("stdout");
         let (err, _err_write) = pipe().expect("stderr");
         let mut reader = MacosWorkerOutput::new(out.into(), err.into()).expect("reader");
@@ -256,6 +281,9 @@ mod tests {
 
     #[test]
     fn exact_stdout_and_stderr_limits_accept_eof_but_reject_the_next_byte() {
+        if run_in_child("exact_stdout_and_stderr_limits_accept_eof_but_reject_the_next_byte") {
+            return;
+        }
         for stream in 0..2 {
             for overflow in [false, true] {
                 let (out, mut out_write) = pipe().expect("stdout");
@@ -306,6 +334,9 @@ mod tests {
 
     #[test]
     fn oversized_burst_is_split_into_fixed_chunks() {
+        if run_in_child("oversized_burst_is_split_into_fixed_chunks") {
+            return;
+        }
         let (out, mut writer) = pipe().expect("stdout");
         let (err, err_writer) = pipe().expect("stderr");
         let mut reader = MacosWorkerOutput::new(out.into(), err.into()).expect("reader");
@@ -336,6 +367,11 @@ mod tests {
 
     #[test]
     fn invalid_input_releases_both_owned_readers_and_drop_preserves_other_handles() {
+        if run_in_child(
+            "invalid_input_releases_both_owned_readers_and_drop_preserves_other_handles",
+        ) {
+            return;
+        }
         let (socket, _other) = std::os::unix::net::UnixStream::pair().expect("socket pair");
         let (err, mut err_write) = pipe().expect("stderr");
         assert!(MacosWorkerOutput::new(socket.into(), err.into()).is_err());

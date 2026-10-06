@@ -1,4 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
+import { desktopCommand as command } from "./desktop-client";
+import type {
+  TrackerSummary,
+  TrackerMetadata,
+  SavedTrackerEntry,
+} from "@ort/contracts/wire";
 import {
   useEffect,
   useLayoutEffect,
@@ -15,18 +20,9 @@ import {
 } from "./TrackerFields";
 import { trackerLinkTarget } from "./tracker-link";
 
-type RecordEntry = { id: string; revision: number; value: TrackerEntry };
-type Response<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: { code: string } };
+type RecordEntry = TrackerSummary;
 type ContentKind = "resume" | "cover_letter" | "answers";
 type ContentView = { id: string; kind: ContentKind };
-
-async function command<T>(name: string, args: Record<string, unknown> = {}) {
-  const response = await invoke<Response<T>>(name, args);
-  if (!response.ok) throw new Error(response.error.code);
-  return response.value;
-}
 
 const statuses = [
   ["applied", "Applied"],
@@ -131,7 +127,7 @@ export function TrackerWorkspace({
   const [entries, setEntries] = useState<RecordEntry[]>([]);
   const loadEpoch = useRef(0);
   const committed = useRef(new Map<string, RecordEntry>());
-  const desired = useRef(new Map<string, TrackerEntry>());
+  const desired = useRef(new Map<string, TrackerMetadata>());
   const timers = useRef(new Map<string, number>());
   const inFlight = useRef(new Map<string, Promise<void>>());
   const deletingIds = useRef(new Set<string>());
@@ -154,16 +150,33 @@ export function TrackerWorkspace({
   const [pdf, setPdf] = useState<{ base64: string; filename: string } | null>(
     null,
   );
+  const [contentRecord, setContentRecord] = useState<SavedTrackerEntry | null>(
+    null,
+  );
   const [contentLoading, setContentLoading] = useState(false);
   const [contentError, setContentError] = useState("");
   const contentRequest = useRef(0);
+  const lifetime = useRef(0);
   const contentDialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || pendingCount > 0) return;
     let cancelled = false;
     const epoch = loadEpoch.current;
-    void command<RecordEntry[]>("list_tracker_entries")
+    const load = async () => {
+      const loaded: RecordEntry[] = [];
+      for (let offset = 0; ; offset += 100) {
+        const page = await command("list_tracker_entries", {
+          offset,
+          limit: 100,
+          search,
+          status: filter,
+        });
+        loaded.push(...page);
+        if (page.length < 100) return loaded;
+      }
+    };
+    void load()
       .then((loaded) => {
         if (cancelled || epoch !== loadEpoch.current || desired.current.size)
           return;
@@ -179,7 +192,7 @@ export function TrackerWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [active]);
+  }, [active, search, filter, pendingCount]);
 
   useEffect(() => {
     const dialog = createDialog.current;
@@ -212,6 +225,7 @@ export function TrackerWorkspace({
   );
   useEffect(
     () => () => {
+      lifetime.current += 1;
       for (const timer of timers.current.values()) window.clearTimeout(timer);
       if (linkTimer.current !== null) window.clearTimeout(linkTimer.current);
     },
@@ -219,28 +233,9 @@ export function TrackerWorkspace({
   );
 
   const visible = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase();
     return entries
       .map((record, index) => ({ record, index }))
-      .filter(({ record: { value } }) => {
-        if (filter && value.status !== filter) return false;
-        if (!term) return true;
-        return [
-          value.company,
-          value.title,
-          value.location,
-          value.dateApplied,
-          value.status,
-          value.customStatus,
-          value.sourceUrl,
-          value.resume?.title ?? "",
-          value.coverLetter ?? "",
-          ...value.answers.flatMap(({ question, answer }) => [
-            question,
-            answer,
-          ]),
-        ].some((part) => part.toLocaleLowerCase().includes(term));
-      })
+      .filter(({ record: { value } }) => !filter || value.status === filter)
       .sort(
         (a, b) =>
           b.record.value.dateApplied.localeCompare(
@@ -248,7 +243,7 @@ export function TrackerWorkspace({
           ) || a.index - b.index,
       )
       .map(({ record }) => record);
-  }, [entries, search, filter]);
+  }, [entries, filter]);
 
   function clearTimer(id: string) {
     const timer = timers.current.get(id);
@@ -268,7 +263,7 @@ export function TrackerWorkspace({
   }
   function edit(
     id: string,
-    change: (value: TrackerEntry) => TrackerEntry,
+    change: (value: TrackerMetadata) => TrackerMetadata,
     delay = 400,
   ) {
     const base = desired.current.get(id) ?? committed.current.get(id)?.value;
@@ -299,7 +294,7 @@ export function TrackerWorkspace({
   function openLink(source: string) {
     const target = trackerLinkTarget(source);
     if (!target) return;
-    void command<boolean>("open_tracker_link", { target }).catch((error) =>
+    void command("open_tracker_link", { target }).catch((error) =>
       setNotice("Could not open link (" + String(error) + ")."),
     );
   }
@@ -327,8 +322,9 @@ export function TrackerWorkspace({
     clearTimer(id);
     const existing = inFlight.current.get(id);
     if (existing) return existing;
+    const epoch = lifetime.current;
     const run = async () => {
-      while (true) {
+      while (epoch === lifetime.current) {
         const target = desired.current.get(id);
         const previous = committed.current.get(id);
         if (!target || !previous) return;
@@ -338,11 +334,12 @@ export function TrackerWorkspace({
           return;
         }
         try {
-          const saved = await command<RecordEntry>("save_tracker_entry", {
+          const saved = await command("save_tracker_metadata", {
             id,
             expectedRevision: previous.revision,
-            entry: target,
+            metadata: target,
           });
+          if (epoch !== lifetime.current) return;
           committed.current.set(id, saved);
           const latest = desired.current.get(id);
           if (latest === target) desired.current.delete(id);
@@ -365,6 +362,7 @@ export function TrackerWorkspace({
             return updated;
           });
         } catch (error) {
+          if (epoch !== lifetime.current) return;
           failed.current.add(id);
           setSaveErrors((current) => ({ ...current, [id]: String(error) }));
           return;
@@ -374,6 +372,7 @@ export function TrackerWorkspace({
     const task = run().finally(() => {
       inFlight.current.delete(id);
       if (
+        epoch === lifetime.current &&
         desired.current.has(id) &&
         !failed.current.has(id) &&
         !deletingIds.current.has(id)
@@ -389,7 +388,7 @@ export function TrackerWorkspace({
     setCreating(true);
     setNotice("");
     try {
-      const record = await command<RecordEntry>("save_tracker_entry", {
+      const record = await command("save_tracker_entry", {
         id: null,
         expectedRevision: null,
         entry: createDraft,
@@ -416,7 +415,7 @@ export function TrackerWorkspace({
       await inFlight.current.get(id);
       const record = committed.current.get(id);
       if (!record) throw new Error("TRACKER_NOT_FOUND");
-      await command<boolean>("delete_tracker_entry", {
+      await command("delete_tracker_entry", {
         id,
         expectedRevision: record.revision,
       });
@@ -446,18 +445,23 @@ export function TrackerWorkspace({
     const request = ++contentRequest.current;
     setContent({ id: record.id, kind });
     setPdf(null);
+    setContentRecord(null);
     setContentError("");
     setContentLoading(false);
-    if (kind === "answers") return;
     setContentLoading(true);
     try {
       await persist(record.id);
       const saved = committed.current.get(record.id);
       if (!saved) throw new Error("TRACKER_NOT_FOUND");
-      const result = await command<{ base64: string; filename: string }>(
-        "preview_tracker_pdf",
-        { id: record.id, expectedRevision: saved.revision, kind },
-      );
+      const detail = await command("get_tracker_entry", { id: record.id });
+      if (request !== contentRequest.current) return;
+      setContentRecord(detail);
+      if (kind === "answers") return;
+      const result = await command("preview_tracker_pdf", {
+        id: record.id,
+        expectedRevision: saved.revision,
+        kind,
+      });
       if (request === contentRequest.current) setPdf(result);
     } catch (error) {
       if (request === contentRequest.current)
@@ -470,6 +474,7 @@ export function TrackerWorkspace({
     contentRequest.current += 1;
     setContent(null);
     setPdf(null);
+    setContentRecord(null);
     setContentError("");
     setContentLoading(false);
   }
@@ -504,9 +509,6 @@ export function TrackerWorkspace({
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
-  const contentRecord = content
-    ? entries.find((record) => record.id === content.id)
-    : null;
   const deleteRecord = deleteId
     ? entries.find((record) => record.id === deleteId)
     : null;
@@ -784,7 +786,7 @@ export function TrackerWorkspace({
                   </td>
                   <td className="tracker-content-cell">
                     <div className="tracker-content-items">
-                      {value.resume && (
+                      {record.hasResume && (
                         <button
                           type="button"
                           className="button--secondary"
@@ -793,7 +795,7 @@ export function TrackerWorkspace({
                           Final resume
                         </button>
                       )}
-                      {value.coverLetter && (
+                      {record.hasCoverLetter && (
                         <button
                           type="button"
                           className="button--secondary"
@@ -804,18 +806,18 @@ export function TrackerWorkspace({
                           Cover letter
                         </button>
                       )}
-                      {value.answers.length > 0 && (
+                      {record.answerCount > 0 && (
                         <button
                           type="button"
                           className="button--secondary"
                           onClick={() => void openContent(record, "answers")}
                         >
-                          Answers ({value.answers.length})
+                          Answers ({record.answerCount})
                         </button>
                       )}
-                      {!value.resume &&
-                        !value.coverLetter &&
-                        !value.answers.length && (
+                      {!record.hasResume &&
+                        !record.hasCoverLetter &&
+                        !record.answerCount && (
                           <span className="tracker-empty">
                             No saved content
                           </span>

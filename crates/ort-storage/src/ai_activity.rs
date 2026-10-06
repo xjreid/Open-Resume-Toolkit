@@ -158,7 +158,7 @@ pub struct AiCapPolicy {
     pub expected_revision: Option<u64>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AiPeriod {
     Week,
@@ -187,7 +187,7 @@ impl AiPeriod {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiCapPolicySummary {
     pub credential_id: Uuid,
@@ -235,7 +235,7 @@ pub struct AiAttemptSettlement {
     pub keep_operation_active: bool,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiMonitoringSummary {
     pub logical_operations: u64,
@@ -259,7 +259,7 @@ pub struct AiMonitoringSummary {
     pub time_buckets: Vec<AiMonitoringBucket>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AiMonitoringBucket {
     pub label: String,

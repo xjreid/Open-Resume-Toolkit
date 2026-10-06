@@ -20,14 +20,12 @@
       "properties": {
         "aiAttempts": {
           "type": "integer",
-          "format": "uint16",
-          "maximum": 65535,
+          "format": "uint32",
           "minimum": 0
         },
         "aiOperations": {
           "type": "integer",
-          "format": "uint16",
-          "maximum": 65535,
+          "format": "uint32",
           "minimum": 0
         },
         "appVersion": {
@@ -73,8 +71,7 @@
         },
         "publishedResumes": {
           "type": "integer",
-          "format": "uint16",
-          "maximum": 65535,
+          "format": "uint32",
           "minimum": 0
         },
         "renderManifests": {

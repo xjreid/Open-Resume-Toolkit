@@ -25,6 +25,10 @@
     }
   },
   "additionalProperties": false,
+  "required": [
+    "draft",
+    "latestPublished"
+  ],
   "$defs": {
     "Bullet": {
       "type": "object",
@@ -76,6 +80,7 @@
       "additionalProperties": false,
       "required": [
         "year",
+        "month",
         "expected"
       ]
     },
@@ -244,7 +249,9 @@
       "required": [
         "id",
         "order",
-        "label"
+        "label",
+        "start",
+        "end"
       ]
     },
     "ResumeDocument": {

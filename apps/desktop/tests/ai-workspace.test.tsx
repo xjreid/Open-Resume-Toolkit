@@ -27,10 +27,10 @@ let root: Root;
 const connection = {
   ok: true,
   value: {
-    primaryCredentialId: "fixture-id",
+    primaryCredentialId: "019a0000-0000-7000-8000-000000000001",
     keys: [
       {
-        credentialId: "fixture-id",
+        credentialId: "019a0000-0000-7000-8000-000000000001",
         createdAt: "2026-09-01T12:00:00Z",
         provider: "openai",
         preset: "balanced",
@@ -39,7 +39,7 @@ const connection = {
         cleanupRequired: false,
       },
       {
-        credentialId: "second-id",
+        credentialId: "019a0000-0000-7000-8000-000000000002",
         createdAt: "2026-09-02T12:00:00Z",
         provider: "anthropic",
         preset: "balanced",
@@ -54,8 +54,16 @@ const emptyMonitoring = {
   ok: true,
   value: {
     logicalOperations: 0,
+    totalTokens: 0,
+    byCredentialId: {},
     attempts: 0,
-    usage: { inputTokens: 0, outputTokens: 0 },
+    usage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      cacheWriteTokens: 0,
+      reasoningTokens: 0,
+    },
     costByCurrencyMicros: {},
     byProvider: {},
     byStatus: {},
@@ -73,7 +81,7 @@ const emptyMonitoring = {
 const preview = {
   ok: true,
   value: {
-    credentialId: "fixture-id",
+    credentialId: "019a0000-0000-7000-8000-000000000001",
     provider: "openai",
     model: "fixture-model",
     currency: "USD",
@@ -84,6 +92,9 @@ const preview = {
 const catalog = {
   ok: true,
   value: {
+    formatVersion: 1,
+    minimumAppVersion: "0.0.0-dev",
+    issuedAt: "2026-09-15T00:00:00Z",
     catalogId: "fixture-catalog",
     expiresAt: "2027-01-01T00:00:00Z",
     entries: [
@@ -133,12 +144,20 @@ beforeEach(async () => {
     if (command === "load_ai_key_settings")
       return Promise.resolve({
         ok: true,
-        value: { cap: null, lifetimeSpendByCurrencyMicros: { USD: 250_000 } },
+        value: {
+          cap: null,
+          lifetimeSpendPartial: false,
+          lifetimeSpendByCurrencyMicros: { USD: 250_000 },
+        },
       });
     if (command === "load_ai_general_settings")
       return Promise.resolve({
         ok: true,
-        value: { cap: null, lifetimeSpendByCurrencyMicros: { USD: 500_000 } },
+        value: {
+          cap: null,
+          lifetimeSpendPartial: false,
+          lifetimeSpendByCurrencyMicros: { USD: 500_000 },
+        },
       });
     if (command === "load_ai_retention")
       return Promise.resolve({
@@ -150,6 +169,7 @@ beforeEach(async () => {
       return Promise.resolve({
         ok: true,
         value: {
+          attemptId: "019a0000-0000-7000-8000-000000000005",
           confirmed: true,
           effectiveModel: "fixture-model",
           usageComplete: true,
@@ -189,7 +209,7 @@ it("refreshes the model preset after the overlay changes it", async () => {
           value: {
             ...connection.value,
             keys: connection.value.keys.map((key) =>
-              key.credentialId === "fixture-id"
+              key.credentialId === "019a0000-0000-7000-8000-000000000001"
                 ? { ...key, preset: "economy" }
                 : key,
             ),
@@ -231,7 +251,7 @@ it("requires an estimate review before the synthetic provider request", async ()
   expect(native.invoke).toHaveBeenCalledWith(
     "test_ai_connection",
     expect.objectContaining({
-      credentialId: "fixture-id",
+      credentialId: "019a0000-0000-7000-8000-000000000001",
       expectedModel: "fixture-model",
       expectedMaximumCostMicros: 123_000,
     }),
@@ -314,7 +334,15 @@ it("keeps cancellation available while a request is active", async () => {
   await click("Cancel active test");
   expect(native.invoke).toHaveBeenCalledWith("cancel_ai_test");
   await act(async () => {
-    complete({ ok: false, error: { code: "AI_CANCELLED" } });
+    complete({
+      ok: false,
+      error: {
+        code: "AI_CANCELLED",
+        messageKey: "errors.synthetic",
+        retryable: false,
+        details: {},
+      },
+    });
   });
   expect(document.body.textContent).toContain("Synthetic request cancelled");
 });
@@ -336,7 +364,12 @@ it("surfaces a missing-usage failure without treating reserved exposure as zero"
     if (command === "test_ai_connection")
       return Promise.resolve({
         ok: false,
-        error: { code: "AI_USAGE_UNKNOWN" },
+        error: {
+          code: "AI_USAGE_UNKNOWN",
+          messageKey: "errors.synthetic",
+          retryable: false,
+          details: {},
+        },
       });
     return Promise.reject(new Error(`unexpected ${command}`));
   });
@@ -351,7 +384,12 @@ it("explains a provider 503 instead of showing the generic test failure", async 
     command === "test_ai_connection"
       ? Promise.resolve({
           ok: false,
-          error: { code: "AI_PROVIDER_SERVICE_UNAVAILABLE" },
+          error: {
+            code: "AI_PROVIDER_SERVICE_UNAVAILABLE",
+            messageKey: "errors.synthetic",
+            retryable: false,
+            details: {},
+          },
         })
       : previous(command, args),
   );
@@ -373,6 +411,7 @@ it("saves an inline cap on click-away without changing primary", async () => {
         ok: true,
         value: {
           cap: savedCap,
+          lifetimeSpendPartial: false,
           lifetimeSpendByCurrencyMicros: { USD: 250_000 },
         },
       });
@@ -382,6 +421,9 @@ it("saves an inline cap on click-away without changing primary", async () => {
         currency: "USD",
         countedMicros: 250_000,
         reservedMicros: 0,
+        activatedAtUnixMs: 0,
+        periodStartUnixMs: 0,
+        periodEndUnixMs: null,
         unresolvedMicros: 0,
         revision: 1,
       };
@@ -391,7 +433,7 @@ it("saves an inline cap on click-away without changing primary", async () => {
   });
   await clickAccessible("Edit Anthropic key spending limit");
   expect(native.invoke).toHaveBeenCalledWith("load_ai_key_settings", {
-    credentialId: "second-id",
+    credentialId: "019a0000-0000-7000-8000-000000000002",
   });
   const input = document.querySelector<HTMLInputElement>(
     'input[inputmode="decimal"]',
@@ -408,7 +450,7 @@ it("saves an inline cap on click-away without changing primary", async () => {
   });
   expect(native.invoke).toHaveBeenCalledWith("save_ai_cap", {
     request: {
-      credentialId: "second-id",
+      credentialId: "019a0000-0000-7000-8000-000000000002",
       period: "all_time",
       limitMicros: 1_250_000,
       timeZone: expect.any(String),
@@ -440,7 +482,13 @@ it("shows selected-period buckets without the redundant activity breakdown", asy
             ...emptyMonitoring.value,
             logicalOperations: 1,
             attempts: 1,
-            usage: { inputTokens: 8, outputTokens: 5, reasoningTokens: 3 },
+            usage: {
+              inputTokens: 8,
+              outputTokens: 5,
+              reasoningTokens: 3,
+              cachedInputTokens: 0,
+              cacheWriteTokens: 0,
+            },
             totalTokens: 13,
             costByCurrencyMicros: { USD: 10_000 },
             byProvider: { openai: 1 },
@@ -452,7 +500,13 @@ it("shows selected-period buckets without the redundant activity breakdown", asy
               {
                 label: "2026-09-15",
                 attempts: 1,
-                usage: { inputTokens: 8, outputTokens: 5, reasoningTokens: 3 },
+                usage: {
+                  inputTokens: 8,
+                  outputTokens: 5,
+                  reasoningTokens: 3,
+                  cachedInputTokens: 0,
+                  cacheWriteTokens: 0,
+                },
                 totalTokens: 13,
                 costByCurrencyMicros: { USD: 10_000 },
                 partial: false,
@@ -674,7 +728,10 @@ it("saves names immediately while typing and exits on click-away", async () => {
   )!;
   await typeInput(input, "Personal");
   expect(native.invoke).toHaveBeenCalledWith("rename_ai_key", {
-    request: { credentialId: "fixture-id", name: "Personal" },
+    request: {
+      credentialId: "019a0000-0000-7000-8000-000000000001",
+      name: "Personal",
+    },
   });
   expect(document.querySelector('[aria-label="Save key name"]')).toBeNull();
   expect(document.querySelector('[aria-label="Cancel rename"]')).toBeNull();
@@ -717,7 +774,9 @@ it("serializes rapid name saves without replacing newer draft text", async () =>
     value: {
       ...connection.value,
       keys: connection.value.keys.map((key) =>
-        key.credentialId === "fixture-id" ? { ...key, name } : key,
+        key.credentialId === "019a0000-0000-7000-8000-000000000001"
+          ? { ...key, name }
+          : key,
       ),
     },
   });
@@ -741,7 +800,15 @@ it("reports failed name saves without pretending the name was saved", async () =
   const previous = native.invoke.getMockImplementation()!;
   native.invoke.mockImplementation((command: string, args?: unknown) =>
     command === "rename_ai_key"
-      ? Promise.resolve({ ok: false, error: { code: "STORAGE_UNAVAILABLE" } })
+      ? Promise.resolve({
+          ok: false,
+          error: {
+            code: "STORAGE_UNAVAILABLE",
+            messageKey: "errors.synthetic",
+            retryable: false,
+            details: {},
+          },
+        })
       : previous(command, args),
   );
   await clickAccessible("Rename OpenAI key");
@@ -795,17 +862,24 @@ it("manages one general cap across all keys while keeping lifetime spend", async
     if (command === "load_ai_general_settings")
       return Promise.resolve({
         ok: true,
-        value: { cap, lifetimeSpendByCurrencyMicros: { USD: 2_000_000 } },
+        value: {
+          cap,
+          lifetimeSpendPartial: false,
+          lifetimeSpendByCurrencyMicros: { USD: 2_000_000 },
+        },
       });
     if (command === "save_ai_general_cap") {
       cap = {
-        credentialId: "general",
+        credentialId: "00000000-0000-0000-0000-000000000000",
         period: "all_time",
         currency: "USD",
         timeZone: "UTC",
         limitMicros: args.limitMicros,
         countedMicros: 2_000_000,
         reservedMicros: 0,
+        activatedAtUnixMs: 0,
+        periodStartUnixMs: 0,
+        periodEndUnixMs: null,
         unresolvedMicros: 0,
         revision: 1,
       };
@@ -871,7 +945,15 @@ it("fails closed when spending data cannot be loaded", async () => {
   const previous = native.invoke.getMockImplementation()!;
   native.invoke.mockImplementation((command: string, args?: unknown) =>
     command === "load_ai_key_settings"
-      ? Promise.resolve({ ok: false, error: { code: "STORAGE_UNAVAILABLE" } })
+      ? Promise.resolve({
+          ok: false,
+          error: {
+            code: "STORAGE_UNAVAILABLE",
+            messageKey: "errors.synthetic",
+            retryable: false,
+            details: {},
+          },
+        })
       : previous(command, args),
   );
   await act(async () => {
@@ -944,7 +1026,10 @@ it("moves a key into the Active key bucket and returns the previous key to All k
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
     "OpenAI key",
   );
-  returnRegistry({ ...connection.value, primaryCredentialId: "second-id" });
+  returnRegistry({
+    ...connection.value,
+    primaryCredentialId: "019a0000-0000-7000-8000-000000000002",
+  });
   await act(async () => {
     document
       .querySelector<HTMLElement>('[aria-label="Anthropic key · Anthropic"]')!
@@ -956,7 +1041,10 @@ it("moves a key into the Active key bucket and returns the previous key to All k
       );
   });
   expect(native.invoke).toHaveBeenCalledWith("change_ai_key", {
-    request: { credentialId: "second-id", action: "select_primary" },
+    request: {
+      credentialId: "019a0000-0000-7000-8000-000000000002",
+      action: "select_primary",
+    },
   });
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
     "Anthropic key",
@@ -989,7 +1077,10 @@ it("moves the active key back to All keys and leaves no active key", async () =>
 });
 
 it("uses a vertically bounded drag to replace the active key", async () => {
-  returnRegistry({ ...connection.value, primaryCredentialId: "second-id" });
+  returnRegistry({
+    ...connection.value,
+    primaryCredentialId: "019a0000-0000-7000-8000-000000000002",
+  });
   const buckets = document.querySelector<HTMLElement>(".ai-key-buckets")!;
   const active = document.querySelector<HTMLElement>(".ai-key-bucket--active")!;
   const available = document.querySelector<HTMLElement>(
@@ -1035,7 +1126,10 @@ it("uses a vertically bounded drag to replace the active key", async () => {
     dom.window.dispatchEvent(pointer("pointerup", 90));
   });
   expect(native.invoke).toHaveBeenCalledWith("change_ai_key", {
-    request: { credentialId: "second-id", action: "select_primary" },
+    request: {
+      credentialId: "019a0000-0000-7000-8000-000000000002",
+      action: "select_primary",
+    },
   });
 });
 
@@ -1057,30 +1151,40 @@ it("keeps All keys sorted by creation date", async () => {
   const ids = [
     ...document.querySelectorAll(".ai-key-bucket--available .ai-key-row"),
   ].map((row) => row.getAttribute("data-key-id"));
-  expect(ids).toEqual(["fixture-id", "second-id"]);
+  expect(ids).toEqual([
+    "019a0000-0000-7000-8000-000000000001",
+    "019a0000-0000-7000-8000-000000000002",
+  ]);
 });
 
 it("removes the limit back to Unlimited with an empty meter without clearing history", async () => {
   const previous = native.invoke.getMockImplementation()!;
   let cap: Record<string, unknown> | null = {
-    credentialId: "second-id",
+    credentialId: "019a0000-0000-7000-8000-000000000002",
     period: "all_time",
     currency: "USD",
     timeZone: "UTC",
     limitMicros: 1_000_000,
     countedMicros: 200_000,
     reservedMicros: 0,
+    activatedAtUnixMs: 0,
+    periodStartUnixMs: 0,
+    periodEndUnixMs: null,
     unresolvedMicros: 0,
     revision: 1,
   };
   native.invoke.mockImplementation((command: string, args?: any) => {
     if (
       command === "load_ai_key_settings" &&
-      args?.credentialId === "second-id"
+      args?.credentialId === "019a0000-0000-7000-8000-000000000002"
     )
       return Promise.resolve({
         ok: true,
-        value: { cap, lifetimeSpendByCurrencyMicros: { USD: 250_000 } },
+        value: {
+          cap,
+          lifetimeSpendPartial: false,
+          lifetimeSpendByCurrencyMicros: { USD: 250_000 },
+        },
       });
     if (command === "disable_ai_cap") {
       cap = null;
@@ -1099,7 +1203,10 @@ it("removes the limit back to Unlimited with an empty meter without clearing his
       .click();
   });
   expect(native.invoke).toHaveBeenCalledWith("disable_ai_cap", {
-    request: { credentialId: "second-id", period: "all_time" },
+    request: {
+      credentialId: "019a0000-0000-7000-8000-000000000002",
+      period: "all_time",
+    },
   });
   expect(card.textContent).toContain("$0.25/Unlimited0%");
   expect(card.querySelector<HTMLProgressElement>("progress")?.value).toBe(0);
@@ -1139,7 +1246,9 @@ it("pausing the active key leaves no active key; unpausing keeps it in All keys"
     ...connection.value,
     primaryCredentialId: null,
     keys: connection.value.keys.map((key) =>
-      key.credentialId === "fixture-id" ? { ...key, paused: true } : key,
+      key.credentialId === "019a0000-0000-7000-8000-000000000001"
+        ? { ...key, paused: true }
+        : key,
     ),
   });
   await clickAccessible("Pause OpenAI key");
@@ -1182,7 +1291,7 @@ it("removing the active key preserves its activity filter and never selects anot
     ...connection.value,
     primaryCredentialId: null,
     keys: connection.value.keys.map((key) =>
-      key.credentialId === "fixture-id"
+      key.credentialId === "019a0000-0000-7000-8000-000000000001"
         ? { ...key, paused: true, removed: true }
         : key,
     ),
@@ -1199,7 +1308,10 @@ it("removing the active key preserves its activity filter and never selects anot
       ?.textContent,
   ).toContain("OpenAI · Balanced: fixture-model · Removed");
   expect(native.invoke).toHaveBeenCalledWith("change_ai_key", {
-    request: { credentialId: "fixture-id", action: "remove" },
+    request: {
+      credentialId: "019a0000-0000-7000-8000-000000000001",
+      action: "remove",
+    },
   });
 });
 
@@ -1276,7 +1388,7 @@ it("requires both key and provider when adding; the provider is immutable afterw
       ...connection.value.keys,
       {
         ...connection.value.keys[0],
-        credentialId: "third-id",
+        credentialId: "019a0000-0000-7000-8000-000000000003",
         createdAt: "2026-09-03T12:00:00Z",
         provider: "gemini",
         name: "Research key",
@@ -1349,7 +1461,7 @@ it("testing a non-active key preserves the active key", async () => {
           ...preview,
           value: {
             ...preview.value,
-            credentialId: "second-id",
+            credentialId: "019a0000-0000-7000-8000-000000000002",
             provider: "anthropic",
           },
         })
@@ -1357,12 +1469,14 @@ it("testing a non-active key preserves the active key", async () => {
   );
   await clickAccessible("Test Anthropic key");
   expect(native.invoke).toHaveBeenCalledWith("preview_ai_test", {
-    credentialId: "second-id",
+    credentialId: "019a0000-0000-7000-8000-000000000002",
   });
   await click("Confirm and send test");
   expect(native.invoke).toHaveBeenCalledWith(
     "test_ai_connection",
-    expect.objectContaining({ credentialId: "second-id" }),
+    expect.objectContaining({
+      credentialId: "019a0000-0000-7000-8000-000000000002",
+    }),
   );
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
     "OpenAI key",
@@ -1381,7 +1495,12 @@ it("keeps failed removals visible and requires an explicit retry", async () => {
       return removalAttempts === 1
         ? Promise.resolve({
             ok: false,
-            error: { code: "AI_CREDENTIAL_CLEANUP_REQUIRED" },
+            error: {
+              code: "AI_CREDENTIAL_CLEANUP_REQUIRED",
+              messageKey: "errors.synthetic",
+              retryable: false,
+              details: {},
+            },
           })
         : Promise.resolve({
             ok: true,
@@ -1389,7 +1508,7 @@ it("keeps failed removals visible and requires an explicit retry", async () => {
               ...connection.value,
               primaryCredentialId: null,
               keys: connection.value.keys.map((key) =>
-                key.credentialId === "fixture-id"
+                key.credentialId === "019a0000-0000-7000-8000-000000000001"
                   ? {
                       ...key,
                       paused: true,
@@ -1408,7 +1527,7 @@ it("keeps failed removals visible and requires an explicit retry", async () => {
           ...connection.value,
           primaryCredentialId: null,
           keys: connection.value.keys.map((key) =>
-            key.credentialId === "fixture-id"
+            key.credentialId === "019a0000-0000-7000-8000-000000000001"
               ? { ...key, paused: true, cleanupRequired: true }
               : key,
           ),
@@ -1481,7 +1600,9 @@ it("locks paused card settings but permits an explicit test without enabling the
     ...connection.value,
     primaryCredentialId: null,
     keys: connection.value.keys.map((key) =>
-      key.credentialId === "fixture-id" ? { ...key, paused: true } : key,
+      key.credentialId === "019a0000-0000-7000-8000-000000000001"
+        ? { ...key, paused: true }
+        : key,
     ),
   });
   await clickAccessible("Pause OpenAI key");
@@ -1498,7 +1619,7 @@ it("locks paused card settings but permits an explicit test without enabling the
     document.querySelector('[aria-label="Confirm synthetic provider request"]'),
   ).not.toBeNull();
   expect(native.invoke).toHaveBeenCalledWith("preview_ai_test", {
-    credentialId: "fixture-id",
+    credentialId: "019a0000-0000-7000-8000-000000000001",
   });
   expect(
     native.invoke.mock.calls.filter(([command]) => command === "change_ai_key"),
@@ -1511,7 +1632,12 @@ it("blocks key use if a failed mutation cannot refresh backend state", async () 
     if (command === "change_ai_key" || command === "load_ai_connection")
       return Promise.resolve({
         ok: false,
-        error: { code: "STORAGE_UNAVAILABLE" },
+        error: {
+          code: "STORAGE_UNAVAILABLE",
+          messageKey: "errors.synthetic",
+          retryable: false,
+          details: {},
+        },
       });
     return previous(command, args);
   });
@@ -1539,8 +1665,24 @@ it("chooses export and clear months independently from the graph", async () => {
           timeBuckets:
             request.fromUnixMs === 0 && request.bucketSize === "month"
               ? [
-                  { label: "2026-08", attempts: 3 },
-                  { label: "2026-09", attempts: 5 },
+                  {
+                    label: "2026-08",
+                    attempts: 3,
+                    usage: emptyMonitoring.value.usage,
+                    totalTokens: 0,
+                    costByCurrencyMicros: {},
+                    partial: false,
+                    unknownCount: 0,
+                  },
+                  {
+                    label: "2026-09",
+                    attempts: 5,
+                    usage: emptyMonitoring.value.usage,
+                    totalTokens: 0,
+                    costByCurrencyMicros: {},
+                    partial: false,
+                    unknownCount: 0,
+                  },
                 ]
               : [],
         },
@@ -1555,7 +1697,9 @@ it("chooses export and clear months independently from the graph", async () => {
   await chooseDataView("Anthropic key");
   expect(native.invoke).toHaveBeenCalledWith(
     "load_ai_monitoring",
-    expect.objectContaining({ credentialId: "second-id" }),
+    expect.objectContaining({
+      credentialId: "019a0000-0000-7000-8000-000000000002",
+    }),
   );
   await click("Export JSON…");
   expect(
@@ -1577,7 +1721,10 @@ it("chooses export and clear months independently from the graph", async () => {
   expect(native.invoke).toHaveBeenCalledWith(
     "export_ai_monitoring",
     expect.objectContaining({
-      credentialIds: ["fixture-id", "second-id"],
+      credentialIds: [
+        "019a0000-0000-7000-8000-000000000001",
+        "019a0000-0000-7000-8000-000000000002",
+      ],
       months: [
         expect.objectContaining({ label: "2026-09" }),
         expect.objectContaining({ label: "2026-08" }),
@@ -1611,7 +1758,7 @@ it("chooses export and clear months independently from the graph", async () => {
 it("permanently deletes data only for removed keys after explicit confirmation", async () => {
   const removedKey = {
     ...connection.value.keys[0],
-    credentialId: "removed-id",
+    credentialId: "019a0000-0000-7000-8000-000000000004",
     createdAt: "2026-08-01T12:00:00Z",
     name: "Old Gemini",
     provider: "gemini" as const,
@@ -1660,7 +1807,7 @@ it("permanently deletes data only for removed keys after explicit confirmation",
   );
   await click("Permanently delete data");
   expect(native.invoke).toHaveBeenCalledWith("delete_removed_ai_key_data", {
-    request: { credentialIds: ["removed-id"] },
+    request: { credentialIds: ["019a0000-0000-7000-8000-000000000004"] },
   });
   expect(document.body.textContent).toContain(
     "All keys data was updated; My Keys spending totals were not changed",
@@ -1712,23 +1859,28 @@ it("restarts only the expanded key cap while preserving lifetime spend and Data"
   let didReset = false;
   const previous = native.invoke.getMockImplementation()!;
   const cap = {
-    credentialId: "second-id",
+    credentialId: "019a0000-0000-7000-8000-000000000002",
     period: "all_time",
     currency: "USD",
     timeZone: "UTC",
     limitMicros: 1_000_000,
     countedMicros: 50_000,
     reservedMicros: 0,
+    activatedAtUnixMs: 0,
+    periodStartUnixMs: 0,
+    periodEndUnixMs: null,
     unresolvedMicros: 0,
     revision: 1,
   };
   native.invoke.mockImplementation((command: string, args?: any) => {
     if (command === "load_ai_key_settings") {
-      if (args?.credentialId === "second-id") loads++;
+      if (args?.credentialId === "019a0000-0000-7000-8000-000000000002")
+        loads++;
       return Promise.resolve({
         ok: true,
         value: {
           cap: { ...cap, countedMicros: didReset ? 0 : 50_000 },
+          lifetimeSpendPartial: false,
           lifetimeSpendByCurrencyMicros: { USD: 900_000 },
         },
       });
@@ -1754,7 +1906,10 @@ it("restarts only the expanded key cap while preserving lifetime spend and Data"
   expect(didReset).toBe(false);
   await click("Confirm restart");
   expect(native.invoke).toHaveBeenCalledWith("reset_ai_cap", {
-    request: { period: "all_time", credentialId: "second-id" },
+    request: {
+      period: "all_time",
+      credentialId: "019a0000-0000-7000-8000-000000000002",
+    },
   });
   expect(loads).toBe(2);
   expect(document.body.textContent).toContain("$0.00/$1.00");

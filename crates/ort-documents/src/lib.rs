@@ -20,7 +20,7 @@ pub use docx::{
 pub const IMPORT_ENABLED: bool = false;
 pub const TEXT_FORMAT_VERSION: u16 = 1;
 pub const MAX_TEXT_BYTES: usize = 256 * 1024;
-const PARAGRAPH_FIELD_LABEL: &str = "__ort_body_paragraph__";
+use ort_domain::PARAGRAPH_FIELD_LABEL;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InlineSpan {

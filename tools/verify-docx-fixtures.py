@@ -60,12 +60,10 @@ def expected_paragraphs(source, style):
         begin = len(paragraphs)
         for entry in section["entries"]:
             fields = [field for field in entry["fields"] if normalized(field["value"])]
-            details = next((field for field in fields
-                            if field["label"] != "__ort_body_paragraph__"
-                            and normalized(field["label"]).lower() != "extra"), None)
-            title = normalized(entry["heading"])
-            if details:
-                title += (" | " if title else "") + normalized(details["value"])
+            details = [field for field in fields if field["label"] != "__ort_body_paragraph__"
+                       and normalized(field["label"]).lower() != "extra"]
+            title = " | ".join(value for value in [normalized(entry["heading"]),
+                                *(normalized(field["value"]) for field in details)] if value)
             date_values = []
             if normalized(entry["dateRange"]):
                 date_values.append(normalized(entry["dateRange"]))
@@ -87,12 +85,11 @@ def expected_paragraphs(source, style):
             paired(normalized(entry["subheading"]), right_rows.pop(0) if right_rows else "", "Normal")
             for right in right_rows:
                 paired("", right, "Normal")
-            body = next((field for field in fields if field["label"] == "__ort_body_paragraph__"), None)
-            if body:
-                add(body["value"])
-            else:
-                for value in entry["bullets"]:
-                    add(value["text"], "ListParagraph", True)
+            for field in fields:
+                if field["label"] == "__ort_body_paragraph__":
+                    add(field["value"])
+            for value in entry["bullets"]:
+                add(value["text"], "ListParagraph", True)
             for value in entry["links"]:
                 add(link(value))
         if len(paragraphs) > begin:

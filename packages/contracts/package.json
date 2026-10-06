@@ -12,7 +12,9 @@
     "./storage": "./generated/storage.ts",
     "./lifecycle": "./generated/lifecycle.ts",
     "./export": "./generated/export.ts",
-    "./pdf": "./generated/pdf.ts"
+    "./pdf": "./generated/pdf.ts",
+    "./wire": "./generated/wire.ts",
+    "./wire-decoder": "./generated/wire-decoder.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

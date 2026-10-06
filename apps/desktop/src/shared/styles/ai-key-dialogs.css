@@ -1,0 +1,114 @@
+.ai-workspace .ai-add-key-trigger {
+  place-items: center;
+  min-width: 36px;
+  box-shadow: 0 1px 2px rgb(16 42 76 / 14%);
+}
+.ai-workspace .ai-add-key-trigger span {
+  display: block;
+  margin-top: -2px;
+  font-weight: 400;
+}
+.ai-workspace .ai-add-key-trigger:hover:not(:disabled) {
+  border-color: #102f52;
+  background: #173f6c;
+}
+.ai-workspace .ai-add-key-trigger:focus-visible {
+  outline: 3px solid #a9c7e5;
+  outline-offset: 2px;
+}
+.ai-key-action-popup {
+  width: min(460px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid #c7d3df;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgb(16 42 76 / 22%);
+  color: #26364a;
+  font-size: 13px;
+}
+.ai-key-action-popup > strong {
+  display: block;
+  color: #1c3135;
+  font-size: 16px;
+}
+.ai-key-action-popup > p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+.ai-key-action-popup__actions {
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid #e3e9f0;
+}
+.ai-add-key-popup {
+  width: min(560px, 100%);
+}
+.ai-add-key-popup__heading {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e3e9f0;
+}
+.ai-add-key-popup__heading strong {
+  color: #1c3135;
+  font-size: 18px;
+}
+.ai-add-key-popup__heading span {
+  color: #566c70;
+  font-size: 12px;
+}
+.ai-provider-picker {
+  min-width: 0;
+  margin: 16px 0;
+  padding: 0;
+  border: 0;
+}
+.ai-provider-picker legend {
+  margin-bottom: 7px;
+  color: #35465a;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ai-key-customization {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 24px;
+  margin: 12px -12px -12px;
+  padding: 20px;
+  border-top: 1px solid #dce3eb;
+  border-radius: 0 0 5px 5px;
+  background: #fbfdfd;
+}
+.ai-key-customization .field {
+  gap: 7px;
+}
+@media (max-width: 800px) {
+  .ai-key-customization {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+.ai-workspace .ai-add-key-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: auto;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  font-size: 13px;
+  border-radius: 7px;
+}
+.ai-add-key-trigger .workspace-icon {
+  width: 16px;
+  height: 16px;
+}
+.ai-workspace .ai-add-key-trigger span {
+  font-size: 13px;
+  line-height: 1;
+}

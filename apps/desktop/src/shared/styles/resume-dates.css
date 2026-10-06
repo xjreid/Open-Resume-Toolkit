@@ -1,0 +1,123 @@
+.date-editor {
+  margin-top: 20px;
+}
+.date-record,
+.calendar-fields {
+  min-width: 0;
+  border: 1px solid #d6dce3;
+  border-radius: 8px;
+  padding: 14px;
+  margin: 12px 0;
+}
+.date-record > .field {
+  margin-bottom: 12px;
+}
+.date-editor select {
+  max-width: 100%;
+}
+.date-replacement {
+  padding: 12px;
+  background: #f4f6f8;
+  border-radius: 8px;
+}
+.date-editor .move-controls {
+  flex-wrap: wrap;
+}
+.canvas-date-editor {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 10px;
+  border: 1px solid #89a5c3;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(16 42 76 / 18%);
+  font-family: Hanken, ui-sans-serif, sans-serif;
+}
+.canvas-date-field.canvas-field--editing {
+  min-height: 31px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.canvas-date-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+.canvas-date-editor__header button {
+  min-width: 27px;
+}
+.canvas-date-editor__legacy,
+.canvas-date-editor__preview {
+  margin: 5px 0;
+  color: #5f6f82;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.compact-calendar-fields select,
+.compact-calendar-fields input,
+.canvas-date-editor__end-mode select {
+  width: 100%;
+  min-height: 30px;
+  margin: 0;
+  padding: 4px 7px;
+  border: 1px solid #aebdcd;
+  border-radius: 5px;
+  background: #fff;
+  font-size: 11px;
+}
+.canvas-date-editor__end-mode {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 7px;
+  color: #566c70;
+  font-size: 9px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+.canvas-date-editor__preview {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid #d5e0eb;
+  color: #243e5c;
+  font-weight: 700;
+}
+.canvas-date-editor {
+  width: min(300px, calc(100vw - 100px));
+  border-color: #a7c9cc;
+  background: #f3f9f9;
+}
+.canvas-date-editor__header {
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.canvas-date-editor__header strong {
+  margin-right: auto;
+}
+.canvas-date-editor__header button {
+  min-height: 32px;
+  width: auto;
+  padding: 4px 8px;
+  color: var(--ink);
+  font-size: 11px;
+}
+.canvas-date-editor__header button[aria-label="Clear date"] {
+  color: var(--danger);
+}
+
+.canvas-date-editor :is(input, select) {
+  border: 1px solid #b6cace;
+  background: white;
+  padding: 6px 8px;
+}
+.canvas-date-editor .compact-calendar-fields legend {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: none;
+}

@@ -1,5 +1,13 @@
 # M5 implementation record
 
+Scope revision, October 5, 2026: the user assigned paid ORT application signing,
+production desktop/helper identity and vault qualification, and final Store
+publication/installed production checks to M7. M5 now targets authenticated
+Chrome/Edge functionality, install/repair/status/version handling and its short
+walkthrough/failure checks using the declared current-user development bridge.
+M5 remains in progress. Earlier signing-dependent remaining-work statements
+below are historical and superseded by this milestone assignment.
+
 Status: development browser capture is implemented and tested in disposable
 profiles. The opt-in unsigned macOS BETA now uses a silent Chrome extension with
 all controls on the desktop overlay. Real native delivery into encrypted review
@@ -34,9 +42,15 @@ for installed-app and Chrome setup. Earlier checks below are historical records.
 
 ## Remaining M5 work
 
-- Signed desktop/native-host identity and fixed Chrome/Edge extension IDs, followed by identity-scoped vault sharing, authenticated local IPC, and production desktop capture delivery/review.
-- Install, repair, and connected/version status for both browsers. Default native builds remain unavailable; the development host delivers only overlay-authorized captures.
-- Chrome capture-to-tracker walkthrough and Edge smoke check on a signed test package. These production checks remain unrun.
+- Complete functional Edge capture and Chrome/Edge development install, repair,
+  connected/version status and failure guidance. Default native builds remain
+  unavailable; a bridge-enabled development build is required.
+- Complete the Chrome capture-to-tracker walkthrough and Edge smoke check using
+  the development app/host; record save/reopen, failed-save preservation,
+  wrong-client/replay/oversized/desktop-absent/version rejection and no automatic AI.
+- Prepare and synchronize exact test extension IDs and compatible packages. Store
+  publication and signed desktop/helper identity, identity-scoped vault sharing,
+  production delivery and installed production checks are assigned to M7.
 
 The September 23 unsigned-preview gate was superseded for local macOS development testing by the user-authorized September 29 exception. This does not qualify the signed production browser bridge.
 

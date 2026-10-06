@@ -18,8 +18,11 @@ import {
 const { listeners } = vi.hoisted(() => ({
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
 }));
+vi.mock("pdfjs-dist/build/pdf.worker.min.mjs?url", () => ({
+  default: "fixture-worker",
+}));
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(() => Promise.resolve()),
+  invoke: vi.fn(() => Promise.resolve({ ok: true, value: true })),
 }));
 vi.mock("@tauri-apps/api/event", () => ({
   emitTo: vi.fn(() => Promise.resolve()),
@@ -285,7 +288,12 @@ it("reports a native command envelope failure", async () => {
   const onError = vi.fn();
   vi.mocked(invoke).mockResolvedValueOnce({
     ok: false,
-    error: { code: "POPUP_UNAVAILABLE" },
+    error: {
+      code: "POPUP_UNAVAILABLE",
+      messageKey: "errors.popupUnavailable",
+      retryable: false,
+      details: {},
+    },
   });
   const host = document.createElement("div");
   document.body.append(host);
@@ -448,8 +456,8 @@ it("serializes a close behind a delayed show and flushes the last edit before hi
   let show!: () => void;
   vi.mocked(invoke).mockImplementationOnce(
     () =>
-      new Promise<void>((resolve) => {
-        show = resolve;
+      new Promise((resolve) => {
+        show = () => resolve({ ok: true, value: true });
       }),
   );
   const host = document.createElement("div");
@@ -480,6 +488,6 @@ it("serializes a close behind a delayed show and flushes the last edit before hi
   expect(onJobChange).toHaveBeenCalledWith(
     "Final, previously undelivered edit",
   );
-  expect(invoke).toHaveBeenLastCalledWith("hide_application_popup", {});
+  expect(invoke).toHaveBeenLastCalledWith("hide_application_popup");
   await act(async () => root.unmount());
 });

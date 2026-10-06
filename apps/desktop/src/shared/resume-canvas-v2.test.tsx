@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it } from "vitest";
-import { ResumeCanvas } from "./App";
+import { ResumeCanvas } from "./ResumeCanvas";
 import { createResumeDocument, createSection } from "./resume-editor";
 
 (

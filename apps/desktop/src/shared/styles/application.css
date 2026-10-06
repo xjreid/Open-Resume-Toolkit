@@ -1,0 +1,414 @@
+.application-shell {
+  min-height: 100vh;
+  color: #1c3135;
+  background: #f2f6f7;
+}
+.application-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #d8e3e5;
+  background: #fff;
+}
+.application-header > div {
+  display: grid;
+  gap: 3px;
+  font-size: 13px;
+}
+.application-header > div span {
+  color: #566c70;
+}
+.application-content {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.application-panel {
+  padding: 26px;
+  border: 1px solid #d8e3e5;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 5px 20px #1833560d;
+}
+.application-panel h1 {
+  margin: 0 0 12px;
+  font-size: 26px;
+  line-height: 1.2;
+}
+.application-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.application-panel p {
+  line-height: 1.5;
+}
+.application-kicker {
+  margin: 0 0 8px;
+  color: #28676c;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+}
+.application-note {
+  color: #52637a;
+}
+.application-workspace-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.application-panel label,
+.application-editor label {
+  display: grid;
+  gap: 7px;
+  margin: 18px 0;
+  color: #283a51;
+  font-weight: 650;
+}
+.application-panel textarea,
+.application-panel input,
+.application-panel select,
+.application-editor textarea,
+.application-editor input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #a8b8c9;
+  border-radius: 7px;
+  color: #1c3135;
+  background: #fff;
+  font-weight: 400;
+}
+.application-panel textarea {
+  resize: vertical;
+}
+.application-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.application-secondary {
+  color: #28676c;
+  background: #fff;
+  border-color: #91a7bd;
+}
+.application-secondary:hover:not(:disabled) {
+  color: #102844;
+  background: #edf3f7;
+}
+.application-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.application-tabs button {
+  color: #28676c;
+  background: transparent;
+  border-color: #b6c5d2;
+}
+.application-tabs button.selected {
+  color: #fff;
+  background: #28676c;
+}
+.application-savebar,
+.application-notice {
+  padding: 12px 16px;
+  margin: 0 0 18px;
+  border-radius: 8px;
+  border: 1px solid #d7b578;
+  background: #fff9ed;
+}
+.application-savebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.application-file {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px;
+  margin: 22px 0;
+  border: 1px solid #b6c5d2;
+  border-radius: 8px;
+  background: #f6f8fa;
+}
+.application-alerts {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid #e5c787;
+  border-radius: 8px;
+  background: #fffaf0;
+}
+.application-alerts > .application-row {
+  justify-content: space-between;
+}
+.application-alert {
+  padding: 14px 0;
+  border-top: 1px solid #e2d4b9;
+}
+.application-alert blockquote {
+  margin: 8px 0;
+  padding-left: 12px;
+  border-left: 3px solid #ba8c43;
+  color: #45576c;
+}
+.application-preview {
+  margin-top: 22px;
+}
+.application-preview > .application-row {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.application-preview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.75fr);
+  gap: 16px;
+  align-items: start;
+}
+.application-pdf-pages {
+  max-height: 75vh;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #d8e3e5;
+  background: #dfe6ed;
+}
+.application-pdf-pages canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto 12px;
+  box-shadow: 0 4px 12px #17243a2b;
+  background: white;
+}
+.application-editor {
+  max-height: 75vh;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid #d8e3e5;
+  border-radius: 8px;
+}
+.application-editor h3,
+.application-editor h4 {
+  margin: 8px 0;
+}
+.application-entry {
+  padding: 10px 0;
+  border-bottom: 1px solid #d7e0e8;
+}
+.application-editor label {
+  margin: 10px 0;
+  font-size: 13px;
+}
+.application-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #0b1c31a8;
+}
+.application-dialog {
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 24px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 48px #0005;
+}
+.application-dialog h2 {
+  margin-top: 0;
+}
+@media (max-width: 800px) {
+  .application-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding: 14px;
+  }
+  .application-content {
+    padding: 12px;
+  }
+  .application-panel {
+    padding: 16px;
+  }
+  .application-preview-grid {
+    grid-template-columns: 1fr;
+  }
+  .application-savebar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+.application-drag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px dashed #64829f;
+  border-radius: 7px;
+  color: #28676c;
+  background: #fff;
+  cursor: grab;
+  user-select: none;
+}
+.application-drag:active {
+  cursor: grabbing;
+}
+.eyebrow,
+.application-kicker {
+  display: none;
+}
+.application-shell.application-shell {
+  color: var(--ink);
+  background: #f5f9f9;
+  font-family: Hanken, sans-serif;
+}
+.application-shell .application-header {
+  padding: 36px 16px 14px;
+  gap: 10px;
+  border-bottom-color: var(--line);
+}
+.application-shell .application-connection select {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.application-shell .application-key-status,
+.application-shell .application-intro,
+.application-shell .application-note {
+  color: var(--muted);
+}
+.application-shell .application-browser.is-connected,
+.application-shell .application-browser.is-connected span {
+  color: #457873;
+}
+.application-shell .application-content {
+  padding: 20px;
+}
+.application-shell .application-role h1 {
+  font-size: 23px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.application-shell .application-role-details > p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.application-shell .application-finish-actions {
+  grid-template-columns: minmax(0, 1fr) 35px 35px;
+  gap: 7px;
+}
+.application-shell .application-finish-actions > button {
+  min-height: 35px;
+  height: 35px;
+}
+.application-shell .application-finish-square {
+  width: 35px;
+}
+.application-shell .application-finish-discard {
+  background: white;
+  border-color: var(--line);
+  color: var(--danger);
+}
+.application-shell .application-tabs {
+  display: flex;
+  gap: 26px;
+  padding: 0;
+  margin: 20px 0 18px;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+.application-shell .application-tabs button {
+  padding: 0 0 11px;
+  min-height: 33px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+  font-weight: 600;
+}
+.application-shell .application-tabs button.selected {
+  color: var(--accent-hover);
+  background: transparent;
+  border-bottom-color: var(--accent);
+  box-shadow: none;
+}
+.application-shell .application-tailoring-notes {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.application-shell .application-tailoring-notes h2 {
+  color: var(--ink);
+  font-size: 13px;
+}
+.application-shell .application-tailoring-notes ul {
+  color: #4e6d73;
+  font-size: 12px;
+  margin-top: 9px;
+}
+.application-shell .application-alerts {
+  color: var(--warning);
+  background: #fcf3e4;
+  border: 0;
+  border-radius: 8px;
+  padding: 13px 14px;
+  margin: 17px 0 18px;
+}
+.application-shell .application-alerts .application-note {
+  color: #775021;
+}
+.application-shell .application-alert {
+  color: #6d5028;
+}
+.application-shell .application-file {
+  padding: 17px 0 0;
+  margin: 17px 0;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+.application-shell .application-drag {
+  color: var(--accent);
+  background: #edf5f6;
+  border-color: #92b8bc;
+}
+.application-shell .application-refinement {
+  padding-top: 16px;
+  border-top-color: var(--line);
+}
+.application-shell .application-panel textarea,
+.application-shell .application-panel input,
+.application-shell .application-panel select {
+  border-color: #c5d5d8;
+  color: var(--ink);
+  border-radius: 6px;
+}
+.application-shell .application-panel button {
+  min-height: 35px;
+}
+.application-shell .application-local-status {
+  color: #566c70;
+}
+.application-shell .application-panel label {
+  color: var(--ink);
+}
+.application-shell .application-secondary {
+  color: var(--ink);
+  border-color: var(--line);
+}

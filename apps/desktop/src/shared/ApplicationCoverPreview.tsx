@@ -1,4 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeDesktop as invoke } from "./desktop-client";
+import type * as Wire from "@ort/contracts/wire";
 import { useEffect, useState } from "react";
 import type { PdfPreview } from "@ort/contracts/pdf";
 import { PdfCanvas } from "./PdfPreview";
@@ -20,13 +21,10 @@ export function ApplicationCoverPreview({
       setStatus("Save the cover letter before opening its PDF preview.");
       return;
     }
-    void invoke<{ ok: boolean; value?: PdfPreview; error?: { code: string } }>(
-      "preview_application_pdf",
-      {
-        expectedRevision: revision,
-        kind: "cover_letter",
-      },
-    )
+    void invoke("preview_application_pdf", {
+      expectedRevision: revision,
+      kind: "cover_letter",
+    })
       .then((result) => {
         if (!active) return;
         if (!result.ok || !result.value || result.value.revision !== revision) {

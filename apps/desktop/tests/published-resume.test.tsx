@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PublishedResume } from "../src/shared/App";
+import { PublishedResume } from "../src/shared/PublishedResume";
 import {
   createEntry,
   createNamedField,

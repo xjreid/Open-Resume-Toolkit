@@ -1,3 +1,4 @@
+import { createResumeDocument } from "./resume-editor";
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -6,6 +7,25 @@ import { invoke } from "@tauri-apps/api/core";
 import { TrackerWorkspace } from "./TrackerTableWorkspace";
 import { emptyTrackerEntry } from "./TrackerFields";
 
+function summary(record: { id: string; revision: number; value: unknown }) {
+  const entry = record.value as ReturnType<typeof emptyTrackerEntry>;
+  return {
+    id: record.id,
+    revision: record.revision,
+    value: {
+      company: entry.company,
+      title: entry.title,
+      location: entry.location,
+      dateApplied: entry.dateApplied,
+      status: entry.status,
+      customStatus: entry.customStatus,
+      sourceUrl: entry.sourceUrl,
+    },
+    hasResume: !!entry.resume,
+    hasCoverLetter: !!entry.coverLetter,
+    answerCount: entry.answers?.length ?? 0,
+  };
+}
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("./ApplicationViews", () => ({
   PdfCanvas: ({ base64 }: { base64: string }) => <div>{base64}</div>,
@@ -34,16 +54,42 @@ it("edits rows directly, autosaves, and keeps content read-only", async () => {
   };
   let revision = 1;
   vi.mocked(invoke).mockImplementation(async (name, args) => {
-    const input = args as { id?: string | null; entry?: unknown } | undefined;
+    const input = args as
+      | { id?: string | null; entry?: unknown; metadata?: unknown }
+      | undefined;
     if (name === "list_tracker_entries")
-      return { ok: true, value: [older, newer] };
-    if (name === "save_tracker_entry")
+      return {
+        ok: true,
+        value: [older, newer]
+          .filter((record) =>
+            record.value.company
+              .toLowerCase()
+              .includes(
+                String(
+                  (args as { search?: string })?.search ?? "",
+                ).toLowerCase(),
+              ),
+          )
+          .map(summary),
+      };
+    if (name === "save_tracker_metadata" || name === "save_tracker_entry")
+      return {
+        ok: true,
+        value: summary({
+          id: input?.id ?? "created",
+          revision: ++revision,
+          value:
+            input?.id === "newer"
+              ? { ...newer.value, ...(input?.metadata as object) }
+              : (input?.metadata ?? input?.entry),
+        }),
+      };
+    if (name === "get_tracker_entry")
       return {
         ok: true,
         value: {
-          id: input?.id ?? "created",
-          revision: ++revision,
-          value: input?.entry,
+          ...newer,
+          value: { ...newer.value, resume: createResumeDocument() },
         },
       };
     if (name === "preview_tracker_pdf")
@@ -99,10 +145,10 @@ it("edits rows directly, autosaves, and keeps content read-only", async () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(vi.mocked(invoke)).toHaveBeenCalledWith(
-      "save_tracker_entry",
+      "save_tracker_metadata",
       expect.objectContaining({
         id: "newer",
-        entry: expect.objectContaining({ status: "interview" }),
+        metadata: expect.objectContaining({ status: "interview" }),
       }),
     );
 
@@ -130,10 +176,10 @@ it("edits rows directly, autosaves, and keeps content read-only", async () => {
       await new Promise((resolve) => setTimeout(resolve, 450));
     });
     expect(vi.mocked(invoke)).toHaveBeenCalledWith(
-      "save_tracker_entry",
+      "save_tracker_metadata",
       expect.objectContaining({
         id: "newer",
-        entry: expect.objectContaining({ company: "Acme Labs" }),
+        metadata: expect.objectContaining({ company: "Acme Labs" }),
       }),
     );
 
@@ -223,18 +269,27 @@ it("keeps an unsaved row editable after a failed autosave and retries it", async
   };
   let attempts = 0;
   vi.mocked(invoke).mockImplementation(async (name, args) => {
-    if (name === "list_tracker_entries") return { ok: true, value: [record] };
-    if (name === "save_tracker_entry") {
+    if (name === "list_tracker_entries")
+      return { ok: true, value: [record].map(summary) };
+    if (name === "save_tracker_metadata" || name === "save_tracker_entry") {
       attempts += 1;
       if (attempts === 1)
-        return { ok: false, error: { code: "STORAGE_UNAVAILABLE" } };
+        return {
+          ok: false,
+          error: {
+            code: "STORAGE_UNAVAILABLE",
+            messageKey: "errors.storage",
+            retryable: true,
+            details: {},
+          },
+        };
       return {
         ok: true,
-        value: {
+        value: summary({
           id: "one",
           revision: 2,
-          value: (args as { entry: unknown }).entry,
-        },
+          value: (args as { metadata: unknown }).metadata,
+        }),
       };
     }
     throw new Error("Unexpected command: " + name);
@@ -290,24 +345,24 @@ it("serializes edits made while a previous autosave is in flight", async () => {
   let resolveFirst: ((value: { ok: true; value: unknown }) => void) | undefined;
   const saves: {
     expectedRevision: number;
-    entry: { company: string; status: string };
+    metadata: { company: string; status: string };
   }[] = [];
   vi.mocked(invoke).mockImplementation(async (name, args) => {
-    if (name === "list_tracker_entries") return { ok: true, value: [record] };
-    if (name === "save_tracker_entry") {
+    if (name === "list_tracker_entries")
+      return { ok: true, value: [record].map(summary) };
+    if (name === "save_tracker_metadata" || name === "save_tracker_entry") {
       const input = args as {
         expectedRevision: number;
-        entry: { company: string; status: string };
+        metadata: { company: string; status: string };
       };
       saves.push(input);
       if (saves.length === 1)
         return new Promise((resolve) => {
           resolveFirst = resolve;
         });
-      return {
-        ok: true,
-        value: { id: "one", revision: 3, value: input.entry },
-      };
+      record.revision = 3;
+      record.value = { ...record.value, ...input.metadata };
+      return { ok: true, value: summary(record) };
     }
     throw new Error("Unexpected command: " + name);
   });
@@ -347,13 +402,13 @@ it("serializes edits made while a previous autosave is in flight", async () => {
     await act(async () => {
       resolveFirst?.({
         ok: true,
-        value: { id: "one", revision: 2, value: saves[0]?.entry },
+        value: summary({ id: "one", revision: 2, value: saves[0]?.metadata }),
       });
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(saves).toHaveLength(2);
     expect(saves[1]?.expectedRevision).toBe(2);
-    expect(saves[1]?.entry).toMatchObject({
+    expect(saves[1]?.metadata).toMatchObject({
       company: "Northstar Labs",
       status: "interview",
     });
@@ -378,16 +433,17 @@ it("opens a source on one click and edits arbitrary source text on a double-clic
     },
   };
   vi.mocked(invoke).mockImplementation(async (name, args) => {
-    if (name === "list_tracker_entries") return { ok: true, value: [record] };
+    if (name === "list_tracker_entries")
+      return { ok: true, value: [record].map(summary) };
     if (name === "open_tracker_link") return { ok: true, value: true };
-    if (name === "save_tracker_entry")
+    if (name === "save_tracker_metadata" || name === "save_tracker_entry")
       return {
         ok: true,
-        value: {
+        value: summary({
           id: "one",
           revision: 2,
-          value: (args as { entry: unknown }).entry,
-        },
+          value: (args as { metadata: unknown }).metadata,
+        }),
       };
     throw new Error("Unexpected command: " + name);
   });
@@ -437,9 +493,9 @@ it("opens a source on one click and edits arbitrary source text on a double-clic
       await new Promise((resolve) => setTimeout(resolve, 30));
     });
     expect(vi.mocked(invoke)).toHaveBeenCalledWith(
-      "save_tracker_entry",
+      "save_tracker_metadata",
       expect.objectContaining({
-        entry: expect.objectContaining({
+        metadata: expect.objectContaining({
           sourceUrl: "Job board reference 123",
         }),
       }),
@@ -470,7 +526,8 @@ it("expands overflowing links independently without changing their full targets 
       return this.textContent?.includes("long-path-") ? 1000 : 100;
     });
   vi.mocked(invoke).mockImplementation(async (name) => {
-    if (name === "list_tracker_entries") return { ok: true, value: records };
+    if (name === "list_tracker_entries")
+      return { ok: true, value: records.map(summary) };
     if (name === "open_tracker_link") return { ok: true, value: true };
     throw new Error("Unexpected command: " + name);
   });

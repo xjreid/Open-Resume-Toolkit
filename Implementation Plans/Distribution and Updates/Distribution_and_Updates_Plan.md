@@ -86,7 +86,7 @@ SBOM, provenance, and candid Gatekeeper/quarantine instructions.
 
 Unsigned macOS preview builds do not silently auto-install updates. `Check for updates` verifies authenticated metadata and opens the exact GitHub release/download guidance. Tauri updater signatures may protect metadata/artifact integrity but are not represented as Apple code signing or notarization.
 
-When the traction/cost trigger in the product plan is met, add Developer ID Application signing, hardened runtime, notarization, stapling, and signed in-app updates. That transition receives its own key-custody and entitlement review.
+M7 production qualification requires Developer ID Application signing of the app and native helpers, hardened runtime, notarization and stapling. Paid enrollment is not required for M0–M6 development. The transition includes key-custody/entitlement review, identity-scoped bridge-secret access, final extension Store identities/publication and installed production integration checks. Signed in-app updates require the independently verified updater design below.
 
 ## Updater trust model
 

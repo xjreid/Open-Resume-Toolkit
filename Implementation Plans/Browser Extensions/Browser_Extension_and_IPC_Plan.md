@@ -4,12 +4,31 @@
 
 - Status: approved baseline; Store/package registration probes required
 - Owner: browser/IPC maintainer
-- Milestone: M5 and release hardening in M7
+- Milestone: M5 development functionality; M7 signed production bridge and Store qualification
 - Product authority: `../../Product Plans/Desktop_Extension_Communication.md`, `Security_Privacy_and_Open_Source.md`, and `Configuration_Limits_and_Defaults.md`
 
 Non-goals: scraping an entire page, running automatically, modifying job sites, collecting browsing history, calling AI providers, or operating without the desktop application/native host.
 
 ## Extension architecture
+
+### M5/M7 boundary — accepted 2026-10-05
+
+M5 does not require paid ORT app signing, production Keychain code-identity
+qualification or public Store publication. It does require Chrome/Edge functional
+capture-to-review/tracker checks, development install/repair/status/version
+handling, exact allowed extension IDs, bounded authenticated IPC and documented
+current-user trust limits. Store-ready code/packages and dashboard IDs can be
+prepared and tested using an explicit development configuration. No default
+production-to-development fallback is permitted. The existing macOS development
+transport uses a temporary private per-session capability; it does not expose
+provider/database credentials or establish signed process identity.
+
+M7 requires Developer ID signing, notarization/stapling and intended desktop/host
+identity checks, identity-scoped access to the persistent IPC vault secret, final
+Chrome/Edge Store identities/publication, and installed production capture,
+repair/version and negative checks. The production authentication design below
+remains an M7 requirement. This scope revision does not itself enable a runtime
+feature or complete either milestone.
 
 One TypeScript codebase produces Chrome and Edge Manifest V3 packages. Browser-specific checked-in templates provide extension name, Store ID, icons later supplied by the aesthetic plan, and native-host allowlist. Production, preview, and development IDs are distinct.
 
@@ -105,7 +124,7 @@ Transport:
 
 Desktop generates a 256-bit installation secret stored in the OS credential vault. Installer/first-run host setup gives the host access through the same user vault entry; the secret never appears in the native-host manifest.
 
-The platform implementation must prove that only the intended desktop and native-host identities receive this IPC entry while database and provider entries remain desktop-only. On Windows, the HMAC secret supplements named-pipe ACL/origin/replay checks but does not claim to resist arbitrary malware already running as the same user, because Generic Credential data is available inside that user boundary. On macOS, signed builds authorize both code identities using a reviewed Keychain ACL/code requirement or access group. If an unsigned preview cannot share one Keychain item without a weaker fallback or misleading prompts, browser integration is disabled for that preview package; the secret is never copied into a plaintext permissions-only file.
+The platform implementation must prove that only the intended desktop and native-host identities receive this IPC entry while database and provider entries remain desktop-only. On Windows, the HMAC secret supplements named-pipe ACL/origin/replay checks but does not claim to resist arbitrary malware already running as the same user, because Generic Credential data is available inside that user boundary. On macOS, signed builds authorize both code identities using a reviewed Keychain ACL/code requirement or access group. If an unsigned production preview cannot meet these identity controls, production browser integration remains disabled. M5 may use the explicit current-user development capability described above, with its temporary lifetime and truthful limitations. The persistent production vault secret is never copied into a plaintext permissions-only file.
 
 Handshake:
 

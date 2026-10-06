@@ -1,4 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeDesktop as invoke } from "./desktop-client";
+import type * as Wire from "@ort/contracts/wire";
 import { useRef, useState } from "react";
 import { keyDisplayName } from "./AiKeyPresentation";
 import type { KeyRegistry, SavedKey } from "./AiWorkspace";
@@ -37,9 +38,7 @@ export function AiKeyName({
         pending.current = null;
         activeName.current = name;
         try {
-          const response = await invoke<
-            { ok: true; value: KeyRegistry } | { ok: false }
-          >("rename_ai_key", {
+          const response = await invoke("rename_ai_key", {
             request: { credentialId: saved.credentialId, name },
           });
           const updated = response.ok

@@ -1,0 +1,188 @@
+.contact-nav-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin: 7px 3px 12px;
+  padding: 8px 7px 11px;
+  border-bottom: 1px solid #d8e3e5;
+  color: #1e3858;
+  font-size: 12px;
+  font-weight: 750;
+}
+.contact-nav-item small {
+  color: #738094;
+  font-size: 9px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+.contact-information-editor {
+  display: grid;
+  gap: 7px;
+  margin-top: 4px;
+  border: 1px dashed #b8c8d9;
+  border-radius: 7px;
+  text-align: left;
+}
+.contact-information-editor__toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 7px;
+  border-bottom: 1px solid #d9e2eb;
+  color: #536377;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.contact-information-editor__items {
+  display: grid;
+  gap: 5px;
+}
+.contact-information-editor__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 5px;
+}
+.contact-information-editor__item input,
+.contact-information-editor__link input {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid #aebdcd;
+  border-radius: 5px;
+  background: #fff;
+  font-size: 11px;
+}
+.contact-information-editor__delete {
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  margin: 0;
+  padding: 0;
+  font-size: 17px;
+}
+.canvas-add-entry,
+.canvas-entry > .removal-control > button,
+.contact-information-editor__add {
+  font-family: Hanken, ui-sans-serif, sans-serif;
+}
+.contact-information-editor__add {
+  color: #2b4d72;
+  background: #fff;
+}
+.contact-information-editor__add {
+  justify-self: stretch;
+}
+.contact-information-editor__link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid #c7d4e2;
+  border-radius: 6px;
+  background: #eef4fa;
+}
+.contact-information-editor__link span {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: #566c70;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.contact-information-editor__link button {
+  min-height: 32px;
+}
+.contact-divider-control {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  color: #65758a;
+  font-size: 9px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+.contact-divider-control select {
+  min-height: 30px;
+  padding: 4px 24px 4px 7px;
+  background: #fff;
+}
+.contact-information-details {
+  color: #171717;
+}
+.contact-information-details > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: #f5f9f9;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+.contact-information-details > summary::-webkit-details-marker {
+  display: none;
+}
+.contact-information-details > summary .workspace-icon {
+  width: 15px;
+  height: 15px;
+  color: #607a7f;
+}
+.contact-information-editor {
+  padding: 12px;
+  border-style: solid;
+  border-color: var(--line);
+  background: #f3f9f9;
+  font-family: Hanken, sans-serif;
+}
+.contact-information-editor__toolbar,
+.contact-divider-control {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.contact-information-editor__add {
+  background: white;
+  color: var(--accent);
+}
+.document-navigator .contact-nav-item {
+  min-height: 42px;
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom-color: var(--line);
+}
+.contact-information-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  font-family: Hanken, sans-serif;
+}
+.contact-information-actions .contact-information-editor__add {
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  font-size: 12px;
+}
+.contact-divider-control select {
+  width: 80px;
+  font-size: 11px;
+}
+
+.document-navigator .section-nav-card[aria-current="location"],
+.document-navigator .contact-nav-item[aria-current="location"] {
+  background: #e3eff0;
+  color: var(--accent-hover);
+}

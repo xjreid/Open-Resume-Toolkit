@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { desktopCommand as popupCommand } from "./desktop-client";
 import { emitTo } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useRef } from "react";
@@ -46,15 +46,6 @@ export type UseApplicationPopupOptions = Omit<
   onCoverChange: (value: string) => void;
   onError: (message: string) => void;
 };
-async function popupCommand(name: string, args: Record<string, unknown> = {}) {
-  const result = await invoke<{ ok: boolean; error?: { code: string } }>(
-    name,
-    args,
-  );
-  if (result?.ok === false)
-    throw new Error(result.error?.code ?? "Popup unavailable");
-}
-
 /** The overlay owns persistence; popups submit sequenced edits and final flushes. */
 export function useApplicationPopup(options: UseApplicationPopupOptions) {
   const optionsRef = useRef(options);

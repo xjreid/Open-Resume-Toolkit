@@ -1,4 +1,6 @@
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { Channel } from "@tauri-apps/api/core";
+import { invokeDesktop as invoke } from "./desktop-client";
+import type * as Wire from "@ort/contracts/wire";
 import { listen } from "@tauri-apps/api/event";
 import {
   useEffect,
@@ -31,106 +33,19 @@ import {
   type Usage,
 } from "./AiUsageChart";
 
-export type SavedKey = {
-  credentialId: string;
-  createdAt: string | null;
-  name?: string | null;
-  provider: "openai" | "anthropic" | "gemini";
-  preset: "economy" | "balanced" | "quality";
-  paused: boolean;
-  removed: boolean;
-  cleanupRequired: boolean;
-};
-export type KeyRegistry = {
-  keys: SavedKey[];
-  primaryCredentialId: string | null;
-};
-type Response =
-  | { ok: true; value: KeyRegistry }
-  | { ok: false; error: { code: string } };
+export type SavedKey = Wire.SavedAiKey;
+export type KeyRegistry = Wire.AiKeyRegistry;
 const keyName = keyDisplayName;
-type Monitoring = {
-  logicalOperations: number;
-  attempts: number;
-  usage: Usage;
-  totalTokens?: number;
-  estimatedCostMicros: number;
-  unresolvedReservedMicros: number;
-  currency: string | null;
-  partial: boolean;
-  unknownCount: number;
-  byProvider: Record<string, number>;
-  byCredentialId?: Record<string, number>;
-  byStatus: Record<string, number>;
-  byModel: Record<string, number>;
-  byPreset: Record<string, number>;
-  byOperationType: Record<string, number>;
-  costByCurrencyMicros: Record<string, number>;
-  timeBuckets: Array<{
-    label: string;
-    attempts: number;
-    usage: {
-      inputTokens: number;
-      cachedInputTokens?: number;
-      cacheWriteTokens?: number;
-      outputTokens: number;
-      reasoningTokens?: number;
-    };
-    totalTokens?: number;
-    costByCurrencyMicros: Record<string, number>;
-    partial: boolean;
-    unknownCount: number;
-  }>;
-};
-type MonitoringResponse =
-  | { ok: true; value: Monitoring }
-  | { ok: false; error: { code: string } };
-type TestPreview = {
-  credentialId: string;
-  provider: string;
-  model: string;
-  currency: string;
-  estimatedInputTokens: number;
-  maximumCostMicros: number;
-};
-type TestResult = {
-  confirmed: boolean;
-  effectiveModel: string;
-  usageComplete: boolean;
-  estimatedCostMicros: number | null;
-  usage: {
-    inputTokens: number;
-    cachedInputTokens: number;
-    cacheWriteTokens: number;
-    outputTokens: number;
-    reasoningTokens: number;
-  };
-};
+type Monitoring = Wire.AiMonitoringSummary;
+type TestPreview = Wire.AiTestPreview;
+type TestResult = Wire.AiTestResult;
 type RetentionPolicy =
   | "30_days"
   | "90_days"
   | "one_year"
   | "retain_until_cleared";
-type CatalogEntry = {
-  provider: "open_ai" | "anthropic" | "gemini";
-  model: string;
-  preset: "economy" | "balanced" | "quality";
-  operations: string[];
-  maxInputTokens: number;
-  maxOutputTokens: number;
-  currency: string;
-  prices: Array<{ category: string; microsPerMillion: number }>;
-  source: string;
-  verifiedAt: string;
-  effectiveFrom: string;
-  effectiveTo: string | null;
-  disabled: boolean;
-};
-export type Catalog = {
-  catalogId: string;
-  expiresAt: string;
-  entries: CatalogEntry[];
-};
+type CatalogEntry = Wire.CatalogEntry;
+export type Catalog = Wire.Catalog;
 function periodBounds(period: ActivityPeriod) {
   const now = new Date();
   return {
@@ -252,7 +167,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   const keyDropTargetRef = useRef<"active" | "available" | null>(null);
 
   useEffect(() => {
-    void invoke<{ ok: true; value: Catalog } | { ok: false }>("load_ai_catalog")
+    void invoke("load_ai_catalog")
       .then((response) => {
         if (response.ok) setCatalog(response.value);
         else setCatalog(null);
@@ -270,7 +185,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   async function refreshKeys() {
     const generation = ++keyRefreshGeneration.current;
     try {
-      const response = await invoke<Response>("load_ai_connection");
+      const response = await invoke("load_ai_connection");
       if (generation !== keyRefreshGeneration.current) return;
       if (response.ok) applyRegistry(response.value);
       else {
@@ -313,7 +228,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     let current = true;
     setMonitoring(null);
     setMonitoringError(false);
-    void invoke<MonitoringResponse>("load_ai_monitoring", {
+    void invoke("load_ai_monitoring", {
       ...monitoringArgs(period),
       credentialId: keyFilter || null,
     })
@@ -331,16 +246,15 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   }, [period, keyFilter, monitoringRevision]);
 
   useEffect(() => {
-    void invoke<
-      | {
-          ok: true;
-          value: { policy: RetentionPolicy; removedOperations: number };
-        }
-      | { ok: false }
-    >("load_ai_retention")
+    void invoke("load_ai_retention")
       .then((response) => {
         if (response.ok) {
-          setRetention(response.value.policy);
+          if (
+            ["30_days", "90_days", "one_year", "retain_until_cleared"].includes(
+              response.value.policy,
+            )
+          )
+            setRetention(response.value.policy as RetentionPolicy);
           if (response.value.removedOperations > 0)
             setMonitoringRevision((value) => value + 1);
         }
@@ -356,9 +270,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     setDataAction(null);
     setWorking(true);
     try {
-      const response = await invoke<
-        { ok: true; value: number } | { ok: false; error: { code: string } }
-      >("clear_ai_monitoring", {
+      const response = await invoke("clear_ai_monitoring", {
         months: selectedMonths.map(({ label, fromUnixMs, toUnixMs }) => ({
           label,
           fromUnixMs,
@@ -388,13 +300,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     if (working) return;
     setWorking(true);
     try {
-      const response = await invoke<
-        | {
-            ok: true;
-            value: { policy: RetentionPolicy; removedOperations: number };
-          }
-        | { ok: false }
-      >("save_ai_retention", { policy: retention });
+      const response = await invoke("save_ai_retention", { policy: retention });
       if (response.ok) {
         setNotice(
           response.value.removedOperations > 0
@@ -418,10 +324,9 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     setNotice("");
     setTestPreview(null);
     try {
-      const response = await invoke<
-        | { ok: true; value: TestPreview }
-        | { ok: false; error: { code: string } }
-      >("preview_ai_test", { credentialId: target.credentialId });
+      const response = await invoke("preview_ai_test", {
+        credentialId: target.credentialId,
+      });
       if (response.ok) setTestPreview(response.value);
       else
         setNotice(
@@ -454,9 +359,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
         );
     };
     try {
-      const response = await invoke<
-        { ok: true; value: TestResult } | { ok: false; error: { code: string } }
-      >("test_ai_connection", {
+      const response = await invoke("test_ai_connection", {
         onProgress: progress,
         credentialId: preview.credentialId,
         expectedModel: preview.model,
@@ -500,9 +403,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     setDataAction(null);
     setWorking(true);
     try {
-      const response = await invoke<
-        { ok: true; value: string } | { ok: false; error: { code: string } }
-      >("export_ai_monitoring", {
+      const response = await invoke("export_ai_monitoring", {
         months: selectedMonths.map(({ label, fromUnixMs, toUnixMs }) => ({
           label,
           fromUnixMs,
@@ -532,13 +433,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     setWorking(true);
     setNotice("");
     try {
-      const response = await invoke<
-        | {
-            ok: true;
-            value: { registry: KeyRegistry; clearedOperations: number };
-          }
-        | { ok: false; error: { code: string } }
-      >("delete_removed_ai_key_data", {
+      const response = await invoke("delete_removed_ai_key_data", {
         request: { credentialIds },
       });
       if (response.ok) {
@@ -571,7 +466,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     setWorking(true);
     setNotice("");
     try {
-      const response = await invoke<Response>("add_ai_key", {
+      const response = await invoke("add_ai_key", {
         request: { provider, apiKey: key, name: newKeyName.trim() || null },
       });
       setKey("");
@@ -609,7 +504,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     setRemoveConfirm(null);
     setNotice("");
     try {
-      const response = await invoke<Response>("change_ai_key", {
+      const response = await invoke("change_ai_key", {
         request: { credentialId: target.credentialId, action },
       });
       if (response.ok) {
@@ -648,7 +543,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     setWorking(true);
     setNotice("");
     try {
-      const response = await invoke<Response>("clear_ai_primary");
+      const response = await invoke("clear_ai_primary");
       if (response.ok) {
         applyRegistry(response.value);
         setNotice("No active key is selected.");
@@ -819,7 +714,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     if (!activityKeys.some((key) => key.credentialId === id))
       activityKeys.push({
         credentialId: id,
-        createdAt: null,
+        createdAt: "",
         provider: "openai",
         preset: "balanced",
         paused: true,

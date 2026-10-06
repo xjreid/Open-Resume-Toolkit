@@ -97,6 +97,7 @@
       "additionalProperties": false,
       "required": [
         "year",
+        "month",
         "expected"
       ]
     },
@@ -201,7 +202,8 @@
         "page",
         "explanation",
         "suggestedTarget",
-        "suggestedValue"
+        "suggestedValue",
+        "proposedSection"
       ]
     },
     "ImportReviewContacts": {
@@ -357,7 +359,9 @@
       "required": [
         "id",
         "order",
-        "label"
+        "label",
+        "start",
+        "end"
       ]
     },
     "ResumeDocument": {

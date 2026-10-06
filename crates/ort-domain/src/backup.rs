@@ -119,11 +119,11 @@ pub enum ValidateBackupResponse {
         document_schema: u16,
         created_at: String,
         master_drafts: u16,
-        published_resumes: u16,
+        published_resumes: u32,
         settings: u16,
         render_manifests: u16,
-        ai_operations: u16,
-        ai_attempts: u16,
+        ai_operations: u32,
+        ai_attempts: u32,
     },
 }
 
