@@ -4,7 +4,7 @@
 
 - Status: approved baseline; SignPath application and Store/native-host probes outstanding
 - Owner: release maintainer
-- Milestone: M7, with preview packaging earlier
+- Milestone: M8, with preview packaging earlier
 - Product authority: `../../Product Plans/Distribution_and_Updates.md`, `Security_Privacy_and_Open_Source.md`, `Quality_Accessibility_and_Verification.md`, and `Release_Scope_and_Open_Decisions.md`
 
 Codex is not included in any ORT installer. Users who select Codex mode install a supported Codex runtime independently.
@@ -86,7 +86,7 @@ SBOM, provenance, and candid Gatekeeper/quarantine instructions.
 
 Unsigned macOS preview builds do not silently auto-install updates. `Check for updates` verifies authenticated metadata and opens the exact GitHub release/download guidance. Tauri updater signatures may protect metadata/artifact integrity but are not represented as Apple code signing or notarization.
 
-M7 production qualification requires Developer ID Application signing of the app and native helpers, hardened runtime, notarization and stapling. Paid enrollment is not required for M0–M6 development. The transition includes key-custody/entitlement review, identity-scoped bridge-secret access, final extension Store identities/publication and installed production integration checks. Signed in-app updates require the independently verified updater design below.
+M8 production qualification requires Developer ID Application signing of the app and native helpers, hardened runtime, notarization and stapling. Paid enrollment is not required for M0–M7 development. The transition includes key-custody/entitlement review, identity-scoped bridge-secret access, final extension Store identities/publication and installed production integration checks. Signed in-app updates require the independently verified updater design below.
 
 ## Updater trust model
 

@@ -4,6 +4,11 @@ This snapshot preserves earlier checkpoints and superseded testing requirements.
 Use [the current roadmap](Delivery_Roadmap.md) for active work. Nothing here adds
 a testing gate to the current plan.
 
+Milestone labels below preserve the historical order. The October 7, 2026 reorder
+supersedes them: the former M8 website is now M6 immediately after M5, the former
+M6 optional Codex integration is now M7, and the former M7 distribution/hardening
+is now M8. Use the current roadmap for all active milestone references.
+
 # Technical delivery roadmap
 
 **2026-09-07 architecture revision:** The user authorized replacing nonviable

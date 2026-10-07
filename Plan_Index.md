@@ -27,7 +27,7 @@ for replay.
 The [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>)
 is authoritative for milestone scope and order. The completed offline-path
 boundary is recorded in [M2 acceptance closure](evidence/0.0.0-dev/m2-acceptance-closure.md).
-M2.5, usable desktop and resume designs, M3 Direct AI foundation, and M4 application materials are complete for macOS Apple Silicon development. The user accepted [M4](evidence/0.0.0-dev/m4/closure.md) on October 5, 2026. M5 remains in progress.
+M2.5, usable desktop and resume designs, M3 Direct AI foundation, and M4 application materials are complete for macOS Apple Silicon development. The user accepted [M4](evidence/0.0.0-dev/m4/closure.md) on October 5, 2026. M5 remains in progress. The October 7, 2026 delivery order is M6 static project website, M7 optional external Codex integration, then M8 distribution and stable hardening.
 
 M0-M2 are currently qualified only on macOS Apple Silicon. Windows and Intel
 Mac remain later platform-expansion goals. Their shared builds may remain in CI
@@ -139,10 +139,10 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 
 ### Next milestone handoff
 
-M5 is functional development qualification without paid ORT app signing. M7
+M5 is functional development qualification without paid ORT app signing. M8
 requires production signing/notarization, native bridge identity/vault controls
 and final extension Store qualification, per the user decision of October 5,
-2026. Existing authentication/integrity requirements remain in effect.
+2026, with production qualification moved to M8 by the October 7 roadmap reorder. Existing authentication/integrity requirements remain in effect.
 
 1. Read [Next milestones](<Implementation Plans/Next_Milestones.md>).
 2. Read M5 in the [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>) and its linked product authority before continuing work.

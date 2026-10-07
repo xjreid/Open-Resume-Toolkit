@@ -4,7 +4,7 @@
 
 - Status: approved baseline for Direct API and document work; Codex remains behind the containment gate
 - Owner: AI/document maintainers
-- Milestones: M2–M6
+- Milestones: M2–M7
 - Product authority: `../../Product Plans/AI_and_Import.md`, `Core_Workflows.md`, `Resume_Editor_and_Schema.md`, `Product_States_and_Operations.md`, and `Configuration_Limits_and_Defaults.md`
 
 Non-goals: hosted ORT keys, a proxy service, training on user content, auto-applying to jobs, inventing credentials, executing page instructions, or bundling Codex.

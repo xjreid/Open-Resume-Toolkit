@@ -1,3 +1,3 @@
 # Windows Store packaging
 
-This boundary holds the M7 Store feasibility spike and any approved fallback configuration.
+This boundary holds the M8 Store feasibility spike and any approved fallback configuration.

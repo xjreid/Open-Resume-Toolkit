@@ -181,7 +181,7 @@ Obtain this item's extension ID and public key from the dashboard, configure the
 matching store-test identity, and install the explicit development adapter using
 `development-testing.md`. This makes the production extension's local identity
 match its desktop host for testing. It does not sign the desktop app or complete
-the M7 native identity work.
+the M8 native identity work.
 
 ## Sources
 

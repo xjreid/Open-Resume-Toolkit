@@ -71,11 +71,11 @@ const sourceSha256 = createHash("sha256")
   .digest("hex");
 writeFileSync(
   `${archive}.json`,
-  `${JSON.stringify({ schemaVersion: 1, browser: "chrome", version: manifest.version, nativeHost: hostName, protocolVersion: 1, archiveSha256: sha256(archive), sourceSha256, sourceFiles, sourceCommit: revision.status === 0 ? revision.stdout.trim() : null, sourceDirty: changes.status === 0 ? changes.stdout.trim().length > 0 : null, desktopDelivery: dev ? "Explicit macOS current-user development bridge" : "Production host; explicit development registration can test the same extension contract. Signed production bridge qualification remains M7.", files: Object.fromEntries(files.map((name) => [name, sha256(resolve(build, name))])) }, null, 2)}\n`,
+  `${JSON.stringify({ schemaVersion: 1, browser: "chrome", version: manifest.version, nativeHost: hostName, protocolVersion: 1, archiveSha256: sha256(archive), sourceSha256, sourceFiles, sourceCommit: revision.status === 0 ? revision.stdout.trim() : null, sourceDirty: changes.status === 0 ? changes.stdout.trim().length > 0 : null, desktopDelivery: dev ? "Explicit macOS current-user development bridge" : "Production host; explicit development registration can test the same extension contract. Signed production bridge qualification remains M8.", files: Object.fromEntries(files.map((name) => [name, sha256(resolve(build, name))])) }, null, 2)}\n`,
 );
 console.log(`Chrome package: ${archive}`);
 console.log(
   dev
     ? "Development beta package; configure exact extension ID before testing."
-    : "Chrome Store upload ZIP ready. Upload as a draft to obtain its final ID. Signed native production bridge qualification remains M7.",
+    : "Chrome Store upload ZIP ready. Upload as a draft to obtain its final ID. Signed native production bridge qualification remains M8.",
 );

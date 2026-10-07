@@ -2,7 +2,7 @@
 
 Chrome 0.3.0 is implemented in repository TypeScript and packaged as a Chrome Web
 Store upload ZIP. This completes the requested Chrome browser code/package work;
-it does not close all of M5 or qualify the signed M7 native bridge.
+it does not close all of M5 or qualify the signed M8 native bridge.
 
 ## Result
 
@@ -16,7 +16,7 @@ it does not close all of M5 or qualify the signed M7 native bridge.
   Disconnect/timeout invalidates queued content. Stale-port responses, malformed
   Unicode and mismatched progress-protocol versions fail closed.
 - Freezes the production host name `com.openresumetoolkit` and documents native
-  protocol v1, including persistent ordered port responses. M7 authentication
+  protocol v1, including persistent ordered port responses. M8 authentication
   is internal to desktop/native-host code, with no secret sent to the extension.
 - Adds verified dashboard public-key/ID synchronization and matching unpacked
   Store-identity builds. An explicit `--store-test` registration connects this
@@ -85,6 +85,6 @@ The user can follow `packaging/extension/chrome/local-store-test-setup.md` for
 manual installed-app testing. Store-installed and signed-production testing remain
 unqualified.
 
-M7 still implements/qualifies signed app/host identity and Keychain controls,
+M8 still implements/qualifies signed app/host identity and Keychain controls,
 production installation/repair and Store-installed integration. Edge is separate
 outstanding M5 work. Signing alone does not implement the missing native controls.

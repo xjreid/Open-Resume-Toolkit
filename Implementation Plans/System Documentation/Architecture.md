@@ -4,7 +4,7 @@
 
 - Status: approved baseline for implementation
 - Owner: core maintainers
-- First milestone: M0 architecture skeleton through M7 release hardening
+- First milestone: M0 architecture skeleton through M8 release hardening
 - Product authority: all files in `../../Product Plans/`, especially `Product_Scope_and_Principles.md`, `Local_Data_and_Document_Model.md`, `Product_States_and_Operations.md`, and `Security_Privacy_and_Open_Source.md`
 
 This document defines how the approved local-first desktop product will be assembled. It does not define visual styling.

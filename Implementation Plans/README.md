@@ -63,9 +63,9 @@ Exact dependency versions are chosen and locked when the workspace is bootstrapp
 3. Deliver the offline editor/publish/preview/export path before connecting any AI service.
 4. Add direct-provider adapters, operation accounting, guardrails, tailoring, and Required Qualification Alerts.
 5. Add the overlay-owned Stage 1/Stage 2 application workflow, tracker, PDF Download/drag handoff, and browser native messaging.
-6. Add external Codex support only after the containment proof passes on both supported operating systems.
-7. Harden packaging, signing, update, recovery, accessibility, and release evidence.
-8. Build and publish the static project website after download channels have real artifacts.
+6. Build and publish the static project website immediately after M5, using verified metadata for available preview downloads or a truthful availability notice when artifacts are not yet public.
+7. Add optional external Codex support only after containment passes on the active macOS Apple Silicon platform; defer it if unsafe, and repeat qualification before enabling later platforms.
+8. Harden packaging, signing, update, recovery, accessibility, and release evidence; update the website with the qualified distribution channels.
 
 For the active handoff, begin with [`Next_Milestones.md`](Next_Milestones.md).
 

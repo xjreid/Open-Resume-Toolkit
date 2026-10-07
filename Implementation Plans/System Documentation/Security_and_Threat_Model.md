@@ -127,11 +127,11 @@ If supported public OS mechanisms cannot enforce these properties without admini
 
 ## Native IPC protocol controls
 
-The user-assigned milestone boundary is M5 development functionality and M7
-signed production qualification (2026-10-05). Before M7, explicit unsigned/ad-hoc
+The user-assigned milestone boundary is M5 development functionality and M8
+signed production qualification (accepted 2026-10-05, reordered 2026-10-07). Before M8, explicit unsigned/ad-hoc
 ORT development transport may authenticate within the current-user boundary
 using its temporary private session capability; it cannot claim signed process
-identity or substitute for the production vault secret. M7 must prove intended
+identity or substitute for the production vault secret. M8 must prove intended
 app/helper code identity and identity-scoped vault access. Exact origins, bounded
 messages, HMAC/replay checks and capture-session authorization remain required;
 no secret/provider/database access is granted to the browser extension.

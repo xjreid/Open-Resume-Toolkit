@@ -81,7 +81,7 @@ production signing. Set `ORT_BROWSER_EXECUTABLE` if Chrome is installed elsewher
 
 The upload always calls **`com.openresumetoolkit`**. It has no automatic fallback
 to a development host. [Native protocol v1](../../packaging/extension/chrome/native-protocol-v1.md)
-is the browser-facing compatibility boundary for M5 and M7. Process identity,
+is the browser-facing compatibility boundary for M5 and M8. Process identity,
 Keychain access and native authentication are implemented inside the desktop/host;
 no signing secret or authentication capability enters the extension.
 
@@ -92,7 +92,7 @@ bridge under the production host name. This changes native registration and the
 local manifest public key, not extension logic. The registration cannot overwrite
 an unrelated/signed host and must be removed before production host installation.
 
-M7 still implements/qualifies the signed desktop/host, protected vault identity,
+M8 still implements/qualifies the signed desktop/host, protected vault identity,
 installation/repair and Store-installed release. Signing alone does not implement
 those controls. Preserve protocol v1 when replacing the native transport; final
 Store review may require package/listing updates. This task does not close M5's
