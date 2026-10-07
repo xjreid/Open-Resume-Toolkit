@@ -2,17 +2,17 @@
 
 ## Status and intent
 
-Precision Workbench is the approved visual direction for Open Resume Toolkit's application shell, overlay, browser-extension surfaces, and public website. It combines the restraint of a professional document tool with the clarity of a well-maintained open-source utility.
+Precision Workbench is the approved visual direction for Open Resume Toolkit's application shell, overlay, and browser-extension surfaces. It combines the restraint of a professional document tool with the clarity of a well-maintained open-source utility.
 
 This document defines how the product should **feel, look, and behave visually**. It intentionally avoids dictating that a particular component must occupy a particular edge, column, or coordinate. Actual placement must remain responsive to workflow testing, platform conventions, accessibility, localization, viewport size, and implementation constraints.
 
 The design should be recognizable through its density, rhythm, hierarchy, typography, color behavior, borders, controls, and tone even if two surfaces use different layouts.
 
-## Reference image
+## Reference guidance
 
-The [original Precision Workbench collage](Reference/precision-workbench-original.png) records the initial visual idea across the desktop application, application overlay, and website.
+The [archived UI captures](current-ui-2026-10-04/) record the earlier desktop and overlay.
 
-The collage is a **design reference, not a specification**. It may guide overall density, line weight, color restraint, type scale, information hierarchy, and visual tone. It must not be treated as authoritative for:
+Visual references are **design references, not specifications**. They may guide overall density, line weight, color restraint, type scale, information hierarchy, and visual tone. They must not be treated as authoritative for:
 
 - exact control placement;
 - navigation architecture;
@@ -22,7 +22,6 @@ The collage is a **design reference, not a specification**. It may guide overall
 - responsive behavior;
 - platform window chrome;
 - release dates, version numbers, example content, or legal text;
-- screenshots shown inside the website concept;
 - final document-template appearance.
 
 When the reference conflicts with an approved product plan, accessibility requirement, or verified implementation behavior, the plan or requirement takes precedence. Preserve the visual character rather than reproducing the pixels.
@@ -252,38 +251,6 @@ The interface should present Week, Month, Year, and All time periods; token tota
 
 Tables and text summaries are equal parts of the design, not accessibility afterthoughts. Direct estimated cost must look different from provider-authoritative billing. Codex account/quota information must not be assigned an invented dollar value.
 
-## Website expression
-
-The website should resemble a carefully maintained open-source project and documentation site. It is informative before it is persuasive.
-
-Its character should include:
-
-- a compact, durable project header;
-- bounded reading widths;
-- direct navigation to Download, Documentation, source, security, and contribution paths;
-- clear release and platform information;
-- restrained tables, notices, code blocks, and checksum presentation;
-- a documentation hierarchy that works without client-side JavaScript;
-- the same Quiet Navy, border, typography, and icon discipline as the desktop product.
-
-The homepage begins with the project name, a factual description, current support or release status, and direct paths to installation and documentation. It must not use a sales-style hero, slogan, testimonial, customer-logo strip, pricing tier, artificial urgency, download counter, or fabricated social proof.
-
-### Screenshot placeholders
-
-The site may reserve space for future verified product screenshots, but generated or premature product images should not ship as previews.
-
-Until the application is implemented, tested, and configured, use neutral placeholder boxes that state the expected future asset, for example:
-
-- **Desktop master-resume editor screenshot**
-- **Application overlay - ready to capture**
-- **Application overlay - tailored resume workspace**
-- **Application tracker screenshot**
-- **AI Monitoring screenshot with accessible table equivalent**
-
-Placeholders should use the standard border, Canvas or White background, and quiet descriptive text. They should reserve realistic aspect ratios and dimensions to prevent later layout shifts. They are functional production placeholders, not skeleton-loading animations or decorative mockups.
-
-When real screenshots replace them, captures must come from a tested release candidate, use synthetic data, reflect current terminology and workflow boundaries, and exclude secrets or personal content.
-
 ## Browser-extension expression
 
 Extension surfaces remain compact and status-oriented. They communicate connection, deliberate selection capture, success, and safe error recovery. They do not reproduce the overlay workflow, hold AI settings, show a resume database, or become a browser sidebar.
@@ -297,7 +264,7 @@ Professional documents are a separate visual system. They must not inherit:
 - Quiet Navy brand color by default;
 - Offset Open Frame marks;
 - application navigation styling;
-- website cards or controls;
+- branded interface cards or controls;
 - product terminology;
 - decorative software iconography.
 
@@ -388,7 +355,7 @@ These changes are acceptable when they preserve:
 - restrained Quiet Navy color behavior;
 - crisp borders and limited elevation;
 - direct language;
-- persistent distinction between desktop, overlay, extension, website, and professional documents;
+- persistent distinction between desktop, overlay, extension, and professional documents;
 - complete accessibility;
 - predictable states and actions.
 
@@ -423,7 +390,7 @@ A Precision Workbench implementation is visually on direction when reviewers can
 4. Is Quiet Navy used as a controlled tool color rather than decoration?
 5. Are borders crisp, radii modest, and shadows rare?
 6. Are primary actions clear without dominating the screen?
-7. Do desktop, overlay, extension, and website feel related while retaining their separate responsibilities?
+7. Do desktop, overlay, and extension feel related while retaining their separate responsibilities?
 8. Do professional documents remain independent of application branding?
 9. Does the interface remain coherent at high text scaling, narrow widths, forced colors, and reduced motion?
 10. Could placement change without losing the design identity?

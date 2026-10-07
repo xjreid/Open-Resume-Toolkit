@@ -24,4 +24,4 @@ It represents standard synchronous text-token prices only: provider batch,
 long-context, storage, tools, taxes, credits, promotions, and account-specific
 terms are not flattened into these rates. Its development signing private key
 was ephemeral and discarded; the protected catalog publishing workflow and
-durable release key remain M8 distribution work.
+durable release key remain M7 distribution work.

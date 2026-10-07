@@ -28,7 +28,7 @@ pages in their own tab. You can restrict site access through Chrome settings.
 
 State the actual supported desktop release/platform when publishing. Current
 integration qualification is macOS Apple Silicon DEVELOPMENT; signed production
-installation is M8 work. Do not claim Windows/Edge/production release support.
+installation is M7 work. Do not claim Windows/Edge/production release support.
 
 ## Permission explanations
 

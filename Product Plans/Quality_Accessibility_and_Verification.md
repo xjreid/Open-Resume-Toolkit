@@ -77,7 +77,7 @@ whole acceptance matrix. Skipped checks are unrun, never implicit passes.
 
 ### Platform and account scope
 
-Use the active macOS Apple Silicon development environment for M3–M8 until another
+Use the active macOS Apple Silicon development environment for M3–M7 until another
 platform is explicitly activated. Use the developer account by default. A separate
 account or clean installation is needed only when that boundary is itself changing
 or when checking the actual distributed package. Browser work gets one primary

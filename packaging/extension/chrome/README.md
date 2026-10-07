@@ -74,7 +74,7 @@ Quit/disable the development connection before changing identities. The script
 removes only its own registration and host, and does not change browser profiles,
 resume data, provider credentials or a different host registration.
 
-## M8 replacement boundary
+## M7 replacement boundary
 
 Replace the test adapter with the signed production native host and desktop
 installation, retaining native-host name and [protocol v1](native-protocol-v1.md).
@@ -85,7 +85,7 @@ native code. Default production native builds fail closed until these gates pass
 Signing credentials alone do not complete the bridge.
 
 Final Store publication, Chrome review, installed production capture and app/host
-installation/repair are M8 work. Do not advertise public production desktop
+installation/repair are M7 work. Do not advertise public production desktop
 compatibility before it is verified. Extension source is complete for the Chrome
 M5 browser contract; Edge qualification remains separate.
 

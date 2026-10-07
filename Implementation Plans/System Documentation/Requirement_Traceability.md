@@ -8,7 +8,7 @@ These IDs provide stable anchors for code issues, tests, and release evidence. T
 |---|---|---|---|---|
 | ORT-SYS-001 | Core editing, tracking, rendering, and export work without network or an ORT account | Product scope / Local ownership | Architecture, desktop | intercepted-network offline journey |
 | ORT-SYS-002 | Exactly one active AI mode: No AI, Direct, or Codex | AI and import / AI operating model | Desktop, AI | connection transition tests |
-| ORT-SYS-003 | Remote telemetry and hosted user-content services are absent | Security / Telemetry and diagnostics | Architecture, website | binary/site network audit |
+| ORT-SYS-003 | Remote telemetry and hosted user-content services are absent | Security / Telemetry and diagnostics | Architecture, desktop | binary network audit |
 | ORT-DATA-001 | Canonical local records use versioned structured schemas | Local data / Canonical records | Local data | schema drift and round-trip tests |
 | ORT-DATA-002 | At most one master draft, published master, and current workspace exist per profile | Configuration / Fixed product values | Local data | database constraint tests |
 | ORT-DATA-003 | Sensitive local records are encrypted at rest and keys remain in the OS vault | Security / Local data exposure | Local data, vault | database/WAL plaintext and vault tests |
@@ -45,13 +45,11 @@ These IDs provide stable anchors for code issues, tests, and release evidence. T
 | ORT-APP-001 | The main window owns master/admin surfaces and has no job-specific route; the overlay owns both application stages and all tailoring/material interactions | Core workflows / Overlay application workflow | Desktop | route/capability and full overlay journey tests |
 | ORT-APP-002 | Stage 2 has Resume/Cover letter/Answers tabs, no more than three change points, prompted regeneration, resettable question capture, and persistent Finish Application | Core workflows / Stage 2 | Desktop, AI | state-machine and accessibility tests |
 | ORT-TRK-001 | Finish Application atomically saves selected structured snapshots and clears temporary workspace data | Core workflows / Finish Application | Desktop, local data | failure-injection journey |
-| ORT-DIST-001 | Preferred Windows stable is SignPath-signed GitHub direct; Store is fallback; unsigned Windows is preview | Distribution / Windows | Distribution, website | signature/channel tests |
-| ORT-DIST-002 | Initial unsigned macOS GitHub downloads are previews until Developer ID/notarization | Distribution / macOS | Distribution, website | artifact/claim verification |
+| ORT-DIST-001 | Preferred Windows stable is SignPath-signed GitHub direct; Store is fallback; unsigned Windows is preview | Distribution / Windows | Distribution | signature/channel tests |
+| ORT-DIST-002 | Initial unsigned macOS GitHub downloads are previews until Developer ID/notarization | Distribution / macOS | Distribution | artifact/claim verification |
 | ORT-DIST-003 | Direct/Store/preview update channels cannot overwrite one another | Distribution / Update behavior | Distribution | crossover tests |
 | ORT-DIST-004 | Releases include checksums, SBOM, provenance, compatibility, and truthful signing status | Distribution / Release docs | Distribution | release evidence bundle |
-| ORT-ACC-001 | Critical journeys support keyboard, screen reader, scaling, high contrast, and reduced motion | Quality / Accessibility | Desktop, website | focused automated and manual journey check |
-| ORT-WEB-001 | Website is static public information only and never accepts resume/application content | Private website boundary | Website | route/network/form audit |
-| ORT-WEB-002 | Download pages derive from verified canonical release metadata and enforce channel warnings | Website content / Download | Website, distribution | production manifest/link smoke test |
+| ORT-ACC-001 | Critical journeys support keyboard, screen reader, scaling, high contrast, and reduced motion | Quality / Accessibility | Desktop, extension | focused automated and manual journey check |
 
 ## Maintenance rule
 

@@ -169,7 +169,6 @@ until their documented safety gates pass.
 7. package Chrome and Edge variants against the released desktop/native-host compatibility range;
 8. create a draft GitHub Release and Store submissions;
 9. require human release approval, then promote the already-tested artifacts;
-10. update the website from the signed release/compatibility manifest.
 
 ## Deployment and Store order
 
@@ -207,7 +206,7 @@ A failed optional-feature gate disables only that feature where the product plan
 - Database migrations create required safety copies and use forward fixes or compatible restoration rather than reverse SQL.
 - A bad release is withdrawn without deleting evidence; recovery uses newly signed metadata and the last verified compatible artifact or a forward-fix release.
 - Chrome/Edge rollback respects their Store controls and protocol compatibility window.
-- Key compromise follows the independent updater, catalog, code-signing, Store, and website recovery paths in the distribution plan.
+- Key compromise follows the independent updater, catalog, code-signing, and Store recovery paths in the distribution plan.
 
 ## Readiness to begin implementation
 

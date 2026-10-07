@@ -76,7 +76,7 @@ Rust domain types are canonical for application records. The build generates:
 - JSON Schema for native-messaging and catalog payloads;
 - a machine-readable compatibility manifest used by desktop, host, extension, and updater tests.
 
-Generated output is checked in so extension and website builds do not require Rust. CI regenerates into a temporary tree and fails on a diff. Hand editing generated files is forbidden.
+Generated output is checked in so extension builds do not require Rust. CI regenerates into a temporary tree and fails on a diff. Hand editing generated files is forbidden.
 
 Cross-language integer counters use bounded integers whose JSON range is safe in JavaScript; currency uses `{currency, micros}` or provider-native decimal strings, never floating point. Timestamps are RFC 3339 UTC plus an IANA time-zone identifier when calendar boundaries matter.
 

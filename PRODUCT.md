@@ -99,9 +99,10 @@ do not inherit ORT branding, logos, colors, or promotional language.
   desktop code in `apps/desktop`, and milestone records in `evidence/0.0.0-dev`
   document implementation behavior and its verification limits.
 - [Logo assets](Aesthetic/Logo/README.md),
-  [document examples](Aesthetic/Resume-Designs/README.md), and the archived original visual
-  reference in `Aesthetic/previous refrence/Reference` provide design evidence. Reference
-  layouts are illustrative and do not override approved workflows.
+  [document examples](Aesthetic/Resume-Designs/README.md), and the
+  [archived UI captures](<Aesthetic/previous refrence/current-ui-2026-10-04/>)
+  provide design evidence. Reference layouts are illustrative and do not override
+  approved workflows.
 - No customer testimonials, measured employment outcomes, universal ATS evidence,
   or user-research findings were established by this initialization. Do not
   fabricate them or treat design references as proof of usability.

@@ -36,7 +36,7 @@ Supported entry patterns include dated entries, education, skill collections, ac
 
 ### Styles
 
-Resume and cover-letter documents do not inherit the ORT application/website theme, colors, logo, iconography, or marketing language. They must appear like ordinary professional documents when exported.
+Resume and cover-letter documents do not inherit the ORT application theme, colors, logo, iconography, or marketing language. They must appear like ordinary professional documents when exported.
 
 Initial style directions are:
 

@@ -123,7 +123,7 @@ The official GPL text remains unmodified in `LICENSE`. For original project mate
 Before publication:
 
 - Keep the unmodified official license text as `LICENSE`.
-- Keep `NOTICE`, `ADDITIONAL_TERMS.md`, and `TRADEMARKS.md` public and internally consistent with application and website legal notices.
+- Keep `NOTICE`, `ADDITIONAL_TERMS.md`, and `TRADEMARKS.md` public and internally consistent with application and repository legal notices.
 - Add SPDX identifiers, copyright notices, and an `ADDITIONAL_TERMS.md` applicability pointer to original source files where appropriate. Do not imply that the Section 7 term applies to third-party material or a contribution whose copyright holder has not accepted it.
 - Audit all runtime, build, font, template, icon, and asset licenses for GPL compatibility and redistribution rights.
 - Avoid proprietary bundled components that would make the published build non-reproducible or undermine SignPath eligibility.

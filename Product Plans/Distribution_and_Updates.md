@@ -38,7 +38,7 @@ completion. A shared CI build is not a supported distribution.
 
 - Initial macOS packages may be published through canonical GitHub Releases only as clearly labeled unsigned previews. Each preview includes checksums, source/build provenance, authenticated release metadata, accurate Gatekeeper and manual-opening instructions, and documented native-messaging or update limitations.
 - An unsigned macOS artifact is not a stable broadly trusted release, even when it is project-controlled and its checksum is valid.
-- Stable direct macOS distribution requires Apple Developer ID signing, hardened runtime, and Apple notarization. The project adopts the required paid Apple Developer Program membership for M8 production qualification. M0–M7 development and functional acceptance do not require paid ORT signing.
+- Stable direct macOS distribution requires Apple Developer ID signing, hardened runtime, and Apple notarization. The project adopts the required paid Apple Developer Program membership for M7 production qualification. M0–M6 development and functional acceptance do not require paid ORT signing.
 - Automatic application updating must not be enabled for unsigned previews unless an independently secure signature system is implemented, threat-reviewed, and clearly explained. Manual update notification may still point to the canonical release page.
 
 ## Update behavior
@@ -54,9 +54,9 @@ completion. A shared CI build is not a supported distribution.
 ## Browser-extension stores
 
 Store-ready extension code and packages may be developed and tested with the
-explicit unsigned/ad-hoc development app and native host before M8. This tests
+explicit unsigned/ad-hoc development app and native host before M7. This tests
 functionality within the documented current-user boundary, not signed production
-identity. M8 owns final Store publication, Developer ID/Keychain integration and
+identity. M7 owns final Store publication, Developer ID/Keychain integration and
 qualification of the exact distributed desktop/host/extension combination. A
 Store extension does not download or install its required native host by itself.
 

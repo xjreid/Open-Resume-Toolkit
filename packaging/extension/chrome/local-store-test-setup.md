@@ -63,7 +63,7 @@ review/publication remain pending.
 Generated installation, native-host, and test-package receipts are in
 `target/chrome-store-setup-2026-10-06/`.
 
-## M8 replacement
+## M7 replacement
 
 Keep `com.openresumetoolkit` and protocol v1. Quit the development app and remove
 this explicit adapter using `node tools/dev-browser-bridge.mjs uninstall --store-test`

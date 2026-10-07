@@ -48,11 +48,9 @@ Microsoft Edge documentation must be rechecked before packaging even where Chrom
 
 ORT supports only a tested subset and version range. Official protocol availability does not by itself prove the OS containment requirements; that remains a separate blocking gate.
 
-## Release provenance and website
+## Release provenance
 
 - [GitHub artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations) — build provenance publication and verification.
 - [GitHub Actions artifacts](https://docs.github.com/en/actions/how-tos/writing-workflows/choosing-what-your-workflow-does/storing-and-sharing-data-from-a-workflow) — CI artifact flow; release assets remain a separate publication step.
-- [Cloudflare Pages Astro guide](https://developers.cloudflare.com/pages/framework-guides/deploy-an-astro-site/) — static build output, Git integration, and preview deployments.
-- [Astro documentation](https://docs.astro.build/) — static content architecture and content collections.
 
-SignPath eligibility/process, Microsoft Store packaging/submission, Chrome Web Store, Edge Add-ons, Apple signing/notarization, provider endpoints/model catalogs/prices, and Cloudflare behavior are all release-time facts and require current official-source review.
+SignPath eligibility/process, Microsoft Store packaging/submission, Chrome Web Store, Edge Add-ons, Apple signing/notarization, and provider endpoints/model catalogs/prices are all release-time facts and require current official-source review.

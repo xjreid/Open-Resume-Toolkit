@@ -4,7 +4,7 @@
 
 - Status: approved implementation baseline
 - Owner: desktop maintainer
-- Milestones: M0–M8
+- Milestones: M0–M7
 - Product authority: `../../Product Plans/Core_Workflows.md`, `Resume_Editor_and_Schema.md`, `Product_States_and_Operations.md`, `AI_and_Import.md`, and `Quality_Accessibility_and_Verification.md`
 
 This plan defines functional structure and interaction contracts only. It expressly does not select the application aesthetic.

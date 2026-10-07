@@ -32,7 +32,6 @@ work to the M0-M2 exit gates.
 | Browser bridge | Shared Manifest V3 extension plus a Rust native-messaging host and authenticated local IPC |
 | Packaging | Tauri macOS-arm64 app/DMG preview initially; NSIS/Windows signing and Intel/universal Mac packages later |
 | Updates | Signed ORT update metadata and GitHub Release assets, with channel separation |
-| Website | Static Astro/TypeScript site on Cloudflare Pages, documented in the private repository |
 
 Exact dependency versions are chosen and locked when the workspace is bootstrapped. They must pass the license, security, and platform-build gates in the plans below.
 
@@ -45,7 +44,7 @@ Exact dependency versions are chosen and locked when the workspace is bootstrapp
 - [`System Documentation/Development_and_Deployment_Outline.md`](System%20Documentation/Development_and_Deployment_Outline.md) — shared-code ownership, build targets, environments, artifact matrix, CI/deployment flow, gates, rollback, and M0 readiness checklist.
 - [`System Documentation/Security_and_Threat_Model.md`](System%20Documentation/Security_and_Threat_Model.md) — trust boundaries, controls, abuse cases, and release-blocking security gates.
 - [`System Documentation/Delivery_Roadmap.md`](System%20Documentation/Delivery_Roadmap.md) — vertical milestones, dependencies, evidence, and explicit deferrals.
-- [`Next_Milestones.md`](Next_Milestones.md) — completed M3 review route and ordered navigation for M4–M8; it summarizes and does not supersede the delivery roadmap.
+- [`Next_Milestones.md`](Next_Milestones.md) — completed M3 review route and ordered navigation for M4–M7; it summarizes and does not supersede the delivery roadmap.
 - [`System Documentation/Requirement_Traceability.md`](System%20Documentation/Requirement_Traceability.md) — stable requirement IDs for issues, tests, and release evidence.
 
 ### Component plans
@@ -63,9 +62,8 @@ Exact dependency versions are chosen and locked when the workspace is bootstrapp
 3. Deliver the offline editor/publish/preview/export path before connecting any AI service.
 4. Add direct-provider adapters, operation accounting, guardrails, tailoring, and Required Qualification Alerts.
 5. Add the overlay-owned Stage 1/Stage 2 application workflow, tracker, PDF Download/drag handoff, and browser native messaging.
-6. Build and publish the static project website immediately after M5, using verified metadata for available preview downloads or a truthful availability notice when artifacts are not yet public.
-7. Add optional external Codex support only after containment passes on the active macOS Apple Silicon platform; defer it if unsafe, and repeat qualification before enabling later platforms.
-8. Harden packaging, signing, update, recovery, accessibility, and release evidence; update the website with the qualified distribution channels.
+6. Add optional external Codex support only after containment passes on the active macOS Apple Silicon platform; defer it if unsafe, and repeat qualification before enabling later platforms.
+7. Harden packaging, signing, update, recovery, accessibility, and release evidence; publish verified distribution information through GitHub Releases.
 
 For the active handoff, begin with [`Next_Milestones.md`](Next_Milestones.md).
 

@@ -25,5 +25,5 @@ features and its input bound is below OpenAI's long-context threshold.
 
 The exact catalog bytes are signed with the public key in `packages/catalog`.
 The development signing private key was generated ephemerally and discarded.
-The protected publishing workflow and durable release catalog key remain M8
+The protected publishing workflow and durable release catalog key remain M7
 distribution work; this record does not claim production key custody.

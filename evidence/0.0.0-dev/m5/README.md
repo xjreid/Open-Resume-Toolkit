@@ -2,7 +2,7 @@
 
 Scope revision, October 5, 2026: the user assigned paid ORT application signing,
 production desktop/helper identity and vault qualification, and final Store
-publication/installed production checks to M8. M5 now targets authenticated
+publication/installed production checks to M7. M5 now targets authenticated
 Chrome/Edge functionality, install/repair/status/version handling and its short
 walkthrough/failure checks using the declared current-user development bridge.
 M5 remains in progress. Earlier signing-dependent remaining-work statements
@@ -31,7 +31,7 @@ See [the Chrome implementation record](chrome-store-extension.md) and
 The production package always calls `com.openresumetoolkit`. An explicit local
 `--store-test` registration allows the same extension code and host protocol to
 exercise the current-user development app. It does not add a fallback to the
-extension or claim signed identity. The native protocol remains the M8 replacement
+extension or claim signed identity. The native protocol remains the M7 replacement
 boundary. Final dashboard identity and installed walkthrough await the user's
 initial draft upload; Edge, signed production transport, installation/repair and
 Store/public release qualification remain outstanding. M5 is still in progress.
@@ -66,7 +66,7 @@ Store/public release qualification remain outstanding. M5 is still in progress.
   wrong-client/replay/oversized/desktop-absent/version rejection and no automatic AI.
 - Prepare and synchronize exact test extension IDs and compatible packages. Store
   publication and signed desktop/helper identity, identity-scoped vault sharing,
-  production delivery and installed production checks are assigned to M8.
+  production delivery and installed production checks are assigned to M7.
 
 The September 23 unsigned-preview gate was superseded for local macOS development testing by the user-authorized September 29 exception. This does not qualify the signed production browser bridge.
 

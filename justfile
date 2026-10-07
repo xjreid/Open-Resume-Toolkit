@@ -80,4 +80,4 @@ package-preview:
 	pnpm --filter @ort/desktop tauri build --config src-tauri/tauri.preview.conf.json
 
 verify-artifacts:
-	@echo "Artifact verification becomes active with the M8 packaging pipeline."
+	@echo "Artifact verification becomes active with the M7 packaging pipeline."

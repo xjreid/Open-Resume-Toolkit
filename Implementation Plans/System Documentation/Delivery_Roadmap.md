@@ -11,9 +11,8 @@
 | M3 | Complete | Direct AI foundation |
 | M4 | Complete | Tailoring, alerts and application materials |
 | M5 | In progress | Workspace, tracker and browser bridge |
-| M6 | Planned | Static project website |
-| M7 | Optional | External Codex integration |
-| M8 | Planned | Distribution and stable hardening |
+| M6 | Optional | External Codex integration |
+| M7 | Planned | Distribution and stable hardening |
 
 M0–M2 completion applies to macOS Apple Silicon development. See the
 [closure and accepted limitations](../../evidence/0.0.0-dev/m2-acceptance-closure.md).
@@ -37,18 +36,19 @@ The [M4 closure](../../evidence/0.0.0-dev/m4/closure.md) records that acceptance
 and its scope. M5 remains in progress; this closure does not qualify its browser
 bridge or public distribution.
 
-On October 7, 2026, the user reordered the remaining work: M6 is the static
-project website immediately after M5, M7 is optional external Codex integration,
-and M8 is distribution and stable hardening. The October 5 signing boundary
-moves with production qualification to M8. M0–M7 do not require Apple Developer
-ID signing or notarization of ORT. M5 qualifies the declared current-user
-development bridge on the active Mac; M8 qualifies the production app, native host, and store-distributed extensions.
+On October 7, 2026, the user confirmed the remaining app delivery order:
+M6 is optional external Codex integration and M7 is distribution and stable
+hardening. GitHub remains the primary public project home. The October 5
+signing boundary stays with production qualification in M7. M0–M6 do not require
+Apple Developer ID signing or notarization of ORT. M5 qualifies the declared
+current-user development bridge on the active Mac; M7 qualifies the production
+app, native host, and store-distributed extensions.
 Local ad-hoc signing, executable integrity checks, authenticated IPC, and official
 external-runtime verification remain applicable; they are not waived.
 
 ## Testing approach
 
-The user approved a lighter testing policy for M2.5 and M3–M8. The
+The user approved a lighter testing policy for M2.5 and M3–M7. The
 [quality and verification plan](../../Product%20Plans/Quality_Accessibility_and_Verification.md)
 is authoritative: focused automated checks, one short feature walkthrough, and
 representative critical-failure checks. Aim for a 5–15 minute manual walkthrough
@@ -110,7 +110,7 @@ capture/review; retained snapshots, search/filter/reopen; authenticated Chrome/E
 native messaging within the declared current-user development boundary;
 development install/repair/status and version handling. Store-ready extension
 code/packages may be developed and tested without paid ORT app signing. Final
-store publication and signed production bridge qualification belong to M8 and
+store publication and signed production bridge qualification belong to M7 and
 are not M5 exit requirements. Optional overlay initiation remains separately
 gated by its documented permission model.
 
@@ -120,20 +120,7 @@ and failed-save preservation; representative wrong-client, replay/oversized
 message, desktop-absent and version-mismatch rejection.
 Confirm capture does not start AI automatically. No full browser/profile/OS matrix.
 
-## M6 — static project website
-
-**Deliver:** approved product/docs/download/support/legal pages immediately after
-M5, with no resume upload, account, hosted AI or backend user-data service. Use
-verified preview/release metadata for available downloads; if no public artifacts
-exist, publish a truthful availability notice without active download buttons.
-The site does not wait for M7 Codex or M8 stable distribution. Describe Codex as
-planned until qualified, and update release/download information as artifacts ship.
-
-**Minimum checks:** build; primary links/download identity; one desktop and one narrow
-viewport; keyboard navigation and readable content. No broad device/browser matrix
-or load-testing campaign for the static site.
-
-## M7 — optional external Codex
+## M6 — optional external Codex
 
 **Deliver:** verified official-runtime discovery and supported-version negotiation;
 isolated ORT Codex home; managed sign-in/keyring; stdio adapter, cancellation and
@@ -144,12 +131,12 @@ controlled wrong-identity/version and forbidden tool/file/command event rejectio
 representative quota/missing-data behavior and child cleanup. Runtime isolation
 and strict event handling remain implementation requirements. A smoke pass does
 not establish isolation by itself: inspect the enforcement configuration/code.
-If safe containment cannot be established, leave Codex mode disabled and defer M7.
+If safe containment cannot be established, leave Codex mode disabled and defer M6.
 No exhaustive runtime/platform matrix or specialized bypass campaign is required.
 
-M7 may be deferred without blocking M8.
+M6 may be deferred without blocking M7.
 
-## M8 — distribution and stable hardening
+## M7 — distribution and stable hardening
 
 **Deliver:** production qualification of the active macOS Apple Silicon channel,
 including required Developer ID application/native-helper signing, hardened
@@ -159,8 +146,8 @@ extension identities, Store review/publication and compatibility sequencing;
 signed updater metadata where updates are enabled; release channels and recovery;
 checksums, dependency/license inventory and provenance; support/diagnostic runbooks.
 Windows NSIS, SignPath and Store work remains deferred until that platform is
-explicitly activated. Paid enrollment is performed when undertaking M8 production
-qualification, not as a prerequisite to M0–M7 development.
+explicitly activated. Paid enrollment is performed when undertaking M7 production
+qualification, not as a prerequisite to M0–M6 development.
 
 **Minimum checks:** one install/launch/update-or-reinstall/uninstall cycle for the
 channel being shipped; one representative supported-version migration/backup reopen;
@@ -192,5 +179,5 @@ paths stay disabled. Unsigned preview acceptance is not signed-release acceptanc
 
 Windows/Intel native qualification; Linux/mobile; cloud sync/accounts/hosted keys
 or resume storage; locally hosted models; Safari/Firefox; automatic job submission;
-macOS signing/notarization before M8; additional themes/dark mode.
+macOS signing/notarization before M7; additional themes/dark mode.
 The approved light aesthetic and three document styles remain product scope.

@@ -4,10 +4,8 @@ This snapshot preserves earlier checkpoints and superseded testing requirements.
 Use [the current roadmap](Delivery_Roadmap.md) for active work. Nothing here adds
 a testing gate to the current plan.
 
-Milestone labels below preserve the historical order. The October 7, 2026 reorder
-supersedes them: the former M8 website is now M6 immediately after M5, the former
-M6 optional Codex integration is now M7, and the former M7 distribution/hardening
-is now M8. Use the current roadmap for all active milestone references.
+Milestone labels below preserve the historical order. Use the current roadmap
+for all active milestone scope, dependencies, and completion requirements.
 
 # Technical delivery roadmap
 
@@ -29,7 +27,7 @@ This architecture note is historical; see current status below.
 - Owner: maintainers
 - Planning unit: demonstrable vertical milestone, not percentage completion
 
-The Quiet Navy/Open Frame application and website direction is approved under `../../Aesthetic/`. Early milestones still use semantic, minimally styled controls and a deliberately plain renderer fixture so security, contracts, accessibility, and data behavior stabilize first. Production component polish and the non-default document-template details may be tested and refined during development, but the three promised style categories must pass their functional, accessibility, licensing, and golden-render gates before release.
+The Quiet Navy/Open Frame application direction is approved under `../../Aesthetic/`. Early milestones still use semantic, minimally styled controls and a deliberately plain renderer fixture so security, contracts, accessibility, and data behavior stabilize first. Production component polish and the non-default document-template details may be tested and refined during development, but the three promised style categories must pass their functional, accessibility, licensing, and golden-render gates before release.
 
 M0, M1, and M2 now use macOS Apple Silicon as their only active native
 qualification target. References below to Windows, Intel Mac, universal builds,
@@ -607,11 +605,6 @@ Exit evidence:
 - **[HIGH]** all stable release gates in
   `Quality_Accessibility_and_Verification.md` pass;
 - **[HIGH]** published artifacts are byte-for-byte the tested artifacts;
-- download pages can be generated from the signed release manifest.
-
-## M8 — static project website
-
-The private website plan may be implemented once real release metadata exists. It includes public product/docs/download/support/legal pages and no resume upload, account, hosted AI, or backend user-data service.
 
 ## Cross-milestone rules
 

@@ -179,7 +179,7 @@ Initial style categories are:
 2. **Professional/Business** — polished and spacious professional direction.
 3. **Modern/Marketing and Sales** — more visual personality while preserving readability and export quality.
 
-Changing style changes presentation only. It never flattens, deletes, rewrites, or requires re-entry of structured content. Resume and cover-letter exports never inherit the ORT application/website color theme, logo, iconography, or brand language. Exact typography, spacing, colors, assets, and template layouts belong in the aesthetic workspace. Exact reuse of Jake's Resume source or assets requires a documented compatible upstream license; otherwise ORT independently implements the common professional structure without copying protected source or branding.
+Changing style changes presentation only. It never flattens, deletes, rewrites, or requires re-entry of structured content. Resume and cover-letter exports never inherit the ORT application color theme, logo, iconography, or brand language. Exact typography, spacing, colors, assets, and template layouts belong in the aesthetic workspace. Exact reuse of Jake's Resume source or assets requires a documented compatible upstream license; otherwise ORT independently implements the common professional structure without copying protected source or branding.
 
 ## Import review
 

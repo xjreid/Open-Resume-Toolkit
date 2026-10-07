@@ -4,14 +4,14 @@
 
 - Status: approved baseline; Store/package registration probes required
 - Owner: browser/IPC maintainer
-- Milestone: M5 development functionality; M8 signed production bridge and Store qualification
+- Milestone: M5 development functionality; M7 signed production bridge and Store qualification
 - Product authority: `../../Product Plans/Desktop_Extension_Communication.md`, `Security_Privacy_and_Open_Source.md`, and `Configuration_Limits_and_Defaults.md`
 
 Non-goals: scraping an entire page, running automatically, modifying job sites, collecting browsing history, calling AI providers, or operating without the desktop application/native host.
 
 ## Extension architecture
 
-### M5/M8 boundary — accepted 2026-10-05, reordered 2026-10-07
+### M5/M7 boundary — accepted 2026-10-05, reordered 2026-10-07
 
 M5 does not require paid ORT app signing, production Keychain code-identity
 qualification or public Store publication. It does require Chrome/Edge functional
@@ -23,11 +23,11 @@ production-to-development fallback is permitted. The existing macOS development
 transport uses a temporary private per-session capability; it does not expose
 provider/database credentials or establish signed process identity.
 
-M8 requires Developer ID signing, notarization/stapling and intended desktop/host
+M7 requires Developer ID signing, notarization/stapling and intended desktop/host
 identity checks, identity-scoped access to the persistent IPC vault secret, final
 Chrome/Edge Store identities/publication, and installed production capture,
 repair/version and negative checks. The production authentication design below
-remains an M8 requirement. This scope revision does not itself enable a runtime
+remains an M7 requirement. This scope revision does not itself enable a runtime
 feature or complete either milestone.
 
 One TypeScript codebase produces Chrome and Edge Manifest V3 packages. Browser-specific checked-in templates provide extension name, Store ID, icons later supplied by the aesthetic plan, and native-host allowlist. Production, preview, and development IDs are distinct.
@@ -150,7 +150,7 @@ NSIS installs the host executable and per-user native-host manifests, registers 
 
 ### Windows Store fallback
 
-Before committing to MSIX, build a proof package verifying whether Store identity/virtualization permits the required registry/native-host registration and update persistence. If it cannot meet the product contract, the Store build must disable extension integration and the website/store listing must say so; do not claim repair support that cannot work.
+Before committing to MSIX, build a proof package verifying whether Store identity/virtualization permits the required registry/native-host registration and update persistence. If it cannot meet the product contract, the Store build must disable extension integration and the release documentation and Store listing must say so; do not claim repair support that cannot work.
 
 ### macOS
 

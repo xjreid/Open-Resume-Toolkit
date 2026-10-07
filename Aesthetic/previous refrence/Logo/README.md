@@ -30,7 +30,7 @@ Do not introduce gradients, multiple colors inside the mark, opacity effects, ou
 
 ## Wordmark typography
 
-The lockups use Inter with Arial as a provisional fallback. The production website and application should bundle and use the approved licensed interface font before relying on the text-based SVG lockups. If final font review selects a different typeface, update every lockup from one controlled source and regenerate all exports together.
+The lockups use Inter with Arial as a provisional fallback. The production application should bundle and use the approved licensed interface font before relying on the text-based SVG lockups. If final font review selects a different typeface, update every lockup from one controlled source and regenerate all exports together.
 
 Do not manually typeset a new wordmark beside the icon in individual surfaces.
 
@@ -50,13 +50,6 @@ Platform-required icon containers may impose their own safe area. In those cases
 At 16 and 20 px, use the supplied export or the source SVG rendered at the exact target size. Do not add internal detail.
 
 ## Context guidance
-
-### Website
-
-- Use the horizontal SVG or a matching 240/320 px raster export in the global header when the full project name is useful.
-- Use the icon SVG or 32/48 px export for favicons and compact navigation.
-- Use a 512 or 1024 px icon export as source material for social-preview composition; do not stretch the small favicon.
-- Use the reversed lockup only on a solid approved dark background.
 
 ### Desktop application
 

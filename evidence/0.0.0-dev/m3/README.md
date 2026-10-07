@@ -93,7 +93,7 @@ workspace sandbox, which cannot access that Keychain context. The repository's
 dependency-license inventory passed (778 Rust and 167 JavaScript packages)
 after a narrow, expiring exception for `webpki-root-certs@1.0.9` certificate
 data. Its CDLA-Permissive-2.0 agreement text must accompany any distributed
-data; release notices are still an M8 obligation, not proven by this gate.
+data; release notices are still an M7 obligation, not proven by this gate.
 
 No live synthetic provider request was made: this workspace has no configured
 user provider credential. The roadmap permits documenting missing live-provider

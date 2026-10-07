@@ -27,7 +27,7 @@ for replay.
 The [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>)
 is authoritative for milestone scope and order. The completed offline-path
 boundary is recorded in [M2 acceptance closure](evidence/0.0.0-dev/m2-acceptance-closure.md).
-M2.5, usable desktop and resume designs, M3 Direct AI foundation, and M4 application materials are complete for macOS Apple Silicon development. The user accepted [M4](evidence/0.0.0-dev/m4/closure.md) on October 5, 2026. M5 remains in progress. The October 7, 2026 delivery order is M6 static project website, M7 optional external Codex integration, then M8 distribution and stable hardening.
+M2.5, usable desktop and resume designs, M3 Direct AI foundation, and M4 application materials are complete for macOS Apple Silicon development. The user accepted [M4](evidence/0.0.0-dev/m4/closure.md) on October 5, 2026. M5 remains in progress. The October 7, 2026 app delivery order is M6 optional external Codex integration, then M7 distribution and stable hardening. The public GitHub repository is the primary home for project information, documentation, support, and releases.
 
 M0-M2 are currently qualified only on macOS Apple Silicon. Windows and Intel
 Mac remain later platform-expansion goals. Their shared builds may remain in CI
@@ -110,7 +110,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 ### Technical implementation and future aesthetic work
 
 - [Implementation plans](<Implementation Plans/README.md>) — selected technical baseline, component plans, delivery order, and implementation gates.
-- [Next milestones](<Implementation Plans/Next_Milestones.md>) — completed M3 review route and ordered navigation to M4–M8; the delivery roadmap remains authoritative for scope and exit evidence.
+- [Next milestones](<Implementation Plans/Next_Milestones.md>) — completed M3 review route and ordered navigation to M4–M7; the delivery roadmap remains authoritative for scope and exit evidence.
 - [Development and deployment outline](<Implementation Plans/System Documentation/Development_and_Deployment_Outline.md>) — shared desktop/extension source ownership, platform and Store artifacts, environments, CI/release sequence, mandatory gates, rollback, and M0 readiness.
 - Component folders under `Implementation Plans/` — implementation-ready plans for architecture/security/build, desktop, extensions/IPC, local data/migration, AI/document processing, and distribution/updates.
 - [Aesthetic planning](Aesthetic/README.md) — approved Open Folio direction, archived incumbent references, surface responsibilities, document independence, and remaining visual deliverables.
@@ -139,15 +139,15 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 
 ### Next milestone handoff
 
-M5 is functional development qualification without paid ORT app signing. M8
+M5 is functional development qualification without paid ORT app signing. M7
 requires production signing/notarization, native bridge identity/vault controls
 and final extension Store qualification, per the user decision of October 5,
-2026, with production qualification moved to M8 by the October 7 roadmap reorder. Existing authentication/integrity requirements remain in effect.
+2026, with production qualification assigned to M7 in the current October 7 roadmap. Existing authentication/integrity requirements remain in effect.
 
 1. Read [Next milestones](<Implementation Plans/Next_Milestones.md>).
 2. Read M5 in the [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>) and its linked product authority before continuing work.
 3. Use [M2 acceptance closure](evidence/0.0.0-dev/m2-acceptance-closure.md) as the completed offline-path boundary; do not reopen completed M0–M2 scope unless a regression requires it.
-4. Use the [M3 evidence](evidence/0.0.0-dev/m3/README.md) and [M4 closure](evidence/0.0.0-dev/m4/closure.md) as completed boundaries. Continue through M5–M8 only in roadmap order and after their stated dependencies and gates are satisfied.
+4. Use the [M3 evidence](evidence/0.0.0-dev/m3/README.md) and [M4 closure](evidence/0.0.0-dev/m4/closure.md) as completed boundaries. Continue through M5–M7 only in roadmap order and after their stated dependencies and gates are satisfied.
 
 ### Security and privacy review
 

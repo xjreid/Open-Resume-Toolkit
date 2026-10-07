@@ -64,7 +64,7 @@ claim a signed desktop installation. The installed desktop app was not opened.
 
 ### Additional fields
 
-- **Official URL:** None, until there is an owned and verified website.
+- **Official URL:** None.
 - **Homepage URL:** Leave blank for now.
 - **Support URL:** Leave blank for now; a support email is not a webpage URL.
   Use `xjrspam1@gmail.com` in the developer account support/contact email field
@@ -139,10 +139,9 @@ and the publisher's stated practices:
 ### Privacy policy URL
 
 This field remains pending. Host the prepared `privacy-policy.html` at a publicly
-accessible HTTPS address, then paste that address. A product website is not
-required just to host a policy; a static page can provide the policy. Do not paste
-a local filesystem path or an invented URL. Local-only capture still requires a
-policy under Google's rules.
+accessible HTTPS address, then paste that address. A standalone static policy
+page is sufficient. Do not paste a local filesystem path or an invented URL.
+Local-only capture still requires a policy under Google's rules.
 
 The prepared policy includes the publisher-supplied contact email
 `xjrspam1@gmail.com`. No hosting or publication was performed by this task.
@@ -181,7 +180,7 @@ Obtain this item's extension ID and public key from the dashboard, configure the
 matching store-test identity, and install the explicit development adapter using
 `development-testing.md`. This makes the production extension's local identity
 match its desktop host for testing. It does not sign the desktop app or complete
-the M8 native identity work.
+the M7 native identity work.
 
 ## Sources
 

@@ -4,14 +4,14 @@
 
 - Status: approved baseline for implementation
 - Owner: core maintainers
-- First milestone: M0 architecture skeleton through M8 release hardening
+- First milestone: M0 architecture skeleton through M7 release hardening
 - Product authority: all files in `../../Product Plans/`, especially `Product_Scope_and_Principles.md`, `Local_Data_and_Document_Model.md`, `Product_States_and_Operations.md`, and `Security_Privacy_and_Open_Source.md`
 
 This document defines how the approved local-first desktop product will be assembled. It does not define visual styling.
 
 ## Architectural goals
 
-1. The desktop application remains useful without an account, extension, website, AI connection, or network access.
+1. The desktop application remains useful without an account, extension, AI connection, or network access.
 2. Resume content, tracker records, activity history, and credentials remain on the device except for the minimum content the user deliberately sends to a chosen AI provider.
 3. Every durable record has one owner and one versioned schema.
 4. The same structured document produces preview and export output through the same renderer.
@@ -40,7 +40,7 @@ Tauri desktop process
     +-- optional external `codex app-server` child over stdio
 ```
 
-The website and GitHub Releases are separate distribution/documentation surfaces. They never receive resume content.
+The public GitHub repository is the primary home for project information, documentation, support, and releases. GitHub Releases distribute verified artifacts and release metadata. Neither receives resume content from the application.
 
 ## Process boundaries
 

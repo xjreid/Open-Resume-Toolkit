@@ -25,7 +25,7 @@ Browser content can never directly read local records, access credentials, chang
 
 M5 qualifies functional Chrome/Edge integration with the clearly identified
 current-user development app/host; paid Apple app signing is not required before
-M8. M8 qualifies signed production desktop/helper identity, identity-scoped vault
+M7. M7 qualifies signed production desktop/helper identity, identity-scoped vault
 access, final Store identities/publication and Store-installed integration.
 Authenticated messages, exact origins, permission/capture authorization, bounds,
 replay rejection and safe failure remain requirements at both stages. Testing

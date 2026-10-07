@@ -1,6 +1,6 @@
 # Chrome extension ↔ native host protocol v1
 
-This is the implemented browser-facing contract for Chrome 0.3.0. M8's signed
+This is the implemented browser-facing contract for Chrome 0.3.0. M7's signed
 native transport must preserve it so the browser implementation remains usable
 without an authentication-specific update. Native-host/desktop authentication
 is internal and is never performed by page scripts or the extension.
@@ -97,7 +97,7 @@ CAPTURE_INVALID and CAPTURE_TOO_LARGE. Connection failures never enable capture.
 
 Exact extension origins are allowlisted by the host manifest and native binary.
 For explicit development testing, a locally registered host with the production
-name relays to the current-user development socket. For M8, the signed host uses
+name relays to the current-user development socket. For M7, the signed host uses
 verified native identities and a scoped vault secret instead. No authentication
 secret crosses this browser contract. Native version/capability metadata may be
 extended compatibly; a breaking change needs deliberate protocol/version rollout.

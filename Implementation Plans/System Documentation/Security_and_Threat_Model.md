@@ -22,7 +22,7 @@ qualification remain required, and import remains disabled.
 
 - Status: implementation baseline; security review required before stable release
 - Owner: security maintainer plus component owners
-- Applies to: desktop, local data, provider/Codex integrations, document processing, extension/IPC, installer, updater, and website claims
+- Applies to: desktop, local data, provider/Codex integrations, document processing, extension/IPC, installer, updater, and public project claims
 - Product authority: `../../Product Plans/Security_Privacy_and_Open_Source.md`
 
 The product stores unusually sensitive employment material and user-supplied credentials. The design therefore assumes job pages, imports, AI output, local IPC peers, backup files, and update infrastructure may be malicious or compromised.
@@ -127,11 +127,11 @@ If supported public OS mechanisms cannot enforce these properties without admini
 
 ## Native IPC protocol controls
 
-The user-assigned milestone boundary is M5 development functionality and M8
-signed production qualification (accepted 2026-10-05, reordered 2026-10-07). Before M8, explicit unsigned/ad-hoc
+The user-assigned milestone boundary is M5 development functionality and M7
+signed production qualification (accepted 2026-10-05, reordered 2026-10-07). Before M7, explicit unsigned/ad-hoc
 ORT development transport may authenticate within the current-user boundary
 using its temporary private session capability; it cannot claim signed process
-identity or substitute for the production vault secret. M8 must prove intended
+identity or substitute for the production vault secret. M7 must prove intended
 app/helper code identity and identity-scoped vault access. Exact origins, bounded
 messages, HMAC/replay checks and capture-session authorization remain required;
 no secret/provider/database access is granted to the browser extension.
@@ -249,7 +249,7 @@ no secret/provider/database access is granted to the browser extension.
 Automated tests intercept all process network destinations for critical offline journeys. Stable release requires proof that:
 
 - offline authoring/import/render/export causes no network request;
-- the website and extension receive no desktop content;
+- the extension receives no desktop content;
 - API calls contain only the fields declared by the operation minimizer;
 - clearing AI Monitoring history does not reset guardrails;
 - backups exclude credentials and device-bound secrets;

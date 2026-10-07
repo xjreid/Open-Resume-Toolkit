@@ -68,8 +68,8 @@ The software may be used internationally, but documentation must not imply that 
 
 ### Functional, open-source presentation
 
-- Product and website language is direct, specific, and documentation-oriented. It describes functionality, limitations, privacy boundaries, installation, source, and contribution without startup slogans, lifestyle marketing, exaggerated claims, or vague “AI-powered” language.
-- ORT branding applies to the application, overlay, extension, website, installer, and project assets. Resume and cover-letter documents are independent professional documents and never carry ORT colors, logos, brand shapes, or promotional language.
+- Product and repository language is direct, specific, and documentation-oriented. It describes functionality, limitations, privacy boundaries, installation, source, and contribution without startup slogans, lifestyle marketing, exaggerated claims, or vague “AI-powered” language.
+- ORT branding applies to the application, overlay, extension, installer, and project assets. Resume and cover-letter documents are independent professional documents and never carry ORT colors, logos, brand shapes, or promotional language.
 
 ## Initial non-goals
 

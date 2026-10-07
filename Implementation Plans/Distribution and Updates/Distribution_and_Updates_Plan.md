@@ -4,7 +4,7 @@
 
 - Status: approved baseline; SignPath application and Store/native-host probes outstanding
 - Owner: release maintainer
-- Milestone: M8, with preview packaging earlier
+- Milestone: M7, with preview packaging earlier
 - Product authority: `../../Product Plans/Distribution_and_Updates.md`, `Security_Privacy_and_Open_Source.md`, `Quality_Accessibility_and_Verification.md`, and `Release_Scope_and_Open_Decisions.md`
 
 Codex is not included in any ORT installer. Users who select Codex mode install a supported Codex runtime independently.
@@ -86,7 +86,7 @@ SBOM, provenance, and candid Gatekeeper/quarantine instructions.
 
 Unsigned macOS preview builds do not silently auto-install updates. `Check for updates` verifies authenticated metadata and opens the exact GitHub release/download guidance. Tauri updater signatures may protect metadata/artifact integrity but are not represented as Apple code signing or notarization.
 
-M8 production qualification requires Developer ID Application signing of the app and native helpers, hardened runtime, notarization and stapling. Paid enrollment is not required for M0–M7 development. The transition includes key-custody/entitlement review, identity-scoped bridge-secret access, final extension Store identities/publication and installed production integration checks. Signed in-app updates require the independently verified updater design below.
+M7 production qualification requires Developer ID Application signing of the app and native helpers, hardened runtime, notarization and stapling. Paid enrollment is not required for M0–M6 development. The transition includes key-custody/entitlement review, identity-scoped bridge-secret access, final extension Store identities/publication and installed production integration checks. Signed in-app updates require the independently verified updater design below.
 
 ## Updater trust model
 
@@ -139,7 +139,6 @@ Triggered from an approved signed semantic-version tag. Uses pinned action commi
 7. assemble signed update metadata;
 8. create a draft GitHub Release with all assets;
 9. human approval promotes draft to public stable release;
-10. website build consumes the released compatibility/download manifest.
 
 Jobs must not rebuild between testing and publication. GitHub artifact attestations complement, not replace, OS/updater signatures.
 
@@ -163,7 +162,7 @@ Jobs must not rebuild between testing and publication. GitHub artifact attestati
 - external Codex runtime/protocol tested range and enabled/disabled gate status;
 - update security floor.
 
-Desktop exposes this data in diagnostics. Website/support pages render it rather than maintaining a divergent hand-written matrix.
+Desktop exposes this data in diagnostics. GitHub release and support documentation derive compatibility information from it rather than maintaining a divergent hand-written matrix.
 
 ## Rollback and incident behavior
 
