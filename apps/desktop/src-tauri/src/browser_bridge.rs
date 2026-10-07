@@ -10,6 +10,11 @@ pub(crate) struct BrowserBridgeState {
     captures: std::sync::Arc<std::sync::Mutex<ort_ipc::capture_session::CaptureSession>>,
 }
 impl BrowserBridgeState {
+    // Keep the instance API on targets where no bridge server is compiled in.
+    #[cfg_attr(
+        not(all(feature = "dev-browser-bridge", target_os = "macos")),
+        allow(clippy::unused_self)
+    )]
     pub(crate) fn enabled(&self) -> bool {
         #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
         {
