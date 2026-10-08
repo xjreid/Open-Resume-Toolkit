@@ -7,7 +7,7 @@ import { AiWorkspace } from "../src/shared/AiWorkspace";
 
 const native = vi.hoisted(() => ({
   invoke: vi.fn(),
-  presetListeners: new Set<() => void>(),
+  modelListeners: new Set<() => void>(),
 }));
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: native.invoke,
@@ -17,8 +17,8 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: async (_event: string, handler: () => void) => {
-    native.presetListeners.add(handler);
-    return () => native.presetListeners.delete(handler);
+    native.modelListeners.add(handler);
+    return () => native.modelListeners.delete(handler);
   },
 }));
 
@@ -33,7 +33,7 @@ const connection = {
         credentialId: "019a0000-0000-7000-8000-000000000001",
         createdAt: "2026-09-01T12:00:00Z",
         provider: "openai",
-        preset: "balanced",
+        model: "fixture-model",
         paused: false,
         removed: false,
         cleanupRequired: false,
@@ -42,7 +42,7 @@ const connection = {
         credentialId: "019a0000-0000-7000-8000-000000000002",
         createdAt: "2026-09-02T12:00:00Z",
         provider: "anthropic",
-        preset: "balanced",
+        model: "fixture-model",
         paused: false,
         removed: false,
         cleanupRequired: false,
@@ -73,6 +73,7 @@ const emptyMonitoring = {
     byPreset: {},
     byOperationType: {},
     timeBuckets: [],
+    recentFailures: [],
     unresolvedReservedMicros: 0,
     estimatedCostMicros: 0,
     currency: null,
@@ -134,8 +135,14 @@ beforeEach(async () => {
   vi.stubGlobal("InputEvent", dom.window.InputEvent);
   vi.stubGlobal("MouseEvent", dom.window.MouseEvent);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  dom.window.HTMLDialogElement.prototype.showModal = function () {
+    this.open = true;
+  };
+  dom.window.HTMLDialogElement.prototype.close = function () {
+    this.open = false;
+  };
   native.invoke.mockReset();
-  native.presetListeners.clear();
+  native.modelListeners.clear();
   native.invoke.mockImplementation((command: string) => {
     if (command === "load_ai_catalog") return Promise.resolve(catalog);
     if (command === "load_ai_connection") return Promise.resolve(connection);
@@ -200,7 +207,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it("refreshes the model preset after the overlay changes it", async () => {
+it("refreshes the selected model after the overlay changes it", async () => {
   const previous = native.invoke.getMockImplementation()!;
   native.invoke.mockImplementation((command: string, args?: unknown) =>
     command === "load_ai_connection"
@@ -210,18 +217,94 @@ it("refreshes the model preset after the overlay changes it", async () => {
             ...connection.value,
             keys: connection.value.keys.map((key) =>
               key.credentialId === "019a0000-0000-7000-8000-000000000001"
-                ? { ...key, preset: "economy" }
+                ? { ...key, model: "other-fixture-model" }
                 : key,
             ),
           },
         })
       : previous(command, args),
   );
-  await act(async () => native.presetListeners.forEach((wake) => wake()));
+  await act(async () => native.modelListeners.forEach((wake) => wake()));
   const select = [...document.querySelectorAll("select")].find((item) =>
-    item.closest("label")?.textContent?.includes("Model preset for"),
+    item.closest("label")?.textContent?.includes("Model for"),
   );
-  expect(select?.value).toBe("economy");
+  expect(select?.value).toBe("other-fixture-model");
+});
+
+it("lists every enabled catalog model by name and saves an explicit model per key", async () => {
+  const previous = native.invoke.getMockImplementation()!;
+  const entries = Array.from({ length: 6 }, (_, index) => ({
+    ...catalog.value.entries[0],
+    model: index === 0 ? "fixture-model" : `fixture-model-${index}`,
+    preset: "balanced",
+    disabled: index === 5,
+  }));
+  native.invoke.mockImplementation((command: string, args?: any) => {
+    if (command === "load_ai_catalog")
+      return Promise.resolve({
+        ...catalog,
+        value: { ...catalog.value, entries: [...entries, entries[0]] },
+      });
+    if (command === "set_ai_key_model")
+      return Promise.resolve({
+        ...connection,
+        value: {
+          ...connection.value,
+          keys: connection.value.keys.map((key) =>
+            key.credentialId === args.request.credentialId
+              ? { ...key, model: args.request.model }
+              : key,
+          ),
+        },
+      });
+    return previous(command, args);
+  });
+  await act(async () =>
+    root.render(<AiWorkspace key="model-options" blocked={false} />),
+  );
+  const select = document.querySelector<HTMLSelectElement>(
+    '[aria-label="OpenAI key settings"] select',
+  )!;
+  expect([...select.options].map((option) => option.textContent)).toEqual([
+    "fixture-model",
+    "fixture-model-1",
+    "fixture-model-2",
+    "fixture-model-3",
+    "fixture-model-4",
+  ]);
+  expect(select.textContent).not.toMatch(
+    /Economy|Balanced|Quality|Coming soon/,
+  );
+  await act(async () => {
+    select.value = "fixture-model-4";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(native.invoke).toHaveBeenCalledWith("set_ai_key_model", {
+    request: {
+      credentialId: connection.value.keys[0].credentialId,
+      model: "fixture-model-4",
+    },
+  });
+  expect(select.value).toBe("fixture-model-4");
+  expect(document.body.textContent).toContain("Model saved.");
+});
+
+it("opens an empty recent-failures popup and restores focus on close", async () => {
+  await click("Data");
+  await click("View recent failures");
+  const dialog = document.querySelector<HTMLDialogElement>(
+    ".ai-recent-failures-dialog",
+  )!;
+  expect(dialog.open).toBe(true);
+  expect(dialog.textContent).toContain(
+    "No recorded failures for this period and key selection.",
+  );
+  expect(document.activeElement?.textContent).toBe("Close");
+  await act(async () =>
+    dialog.querySelector<HTMLButtonElement>("button")!.click(),
+  );
+  expect(dialog.open).toBe(false);
+  expect(document.activeElement?.textContent).toBe("View recent failures");
 });
 
 async function click(label: string) {
@@ -233,6 +316,106 @@ async function click(label: string) {
     button.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   });
 }
+
+it("shows persisted failure diagnostics in Data, including older failure categories", async () => {
+  const previous = native.invoke.getMockImplementation()!;
+  native.invoke.mockImplementation((command: string, args?: unknown) =>
+    command === "load_ai_monitoring"
+      ? Promise.resolve({
+          ok: true,
+          value: {
+            ...emptyMonitoring.value,
+            attempts: 2,
+            logicalOperations: 1,
+            recentFailures: [
+              {
+                operationId: "op-1",
+                attemptId: "attempt-2",
+                provider: "gemini",
+                requestedModel: "gemini-3.5-flash-lite",
+                effectiveModel: null,
+                operationType: "tailor_resume",
+                callNumber: 2,
+                startedAtUnixMs: Date.now() - 5000,
+                durationMs: 3500,
+                category: "transient",
+                usage: null,
+                usageComplete: false,
+                details: {
+                  code: "AI_PROVIDER_SERVICE_UNAVAILABLE",
+                  httpStatus: 503,
+                  finishReason: null,
+                  providerReason: null,
+                  pageCount: null,
+                  validationIssues: [],
+                },
+              },
+              {
+                operationId: "op-old",
+                attemptId: "attempt-old",
+                provider: "gemini",
+                requestedModel: "gemini-3.5-flash-lite",
+                effectiveModel: null,
+                operationType: "tailor_resume",
+                callNumber: 1,
+                startedAtUnixMs: Date.now() - 10000,
+                durationMs: 2000,
+                category: "invalid_output",
+                usage: null,
+                usageComplete: false,
+                details: null,
+              },
+            ].reverse(),
+          },
+        })
+      : previous(command, args),
+  );
+  await act(async () =>
+    root.render(<AiWorkspace key="diagnostic-fixture" blocked={false} />),
+  );
+  await click("Data");
+  expect(
+    document.querySelector(".ai-recent-failures-dialog")?.hasAttribute("open"),
+  ).toBe(false);
+  await click("View recent failures");
+  const failures = document.querySelector<HTMLDialogElement>(
+    ".ai-recent-failures-dialog",
+  )!;
+  expect(failures.open).toBe(true);
+  const rows = [
+    ...failures.querySelectorAll<HTMLDetailsElement>(".ai-failure-row"),
+  ];
+  expect(rows.map((row) => row.querySelector("strong")?.textContent)).toEqual([
+    "Provider unavailable",
+    "Invalid response",
+  ]);
+  expect(rows.every((row) => !row.open)).toBe(true);
+  await act(async () => rows[0].querySelector("summary")!.click());
+  expect(rows[0].open).toBe(true);
+  await act(async () => rows[0].querySelector("summary")!.click());
+  expect(rows[0].open).toBe(false);
+  expect(failures.textContent).toContain("HTTP 503");
+  expect(failures.textContent).toContain(
+    "2 of 4 · source and editorial review",
+  );
+  expect(failures.textContent).toContain("3.5 seconds");
+  expect(failures.textContent).toContain("usage may be uncertain");
+  expect(failures.textContent).toContain(
+    "older record does not include the exact validation reason",
+  );
+  expect(failures.querySelectorAll("details")).toHaveLength(2);
+  const accessibility = await axe.run(failures, {
+    rules: { "color-contrast": { enabled: false } },
+  });
+  expect(accessibility.violations.map((item) => item.id)).toEqual([]);
+  await act(async () =>
+    failures.dispatchEvent(
+      new dom.window.Event("cancel", { cancelable: true }),
+    ),
+  );
+  expect(failures.open).toBe(false);
+  expect(document.activeElement?.textContent).toBe("View recent failures");
+});
 
 it("requires an estimate review before the synthetic provider request", async () => {
   await clickAccessible("Test OpenAI key");
@@ -835,7 +1018,7 @@ it("shows all key information and controls without expansion", async () => {
     firstCard.querySelector(".ai-key-identity-line")?.textContent,
   ).toContain("OpenAI·OpenAI key");
   expect(firstCard.textContent).not.toContain("Sep 1, 2026");
-  expect(document.body.textContent).toContain("Balanced: fixture-model");
+  expect(document.body.textContent).toContain("fixture-model");
   expect(document.body.textContent).not.toContain("ORT-tested input limit");
   expect(document.body.textContent).not.toContain("Pricing & model details");
   expect(document.querySelector(".ai-key-customization")).toBeNull();
@@ -962,7 +1145,7 @@ it("fails closed when spending data cannot be loaded", async () => {
   expect(document.body.textContent).toContain("Spending data unavailable");
   expect(
     [...document.querySelectorAll("select")].find((select) =>
-      select.closest("label")?.textContent?.includes("Model preset"),
+      select.closest("label")?.textContent?.includes("Model for"),
     )?.disabled,
   ).toBe(true);
   expect(
@@ -1306,7 +1489,7 @@ it("removing the active key preserves its activity filter and never selects anot
   expect(
     document.querySelector('[aria-label="View activity for Archived key"]')
       ?.textContent,
-  ).toContain("OpenAI · Balanced: fixture-model · Removed");
+  ).toContain("OpenAI · fixture-model · Removed");
   expect(native.invoke).toHaveBeenCalledWith("change_ai_key", {
     request: {
       credentialId: "019a0000-0000-7000-8000-000000000001",

@@ -257,6 +257,7 @@ export function ApplicationPopup() {
               contactDivider="dot"
               onContactDividerChange={() => undefined}
               showContactDivider={false}
+              allowListClassification={false}
               disabled={snapshot.disabled}
               canAddEntry={canAddEntry}
               onChange={(update) =>

@@ -295,6 +295,7 @@ mod tests {
                     label: "Language".to_owned(),
                     value: "Rust".to_owned(),
                     is_skill: true,
+                    list_kind: None,
                 }],
                 bullets: vec![Bullet {
                     id: EntityId::new(),

@@ -31,8 +31,7 @@ pub struct SavedAiKey {
     pub name: Option<String>,
     #[schemars(with = "CredentialProvider")]
     pub provider: String,
-    #[schemars(with = "ort_ai::Preset")]
-    pub preset: String,
+    pub model: String,
     pub paused: bool,
     pub removed: bool,
     pub cleanup_required: bool,
@@ -48,9 +47,49 @@ pub struct AiKeyRegistry {
 pub(crate) struct AiConnectionState {
     pub mode: String,
     pub provider: Option<String>,
-    pub preset: Option<String>,
+    pub model: Option<String>,
     pub credential_id: Option<Uuid>,
 }
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LegacyConnection {
+    mode: String,
+    provider: Option<String>,
+    preset: Option<String>,
+    credential_id: Option<Uuid>,
+}
+
+fn valid_model_id(model: &str) -> bool {
+    !model.is_empty()
+        && model.len() <= 200
+        && model
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+}
+
+fn legacy_model(provider: &str, preset: &str) -> Result<String, StorageError> {
+    let provider = match provider {
+        "openai" => ort_ai::Provider::OpenAi,
+        "anthropic" => ort_ai::Provider::Anthropic,
+        "gemini" => ort_ai::Provider::Gemini,
+        _ => return Err(StorageError::InvalidData),
+    };
+    let preset: ort_ai::Preset =
+        serde_json::from_value(json!(preset)).map_err(|_| StorageError::InvalidData)?;
+    let catalog: ort_ai::Catalog = serde_json::from_slice(ort_ai::BUILTIN_CATALOG_BYTES)
+        .map_err(|_| StorageError::InvalidData)?;
+    // This reads historical identifiers only. Dispatch still verifies the signed,
+    // current catalog and rejects unavailable models; migration grants no access.
+    Ok(catalog
+        .entries
+        .iter()
+        .find(|entry| entry.provider == provider && entry.preset == preset)
+        .map_or_else(
+            || format!("unavailable-{preset:?}").to_lowercase(),
+            |entry| entry.model.clone(),
+        ))
+}
+
 impl AiKeyRegistry {
     #[cfg(test)]
     fn from_value(value: serde_json::Value) -> Result<Self, StorageError> {
@@ -71,6 +110,17 @@ impl AiKeyRegistry {
             for key in keys {
                 let key = key.as_object_mut().ok_or(StorageError::InvalidData)?;
                 migrated |= key.remove("identificationNumber").is_some();
+                if let Some(preset) = key.remove("preset") {
+                    if !key.contains_key("model") {
+                        let provider = key
+                            .get("provider")
+                            .and_then(serde_json::Value::as_str)
+                            .ok_or(StorageError::InvalidData)?;
+                        let preset = preset.as_str().ok_or(StorageError::InvalidData)?;
+                        key.insert("model".into(), json!(legacy_model(provider, preset)?));
+                    }
+                    migrated = true;
+                }
                 if !key.contains_key("createdAt") {
                     let id = key
                         .get("credentialId")
@@ -87,7 +137,7 @@ impl AiKeyRegistry {
             serde_json::from_value(value).map_err(|_| StorageError::InvalidData)?
         } else {
             migrated = true;
-            let legacy: AiConnectionState =
+            let legacy: LegacyConnection =
                 serde_json::from_value(value).map_err(|_| StorageError::InvalidData)?;
             if !matches!(legacy.mode.as_str(), "direct_api" | "no_ai") {
                 return Err(StorageError::InvalidData);
@@ -98,8 +148,8 @@ impl AiKeyRegistry {
                         credential_id: id,
                         created_at: created_at_for(id),
                         name: None,
+                        model: legacy_model(&provider, &preset)?,
                         provider,
-                        preset,
                         paused: legacy.mode != "direct_api",
                         removed: false,
                         cleanup_required: false,
@@ -117,7 +167,7 @@ impl AiKeyRegistry {
         let mut ids = std::collections::HashSet::new();
         for key in &self.keys {
             if serde_json::from_value::<CredentialProvider>(json!(key.provider)).is_err()
-                || serde_json::from_value::<ort_ai::Preset>(json!(key.preset)).is_err()
+                || !valid_model_id(&key.model)
                 || !ids.insert(key.credential_id)
                 || key.created_at.parse::<jiff::Timestamp>().is_err()
                 || key.name.as_ref().is_some_and(|name| !valid_key_name(name))
@@ -141,7 +191,7 @@ impl AiKeyRegistry {
             return Ok(AiConnectionState {
                 mode: "no_ai".into(),
                 provider: None,
-                preset: None,
+                model: None,
                 credential_id: None,
             });
         };
@@ -158,7 +208,7 @@ impl AiKeyRegistry {
             }
             .into(),
             provider: Some(key.provider.clone()),
-            preset: Some(key.preset.clone()),
+            model: Some(key.model.clone()),
             credential_id: Some(id),
         })
     }
@@ -341,13 +391,16 @@ fn add_key<V: ProviderCredentialVault>(
     };
     let catalog = ort_ai::builtin_catalog(&jiff::Timestamp::now().to_string(), None)
         .map_err(|_| "AI_CATALOG_UNAVAILABLE")?;
-    catalog
-        .resolve(
-            provider,
-            ort_ai::Preset::Balanced,
-            ort_ai::OperationType::CredentialTest,
-        )
-        .map_err(|_| "AI_PRESET_UNAVAILABLE")?;
+    let choices = catalog.available_models(provider, ort_ai::OperationType::CredentialTest);
+    // Preserve the shipped default for new keys while allowing future catalogs
+    // without a legacy Balanced entry to expose their first supported model.
+    let default_model = choices
+        .iter()
+        .find(|entry| entry.preset == ort_ai::Preset::Balanced)
+        .or_else(|| choices.first())
+        .ok_or("AI_MODEL_UNAVAILABLE")?
+        .model
+        .clone();
     let secret = ProviderSecret::from_bytes(request.api_key.into_bytes())
         .map_err(|_| "AI_CREDENTIAL_INVALID")?;
     let (mut registry, revision) = load_registry(store).map_err(|_| STORAGE)?;
@@ -357,7 +410,7 @@ fn add_key<V: ProviderCredentialVault>(
         created_at: created_at_for(credential_id),
         name,
         provider: request.provider,
-        preset: "balanced".into(),
+        model: default_model,
         paused: true,
         removed: false,
         cleanup_required: true,
@@ -505,13 +558,13 @@ pub struct RenameAiKeyRequest {
 }
 #[derive(Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SetAiKeyPresetRequest {
+pub struct SetAiKeyModelRequest {
     credential_id: Uuid,
-    preset: String,
+    model: String,
 }
-fn set_key_preset(
+fn set_key_model(
     store: &EncryptedStore,
-    request: &SetAiKeyPresetRequest,
+    request: &SetAiKeyModelRequest,
 ) -> Result<AiKeyRegistry, &'static str> {
     let (mut registry, revision) = load_registry(store).map_err(|_| STORAGE)?;
     let key = registry
@@ -527,28 +580,26 @@ fn set_key_preset(
         "gemini" => ort_ai::Provider::Gemini,
         _ => return Err("AI_PROVIDER_INVALID"),
     };
-    let preset = match request.preset.as_str() {
-        "economy" => ort_ai::Preset::Economy,
-        "balanced" => ort_ai::Preset::Balanced,
-        "quality" => ort_ai::Preset::Quality,
-        _ => return Err("AI_PRESET_UNAVAILABLE"),
-    };
     let catalog = ort_ai::builtin_catalog(&jiff::Timestamp::now().to_string(), None)
         .map_err(|_| "AI_CATALOG_UNAVAILABLE")?;
     catalog
-        .resolve(provider, preset, ort_ai::OperationType::CredentialTest)
-        .map_err(|_| "AI_PRESET_UNAVAILABLE")?;
-    key.preset.clone_from(&request.preset);
+        .resolve_model(
+            provider,
+            &request.model,
+            ort_ai::OperationType::CredentialTest,
+        )
+        .map_err(|_| "AI_MODEL_UNAVAILABLE")?;
+    key.model.clone_from(&request.model);
     save_registry(store, &registry, revision)?;
     Ok(registry)
 }
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub fn set_ai_key_preset(
+pub fn set_ai_key_model(
     window: WebviewWindow,
     state: State<'_, DesktopState>,
     gate: State<'_, AiRequestGate>,
-    request: SetAiKeyPresetRequest,
+    request: SetAiKeyModelRequest,
 ) -> CommandResponse<AiKeyRegistry> {
     if !matches!(window.label(), "main" | "overlay") {
         return window_not_authorized();
@@ -561,16 +612,16 @@ pub fn set_ai_key_preset(
     let Some(_lease) = lease else {
         return CommandResponse::failure("AI_BUSY", "errors.aiBusy", true);
     };
-    let result = response(state.with_store(|store| Ok(set_key_preset(store, &request))));
+    let result = response(state.with_store(|store| Ok(set_key_model(store, &request))));
     if matches!(&result, CommandResponse::Success { .. }) {
         let _ = window.emit_to(
             EventTarget::webview_window("main"),
-            "ort:ai-preset-changed",
+            "ort:ai-model-changed",
             (),
         );
         let _ = window.emit_to(
             EventTarget::webview_window("overlay"),
-            "ort:ai-preset-changed",
+            "ort:ai-model-changed",
             (),
         );
     }

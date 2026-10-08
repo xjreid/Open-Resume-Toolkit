@@ -18,6 +18,7 @@ export function ResumeCanvas({
   contactDivider,
   onContactDividerChange,
   showContactDivider = true,
+  allowListClassification = true,
   onFocusSection,
   disabled,
   canAddEntry,
@@ -28,6 +29,7 @@ export function ResumeCanvas({
   contactDivider: ContactDivider;
   onContactDividerChange: (divider: ContactDivider) => void;
   showContactDivider?: boolean;
+  allowListClassification?: boolean;
   onFocusSection?: (sectionId: string) => void;
   disabled: boolean;
   canAddEntry: boolean;
@@ -102,6 +104,7 @@ export function ResumeCanvas({
             <CanvasEntry
               key={entry.id}
               entry={entry}
+              allowListClassification={allowListClassification}
               disabled={disabled}
               onChange={(next) => changeEntry(section.id, entry.id, () => next)}
               onRemove={() =>
@@ -155,11 +158,13 @@ export function ResumeCanvas({
 
 function CanvasEntry({
   entry,
+  allowListClassification,
   disabled,
   onChange,
   onRemove,
 }: {
   entry: ResumeEntry;
+  allowListClassification: boolean;
   disabled: boolean;
   onChange: (entry: ResumeEntry) => void;
   onRemove: () => void;
@@ -277,6 +282,49 @@ function CanvasEntry({
           />
         ))}
       </div>
+      {allowListClassification &&
+        entry.fields.some((field) => fieldRole(field) !== "paragraph") && (
+          <details className="canvas-list-settings">
+            <summary>AI list selection</summary>
+            <p>
+              Allow AI to select exact skills or courses from these lists.
+              Publish master changes before tailoring.
+            </p>
+            {entry.fields
+              .filter((field) => fieldRole(field) !== "paragraph")
+              .map((field, index) => (
+                <label key={field.id}>
+                  <span>{field.label || `Details ${index + 1}`}</span>
+                  <select
+                    aria-label={`List type for ${field.label || "details"} ${index + 1}`}
+                    disabled={disabled}
+                    value={field.listKind ?? (field.isSkill ? "skills" : "")}
+                    onChange={(event) => {
+                      const kind = event.target.value;
+                      onChange({
+                        ...entry,
+                        fields: entry.fields.map((candidate) => {
+                          if (candidate.id !== field.id) return candidate;
+                          const { listKind: _previous, ...rest } = candidate;
+                          return {
+                            ...rest,
+                            isSkill: kind === "skills",
+                            ...(kind === "skills" || kind === "coursework"
+                              ? { listKind: kind }
+                              : {}),
+                          };
+                        }),
+                      });
+                    }}
+                  >
+                    <option value="">Protected details</option>
+                    <option value="skills">Skills</option>
+                    <option value="coursework">Coursework</option>
+                  </select>
+                </label>
+              ))}
+          </details>
+        )}
       <CanvasField
         label="Information"
         value={

@@ -113,3 +113,43 @@ it("renders all paragraphs alongside retained bullets", async () => {
     await act(async () => root.unmount());
   }
 });
+
+it("classifies a list without altering its value, identity or other metadata", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  let resume = sample();
+  const original = { ...resume.sections[0].entries[0].fields[0] };
+  await act(async () =>
+    root.render(
+      <ResumeCanvas
+        document={resume}
+        style="technical"
+        contactDivider="dot"
+        onContactDividerChange={() => {}}
+        disabled={false}
+        canAddEntry
+        onChange={(update) => {
+          resume = update(resume);
+        }}
+      />,
+    ),
+  );
+  const select = host.querySelector<HTMLSelectElement>(
+    'select[aria-label="List type for Language 1"]',
+  )!;
+  await act(async () => {
+    select.value = "coursework";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(resume.sections[0].entries[0].fields[0]).toEqual({
+    ...original,
+    listKind: "coursework",
+    isSkill: false,
+  });
+  expect(resume.sections[0].entries[0].fields[1].value).toBe(
+    "Preserve this certification",
+  );
+  await act(async () => root.unmount());
+  host.remove();
+});

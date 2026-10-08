@@ -36,6 +36,7 @@ pub fn document_for(
                         label: ort_domain::PARAGRAPH_FIELD_LABEL.into(),
                         value: text.to_owned(),
                         is_skill: false,
+                        list_kind: None,
                     }],
                     bullets: Vec::<Bullet>::new(),
                     links: Vec::new(),

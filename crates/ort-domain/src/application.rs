@@ -81,6 +81,8 @@ pub struct ApplicationWorkspace {
     pub tracker_metadata: Option<TrackerMetadata>,
     pub resume: ResumeDocument,
     pub change_points: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub change_summary: Vec<String>,
     pub alerts: Vec<QualificationAlert>,
     pub alerts_truncated: bool,
     pub dismissed_alert_ids: Vec<String>,

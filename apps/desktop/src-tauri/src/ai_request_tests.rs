@@ -1,4 +1,5 @@
 use super::*;
+use ort_ai::Preset;
 
 #[test]
 fn material_failures_distinguish_completion_model_and_format() {
@@ -19,6 +20,38 @@ fn material_failures_distinguish_completion_model_and_format() {
         output.material_error("gemini-3.6-flash"),
         Some("AI_OUTPUT_INVALID")
     );
+}
+
+#[test]
+fn gemini_failures_distinguish_service_token_limit_policy_and_incomplete_stream() {
+    for (payload, expected) in [
+        (
+            json!({"error":{"code":503}}),
+            "AI_PROVIDER_SERVICE_UNAVAILABLE",
+        ),
+        (json!({"error":{"code":429}}), "AI_RATE_LIMITED"),
+        (
+            json!({"candidates":[{"finishReason":"MAX_TOKENS"}]}),
+            "AI_OUTPUT_LIMIT",
+        ),
+        (
+            json!({"candidates":[{"finishReason":"SAFETY"}]}),
+            "AI_OUTPUT_BLOCKED",
+        ),
+        (
+            json!({"candidates":[{"content":{"parts":[{"text":"partial"}]}}]}),
+            "AI_OUTPUT_INCOMPLETE",
+        ),
+    ] {
+        let raw = format!("data: {payload}\n");
+        let output =
+            SyntheticStreamState::from_events(GeminiAdapter.parse_stream(raw.as_bytes()).unwrap());
+        assert_eq!(
+            output.material_error("gemini-3.5-flash-lite"),
+            Some(expected)
+        );
+        assert!(!output.valid("gemini-3.5-flash-lite"));
+    }
 }
 
 #[test]
@@ -104,6 +137,7 @@ fn all_provider_streams_apply_header_free_resume_consistently() {
                 label: "Technologies".into(),
                 value: "Rust, SQL".into(),
                 is_skill: true,
+                list_kind: None,
             }],
             bullets: vec![Bullet {
                 id: EntityId::new(),
@@ -113,8 +147,8 @@ fn all_provider_streams_apply_header_free_resume_consistently() {
             links: vec![],
         }],
     });
-    let text = json!({"schemaVersion":5,"tailoringPlan":["Emphasize Rust support tools for the tooling role."],"roleInfo":null,"alerts":[],
-        "templateSections":[{"sectionId":section_id,"entries":[{"entryId":entry_id,"sourceEntryIds":[entry_id],"mainInfo":{"format":"bullets","items":["Developed Rust tools for support teams."]}}]}]}).to_string();
+    let text = json!({"schemaVersion":6,"tailoringPlan":["Emphasize Rust support tools for the tooling role."],"roleInfo":null,"alerts":[],"rolePriorities":["Rust tooling"],"reviewIssues":[],
+        "templateSections":[{"sectionId":section_id,"entries":[{"entryId":entry_id,"sourceEntryIds":[entry_id],"selectedLists":[{"fieldId":source.sections[0].entries[0].fields[0].id,"itemIndexes":[0,1]}],"mainInfo":{"format":"bullets","items":[{"text":"Developed Rust tools for support teams.","sourceRefs":[source.sections[0].entries[0].bullets[0].id]}]}}]}]}).to_string();
     let mut expected = None;
     for provider in [Provider::OpenAi, Provider::Anthropic, Provider::Gemini] {
         let model = if provider == Provider::Gemini {
@@ -144,7 +178,14 @@ fn all_provider_streams_apply_header_free_resume_consistently() {
                 material.resume.sections[0].entries[0].date_range,
                 "2021 - 2024"
             );
-            let context = ort_ai::materials::resume_context(&material.resume);
+            let mut context = ort_ai::materials::resume_context(&material.resume);
+            for section in context["sections"].as_array_mut().unwrap() {
+                for entry in section["entries"].as_array_mut().unwrap() {
+                    for bullet in entry["sourceBullets"].as_array_mut().unwrap() {
+                        bullet.as_object_mut().unwrap().remove("sourceId");
+                    }
+                }
+            }
             if let Some(expected) = &expected {
                 assert_eq!(&context, expected);
             } else {

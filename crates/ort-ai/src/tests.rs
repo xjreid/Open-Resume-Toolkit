@@ -547,9 +547,21 @@ fn gemini_requires_successful_candidate_completion() {
         let stream = format!("data: {value}\ndata: [DONE]\n");
         let events = GeminiAdapter.parse_stream(stream.as_bytes()).unwrap();
         assert_eq!(
-            events.contains(&StreamEvent::ProviderFailure),
-            reason != Some("STOP")
+            events.contains(&StreamEvent::Finished),
+            reason == Some("STOP")
         );
+        match reason {
+            Some("MAX_TOKENS") => {
+                assert!(events.contains(&StreamEvent::Failure(StreamFailure::OutputLimit)));
+            }
+            Some("SAFETY" | "RECITATION") => assert!(events.contains(&StreamEvent::Failure(
+                StreamFailure::Blocked(reason.unwrap().into())
+            ))),
+            Some("OTHER") => assert!(events.contains(&StreamEvent::Failure(
+                StreamFailure::Stopped("OTHER".into())
+            ))),
+            _ => {}
+        }
         assert!(
             events
                 .iter()
@@ -563,6 +575,83 @@ fn gemini_requires_successful_candidate_completion() {
         let events = GeminiAdapter
             .parse_stream(format!("data: {value}\n").as_bytes())
             .unwrap();
-        assert!(events.contains(&StreamEvent::ProviderFailure));
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, StreamEvent::ProviderFailure | StreamEvent::Failure(_)))
+        );
+    }
+}
+
+#[test]
+fn gemini_stream_error_status_is_preserved_without_copying_provider_messages() {
+    for code in [400, 401, 403, 429, 500, 503, 504] {
+        let stream = format!(
+            "data: {{\"error\":{{\"code\":{code},\"message\":\"SYNTHETIC_PRIVATE_BODY\"}}}}\n"
+        );
+        let events = GeminiAdapter.parse_stream(stream.as_bytes()).unwrap();
+        assert_eq!(
+            events,
+            vec![StreamEvent::Failure(StreamFailure::ProviderStatus(code))]
+        );
+    }
+}
+
+#[test]
+fn provider_error_diagnostics_extract_codes_and_exclude_free_text() {
+    assert_eq!(provider_error_reason(br#"{"error":{"status":"INVALID_ARGUMENT","message":"SYNTHETIC_PRIVATE_TEXT","details":[{"reason":"API_KEY_INVALID"}]}}"#), Some("API_KEY_INVALID".into()));
+    assert_eq!(
+        provider_error_reason(
+            br#"{"error":{"code":"insufficient_quota","message":"SYNTHETIC_PRIVATE_TEXT"}}"#
+        ),
+        Some("insufficient_quota".into())
+    );
+    assert_eq!(
+        provider_error_reason(br#"{"error":{"message":"SYNTHETIC_PRIVATE_TEXT"}}"#),
+        None
+    );
+    assert_eq!(
+        provider_error_reason(br#"{"error":{"status":"private text with spaces"}}"#),
+        None
+    );
+    assert_eq!(provider_error_reason(&vec![b'x'; 16 * 1024 + 1]), None);
+}
+
+#[test]
+fn explicit_model_selection_has_no_three_tier_limit_and_never_falls_back() {
+    let mut catalog = builtin_catalog("2026-10-08T00:00:00Z", None).unwrap();
+    let source = catalog.entries[0].clone();
+    catalog.entries = (0..12)
+        .map(|index| CatalogEntry {
+            model: format!("fixture-model-{index}"),
+            // Every model can share legacy metadata without colliding in selection.
+            preset: Preset::Balanced,
+            ..source.clone()
+        })
+        .collect();
+    catalog.entries.push(catalog.entries[0].clone());
+    catalog.entries[4].disabled = true;
+    catalog.entries[5].operations = vec![OperationType::CredentialTest];
+    let choices = catalog.available_models(Provider::OpenAi, OperationType::TailorResume);
+    assert_eq!(choices.len(), 10);
+    let selected = catalog
+        .resolve_model(
+            Provider::OpenAi,
+            "fixture-model-11",
+            OperationType::TailorResume,
+        )
+        .unwrap();
+    assert_eq!(selected.model, "fixture-model-11");
+    for (provider, model) in [
+        (Provider::OpenAi, "fixture-model-4"),
+        (Provider::OpenAi, "fixture-model-5"),
+        (Provider::OpenAi, "unknown"),
+        (Provider::Gemini, "fixture-model-11"),
+    ] {
+        assert!(
+            catalog
+                .resolve_model(provider, model, OperationType::TailorResume)
+                .is_err()
+        );
     }
 }

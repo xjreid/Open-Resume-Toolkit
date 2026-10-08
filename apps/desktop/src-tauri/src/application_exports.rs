@@ -112,6 +112,7 @@ impl ApplicationExportState {
         prepared.push(next);
     }
 
+    #[cfg(test)]
     pub(crate) fn is_prepared(
         &self,
         profile_id: uuid::Uuid,
@@ -318,6 +319,7 @@ impl ApplicationExportFormat {
 pub struct PreparedApplicationExport {
     pub revision: i64,
     pub pdf_ready: bool,
+    pub page_count: usize,
     pub docx_ready: bool,
 }
 
@@ -363,15 +365,31 @@ pub fn prepare_application_exports(
     if window.label() != "overlay" {
         return window_not_authorized();
     }
-    if window.state::<ApplicationExportState>().is_prepared(
-        window
-            .state::<DesktopState>()
-            .with_store(|store| Ok(store.manifest().profile_id))
-            .unwrap_or_default(),
-        expected_revision,
-        kind,
-    ) {
+    let profile_id = match window
+        .state::<DesktopState>()
+        .with_store(|store| Ok(store.manifest().profile_id))
+    {
+        Ok(profile) => profile,
+        Err(problem) => return storage_failure(&problem),
+    };
+    let cached_pages = window
+        .state::<ApplicationExportState>()
+        .prepared
+        .lock()
+        .ok()
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|item| {
+                    item.profile_id == profile_id
+                        && item.revision == expected_revision
+                        && item.kind == kind
+                })
+                .map(|item| item.receipt.page_count)
+        });
+    if let Some(page_count) = cached_pages {
         let current = window.state::<DesktopState>().with_store(|store| {
+            ort_application::application_workspace::ensure_profile(store, profile_id)?;
             Ok(load(store)?.is_some_and(|saved| saved.revision == expected_revision))
         });
         match current {
@@ -379,6 +397,7 @@ pub fn prepare_application_exports(
                 return CommandResponse::success(PreparedApplicationExport {
                     revision: expected_revision,
                     pdf_ready: true,
+                    page_count,
                     docx_ready: true,
                 });
             }
@@ -395,6 +414,7 @@ pub fn prepare_application_exports(
         Err(StorageError::InvalidData) => return error("EXPORT_PREPARE_FAILED"),
         Err(problem) => return storage_failure(&problem),
     };
+    let page_count = prepared.receipt.page_count;
     let still_current = window.state::<DesktopState>().with_store(|store| {
         Ok(
             load(store)?.is_some_and(|saved| saved.revision == expected_revision)
@@ -410,6 +430,7 @@ pub fn prepare_application_exports(
     CommandResponse::success(PreparedApplicationExport {
         revision: expected_revision,
         pdf_ready: true,
+        page_count,
         docx_ready: true,
     })
 }

@@ -1,0 +1,157 @@
+.ai-failure-details {
+  margin-block: 12px;
+  overflow-wrap: anywhere;
+}
+.ai-failure-details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.ai-failure-details ul {
+  padding-inline-start: 20px;
+}
+.ai-failure-history {
+  padding: 0;
+  list-style: none;
+}
+.ai-failure-history > li {
+  padding-block: 16px;
+  border-top: 1px solid var(--line);
+}
+.ai-failure-history p {
+  margin-block: 6px;
+}
+.ai-failure-trigger-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.ai-recent-failures-dialog {
+  width: min(640px, calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  overflow: auto;
+}
+.ai-recent-failures-dialog::backdrop {
+  background: rgb(28 49 53 / 42%);
+}
+.ai-recent-failures-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.ai-recent-failures-heading h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.ai-recent-failures-heading p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.ai-recent-failures-body {
+  padding: 16px 24px 20px;
+}
+.ai-recent-failures-dialog .ai-failure-history {
+  margin-block: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.ai-recent-failures-dialog .ai-failure-history > li {
+  padding: 0;
+  border-color: var(--line);
+}
+.ai-failure-row > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 8px;
+  list-style: none;
+  cursor: pointer;
+  border-radius: 5px;
+}
+.ai-failure-row > summary::-webkit-details-marker {
+  display: none;
+}
+.ai-failure-row > summary:hover {
+  background: var(--canvas);
+}
+.ai-failure-row > summary:focus-visible {
+  outline: 3px solid var(--focus, #469298);
+  outline-offset: -3px;
+}
+.ai-failure-row-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ai-failure-row-copy > strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.ai-failure-row-copy > span,
+.ai-failure-row-copy > time {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ai-failure-row-copy > time {
+  font-variant-numeric: tabular-nums;
+}
+.ai-failure-row > summary > svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+.ai-failure-row[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.ai-failure-row-body {
+  padding: 0 8px 16px;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.ai-failure-content dl {
+  margin-block: 12px;
+  font-size: 14px;
+}
+.ai-failure-content dl > div {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.45fr) minmax(0, 1fr);
+  gap: 12px;
+  padding-block: 4px;
+}
+.ai-failure-content dt {
+  color: var(--muted);
+}
+.ai-failure-content dd {
+  min-width: 0;
+  margin: 0;
+  user-select: text;
+}
+.ai-failure-empty {
+  margin-block: 24px;
+}
+@media (max-width: 640px) {
+  .ai-recent-failures-dialog {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+  .ai-recent-failures-heading,
+  .ai-recent-failures-body {
+    padding-inline: 16px;
+  }
+}

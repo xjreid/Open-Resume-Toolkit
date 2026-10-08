@@ -1,6 +1,7 @@
 //! Versioned application-material responses. Generated prose is user-reviewed;
 //! validation enforces response shape and document bounds, not factual truth.
 pub use ort_domain::{AlertCategory, AlertEvidence, AlertKind, QualificationAlert, RoleInfo};
+mod list_selection;
 mod resume_draft;
 
 pub use resume_draft::{gemini_resume_output_schema, resume_context, resume_output_schema};
@@ -20,6 +21,12 @@ pub const MAX_ANSWER_CHARS: usize = 4_000;
 pub enum MaterialError {
     #[error("invalid application material")]
     Invalid,
+    #[error("{0}")]
+    InvalidDetail(String),
+    #[error("invalid or cross-entry published evidence reference")]
+    Evidence,
+    #[error("{0}")]
+    EvidenceDetail(String),
     #[error("unsupported application-material schema")]
     Version,
     #[error("the question requires a personal answer")]
@@ -265,6 +272,8 @@ pub struct TailoredMaterial {
     pub resume: ResumeDocument,
     pub role_info: Option<RoleInfo>,
     pub change_points: Vec<String>,
+    pub role_priorities: Vec<String>,
+    pub review_issues: Vec<String>,
     pub alerts: Vec<QualificationAlert>,
     pub alerts_truncated: bool,
 }
@@ -333,7 +342,7 @@ pub fn validate_tailoring(
     if value
         .get("schemaVersion")
         .and_then(serde_json::Value::as_u64)
-        == Some(5)
+        == Some(6)
     {
         return resume_draft::validate(source, source, job, value, published_revision);
     }
@@ -434,6 +443,7 @@ pub fn validate_tailoring(
                         || field.label != source_field.label
                         || field.value != source_field.value
                         || field.is_skill != source_field.is_skill
+                        || field.list_kind != source_field.list_kind
                     {
                         return Err(MaterialError::Invalid);
                     }
@@ -488,6 +498,8 @@ pub fn validate_tailoring(
         resume,
         role_info,
         change_points,
+        role_priorities: Vec::new(),
+        review_issues: Vec::new(),
         alerts,
         alerts_truncated,
     })
@@ -520,6 +532,26 @@ pub fn validate_refinement(
     raw: &str,
     published_revision: i64,
 ) -> Result<TailoredMaterial, MaterialError> {
+    validate_refinement_detailed(source, current, job, raw, published_revision).map_err(|error| {
+        match error {
+            MaterialError::InvalidDetail(_) => MaterialError::Invalid,
+            MaterialError::EvidenceDetail(_) => MaterialError::Evidence,
+            other => other,
+        }
+    })
+}
+
+/// Validate with actionable, in-memory feedback for the bounded correction pass.
+/// Feedback may contain source identities; it is never written to activity logs.
+/// # Errors
+/// Rejects malformed responses, invalid identities, and unsupported evidence.
+pub fn validate_refinement_detailed(
+    source: &ResumeDocument,
+    current: &ResumeDocument,
+    job: &str,
+    raw: &str,
+    published_revision: i64,
+) -> Result<TailoredMaterial, MaterialError> {
     source
         .validate(DocumentLimits::default())
         .map_err(|_| MaterialError::Invalid)?;
@@ -530,7 +562,7 @@ pub fn validate_refinement(
     {
         return Err(MaterialError::Invalid);
     }
-    let value = serde_json::from_str(raw).map_err(|_| MaterialError::Invalid)?;
+    let value = serde_json::from_str(raw).map_err(|error| MaterialError::InvalidDetail(format!("Invalid JSON at line {}, column {}. Return one complete JSON object without markdown fences or surrounding prose.", error.line(), error.column())))?;
     resume_draft::validate(source, current, job, value, published_revision)
 }
 
@@ -1047,6 +1079,7 @@ mod tests {
                     label: "Skill".into(),
                     value: "Rust".into(),
                     is_skill: true,
+                    list_kind: None,
                 }],
                 bullets: vec![Bullet {
                     id: EntityId::new(),
@@ -1417,6 +1450,7 @@ mod tests {
             label: "Graduation year".into(),
             value: "2028".into(),
             is_skill: false,
+            list_kind: None,
         });
         let field_id = source.sections[0].entries[0].fields[1].id;
         let candidate = json!({"kind":"confirmed_mismatch","category":"graduation_date",

@@ -1,0 +1,84 @@
+{
+  "name": "experienced-data",
+  "job": "Required: SQL. Python preferred. Reporting engineer.",
+  "source": {
+    "schemaVersion": 1,
+    "documentId": "019a0000-0000-7000-8000-000000000006",
+    "title": "Synthetic master",
+    "contact": {
+      "fullName": "Alex Example",
+      "email": "alex@example.invalid",
+      "phone": "",
+      "location": "Boston",
+      "links": []
+    },
+    "sections": [
+      {
+        "id": "019a0000-0000-7000-8000-000000000007",
+        "order": 0,
+        "heading": "Experience",
+        "entries": [
+          {
+            "id": "019a0000-0000-7000-8000-000000000008",
+            "order": 0,
+            "heading": "Example 1",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000009",
+                "order": 0,
+                "label": "Technologies",
+                "value": "SQL, Python",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000000a",
+                "order": 0,
+                "text": "Maintained SQL reporting jobs and reduced the weekly reporting run from 4 hours to 2 hours."
+              }
+            ],
+            "links": []
+          }
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "schemaVersion": 6,
+    "tailoringPlan": ["Emphasize direct published evidence for the role."],
+    "rolePriorities": ["Direct technical evidence"],
+    "reviewIssues": [],
+    "roleInfo": null,
+    "templateSections": [
+      {
+        "sectionId": "019a0000-0000-7000-8000-000000000007",
+        "entries": [
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000008",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000008"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000009",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Maintained SQL reporting jobs and reduced the weekly reporting run from 4 hours to 2 hours.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000000a"]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "alerts": []
+  }
+}

@@ -4,7 +4,7 @@
     "cleanupPending": false,
     "durabilityUnconfirmed": false,
     "formatMajor": 1,
-    "formatMinor": 6,
+    "formatMinor": 7,
     "status": "exported"
   },
   "get_tracker_entry": {
@@ -54,6 +54,7 @@
     "estimatedCostMicros": 0,
     "logicalOperations": 0,
     "partial": false,
+    "recentFailures": [],
     "timeBuckets": [],
     "totalTokens": 0,
     "unknownCount": 0,
@@ -112,7 +113,7 @@
     "databaseSchema": 5,
     "documentSchema": 2,
     "formatMajor": 1,
-    "formatMinor": 6,
+    "formatMinor": 7,
     "masterDrafts": 1,
     "publishedResumes": 101,
     "renderManifests": 0,

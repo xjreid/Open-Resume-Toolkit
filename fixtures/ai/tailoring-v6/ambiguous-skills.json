@@ -1,0 +1,84 @@
+{
+  "name": "ambiguous-skills",
+  "job": "Required: Rust. C++ preferred.",
+  "source": {
+    "schemaVersion": 1,
+    "documentId": "019a0000-0000-7000-8000-00000000008e",
+    "title": "Synthetic master",
+    "contact": {
+      "fullName": "Alex Example",
+      "email": "alex@example.invalid",
+      "phone": "",
+      "location": "Boston",
+      "links": []
+    },
+    "sections": [
+      {
+        "id": "019a0000-0000-7000-8000-00000000008f",
+        "order": 0,
+        "heading": "Projects",
+        "entries": [
+          {
+            "id": "019a0000-0000-7000-8000-000000000090",
+            "order": 0,
+            "heading": "Example 1",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000091",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Languages: Rust, SQL | C/C++",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000092",
+                "order": 0,
+                "text": "Built a Rust service using SQL."
+              }
+            ],
+            "links": []
+          }
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "schemaVersion": 6,
+    "tailoringPlan": ["Emphasize direct published evidence for the role."],
+    "rolePriorities": ["Direct technical evidence"],
+    "reviewIssues": [],
+    "roleInfo": null,
+    "templateSections": [
+      {
+        "sectionId": "019a0000-0000-7000-8000-00000000008f",
+        "entries": [
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000090",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000090"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000091",
+                "itemIndexes": [0]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built a Rust service using SQL.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000092"]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "alerts": []
+  }
+}

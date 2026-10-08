@@ -237,7 +237,7 @@ impl ResumeDocument {
                     check_identifier(field.id, &mut identifiers)?;
                     total_characters += bounded_characters(&field.label, limits.field_characters)?;
                     total_characters += bounded_characters(&field.value, limits.field_characters)?;
-                    if field.is_skill {
+                    if field.is_skill || field.list_kind == Some(ListKind::Skills) {
                         skill_count += 1;
                     }
                 }
@@ -351,6 +351,27 @@ pub struct NamedField {
     pub label: String,
     pub value: String,
     pub is_skill: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_option"
+    )]
+    #[schemars(with = "ListKind")]
+    pub list_kind: Option<ListKind>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ListKind {
+    Skills,
+    Coursework,
+}
+
+impl NamedField {
+    #[must_use]
+    pub fn selectable(&self) -> bool {
+        self.role() != FieldRole::Paragraph && (self.list_kind.is_some() || self.is_skill)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

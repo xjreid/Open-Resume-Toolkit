@@ -46,6 +46,93 @@
       "title": "AiActivityMonth",
       "type": "object"
     },
+    "AiAttemptFailure": {
+      "properties": {
+        "attemptId": {
+          "type": "string"
+        },
+        "callNumber": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "details": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AiFailureDetails"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "durationMs": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "effectiveModel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "operationType": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "requestedModel": {
+          "type": "string"
+        },
+        "startedAtUnixMs": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Usage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "usageComplete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "operationId",
+        "attemptId",
+        "provider",
+        "requestedModel",
+        "effectiveModel",
+        "operationType",
+        "callNumber",
+        "startedAtUnixMs",
+        "durationMs",
+        "category",
+        "details",
+        "usage",
+        "usageComplete"
+      ],
+      "type": "object"
+    },
     "AiCapActionRequest": {
       "$defs": {},
       "additionalProperties": false,
@@ -134,6 +221,60 @@
         "reservedMicros",
         "unresolvedMicros",
         "revision"
+      ],
+      "type": "object"
+    },
+    "AiFailureDetails": {
+      "additionalProperties": false,
+      "description": "Bounded diagnostics authored locally. No keys, prompts, response bodies,\njob descriptions, or model-authored review text belong in these records.",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "finishReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "httpStatus": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pageCount": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "providerReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "validationIssues": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "code",
+        "httpStatus",
+        "finishReason",
+        "providerReason",
+        "validationIssues",
+        "pageCount"
       ],
       "type": "object"
     },
@@ -365,6 +506,13 @@
         "partial": {
           "type": "boolean"
         },
+        "recentFailures": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/AiAttemptFailure"
+          },
+          "type": "array"
+        },
         "timeBuckets": {
           "items": {
             "$ref": "#/$defs/AiMonitoringBucket"
@@ -408,7 +556,8 @@
         "byModel",
         "byPreset",
         "byOperationType",
-        "timeBuckets"
+        "timeBuckets",
+        "recentFailures"
       ],
       "title": "AiMonitoringSummary",
       "type": "object"
@@ -584,18 +733,15 @@
         "browserConnected": {
           "type": "boolean"
         },
-        "preset": {
+        "model": {
           "type": [
             "string",
             "null"
           ]
         },
-        "presetLabel": {
-          "type": "string"
-        },
-        "presetOptions": {
+        "modelOptions": {
           "items": {
-            "$ref": "#/$defs/ApplicationPresetOption"
+            "$ref": "#/$defs/ApplicationModelOption"
           },
           "type": "array"
         },
@@ -629,9 +775,8 @@
         "aiBusy",
         "selectedKeyReady",
         "selectedKeyId",
-        "preset",
-        "presetLabel",
-        "presetOptions",
+        "model",
+        "modelOptions",
         "browserConnected"
       ],
       "title": "ApplicationContext",
@@ -645,6 +790,18 @@
       "title": "ApplicationExportFormat",
       "type": "string"
     },
+    "ApplicationModelOption": {
+      "properties": {
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "model"
+      ],
+      "title": "ApplicationModelOption",
+      "type": "object"
+    },
     "ApplicationPopupKind": {
       "enum": [
         "job",
@@ -656,33 +813,6 @@
       ],
       "title": "ApplicationPopupKind",
       "type": "string"
-    },
-    "ApplicationPresetOption": {
-      "properties": {
-        "available": {
-          "type": "boolean"
-        },
-        "label": {
-          "type": "string"
-        },
-        "model": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "preset": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "preset",
-        "label",
-        "model",
-        "available"
-      ],
-      "title": "ApplicationPresetOption",
-      "type": "object"
     },
     "ApplicationWorkspace": {
       "additionalProperties": false,
@@ -706,6 +836,12 @@
           "type": "array"
         },
         "changePoints": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "changeSummary": {
           "items": {
             "type": "string"
           },
@@ -2357,6 +2493,13 @@
       ],
       "type": "object"
     },
+    "ListKind": {
+      "enum": [
+        "skills",
+        "coursework"
+      ],
+      "type": "string"
+    },
     "LoadResumeRequest": {
       "$defs": {},
       "additionalProperties": false,
@@ -2461,6 +2604,9 @@
         },
         "label": {
           "type": "string"
+        },
+        "listKind": {
+          "$ref": "#/$defs/ListKind"
         },
         "order": {
           "format": "uint16",
@@ -3102,6 +3248,11 @@
         "docxReady": {
           "type": "boolean"
         },
+        "pageCount": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
         "pdfReady": {
           "type": "boolean"
         },
@@ -3113,6 +3264,7 @@
       "required": [
         "revision",
         "pdfReady",
+        "pageCount",
         "docxReady"
       ],
       "title": "PreparedApplicationExport",
@@ -3814,6 +3966,9 @@
           "format": "uuid",
           "type": "string"
         },
+        "model": {
+          "type": "string"
+        },
         "name": {
           "type": [
             "string",
@@ -3822,9 +3977,6 @@
         },
         "paused": {
           "type": "boolean"
-        },
-        "preset": {
-          "$ref": "#/$defs/Preset"
         },
         "provider": {
           "$ref": "#/$defs/CredentialProvider"
@@ -3837,7 +3989,7 @@
         "credentialId",
         "createdAt",
         "provider",
-        "preset",
+        "model",
         "paused",
         "removed",
         "cleanupRequired"
@@ -3921,22 +4073,22 @@
       "title": "SavedWorkspace",
       "type": "object"
     },
-    "SetAiKeyPresetRequest": {
+    "SetAiKeyModelRequest": {
       "additionalProperties": false,
       "properties": {
         "credentialId": {
           "format": "uuid",
           "type": "string"
         },
-        "preset": {
+        "model": {
           "type": "string"
         }
       },
       "required": [
         "credentialId",
-        "preset"
+        "model"
       ],
-      "title": "SetAiKeyPresetRequest",
+      "title": "SetAiKeyModelRequest",
       "type": "object"
     },
     "StageOneDraft": {
@@ -5864,12 +6016,12 @@
         "$ref": "#/$defs/TrackerSummary"
       }
     },
-    "set_ai_key_preset": {
+    "set_ai_key_model": {
       "args": {
         "additionalProperties": false,
         "properties": {
           "request": {
-            "$ref": "#/$defs/SetAiKeyPresetRequest"
+            "$ref": "#/$defs/SetAiKeyModelRequest"
           }
         },
         "required": [

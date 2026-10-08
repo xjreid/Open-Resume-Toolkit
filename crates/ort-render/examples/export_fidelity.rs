@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         date_range: String::new(), location: "Portland metropolitan area, Oregon".into(),
         dates: Some(vec![ResumeDate { id: EntityId::new(), order: 0, label: "Graduation".into(),
             start: Some(CalendarDate { year: 2027, month: Some(6), expected: true }), end: None }]),
-        fields: vec![NamedField { id: EntityId::new(), order: 0, label: "Extra".into(), value: "Remote work eligibility".into(), is_skill: false }],
+        fields: vec![NamedField { id: EntityId::new(), order: 0, label: "Extra".into(), value: "Remote work eligibility".into(), is_skill: false, list_kind: None }],
         links: vec![], bullets: vec![Bullet { id: EntityId::new(), order: 0,
             text: "Built accessible reporting tools that preserve every customer record, improve review speed, and provide clear documentation for distributed engineering teams.".into() }],
     }
@@ -51,6 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         label: "__ort_body_paragraph__".into(),
         value: "Languages: Rust, Python, TypeScript\nTools: Git, SQL, Linux".into(),
         is_skill: true,
+        list_kind: None,
     }];
     document.sections.push(ResumeSection {
         id: EntityId::new(),

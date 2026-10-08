@@ -24,7 +24,10 @@ export function documentUsage(document: ResumeDocument) {
       entries.reduce((sum, entry) => sum + entry.links.length, 0),
     skills: entries.reduce(
       (sum, entry) =>
-        sum + entry.fields.filter((field) => field.isSkill).length,
+        sum +
+        entry.fields.filter(
+          (field) => field.isSkill || field.listKind === "skills",
+        ).length,
       0,
     ),
   };

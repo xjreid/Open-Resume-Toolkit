@@ -350,3 +350,30 @@
     flex-wrap: nowrap;
   }
 }
+
+.canvas-list-settings {
+  grid-column: 1 / -1;
+  margin-block: 12px;
+  color: var(--muted, #566c70);
+  font:
+    14px/1.5 Hanken,
+    ui-sans-serif,
+    sans-serif;
+}
+.canvas-list-settings summary {
+  cursor: pointer;
+}
+.canvas-list-settings p {
+  margin-block: 8px;
+}
+.canvas-list-settings label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-block: 8px;
+}
+.canvas-list-settings select {
+  min-height: 40px;
+  max-width: 100%;
+}

@@ -58,7 +58,7 @@ pub use lifecycle::{
 };
 
 pub use resume::{
-    Bullet, ContactDetails, DocumentLimits, EntityId, FieldRole, Link, MAX_RESUME_DATES,
+    Bullet, ContactDetails, DocumentLimits, EntityId, FieldRole, Link, ListKind, MAX_RESUME_DATES,
     NamedField, PARAGRAPH_FIELD_LABEL, ResumeDocument, ResumeEntry, ResumeSection, ValidationError,
 };
 pub use resume_commands::{
@@ -126,6 +126,46 @@ pub struct ErrorEnvelope {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_id: Option<String>,
     pub details: Map<String, Value>,
+}
+
+/// Bounded diagnostics authored locally. No keys, prompts, response bodies,
+/// job descriptions, or model-authored review text belong in these records.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AiFailureDetails {
+    pub code: String,
+    pub http_status: Option<u16>,
+    pub finish_reason: Option<String>,
+    pub provider_reason: Option<String>,
+    #[serde(default)]
+    pub validation_issues: Vec<String>,
+    pub page_count: Option<usize>,
+}
+
+impl AiFailureDetails {
+    #[must_use]
+    pub fn valid(&self) -> bool {
+        self.code.starts_with("AI_")
+            && self.code.len() <= 64
+            && self
+                .code
+                .bytes()
+                .all(|b| b.is_ascii_uppercase() || b == b'_')
+            && self.http_status.is_none_or(|s| (400..=599).contains(&s))
+            && self.finish_reason.as_ref().is_none_or(|r| {
+                r.len() <= 64 && r.bytes().all(|b| b.is_ascii_uppercase() || b == b'_')
+            })
+            && self.provider_reason.as_ref().is_none_or(|r| {
+                !r.is_empty()
+                    && r.len() <= 64
+                    && r.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+            })
+            && self.validation_issues.len() <= 10
+            && self
+                .validation_issues
+                .iter()
+                .all(|s| s.len() <= 1000 && !s.chars().any(char::is_control))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

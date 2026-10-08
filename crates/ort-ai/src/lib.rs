@@ -258,6 +258,46 @@ impl Catalog {
             })
             .ok_or(AiError::UnsupportedModel)
     }
+
+    /// Resolves an explicit model without assigning it to a cost tier.
+    /// # Errors
+    /// Rejects unknown, disabled, wrong-provider, or unsupported-operation models.
+    pub fn resolve_model(
+        &self,
+        provider: Provider,
+        model: &str,
+        operation: OperationType,
+    ) -> Result<&CatalogEntry, AiError> {
+        self.entries
+            .iter()
+            .find(|entry| {
+                entry.provider == provider
+                    && entry.model == model
+                    && entry.operations.contains(&operation)
+                    && !entry.disabled
+            })
+            .ok_or(AiError::UnsupportedModel)
+    }
+
+    /// All enabled choices for this provider and operation, in catalog order.
+    /// Legacy tier metadata never limits the number of model choices.
+    #[must_use]
+    pub fn available_models(
+        &self,
+        provider: Provider,
+        operation: OperationType,
+    ) -> Vec<&CatalogEntry> {
+        let mut seen = std::collections::HashSet::new();
+        self.entries
+            .iter()
+            .filter(|entry| {
+                entry.provider == provider
+                    && !entry.disabled
+                    && entry.operations.contains(&operation)
+                    && seen.insert(entry.model.as_str())
+            })
+            .collect()
+    }
 }
 fn version_newer(required: &str, current: &str) -> Result<bool, AiError> {
     fn parse(value: &str) -> Result<[u64; 3], AiError> {
@@ -310,7 +350,15 @@ pub enum StreamEvent {
     Usage(Usage),
     Model(String),
     ProviderFailure,
+    Failure(StreamFailure),
     Finished,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StreamFailure {
+    OutputLimit,
+    Blocked(String),
+    ProviderStatus(u16),
+    Stopped(String),
 }
 pub trait ProviderAdapter {
     fn provider(&self) -> Provider;
@@ -525,15 +573,43 @@ impl ProviderAdapter for GeminiAdapter {
                 events.push(StreamEvent::Model(model.into()));
             }
             if let Some(reason) = v.pointer("/candidates/0/finishReason") {
-                if reason.as_str() == Some("STOP") {
-                    completed = true;
-                    events.push(StreamEvent::Finished);
+                match reason.as_str() {
+                    Some("STOP") => {
+                        completed = true;
+                        events.push(StreamEvent::Finished);
+                    }
+                    Some("MAX_TOKENS") => {
+                        events.push(StreamEvent::Failure(StreamFailure::OutputLimit));
+                    }
+                    Some("SAFETY" | "RECITATION" | "BLOCKLIST" | "PROHIBITED_CONTENT" | "SPII") => {
+                        events.push(StreamEvent::Failure(StreamFailure::Blocked(
+                            reason.as_str().expect("matched string").into(),
+                        )));
+                    }
+                    Some(reason) if safe_provider_reason(reason) => {
+                        events.push(StreamEvent::Failure(StreamFailure::Stopped(reason.into())));
+                    }
+                    _ => events.push(StreamEvent::ProviderFailure),
+                }
+            }
+            if let Some(error) = v.get("error") {
+                if let Some(code) = error
+                    .get("code")
+                    .and_then(Value::as_u64)
+                    .and_then(|code| u16::try_from(code).ok())
+                    .filter(|code| (400..=599).contains(code))
+                {
+                    events.push(StreamEvent::Failure(StreamFailure::ProviderStatus(code)));
                 } else {
                     events.push(StreamEvent::ProviderFailure);
                 }
             }
-            if v.get("error").is_some() || v.pointer("/promptFeedback/blockReason").is_some() {
-                events.push(StreamEvent::ProviderFailure);
+            if let Some(reason) = v.pointer("/promptFeedback/blockReason") {
+                let reason = reason
+                    .as_str()
+                    .filter(|r| safe_provider_reason(r))
+                    .unwrap_or("UNKNOWN_BLOCK_REASON");
+                events.push(StreamEvent::Failure(StreamFailure::Blocked(reason.into())));
             }
             if events.is_empty() {
                 None
@@ -543,10 +619,42 @@ impl ProviderAdapter for GeminiAdapter {
         })?;
         // EOF or a generic SSE sentinel is not a successful candidate completion.
         if !completed {
-            events.push(StreamEvent::ProviderFailure);
+            events.retain(|event| !matches!(event, StreamEvent::Finished));
         }
         Ok(events)
     }
+}
+fn safe_provider_reason(reason: &str) -> bool {
+    !reason.is_empty()
+        && reason.len() <= 64
+        && reason.bytes().all(|b| b.is_ascii_uppercase() || b == b'_')
+}
+
+/// Extract a bounded machine code, never the provider's free-text message.
+#[must_use]
+pub fn provider_error_reason(bytes: &[u8]) -> Option<String> {
+    if bytes.len() > 16 * 1024 {
+        return None;
+    }
+    let value: Value = serde_json::from_slice(bytes).ok()?;
+    let detail = value
+        .pointer("/error/details")
+        .and_then(Value::as_array)
+        .and_then(|details| {
+            details
+                .iter()
+                .find_map(|d| d.get("reason").and_then(Value::as_str))
+        });
+    detail
+        .or_else(|| value.pointer("/error/status").and_then(Value::as_str))
+        .or_else(|| value.pointer("/error/code").and_then(Value::as_str))
+        .or_else(|| value.pointer("/error/type").and_then(Value::as_str))
+        .filter(|r| {
+            !r.is_empty()
+                && r.len() <= 64
+                && r.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        })
+        .map(str::to_owned)
 }
 fn parse_sse(
     bytes: &[u8],

@@ -15,6 +15,7 @@ use uuid::Uuid;
 pub(super) struct Policy {
     pub timeout: Duration,
     pub retry_server_error: bool,
+    pub keep_success_active: bool,
 }
 pub(super) struct Completed<T> {
     pub value: T,
@@ -24,14 +25,23 @@ pub(super) struct Completed<T> {
 pub(super) struct Failure {
     pub code: &'static str,
     pub retryable: bool,
+    pub details: Box<ort_domain::AiFailureDetails>,
 }
 impl Failure {
     fn new(code: &'static str) -> Self {
         Self {
             code,
+            details: Box::new(failure_details(code)),
             retryable: matches!(
                 code,
-                "STORAGE_UNAVAILABLE" | "AI_PROVIDER_UNAVAILABLE" | "AI_BUSY" | "AI_USAGE_UNKNOWN"
+                "STORAGE_UNAVAILABLE"
+                    | "AI_PROVIDER_UNAVAILABLE"
+                    | "AI_PROVIDER_TIMEOUT"
+                    | "AI_PROVIDER_SERVICE_UNAVAILABLE"
+                    | "AI_PROVIDER_TEMPORARY"
+                    | "AI_RATE_LIMITED"
+                    | "AI_BUSY"
+                    | "AI_USAGE_UNKNOWN"
             ),
         }
     }
@@ -89,7 +99,19 @@ impl Attempt<'_> {
     }
     fn failed(&self, code: &'static str, status: AiTerminalStatus, category: &str) -> Failure {
         match self.settle(status, Some(category), None, false) {
-            Ok(_) => Failure::new(code),
+            Ok(_) => {
+                let failure = Failure::new(code);
+                if self
+                    .state
+                    .with_store(|store| {
+                        store.record_ai_failure_details(self.preflight.attempt_id, &failure.details)
+                    })
+                    .is_err()
+                {
+                    return Failure::new("STORAGE_UNAVAILABLE");
+                }
+                failure
+            }
             Err(error) => error,
         }
     }
@@ -170,14 +192,21 @@ pub(super) async fn execute<T>(
             let _ = attempt.cancel_reserved();
             return Err(Failure::storage(error));
         }
-        let response = tokio::select! {
-            result = outgoing.send() => result.map_err(|_| attempt.failed("AI_PROVIDER_UNAVAILABLE", AiTerminalStatus::OutcomeUnknown, "transient"))?,
+        let mut response = tokio::select! {
+            result = outgoing.send() => result.map_err(|error| transport_failure(&attempt, &error))?,
             () = signal.wait() => return Err(attempt.failed("AI_CANCELLED", AiTerminalStatus::Cancelled, "cancelled")),
         };
         if response.status().is_server_error()
             && let Some(retry) = retry
         {
             attempt.settle(AiTerminalStatus::Failed, Some("transient"), None, true)?;
+            let mut details = failure_details(provider_failure(response.status()).0);
+            details.http_status = Some(response.status().as_u16());
+            state
+                .with_store(|store| {
+                    store.record_ai_failure_details(attempt.preflight.attempt_id, &details)
+                })
+                .map_err(Failure::storage)?;
             tokio::select! {
                 () = tokio::time::sleep(Duration::from_secs(1)) => {},
                 () = signal.wait() => {
@@ -206,11 +235,33 @@ pub(super) async fn execute<T>(
             continue;
         }
         if !response.status().is_success() {
-            let (code, retryable) = provider_failure(response.status());
-            let mut error =
-                attempt.failed(code, AiTerminalStatus::Failed, category(response.status()));
+            let status = response.status();
+            let (code, retryable) = provider_failure(status);
+            let mut body = Vec::new();
+            loop {
+                let chunk = tokio::select! {
+                    result = response.chunk() => result,
+                    () = signal.wait() => return Err(attempt.failed("AI_CANCELLED", AiTerminalStatus::Cancelled, "cancelled")),
+                };
+                let Ok(Some(chunk)) = chunk else {
+                    break;
+                };
+                if body.len() + chunk.len() > 16 * 1024 {
+                    break;
+                }
+                body.extend_from_slice(&chunk);
+            }
+            let mut error = attempt.failed(code, AiTerminalStatus::Failed, category(status));
             if error.code == code {
                 error.retryable = retryable;
+                error.details.http_status = Some(status.as_u16());
+                error.details.provider_reason = ort_ai::provider_error_reason(&body);
+                state
+                    .with_store(|store| {
+                        store
+                            .record_ai_failure_details(attempt.preflight.attempt_id, &error.details)
+                    })
+                    .map_err(Failure::storage)?;
             }
             return Err(error);
         }
@@ -229,7 +280,7 @@ pub(super) async fn execute<T>(
     let mut scan = 0;
     loop {
         let chunk = tokio::select! {
-            result = response.chunk() => result.map_err(|_| attempt.failed("AI_PROVIDER_UNAVAILABLE", AiTerminalStatus::OutcomeUnknown, "transient"))?,
+            result = response.chunk() => result.map_err(|error| transport_failure(&attempt, &error))?,
             () = signal.wait() => return Err(attempt.failed("AI_CANCELLED", AiTerminalStatus::Cancelled, "cancelled")),
         };
         let Some(chunk) = chunk else {
@@ -283,17 +334,80 @@ pub(super) async fn execute<T>(
     };
     let cost = attempt.settle(
         status,
-        result.as_ref().err().map(|_| "invalid_output"),
+        result.as_ref().err().map(|code| failure_category(code)),
         Some(&output),
-        false,
+        policy.keep_success_active && status == AiTerminalStatus::Succeeded,
     )?;
-    let value = result.map_err(Failure::new)?;
+    let value = result.map_err(|code| {
+        let mut failure = Failure::new(code);
+        match &output.failure {
+            Some(ort_ai::StreamFailure::ProviderStatus(status)) => {
+                failure.details.http_status = Some(*status);
+            }
+            Some(
+                ort_ai::StreamFailure::Blocked(reason) | ort_ai::StreamFailure::Stopped(reason),
+            ) => failure.details.finish_reason = Some(reason.clone()),
+            _ => {}
+        }
+        if state
+            .with_store(|store| {
+                store.record_ai_failure_details(attempt.preflight.attempt_id, &failure.details)
+            })
+            .is_err()
+        {
+            return Failure::new("STORAGE_UNAVAILABLE");
+        }
+        failure
+    })?;
     progress("finished", String::new());
     Ok(Completed {
         value,
         attempt_id: attempt.preflight.attempt_id,
         cost,
     })
+}
+
+fn transport_failure(attempt: &Attempt<'_>, error: &reqwest::Error) -> Failure {
+    let (code, category) = if error.is_timeout() {
+        ("AI_PROVIDER_TIMEOUT", "timeout")
+    } else {
+        ("AI_PROVIDER_UNAVAILABLE", "transient")
+    };
+    attempt.failed(code, AiTerminalStatus::OutcomeUnknown, category)
+}
+
+pub(super) fn failure_category(code: &str) -> &'static str {
+    match code {
+        "AI_PROVIDER_SERVICE_UNAVAILABLE" | "AI_PROVIDER_TEMPORARY" | "AI_PROVIDER_UNAVAILABLE" => {
+            "transient"
+        }
+        "AI_PROVIDER_TIMEOUT" => "timeout",
+        "AI_RATE_LIMITED" => "rate_limit",
+        "AI_AUTHENTICATION_FAILED" => "authentication",
+        "AI_OUTPUT_BLOCKED" => "safety",
+        "AI_PROVIDER_BAD_REQUEST" | "AI_MODEL_UNAVAILABLE" | "AI_PROVIDER_FAILED" => "provider",
+        _ => "invalid_output",
+    }
+}
+
+pub(super) fn failure_details(code: &'static str) -> ort_domain::AiFailureDetails {
+    ort_domain::AiFailureDetails {
+        code: code.into(),
+        http_status: match code {
+            "AI_PROVIDER_BAD_REQUEST" => Some(400),
+            "AI_MODEL_UNAVAILABLE" => Some(404),
+            "AI_RATE_LIMITED" => Some(429),
+            "AI_PROVIDER_SERVICE_UNAVAILABLE" => Some(503),
+            // A timeout may originate locally or from HTTP 504; avoid guessing.
+            _ => None,
+        },
+        finish_reason: match code {
+            "AI_OUTPUT_LIMIT" => Some("MAX_TOKENS".into()),
+            "AI_OUTPUT_BLOCKED" => Some("SAFETY_OR_POLICY".into()),
+            _ => None,
+        },
+        ..ort_domain::AiFailureDetails::default()
+    }
 }
 
 #[cfg(test)]

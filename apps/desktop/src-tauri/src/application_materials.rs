@@ -3,19 +3,22 @@
 #![allow(clippy::needless_pass_by_value, clippy::manual_let_else)]
 use crate::application_exports::ApplicationExportState;
 use ort_ai::materials::{self, MAX_JOB_CHARS, MAX_QUESTION_CHARS};
-use ort_ai::{OperationType, Preset, Provider};
+use ort_ai::{OperationType, Provider};
 use ort_application::application_workspace::{
     ANSWER_SYSTEM, COVER_SYSTEM, REFINE_ANSWER_SYSTEM, REFINE_SYSTEM, TAILOR_SYSTEM,
     ensure_profile, load, load_stage_one, merge_refinement_alerts, resume_system, save,
     save_reviewed, save_stage_one, validate_stage_one, validate_workspace,
 };
 use ort_application::material_document::preflight_pdf;
+use ort_application::tailoring::{
+    MAX_TAILORING_CALLS, TailoringRun, TailoringStep, change_summary,
+};
 use ort_domain::MaterialKind;
 use ort_domain::{CommandResponse, DocumentStyle, ResumeDocument};
 use ort_storage::StorageError;
 use serde::Serialize;
 use serde_json::json;
-use tauri::{Manager, WebviewWindow};
+use tauri::{Emitter, Manager, WebviewWindow};
 
 use crate::{DesktopState, ai_request, storage_failure, window_not_authorized};
 
@@ -320,19 +323,15 @@ pub struct ApplicationContext {
     pub ai_busy: bool,
     pub selected_key_ready: bool,
     pub selected_key_id: Option<uuid::Uuid>,
-    pub preset: Option<String>,
-    pub preset_label: String,
-    pub preset_options: Vec<ApplicationPresetOption>,
+    pub model: Option<String>,
+    pub model_options: Vec<ApplicationModelOption>,
     pub browser_connected: bool,
 }
 
 #[derive(Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ApplicationPresetOption {
-    pub preset: String,
-    pub label: String,
-    pub model: Option<String>,
-    pub available: bool,
+pub struct ApplicationModelOption {
+    pub model: String,
 }
 
 fn provider_from_name(value: &str) -> Option<Provider> {
@@ -341,24 +340,6 @@ fn provider_from_name(value: &str) -> Option<Provider> {
         "anthropic" => Some(Provider::Anthropic),
         "gemini" => Some(Provider::Gemini),
         _ => None,
-    }
-}
-
-fn preset_from_name(value: &str) -> Option<Preset> {
-    match value {
-        "economy" => Some(Preset::Economy),
-        "balanced" => Some(Preset::Balanced),
-        "quality" => Some(Preset::Quality),
-        _ => None,
-    }
-}
-
-fn preset_display(value: &str) -> &'static str {
-    match value {
-        "economy" => "Economy",
-        "balanced" => "Balanced",
-        "quality" => "Quality",
-        _ => "Preset",
     }
 }
 
@@ -380,49 +361,23 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
             .unwrap_or_else(|| "Direct AI".into());
         let provider = provider_from_name(&provider_name);
         let catalog = ort_ai::builtin_catalog(&jiff::Timestamp::now().to_string(), None).ok();
-        let preset_options = ["economy", "balanced", "quality"]
-            .into_iter()
-            .map(|preset_name| {
-                let model = provider
-                    .zip(catalog.as_ref())
-                    .and_then(|(provider, catalog)| {
-                        catalog
-                            .resolve(
-                                provider,
-                                preset_from_name(preset_name)?,
-                                OperationType::TailorResume,
-                            )
-                            .ok()
-                            .map(|entry| entry.model.clone())
-                    });
-                ApplicationPresetOption {
-                    preset: preset_name.into(),
-                    label: format!(
-                        "{}: {}",
-                        preset_display(preset_name),
-                        model.as_deref().unwrap_or("model unavailable")
-                    ),
-                    available: model.is_some(),
-                    model,
-                }
-            })
-            .collect::<Vec<_>>();
-        let selected_model = connection.preset.as_deref().and_then(|preset| {
-            preset_options
-                .iter()
-                .find(|option| option.preset == preset)
-                .and_then(|option| option.model.clone())
-        });
-        let preset_label = connection.preset.as_deref().map_or_else(
-            || "AI not configured".into(),
-            |preset| {
-                format!(
-                    "{}: {}",
-                    preset_display(preset),
-                    selected_model.as_deref().unwrap_or("model unavailable")
-                )
-            },
-        );
+        let model_options =
+            provider
+                .zip(catalog.as_ref())
+                .map_or_else(Vec::new, |(provider, catalog)| {
+                    catalog
+                        .available_models(provider, OperationType::TailorResume)
+                        .into_iter()
+                        .map(|entry| ApplicationModelOption {
+                            model: entry.model.clone(),
+                        })
+                        .collect::<Vec<_>>()
+                });
+        let selected_model = connection.model.clone();
+        let model_available = selected_model
+            .as_ref()
+            .is_some_and(|model| model_options.iter().any(|option| &option.model == model));
+        let ai_ready = ai_ready && model_available;
         let ai_label = if ai_ready {
             format!(
                 "{provider_name} · {}",
@@ -439,9 +394,8 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
             ai_busy: window.state::<ai_request::AiRequestGate>().is_busy(),
             selected_key_ready: ai_ready,
             selected_key_id: connection.credential_id,
-            preset: connection.preset,
-            preset_label,
-            preset_options,
+            model: connection.model,
+            model_options,
             browser_connected,
         })
     }) {
@@ -466,6 +420,40 @@ pub(crate) fn error<T: Serialize>(code: &'static str) -> CommandResponse<T> {
     )
 }
 
+fn material_error<T: Serialize>(
+    window: &WebviewWindow,
+    mut failure: ai_request::MaterialFailure,
+    run: Option<&TailoringRun<'_>>,
+) -> CommandResponse<T> {
+    if let Some(value) = failure.details.get_mut("diagnostic")
+        && let Ok(mut diagnostic) =
+            serde_json::from_value::<ort_domain::AiFailureDetails>(value.clone())
+    {
+        if let Some(run) = run {
+            diagnostic.validation_issues = run.validation_feedback().to_vec();
+            diagnostic.page_count = run.page_count();
+        }
+        if diagnostic.valid() {
+            *value = json!(diagnostic);
+            if let Some(attempt_id) = failure.attempt_id {
+                let _ = window
+                    .state::<DesktopState>()
+                    .with_store(|store| store.record_ai_failure_details(attempt_id, &diagnostic));
+            }
+        }
+    }
+    let mut response = error(failure.code);
+    if let CommandResponse::Failure { error, .. } = &mut response {
+        error.operation_id = failure
+            .details
+            .get("operationId")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned);
+        error.details = failure.details;
+    }
+    response
+}
+
 #[tauri::command]
 pub fn load_application_workspace(
     window: WebviewWindow,
@@ -477,6 +465,39 @@ pub fn load_application_workspace(
         Ok(saved) => CommandResponse::success(saved),
         Err(problem) => storage_failure(&problem),
     }
+}
+
+fn save_tailored_workspace(
+    store: &ort_storage::EncryptedStore,
+    profile: uuid::Uuid,
+    expected: Option<i64>,
+    workspace: &ApplicationWorkspace,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<SavedWorkspace, StorageError> {
+    ensure_profile(store, profile)?;
+    if cancelled() || (expected.is_none() && load(store)?.is_some()) {
+        return Err(StorageError::RevisionConflict);
+    }
+    save(store, expected, workspace)
+}
+
+fn tailoring_progress(window: &WebviewWindow, phase: &str, call: u8, page_count: Option<usize>) {
+    let _ = window.emit(
+        "ort:tailoring-progress",
+        json!({
+            "phase": phase, "call": call, "maximum": MAX_TAILORING_CALLS, "pageCount": page_count
+        }),
+    );
+}
+fn advance_tailoring(
+    window: &WebviewWindow,
+    run: &mut TailoringRun<'_>,
+    raw: &str,
+    call: u8,
+) -> Result<TailoringStep, &'static str> {
+    let result = run.advance(raw);
+    tailoring_progress(window, "Checking page fit", call, run.page_count());
+    result
 }
 
 #[tauri::command]
@@ -500,65 +521,83 @@ pub async fn start_application(
         if load(store)?.is_some() {
             return Err(StorageError::RevisionConflict);
         }
-        store.load_latest_published()?.ok_or(StorageError::NotFound)
+        let source = store
+            .load_latest_published()?
+            .ok_or(StorageError::NotFound)?;
+        Ok((source, store.manifest().profile_id))
     });
-    let source = match prepared {
+    let (source, profile) = match prepared {
         Ok(source) => source,
         Err(StorageError::NotFound) => return error("PUBLISHED_RESUME_REQUIRED"),
         Err(problem) => return storage_failure(&problem),
     };
-    let input = json!({"schemaVersion":5,"publishedRevision":source.revision,"publishedResume":materials::resume_context(&source.document),"reviewedJobDescription":job_description,"style":style});
+    let input = json!({"schemaVersion":6,"qualityPhase":"draft","callNumber":1,"publishedRevision":source.revision,"publishedResume":materials::resume_context(&source.document),"reviewedJobDescription":job_description,"style":style});
+    let mut run = TailoringRun::new(
+        &source.document,
+        &source.document,
+        &job_description,
+        source.revision,
+        style,
+        input.clone(),
+    );
     let system = resume_system(TAILOR_SYSTEM);
-    let result = match ai_request::execute_material(
+    let mut storage_problem = None;
+    let result = ai_request::execute_material_sequence(
         &window,
         OperationType::TailorResume,
         &system,
         input,
-        |raw| {
-            materials::validate_template_tailoring(
-                &source.document,
-                &job_description,
-                raw,
-                source.revision,
-            )
-            .map_err(|_| ())
+        MAX_TAILORING_CALLS,
+        Some(profile),
+        |raw, call, cancelled| match advance_tailoring(&window, &mut run, raw, call)? {
+            TailoringStep::Continue(next) => Ok(ai_request::MaterialDecision::Continue(next)),
+            TailoringStep::Ready(result) => {
+                let workspace = ApplicationWorkspace {
+                    schema_version: SCHEMA_VERSION,
+                    tracker_metadata: None,
+                    published_revision: source.revision,
+                    job_description: job_description.clone(),
+                    job_url: job_url.clone(),
+                    role_info: result.role_info.unwrap_or_default(),
+                    change_summary: change_summary(&source.document, &result.resume),
+                    resume: result.resume,
+                    change_points: result.change_points,
+                    alerts: result.alerts,
+                    alerts_truncated: result.alerts_truncated,
+                    dismissed_alert_ids: Vec::new(),
+                    ignore_all_alerts: false,
+                    cover_letter: None,
+                    question: String::new(),
+                    answer: String::new(),
+                    approved_answers: Vec::new(),
+                    style,
+                };
+                tailoring_progress(&window, "Saving one-page resume", call, Some(1));
+                if cancelled() {
+                    return Err("AI_CANCELLED");
+                }
+                match state.with_store(|store| {
+                    save_tailored_workspace(store, profile, None, &workspace, cancelled)
+                }) {
+                    Ok(saved) => Ok(ai_request::MaterialDecision::Complete(saved)),
+                    Err(problem) => {
+                        if cancelled() {
+                            return Err("AI_CANCELLED");
+                        }
+                        storage_problem = Some(problem);
+                        Err("STORAGE_UNAVAILABLE")
+                    }
+                }
+            }
         },
     )
-    .await
-    {
-        Ok(result) => result,
-        Err(code) => return error(code),
-    };
-    let workspace = ApplicationWorkspace {
-        schema_version: SCHEMA_VERSION,
-        tracker_metadata: None,
-        published_revision: source.revision,
-        job_description,
-        job_url,
-        role_info: result.role_info.unwrap_or_default(),
-        resume: result.resume,
-        change_points: result.change_points,
-        alerts: result.alerts,
-        alerts_truncated: result.alerts_truncated,
-        dismissed_alert_ids: Vec::new(),
-        ignore_all_alerts: false,
-        cover_letter: None,
-        question: String::new(),
-        answer: String::new(),
-        approved_answers: Vec::new(),
-        style,
-    };
-    if let Err(code) = preflight_pdf(&workspace, MaterialKind::Resume) {
-        return error(code);
+    .await;
+    if let Some(problem) = storage_problem {
+        return storage_failure(&problem);
     }
-    match state.with_store(|store| {
-        if load(store)?.is_some() {
-            return Err(StorageError::RevisionConflict);
-        }
-        save(store, None, &workspace)
-    }) {
+    match result {
         Ok(saved) => CommandResponse::success(saved),
-        Err(problem) => storage_failure(&problem),
+        Err(failure) => material_error(&window, failure, Some(&run)),
     }
 }
 
@@ -583,51 +622,77 @@ pub async fn regenerate_application_resume(
         let source = store
             .load_published_revision(saved.workspace.published_revision)?
             .ok_or(StorageError::NotFound)?;
-        Ok((saved.workspace, source))
+        Ok((saved.workspace, source, store.manifest().profile_id))
     });
-    let (mut workspace, source) = match prepared {
+    let (workspace, source, profile) = match prepared {
         Ok(value) => value,
         Err(problem) => return storage_failure(&problem),
     };
-    let input = json!({"schemaVersion":5,"publishedRevision":source.revision,"publishedResume":materials::resume_context(&source.document),
+    let input = json!({"schemaVersion":6,"qualityPhase":"draft","callNumber":1,"publishedRevision":source.revision,"publishedResume":materials::resume_context(&source.document),
         "currentReviewedResume":materials::resume_context(&workspace.resume),"reviewedJobDescription":workspace.job_description,"reviewedRoleInfo":workspace.role_info,"style":workspace.style,"correctionInstruction":correction_instruction});
+    let mut run = TailoringRun::new(
+        &source.document,
+        &workspace.resume,
+        &workspace.job_description,
+        source.revision,
+        workspace.style,
+        input.clone(),
+    );
     let system = resume_system(REFINE_SYSTEM);
-    let result = match ai_request::execute_material(
+    let mut storage_problem = None;
+    let result = ai_request::execute_material_sequence(
         &window,
         OperationType::RefineResume,
         &system,
         input,
-        |raw| {
-            materials::validate_refinement(
-                &source.document,
-                &workspace.resume,
-                &workspace.job_description,
-                raw,
-                source.revision,
-            )
-            .map_err(|_| ())
+        MAX_TAILORING_CALLS,
+        Some(profile),
+        |raw, call, cancelled| match advance_tailoring(&window, &mut run, raw, call)? {
+            TailoringStep::Continue(next) => Ok(ai_request::MaterialDecision::Continue(next)),
+            TailoringStep::Ready(result) => {
+                let mut revised = workspace.clone();
+                revised.change_summary = change_summary(&workspace.resume, &result.resume);
+                revised.resume = result.resume;
+                if let Some(info) = result
+                    .role_info
+                    .filter(|_| revised.tracker_metadata.is_none())
+                {
+                    revised.role_info = info;
+                }
+                revised.change_points = result.change_points;
+                merge_refinement_alerts(&mut revised, result.alerts, result.alerts_truncated);
+                tailoring_progress(&window, "Saving one-page resume", call, Some(1));
+                if cancelled() {
+                    return Err("AI_CANCELLED");
+                }
+                match state.with_store(|store| {
+                    save_tailored_workspace(
+                        store,
+                        profile,
+                        Some(expected_revision),
+                        &revised,
+                        cancelled,
+                    )
+                }) {
+                    Ok(saved) => Ok(ai_request::MaterialDecision::Complete(saved)),
+                    Err(problem) => {
+                        if cancelled() {
+                            return Err("AI_CANCELLED");
+                        }
+                        storage_problem = Some(problem);
+                        Err("STORAGE_UNAVAILABLE")
+                    }
+                }
+            }
         },
     )
-    .await
-    {
-        Ok(result) => result,
-        Err(code) => return error(code),
-    };
-    workspace.resume = result.resume;
-    if let Some(role_info) = result
-        .role_info
-        .filter(|_| workspace.tracker_metadata.is_none())
-    {
-        workspace.role_info = role_info;
+    .await;
+    if let Some(problem) = storage_problem {
+        return storage_failure(&problem);
     }
-    workspace.change_points = result.change_points;
-    merge_refinement_alerts(&mut workspace, result.alerts, result.alerts_truncated);
-    if let Err(code) = preflight_pdf(&workspace, MaterialKind::Resume) {
-        return error(code);
-    }
-    match state.with_store(|store| save(store, Some(expected_revision), &workspace)) {
+    match result {
         Ok(saved) => CommandResponse::success(saved),
-        Err(problem) => storage_failure(&problem),
+        Err(failure) => material_error(&window, failure, Some(&run)),
     }
 }
 
@@ -672,7 +737,7 @@ pub async fn generate_application_cover_letter(
     .await
     {
         Ok(text) => Some(text),
-        Err(code) => return error(code),
+        Err(failure) => return material_error(&window, failure, None),
     };
     if let Err(code) = preflight_pdf(&workspace, MaterialKind::CoverLetter) {
         return error(code);
@@ -730,7 +795,7 @@ pub async fn generate_application_answer(
     .await
     {
         Ok(text) => text,
-        Err(code) => return error(code),
+        Err(failure) => return material_error(&window, failure, None),
     };
     workspace.question = question;
     match state.with_store(|store| save(store, Some(expected_revision), &workspace)) {
@@ -786,7 +851,7 @@ pub async fn refine_application_answer(
     .await
     {
         Ok(text) => text,
-        Err(code) => return error(code),
+        Err(failure) => return material_error(&window, failure, None),
     };
     match state.with_store(|store| save(store, Some(expected_revision), &workspace)) {
         Ok(saved) => CommandResponse::success(saved),

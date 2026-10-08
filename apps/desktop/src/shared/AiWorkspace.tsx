@@ -10,6 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { AiKeyName } from "./AiKeyName";
+import { AiRecentFailuresDialog } from "./AiRecentFailuresDialog";
 import { AiKeyMenu } from "./AiKeyMenu";
 import {
   keyDisplayName,
@@ -138,6 +139,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     "retain_until_cleared",
   );
   const [retentionConfirm, setRetentionConfirm] = useState(false);
+  const [failuresOpen, setFailuresOpen] = useState(false);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
   const [keyDropTarget, setKeyDropTarget] = useState<
@@ -210,7 +212,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
       if (active) void refreshKeys();
     };
     window.addEventListener("focus", wake);
-    void listen("ort:ai-preset-changed", wake)
+    void listen("ort:ai-model-changed", wake)
       .then((stop) => {
         if (active) unlisten = stop;
         else stop();
@@ -330,8 +332,8 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
       if (response.ok) setTestPreview(response.value);
       else
         setNotice(
-          response.error.code === "AI_PRESET_UNAVAILABLE"
-            ? "This provider and preset have no enabled signed-catalog entry."
+          response.error.code === "AI_MODEL_UNAVAILABLE"
+            ? "This model has no enabled catalog entry for this provider."
             : "The synthetic test estimate is unavailable.",
         );
     } catch {
@@ -716,7 +718,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
         credentialId: id,
         createdAt: "",
         provider: "openai",
-        preset: "balanced",
+        model: "",
         paused: true,
         removed: true,
         cleanupRequired: false,
@@ -1338,6 +1340,19 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                     No recorded activity for {period.toLowerCase()}.
                   </p>
                 )}
+                <div className="ai-failure-trigger-row">
+                  <button
+                    type="button"
+                    className="button--secondary"
+                    aria-haspopup="dialog"
+                    onClick={(event) => {
+                      event.currentTarget.focus();
+                      setFailuresOpen(true);
+                    }}
+                  >
+                    View recent failures
+                  </button>
+                </div>
               </>
             )}
             <p className="ai-help ai-billing-note">
@@ -1529,6 +1544,13 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                 </div>
               </div>
             )}
+            <AiRecentFailuresDialog
+              open={failuresOpen && page === "data"}
+              failures={monitoring?.recentFailures ?? []}
+              period={period}
+              selection={activityView.title}
+              onClose={() => setFailuresOpen(false)}
+            />
             <AiDataActionDialog
               action={dataAction}
               keys={activityKeys}

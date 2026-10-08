@@ -20,6 +20,7 @@ fn entry(title: &str, subtitle: &str, dates: &str, bullets: &[&str]) -> ResumeEn
                 label: "Skills / details".into(),
                 value: "**Rust**, *Typst*, SQL, Spring Boot, FastAPI, PostgreSQL".into(),
                 is_skill: true,
+                list_kind: None,
             },
             NamedField {
                 id: EntityId::new(),
@@ -27,6 +28,7 @@ fn entry(title: &str, subtitle: &str, dates: &str, bullets: &[&str]) -> ResumeEn
                 label: "Extra".into(),
                 value: "Remote".into(),
                 is_skill: false,
+                list_kind: None,
             },
         ],
         links: vec![],

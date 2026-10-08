@@ -32,7 +32,7 @@ is bound to the credential when it is saved and cannot later be changed.
 
 The secret is stored in the operating-system credential vault. The encrypted
 profile stores non-secret metadata such as credential identity, provider,
-name, preset, creation time, and state. The API key text must never be rendered
+name, selected model, creation time, and state. The API key text must never be rendered
 back into the interface or stored in the activity database.
 
 A newly added key appears in All keys. Adding a key does not make it active and
@@ -44,7 +44,7 @@ Each key card displays:
 
 - provider logo and provider name;
 - editable key name;
-- selected preset and resolved model;
+- selected model;
 - lifetime estimated spend;
 - current limit exposure, limit, percentage, and progress bar;
 - a three-dot action menu.
@@ -106,13 +106,22 @@ Removal always requires confirmation.
 Removing a key is intentionally different from deleting its historical Data.
 See [AI data and monitoring](ai-data-and-monitoring.md#delete-removed-key-data).
 
-## Presets and models
+## Models
 
-Each key owns its preset selection. The menu presents preset and resolved model
-together, for example `Balanced: <model>`. A preset is selectable only when the
-signed local model catalog has an enabled entry for that provider and preset.
-Unavailable presets remain visible as unavailable or coming soon. Changing one
-key does not change any other key or the active-key selection.
+Each key stores one explicit model identifier. My Keys and the application
+header show model names alone, without cost-tier labels or coming-soon options.
+Choices come from all enabled models in the signed local catalog for that
+provider and operation; there is no three-choice tier limit. More catalog
+models can be added without changing the key format or selector. Disabled and
+wrong-provider models cannot be selected, and dispatch never silently falls
+back to another model.
+
+Changing a key's model does not change any other key or the active-key selection.
+Existing tier-based key settings migrate once to their exact existing model,
+preserving credential identity, name, pause state, and primary selection. An
+unavailable legacy choice remains unavailable until a model is chosen explicitly.
+Legacy tier metadata in the catalog and historical activity remains readable;
+it does not control model selection.
 
 ## Per-key spending
 

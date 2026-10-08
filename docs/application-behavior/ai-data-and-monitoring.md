@@ -6,7 +6,7 @@ The Data tab displays retained local AI operation and provider-attempt
 activity. The **Choose view** control selects either:
 
 - **All keys**, which aggregates every retained activity record; or
-- one saved or removed key, identified by name, provider, preset/model, logo,
+- one saved or removed key, identified by name, provider, model, logo,
   and creation date.
 
 Successfully removed keys remain selectable while their activity is retained.
@@ -45,6 +45,22 @@ and the token-category breakdown when Tokens is selected.
 Missing or uncertain provider usage is not treated as zero. Partial totals,
 unknown attempts, and unresolved reserved exposure are surfaced separately.
 Provider billing remains the source of truth; the graph is a local estimate.
+
+## Recent failures
+
+**View recent failures**, below the graph, opens a popup scoped to the graph's
+current period and key selection. It lists the latest ten failed or uncertain
+attempts from newest to oldest. Each row displays its error name, selected model,
+call number, and time. Clicking or keyboard-activating a row expands its reason
+and recorded diagnostic details; activating it again collapses it. Rows start
+collapsed each time the popup opens.
+
+Close, Escape, or clicking the backdrop dismisses the popup and restores focus
+to the trigger. No failures produces an explicit empty state. Recorded details
+include status/finish codes, duration, token counts and completeness, operation
+and attempt identifiers, and local validation/page-fit issues when available.
+Older attempts show only the category originally recorded. Credentials, prompts,
+raw response text, and resume/job text are excluded.
 
 ## Settings actions
 

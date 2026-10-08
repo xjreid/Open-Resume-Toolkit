@@ -57,27 +57,13 @@ const idleCapture = { phase: "idle", sessionId: null, error: null };
 const context = {
   profileId: "01992187-74f7-7000-8000-000000000001",
   selectedKeyReady: true,
-  presetLabel: "Balanced",
   publishedRevision: 1,
-  aiLabel: "Balanced: Gemini test",
+  aiLabel: "Gemini test",
   aiReady: true,
   aiBusy: false,
   selectedKeyId: "019a0000-0000-7000-8000-000000000006",
-  preset: "balanced",
-  presetOptions: [
-    {
-      available: true,
-      preset: "economy",
-      label: "Economy: Gemini small",
-      model: "small",
-    },
-    {
-      available: true,
-      preset: "balanced",
-      label: "Balanced: Gemini test",
-      model: "test",
-    },
-  ],
+  model: "test",
+  modelOptions: [{ model: "small" }, { model: "test" }],
   browserConnected: false,
 };
 function workspace(): Wire.ApplicationWorkspace {
@@ -132,7 +118,12 @@ it.each([false, true])(
         });
       if (name.startsWith("load_application_")) return reply(null);
       if (name === "prepare_application_exports")
-        return reply({ revision: 1, pdfReady: true, docxReady: true });
+        return reply({
+          revision: 1,
+          pdfReady: true,
+          docxReady: true,
+          pageCount: 1,
+        });
       throw new Error(`Unexpected command: ${name}`);
     });
     const { host } = await mount();
@@ -161,7 +152,12 @@ it("shows a static list even when saved alerts were previously hidden or dismiss
       return reply({ revision: 1, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host } = await mount();
@@ -534,7 +530,12 @@ it.each([
       });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host } = await mount();
@@ -555,7 +556,12 @@ it("displays alerts immediately from a successful tailoring response", async () 
     if (name === "start_application")
       return reply({ revision: 1, workspace: tailored });
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host, button } = await mount();
@@ -646,7 +652,7 @@ it("clamps header dragging before moving the native window", async () => {
   expect(position).toMatchObject({ x: 640, y: 100 });
 });
 
-it("refreshes its model preset when the main app changes it", async () => {
+it("refreshes its selected model when the main app changes it", async () => {
   let current = context;
   vi.mocked(invoke).mockImplementation(async (name) => {
     if (name === "application_capture_status") return reply(idleCapture);
@@ -655,14 +661,41 @@ it("refreshes its model preset when the main app changes it", async () => {
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host } = await mount();
-  current = { ...context, preset: "economy" };
+  current = { ...context, model: "small" };
   await act(async () =>
-    listeners.get("ort:ai-preset-changed")?.({ payload: null }),
+    listeners.get("ort:ai-model-changed")?.({ payload: null }),
   );
   expect(
-    host.querySelector<HTMLSelectElement>('[aria-label="AI model preset"]')
-      ?.value,
-  ).toBe("economy");
+    host.querySelector<HTMLSelectElement>('[aria-label="AI model"]')?.value,
+  ).toBe("small");
+});
+
+it("keeps an unavailable selected model visible without implying a replacement", async () => {
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "application_context")
+      return reply({
+        ...context,
+        model: "previous-model",
+        aiReady: false,
+        selectedKeyReady: false,
+      });
+    if (name.startsWith("load_application_")) return reply(null);
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host } = await mount();
+  const selector = host.querySelector<HTMLSelectElement>(
+    '[aria-label="AI model"]',
+  )!;
+  expect(selector.value).toBe("previous-model");
+  expect(selector.selectedOptions[0].disabled).toBe(true);
+  expect(
+    [...selector.options].map((option) => option.textContent?.trim()),
+  ).toEqual(["previous-model", "small", "test"]);
+  expect(invoke).not.toHaveBeenCalledWith(
+    "set_ai_key_model",
+    expect.anything(),
+  );
 });
 
 it("keeps Answers available without a question capture button", async () => {
@@ -674,7 +707,12 @@ it("keeps Answers available without a question capture button", async () => {
       return reply({ revision: 1, workspace: workspace() });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host, button } = await mount();
@@ -697,7 +735,12 @@ it("opens the cover PDF with View and the current cover text with Edit", async (
       return reply({ revision: 1, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     if (name === "save_application_workspace")
       return reply({
         revision: 2,
@@ -751,7 +794,12 @@ it("refines an answer and saves only its final version on reset", async () => {
       return reply({ revision, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     if (name === "refine_application_answer") {
       current = { ...current, answer: "Final answer" };
       revision += 1;
@@ -821,7 +869,12 @@ it("finishes directly and saves the final answer with tracker details", async ()
       return reply({ revision, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     if (name === "save_application_workspace") {
       current = input.workspace as typeof current;
       revision += 1;
@@ -862,7 +915,12 @@ it("edits tracker details before finishing and saves all materials", async () =>
       return reply({ revision: 1, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     if (name === "finish_application") return reply(true);
     throw new Error(`Unexpected command: ${name}`);
   });
@@ -915,7 +973,7 @@ it("saves tracker details on Back, restores them after remount, and uses them on
       return reply({ revision, workspace: current });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision, pdfReady: true, docxReady: true });
+      return reply({ revision, pdfReady: true, docxReady: true, pageCount: 1 });
     if (name === "save_application_workspace") {
       current = (args as { workspace: Wire.ApplicationWorkspace }).workspace;
       return reply({ revision: ++revision, workspace: current });
@@ -997,7 +1055,12 @@ it("keeps tracker edits open when Back cannot save them", async () => {
       return reply({ revision: 1, workspace: workspace() });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     if (name === "save_application_workspace") return saving.promise;
     throw new Error(`Unexpected command: ${name}`);
   });
@@ -1042,7 +1105,12 @@ it("confirms discarding the application without a tracker entry", async () => {
       return reply({ revision: 1, workspace: workspace() });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     if (name === "finish_application") return reply(true);
     throw new Error(`Unexpected command: ${name}`);
   });
@@ -1076,7 +1144,12 @@ it("edits the job fields directly and saves them before tailoring", async () => 
     if (name === "start_application")
       return reply({ revision: 1, workspace: workspace() });
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host, button } = await mount();
@@ -1115,6 +1188,9 @@ it("edits the job fields directly and saves them before tailoring", async () => 
 });
 
 it.each([
+  ["AI_PAGE_FIT_FAILED", "could not fit a supported resume onto one page"],
+  ["AI_REVIEW_FAILED", "unresolved issues after four calls"],
+  ["AI_GROUNDING_FAILED", "valid references to the published evidence"],
   ["AI_OUTPUT_INVALID", "blocked, incomplete, or unreadable response"],
   ["AI_OUTPUT_INCOMPLETE", "did not finish generating"],
   ["AI_MODEL_MISMATCH", "different model than the one selected"],
@@ -1156,6 +1232,61 @@ it.each([
   );
 });
 
+it("retains detailed native failures in the tailoring popup without saving", async () => {
+  vi.mocked(invoke).mockImplementation(async (name, args) => {
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "application_context") return reply(context);
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "save_application_stage_one")
+      return reply({
+        revision: 1,
+        draft: (args as Record<string, unknown>).draft,
+      });
+    if (name === "start_application")
+      return {
+        ok: false,
+        error: {
+          code: "AI_MATERIAL_INVALID",
+          messageKey: "errors.applicationMaterial",
+          retryable: false,
+          details: {
+            model: "gemini-3.5-flash-lite",
+            provider: "gemini",
+            callNumber: 4,
+            maximumCalls: 4,
+            durationMs: 15200,
+            operationId: "op-safe",
+            attemptId: "attempt-safe",
+            diagnostic: {
+              code: "AI_MATERIAL_INVALID",
+              httpStatus: null,
+              finishReason: null,
+              providerReason: null,
+              pageCount: null,
+              validationIssues: [
+                "Missing required schema v6 field: reviewIssues.",
+              ],
+            },
+          },
+        },
+      };
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  await act(async () => popup.options?.onJobChange("Rust engineer required"));
+  await act(async () => button("Tailor").click());
+  expect(host.textContent).toContain("4 of 4 · correction");
+  expect(host.textContent).toContain("15.2 seconds");
+  expect(host.textContent).toContain("gemini-3.5-flash-lite");
+  expect(host.textContent).toContain(
+    "Missing required schema v6 field: reviewIssues.",
+  );
+  expect(host.querySelector(".ai-failure-details")?.hasAttribute("open")).toBe(
+    true,
+  );
+  expect(button("Tailor").disabled).toBe(false);
+});
+
 it("places Finish Application directly below the header when no role was found", async () => {
   const draft = workspace();
   draft.roleInfo = { company: "", title: "", location: "" };
@@ -1166,7 +1297,12 @@ it("places Finish Application directly below the header when no role was found",
       return reply({ revision: 1, workspace: draft });
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
-      return reply({ revision: 1, pdfReady: true, docxReady: true });
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host, button } = await mount();
@@ -1177,7 +1313,7 @@ it("places Finish Application directly below the header when no role was found",
   expect(host.textContent).not.toContain("Your next opportunity");
 });
 
-it("requires an active key even when a job exists and routes connected capture + presets", async () => {
+it("requires an active key even when a job exists and routes connected capture + models", async () => {
   let activeContext = {
     ...context,
     aiReady: false,
@@ -1207,17 +1343,17 @@ it("requires an active key even when a job exists and routes connected capture +
   activeContext = { ...context, browserConnected: true };
   await act(async () => window.dispatchEvent(new Event("focus")));
   const selector = host.querySelector<HTMLSelectElement>(
-    '[aria-label="AI model preset"]',
+    '[aria-label="AI model"]',
   )!;
-  expect(selector.options[0].text).toBe("Economy: Gemini small");
+  expect(selector.options[0].text).toBe("small");
   await act(async () => {
-    selector.value = "economy";
+    selector.value = "small";
     selector.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  expect(invoke).toHaveBeenCalledWith("set_ai_key_preset", {
+  expect(invoke).toHaveBeenCalledWith("set_ai_key_model", {
     request: {
       credentialId: "019a0000-0000-7000-8000-000000000006",
-      preset: "economy",
+      model: "small",
     },
   });
 });
@@ -1237,7 +1373,7 @@ it("autosaves without losing newer typing and only exports the latest prepared r
     if (name.startsWith("load_application_")) return reply(null);
     if (name === "prepare_application_exports")
       return input.expectedRevision === 1
-        ? reply({ revision: 1, pdfReady: true, docxReady: true })
+        ? reply({ revision: 1, pdfReady: true, docxReady: true, pageCount: 1 })
         : newExports.promise;
     if (name === "save_application_workspace") {
       latest = input.workspace as ReturnType<typeof workspace>;
@@ -1274,7 +1410,9 @@ it("autosaves without losing newer typing and only exports the latest prepared r
   });
   expect(button("Download").disabled).toBe(true);
   await act(async () =>
-    newExports.resolve(reply({ revision: 1, pdfReady: true, docxReady: true })),
+    newExports.resolve(
+      reply({ revision: 1, pdfReady: true, docxReady: true, pageCount: 1 }),
+    ),
   );
   expect(button("Download").disabled).toBe(false);
   const preparationCalls = vi
@@ -1423,4 +1561,90 @@ it("uses the overlay button to start, switch to Cancel after the first corner, a
   expect(button("Capture").getAttribute("aria-pressed")).toBe("false");
   await act(async () => resolveStaleStatus!(reply(staleMode)));
   expect(button("Capture").getAttribute("aria-pressed")).toBe("false");
+});
+
+it("shows measured page fit and locally computed selection changes", async () => {
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "application_context") return reply(context);
+    if (name === "load_application_workspace")
+      return reply({
+        revision: 1,
+        workspace: {
+          ...workspace(),
+          changeSummary: [
+            "Selection: removed 2, restored 0, reordered 1 sections/items.",
+          ],
+        },
+      });
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "prepare_application_exports")
+      return reply({
+        revision: 1,
+        pdfReady: true,
+        docxReady: true,
+        pageCount: 1,
+      });
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host } = await mount();
+  expect(host.textContent).toContain("One-page PDF verified");
+  expect(
+    host.querySelector('[aria-label="Resume changes"]')?.textContent,
+  ).toContain("removed 2");
+  await act(async () =>
+    popup.options?.onResumeChange({
+      ...workspace().resume,
+      title: "Manual edit",
+    }),
+  );
+  expect(host.textContent).not.toContain("One-page PDF verified");
+});
+
+it("announces quality phases and call count during tailoring", async () => {
+  const pending = deferred<unknown>();
+  vi.mocked(invoke).mockImplementation(async (name, args) => {
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "application_context") return reply(context);
+    if (name.startsWith("load_application_")) return reply(null);
+    if (name === "save_application_stage_one")
+      return reply({
+        revision: 1,
+        draft: (args as Record<string, unknown>).draft,
+      });
+    if (name === "start_application") return pending.promise;
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host, button } = await mount();
+  await editField(
+    host.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Job Description"]',
+    )!,
+    "Rust engineer required",
+  );
+  await act(async () => button("Tailor").click());
+  await act(async () =>
+    listeners.get("ort:tailoring-progress")?.({
+      payload: {
+        phase: "Checking sources and editing",
+        call: 2,
+        maximum: 4,
+        pageCount: 2,
+      },
+    }),
+  );
+  expect(host.textContent).toContain(
+    "Checking sources and editing · call 2 of 4 · PDF: 2 pages; target 1",
+  );
+  await act(async () =>
+    pending.resolve({
+      ok: false,
+      error: {
+        code: "AI_CANCELLED",
+        messageKey: "errors.application",
+        retryable: false,
+        details: {},
+      },
+    }),
+  );
 });

@@ -12,6 +12,7 @@ function content(entry: ResumeEntry) {
         label: x.label.trim(),
         value: x.value.trim(),
         isSkill: x.isSkill,
+        listKind: x.listKind,
       })),
     bullets: entry.bullets.map((x) => x.text.trim()).filter(Boolean),
     links: entry.links

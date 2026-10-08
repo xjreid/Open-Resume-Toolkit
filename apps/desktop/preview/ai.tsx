@@ -4,16 +4,15 @@ import { createRoot } from "react-dom/client";
 import { AiWorkspace } from "../src/shared/AiWorkspace";
 import { AppShell } from "../src/shared/AppShell";
 import { type Usage, type UsageBucket } from "../src/shared/AiUsageChart";
-import "../src/shared/app.css";
-import "../src/shared/workspace-theme.css";
+import "../src/shared/styles/index.css";
 
 type Provider = "openai" | "anthropic" | "gemini";
 type SavedKey = {
   credentialId: string;
-  identificationNumber: number;
+  createdAt: string;
   name?: string | null;
   provider: Provider;
-  preset: "balanced";
+  model: string;
   paused: boolean;
   removed: boolean;
   cleanupRequired: boolean;
@@ -23,10 +22,17 @@ type Registry = {
   primaryCredentialId: string | null;
   nextIdentificationNumber: number;
 };
+const models = {
+  openai: "gpt-5.6-terra",
+  anthropic: "claude-sonnet-5",
+  gemini: "gemini-3.6-flash",
+};
 const now = new Date();
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const dateLabel = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const fixtureKey = (number: number) =>
+  `019a0000-0000-7000-8000-${String(number).padStart(12, "0")}`;
 const seed = () =>
   Array.from({ length: 240 }, (_, index) => {
     const date = new Date(
@@ -39,7 +45,7 @@ const seed = () =>
     );
     return {
       at: date.getTime(),
-      credentialId: `preview-key-${(index % 3) + 1}`,
+      credentialId: fixtureKey((index % 3) + 1),
       label: dateLabel(date),
       attempts: index % 6 === 0 ? 0 : 2,
       usage: {
@@ -90,17 +96,19 @@ function reset(mode: Scenario) {
         ? []
         : (["openai", "anthropic", "gemini"] as const).map(
             (provider, index) => ({
-              credentialId: `preview-key-${index + 1}`,
-              identificationNumber: index + 1,
+              credentialId: fixtureKey(index + 1),
+              createdAt: new Date(
+                now.getTime() - (3 - index) * 86400000,
+              ).toISOString(),
               provider,
-              preset: "balanced",
+              model: models[provider],
               paused: index === 2,
               removed: false,
               cleanupRequired: false,
             }),
           ),
     primaryCredentialId:
-      mode === "setup" || mode === "no_primary" ? null : "preview-key-1",
+      mode === "setup" || mode === "no_primary" ? null : fixtureKey(1),
     nextIdentificationNumber: mode === "setup" ? 1 : 4,
   };
   records = mode === "setup" ? [] : seed();
@@ -109,19 +117,22 @@ function reset(mode: Scenario) {
     mode === "setup"
       ? []
       : [
-          cap("all_time", 10000000, "preview-key-1"),
-          cap("all_time", 5000000, "preview-key-2"),
+          cap("all_time", 10000000, fixtureKey(1)),
+          cap("all_time", 5000000, fixtureKey(2)),
         ];
   partial = mode === "partial";
   retention = "retain_until_cleared";
 }
 reset("connected");
 const catalog = {
+  formatVersion: 1,
+  minimumAppVersion: "0.0.0-dev",
+  issuedAt: "2026-09-17T00:00:00Z",
   catalogId: "sample-ui-data",
   expiresAt: "2027-01-01",
   entries: (["openai", "anthropic", "gemini"] as const).map((provider) => ({
     provider: provider === "openai" ? "open_ai" : provider,
-    model: `Sample ${provider === "openai" ? "OpenAI" : provider === "anthropic" ? "Anthropic" : "Gemini"} model`,
+    model: models[provider],
     preset: "balanced",
     disabled: false,
     operations: ["credential_test"],
@@ -187,6 +198,12 @@ function monitoring(args: Record<string, any>) {
     attempts: selected.length * 2,
     usage,
     costByCurrencyMicros: selected.length ? { USD: cost } : {},
+    totalTokens:
+      usage.inputTokens +
+      usage.cachedInputTokens +
+      usage.cacheWriteTokens +
+      usage.outputTokens +
+      usage.reasoningTokens,
     estimatedCostMicros: cost,
     currency: "USD",
     unresolvedReservedMicros: partial ? 120000 : 0,
@@ -212,9 +229,78 @@ function monitoring(args: Record<string, any>) {
     byPreset: { balanced: selected.length * 2 },
     byStatus: { succeeded: selected.length * 2 },
     byOperationType: { credential_test: selected.length },
-    timeBuckets: [...buckets.values()],
+    timeBuckets: [...buckets.values()].map((bucket) => ({
+      ...bucket,
+      totalTokens:
+        bucket.usage.inputTokens +
+        bucket.usage.cachedInputTokens +
+        bucket.usage.cacheWriteTokens +
+        bucket.usage.outputTokens +
+        bucket.usage.reasoningTokens,
+    })),
+    recentFailures:
+      partial && selected.length
+        ? [
+            {
+              operationId: "preview-operation-1",
+              attemptId: "preview-attempt-2",
+              provider: "gemini",
+              requestedModel: "gemini-3.5-flash-lite",
+              effectiveModel: null,
+              operationType: "tailor_resume",
+              callNumber: 2,
+              startedAtUnixMs: now.getTime() - 120000,
+              durationMs: 2350,
+              category: "transient",
+              usage: null,
+              usageComplete: false,
+              details: {
+                code: "AI_PROVIDER_SERVICE_UNAVAILABLE",
+                httpStatus: 503,
+                finishReason: null,
+                providerReason: null,
+                pageCount: null,
+                validationIssues: [],
+              },
+            },
+            {
+              operationId: "preview-operation-2",
+              attemptId: "preview-attempt-4",
+              provider: "gemini",
+              requestedModel: "gemini-3.5-flash-lite",
+              effectiveModel: "gemini-3.5-flash-lite",
+              operationType: "tailor_resume",
+              callNumber: 4,
+              startedAtUnixMs: now.getTime() - 240000,
+              durationMs: 15420,
+              category: "invalid_output",
+              usage: {
+                inputTokens: 4500,
+                outputTokens: 2200,
+                reasoningTokens: 100,
+                cachedInputTokens: 0,
+                cacheWriteTokens: 0,
+              },
+              usageComplete: true,
+              details: {
+                code: "AI_MATERIAL_INVALID",
+                httpStatus: null,
+                finishReason: null,
+                providerReason: null,
+                pageCount: null,
+                validationIssues: [
+                  "Missing required schema v6 field: reviewIssues. Return the complete candidate, including empty arrays where appropriate.",
+                ],
+              },
+            },
+          ]
+        : [],
   };
 }
+
+Object.defineProperty(window, "__TAURI_EVENT_PLUGIN_INTERNALS__", {
+  value: { unregisterListener: () => {} },
+});
 
 // Credentials are discarded, never logged or stored. All controls use memory-only fixtures.
 Object.defineProperty(window, "__TAURI_INTERNALS__", {
@@ -224,8 +310,15 @@ Object.defineProperty(window, "__TAURI_INTERNALS__", {
     invoke: async (command: string, args: Record<string, any> = {}) => {
       let value: unknown;
       switch (command) {
+        case "plugin:event|listen":
+          return 1;
+        case "plugin:event|unlisten":
+          return null;
         case "load_ai_connection":
-          value = registry;
+          value = {
+            keys: registry.keys,
+            primaryCredentialId: registry.primaryCredentialId,
+          };
           break;
         case "load_ai_catalog":
           value = catalog;
@@ -260,16 +353,19 @@ Object.defineProperty(window, "__TAURI_INTERNALS__", {
             },
           };
           break;
-        case "set_ai_key_preset":
+        case "set_ai_key_model":
           registry = {
             ...registry,
             keys: registry.keys.map((key) =>
               key.credentialId === args.request.credentialId
-                ? { ...key, preset: args.request.preset }
+                ? { ...key, model: args.request.model }
                 : key,
             ),
           };
-          value = registry;
+          value = {
+            keys: registry.keys,
+            primaryCredentialId: registry.primaryCredentialId,
+          };
           break;
         case "load_ai_retention":
           value = { policy: retention, removedOperations: 0 };
@@ -285,17 +381,20 @@ Object.defineProperty(window, "__TAURI_INTERNALS__", {
             keys: [
               ...registry.keys,
               {
-                credentialId: `preview-key-${number}`,
-                identificationNumber: number,
+                credentialId: fixtureKey(number),
+                createdAt: new Date().toISOString(),
                 provider: args.request.provider,
-                preset: "balanced",
+                model: models[args.request.provider as Provider],
                 paused: false,
                 removed: false,
                 cleanupRequired: false,
               },
             ],
           };
-          value = registry;
+          value = {
+            keys: registry.keys,
+            primaryCredentialId: registry.primaryCredentialId,
+          };
           break;
         }
         case "rename_ai_key": {
@@ -307,7 +406,10 @@ Object.defineProperty(window, "__TAURI_INTERNALS__", {
                 : key,
             ),
           };
-          value = registry;
+          value = {
+            keys: registry.keys,
+            primaryCredentialId: registry.primaryCredentialId,
+          };
           break;
         }
         case "change_ai_key": {
@@ -343,7 +445,10 @@ Object.defineProperty(window, "__TAURI_INTERNALS__", {
           };
           if (action === "remove")
             caps = caps.filter((item) => item.credentialId !== credentialId);
-          value = registry;
+          value = {
+            keys: registry.keys,
+            primaryCredentialId: registry.primaryCredentialId,
+          };
           break;
         }
         case "preview_ai_test":

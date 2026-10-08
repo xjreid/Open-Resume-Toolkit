@@ -84,7 +84,7 @@ export function AiKeyCustomization({
     (entry) =>
       entry.provider ===
         (saved.provider === "openai" ? "open_ai" : saved.provider) &&
-      entry.preset === saved.preset &&
+      entry.model === saved.model &&
       !entry.disabled,
   );
   const cap = settings?.cap;
@@ -169,22 +169,22 @@ export function AiKeyCustomization({
       setWorking(false);
     }
   }
-  async function selectPreset(preset: SavedKey["preset"]) {
+  async function selectModel(model: string) {
     if (disabled) return;
     setWorking(true);
     try {
-      const response = await invoke("set_ai_key_preset", {
-        request: { credentialId: id, preset },
+      const response = await invoke("set_ai_key_model", {
+        request: { credentialId: id, model },
       });
       if (response.ok) {
         onRegistry(response.value);
-        setNotice("Preset saved.");
+        setNotice("Model saved.");
       } else
         setNotice(
-          "This preset is unavailable. Finish any active test and try again.",
+          "This model is unavailable. Finish any active test and try again.",
         );
     } catch {
-      setNotice("The preset could not be saved.");
+      setNotice("The model could not be saved.");
     } finally {
       setWorking(false);
     }
@@ -210,38 +210,38 @@ export function AiKeyCustomization({
               </span>
               {identity}
             </div>
-            <label className="ai-key-preset">
-              <span className="visually-hidden">Model preset for {label}</span>
+            <label className="ai-key-model">
+              <span className="visually-hidden">Model for {label}</span>
               <select
-                value={saved.preset}
-                disabled={disabled || !catalog || !entry}
-                title={
-                  entry
-                    ? `${saved.preset}: ${entry.model}`
-                    : "Verified model pricing unavailable"
-                }
-                onChange={(event) =>
-                  void selectPreset(event.target.value as SavedKey["preset"])
-                }
+                value={saved.model}
+                disabled={disabled || !catalog}
+                title={saved.model || "Verified model pricing unavailable"}
+                onChange={(event) => void selectModel(event.target.value)}
               >
-                {(["economy", "balanced", "quality"] as const).map((preset) => {
-                  const model = catalog?.entries.find(
-                    (item) =>
-                      item.provider ===
-                        (saved.provider === "openai"
-                          ? "open_ai"
-                          : saved.provider) &&
-                      item.preset === preset &&
-                      !item.disabled,
-                  );
-                  return (
-                    <option key={preset} value={preset} disabled={!model}>
-                      {preset[0].toUpperCase() + preset.slice(1)}:{" "}
-                      {model?.model ??
-                        (preset === "balanced" ? "Unavailable" : "Coming soon")}
-                    </option>
-                  );
-                })}
+                {!entry && (
+                  <option value={saved.model} disabled>
+                    {saved.model || "Model unavailable"}
+                  </option>
+                )}
+                {[
+                  ...new Map(
+                    (catalog?.entries ?? [])
+                      .filter(
+                        (item) =>
+                          item.provider ===
+                            (saved.provider === "openai"
+                              ? "open_ai"
+                              : saved.provider) &&
+                          !item.disabled &&
+                          item.operations.includes("credential_test"),
+                      )
+                      .map((item) => [item.model, item]),
+                  ).values(),
+                ].map((item) => (
+                  <option key={item.model} value={item.model}>
+                    {item.model}
+                  </option>
+                ))}
               </select>
             </label>
           </div>

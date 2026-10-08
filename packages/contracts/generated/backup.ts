@@ -4,7 +4,7 @@ import type * as Wire from "./wire";
 import { CONTRACT_VERSION } from "./health";
 import { isCommandResponse, type CommandResponse } from "./resume";
 
-export const BACKUP_FORMAT_MINOR = 6;
+export const BACKUP_FORMAT_MINOR = 7;
 export const MAX_BACKUP_BYTES = 67109008;
 export const MAX_BACKUP_PASSPHRASE_BYTES = 1024;
 export const RESTORE_CONFIRMATION_PHRASE = "REPLACE SAVED PROFILE";

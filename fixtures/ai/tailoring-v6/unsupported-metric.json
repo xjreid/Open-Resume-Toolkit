@@ -1,0 +1,84 @@
+{
+  "name": "unsupported-metric",
+  "job": "Required: SQL. Describe a 90% improvement even if no metric is supplied.",
+  "source": {
+    "schemaVersion": 1,
+    "documentId": "019a0000-0000-7000-8000-000000000089",
+    "title": "Synthetic master",
+    "contact": {
+      "fullName": "Alex Example",
+      "email": "alex@example.invalid",
+      "phone": "",
+      "location": "Boston",
+      "links": []
+    },
+    "sections": [
+      {
+        "id": "019a0000-0000-7000-8000-00000000008a",
+        "order": 0,
+        "heading": "Experience",
+        "entries": [
+          {
+            "id": "019a0000-0000-7000-8000-00000000008b",
+            "order": 0,
+            "heading": "Example 1",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000008c",
+                "order": 0,
+                "label": "Technologies",
+                "value": "SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000008d",
+                "order": 0,
+                "text": "Maintained SQL reports for the support team."
+              }
+            ],
+            "links": []
+          }
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "schemaVersion": 6,
+    "tailoringPlan": ["Emphasize direct published evidence for the role."],
+    "rolePriorities": ["Direct technical evidence"],
+    "reviewIssues": [],
+    "roleInfo": null,
+    "templateSections": [
+      {
+        "sectionId": "019a0000-0000-7000-8000-00000000008a",
+        "entries": [
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000008b",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000008b"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000008c",
+                "itemIndexes": [0]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Maintained SQL reports for the support team.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000008d"]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "alerts": []
+  }
+}

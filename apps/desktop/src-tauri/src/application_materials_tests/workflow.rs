@@ -39,10 +39,10 @@ fn qualification_alerts_survive_refinement_and_encrypted_workspace_reload() {
         }],
     }];
     let source = current.resume.clone();
-    let raw = json!({"schemaVersion":5,"tailoringPlan":["Preserve the published Rust tooling experience."],"roleInfo":null,
+    let raw = json!({"schemaVersion":6,"tailoringPlan":["Preserve the published Rust tooling experience."],"roleInfo":null,"rolePriorities":["Rust tooling"],"reviewIssues":[],
         "templateSections":[{"sectionId":source.sections[0].id,"entries":[{
             "entryId":source.sections[0].entries[0].id,"sourceEntryIds":[source.sections[0].entries[0].id],
-            "mainInfo":{"format":"bullets","items":["Built Rust tools."]}
+            "selectedLists":[],"mainInfo":{"format":"bullets","items":[{"text":"Built Rust tools.","sourceRefs":[source.sections[0].entries[0].bullets[0].id]}]}
         }]}],"alerts":[
         {"kind":"not_found","category":"named_skill_or_technology","requirement":"Python","target":"Python","jobExcerpt":"Python","resumeEvidence":null},
         {"kind":"not_found","category":"named_skill_or_technology","requirement":"R","target":"R","jobExcerpt":"R","resumeEvidence":null}
@@ -178,19 +178,19 @@ fn resume_prompt_contract_makes_headers_read_only_for_all_providers() {
         ] {
             assert!(prompt.contains(region), "missing {region}");
         }
-        assert!(prompt.contains("\"schemaVersion\":5"));
+        assert!(prompt.contains("\"schemaVersion\":6"));
         assert!(prompt.contains("tailoringPlan"));
         assert!(prompt.contains("1–3"));
-        assert!(prompt.contains("only editable entry region is mainInfo"));
-        assert!(prompt.contains("Do not write or return any of these fields"));
-        assert!(prompt.contains("Prioritize Education as the first resume section"));
-        assert!(prompt.contains("strong, job-specific reason"));
+        assert!(prompt.contains("selectedLists"));
+        assert!(prompt.contains("Do not return any of these fields"));
+        assert!(prompt.contains("rolePriorities"));
+        assert!(prompt.contains("reviewIssues"));
         assert!(
             prompt.len() <= 12_000,
             "prompt exceeds material request bound"
         );
         assert!(prompt.contains("sourceEntryIds"));
-        assert!(prompt.contains("Do not transplant accomplishments"));
+        assert!(prompt.contains("sourceRefs"));
     }
 }
 
@@ -393,6 +393,7 @@ fn body_only_draft_with_plan_and_read_only_headers_preflights_and_renders() {
                 label: "Details".into(),
                 value: "Distributed systems".into(),
                 is_skill: false,
+                list_kind: None,
             },
             NamedField {
                 id: EntityId::new(),
@@ -400,6 +401,7 @@ fn body_only_draft_with_plan_and_read_only_headers_preflights_and_renders() {
                 label: "Extra".into(),
                 value: "Rust, PostgreSQL".into(),
                 is_skill: true,
+                list_kind: None,
             },
         ],
         bullets: vec![Bullet {
@@ -416,19 +418,21 @@ fn body_only_draft_with_plan_and_read_only_headers_preflights_and_renders() {
         entries: vec![entry.clone()],
     }];
     let draft = json!({
-        "schemaVersion": 5,
+        "schemaVersion": 6,
         "tailoringPlan": [
             "Rust platform role — Built dependable Rust services — foreground the service delivery bullet.",
             "Distributed-systems need — source details name distributed systems — retain that context beside the role.",
             "Remote collaboration context — New York location is published — retain it accurately in metadata."
         ],
+        "rolePriorities":["Rust platform"],"reviewIssues":[],
         "roleInfo": {"company":"Example Co","title":"Platform Engineer","location":"Remote"},
         "templateSections": [{
             "sectionId": source.sections[0].id,
             "entries": [{
                 "entryId": entry.id,
                 "sourceEntryIds": [entry.id],
-                "mainInfo": {"format":"paragraph","items":["Built dependable Rust services for customer workflows."]}
+                "selectedLists":[{"fieldId":entry.fields[1].id,"itemIndexes":[0,1]}],
+                "mainInfo": {"format":"paragraph","items":[{"text":"Built dependable Rust services for customer workflows.","sourceRefs":[entry.bullets[0].id]}]}
             }]
         }],
         "alerts": [{"kind":"not_found","category":"named_skill_or_technology",
@@ -496,4 +500,98 @@ fn body_only_draft_with_plan_and_read_only_headers_preflights_and_renders() {
     )
     .unwrap();
     assert!(docx.starts_with(b"PK\x03\x04"));
+}
+
+#[test]
+fn exhausted_quality_pipeline_does_not_write_encrypted_workspace() {
+    let temp = TempDir::new().unwrap();
+    let vault = MemoryDatabaseKeyVault::new();
+    let store =
+        ort_storage::EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+    let original = workspace();
+    let saved = save(&store, None, &original).unwrap();
+    let mut run = TailoringRun::new(
+        &original.resume,
+        &original.resume,
+        &original.job_description,
+        1,
+        original.style,
+        json!({}),
+    );
+    for call in 1..=MAX_TAILORING_CALLS {
+        match run.advance("malformed provider JSON") {
+            Ok(TailoringStep::Continue(_)) => assert!(call < MAX_TAILORING_CALLS),
+            Ok(TailoringStep::Ready(result)) => {
+                let mut revised = original.clone();
+                revised.resume = result.resume;
+                save_tailored_workspace(
+                    &store,
+                    store.manifest().profile_id,
+                    Some(saved.revision),
+                    &revised,
+                    &|| false,
+                )
+                .unwrap();
+                panic!("malformed output was accepted");
+            }
+            Err(code) => {
+                assert_eq!(call, MAX_TAILORING_CALLS);
+                assert_eq!(code, "AI_MATERIAL_INVALID");
+            }
+        }
+    }
+    let loaded = load(&store).unwrap().unwrap();
+    assert_eq!(loaded.revision, saved.revision);
+    assert_eq!(
+        serde_json::to_value(loaded.workspace).unwrap(),
+        serde_json::to_value(original).unwrap()
+    );
+}
+
+#[test]
+fn final_tailoring_save_checks_cancellation_profile_and_revision() {
+    let temp = TempDir::new().unwrap();
+    let vault = MemoryDatabaseKeyVault::new();
+    let store =
+        ort_storage::EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+    let profile = store.manifest().profile_id;
+    let original = workspace();
+    let saved = save(&store, None, &original).unwrap();
+    let mut candidate = original.clone();
+    candidate.resume.contact.full_name = "Candidate awaiting commit".into();
+    assert!(matches!(
+        save_tailored_workspace(&store, profile, Some(saved.revision), &candidate, &|| true),
+        Err(StorageError::RevisionConflict)
+    ));
+    assert_eq!(load(&store).unwrap().unwrap().revision, saved.revision);
+    assert!(
+        load(&store)
+            .unwrap()
+            .unwrap()
+            .workspace
+            .resume
+            .contact
+            .full_name
+            .is_empty()
+    );
+    let mut reviewed = original.clone();
+    reviewed.resume.contact.full_name = "New manual edit".into();
+    let latest = save_reviewed(&store, saved.revision, &reviewed).unwrap();
+    for (expected, frozen_profile) in [
+        (saved.revision, profile),
+        (latest.revision, uuid::Uuid::now_v7()),
+    ] {
+        assert!(matches!(
+            save_tailored_workspace(&store, frozen_profile, Some(expected), &candidate, &|| {
+                false
+            }),
+            Err(StorageError::RevisionConflict)
+        ));
+    }
+    let loaded = load(&store).unwrap().unwrap();
+    assert_eq!(loaded.revision, latest.revision);
+    assert_eq!(
+        serde_json::to_value(loaded.workspace).unwrap(),
+        serde_json::to_value(reviewed).unwrap()
+    );
 }

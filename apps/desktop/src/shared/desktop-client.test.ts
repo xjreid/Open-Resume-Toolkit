@@ -1,7 +1,29 @@
 import { expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { invokeDesktop } from "./desktop-client";
+import {
+  invokeDesktop,
+  desktopCommand,
+  DesktopCommandError,
+} from "./desktop-client";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+
+it("preserves diagnostic envelopes when a command throws", async () => {
+  const envelope = {
+    code: "AI_PROVIDER_SERVICE_UNAVAILABLE",
+    messageKey: "errors.aiProviderFailed",
+    retryable: true,
+    details: {
+      diagnostic: { code: "AI_PROVIDER_SERVICE_UNAVAILABLE", httpStatus: 503 },
+    },
+  };
+  vi.mocked(invoke).mockResolvedValue({ ok: false, error: envelope });
+  const failure = await desktopCommand("load_ai_connection").catch(
+    (error) => error,
+  );
+  expect(failure).toBeInstanceOf(DesktopCommandError);
+  expect(failure.message).toBe("AI_PROVIDER_SERVICE_UNAVAILABLE");
+  expect(failure.envelope).toEqual(envelope);
+});
 
 it("rejects malformed native success values before state can consume them", async () => {
   vi.mocked(invoke).mockResolvedValue({

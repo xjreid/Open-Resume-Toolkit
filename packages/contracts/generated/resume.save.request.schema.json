@@ -167,6 +167,13 @@
         "url"
       ]
     },
+    "ListKind": {
+      "type": "string",
+      "enum": [
+        "skills",
+        "coursework"
+      ]
+    },
     "NamedField": {
       "type": "object",
       "properties": {
@@ -179,6 +186,9 @@
         },
         "label": {
           "type": "string"
+        },
+        "listKind": {
+          "$ref": "#/$defs/ListKind"
         },
         "order": {
           "type": "integer",

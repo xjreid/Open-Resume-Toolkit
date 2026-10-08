@@ -1,0 +1,1712 @@
+{
+  "name": "oversized-master",
+  "job": "Required: Rust and SQL.",
+  "source": {
+    "schemaVersion": 1,
+    "documentId": "019a0000-0000-7000-8000-000000000010",
+    "title": "Synthetic master",
+    "contact": {
+      "fullName": "Alex Example",
+      "email": "alex@example.invalid",
+      "phone": "",
+      "location": "Boston",
+      "links": []
+    },
+    "sections": [
+      {
+        "id": "019a0000-0000-7000-8000-000000000011",
+        "order": 0,
+        "heading": "Experience",
+        "entries": [
+          {
+            "id": "019a0000-0000-7000-8000-000000000012",
+            "order": 0,
+            "heading": "Example 1",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000013",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000014",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000015",
+            "order": 1,
+            "heading": "Example 2",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000016",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000017",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000018",
+            "order": 2,
+            "heading": "Example 3",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000019",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000001a",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000001b",
+            "order": 3,
+            "heading": "Example 4",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000001c",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000001d",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000001e",
+            "order": 4,
+            "heading": "Example 5",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000001f",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000020",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000021",
+            "order": 5,
+            "heading": "Example 6",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000022",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000023",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000024",
+            "order": 6,
+            "heading": "Example 7",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000025",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000026",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000027",
+            "order": 7,
+            "heading": "Example 8",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000028",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000029",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000002a",
+            "order": 8,
+            "heading": "Example 9",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000002b",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000002c",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000002d",
+            "order": 9,
+            "heading": "Example 10",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000002e",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000002f",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000030",
+            "order": 10,
+            "heading": "Example 11",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000031",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000032",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000033",
+            "order": 11,
+            "heading": "Example 12",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000034",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000035",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000036",
+            "order": 12,
+            "heading": "Example 13",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000037",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000038",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000039",
+            "order": 13,
+            "heading": "Example 14",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000003a",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000003b",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000003c",
+            "order": 14,
+            "heading": "Example 15",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000003d",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000003e",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000003f",
+            "order": 15,
+            "heading": "Example 16",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000040",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000041",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000042",
+            "order": 16,
+            "heading": "Example 17",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000043",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000044",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000045",
+            "order": 17,
+            "heading": "Example 18",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000046",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000047",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000048",
+            "order": 18,
+            "heading": "Example 19",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000049",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000004a",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000004b",
+            "order": 19,
+            "heading": "Example 20",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000004c",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000004d",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000004e",
+            "order": 20,
+            "heading": "Example 21",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000004f",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000050",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000051",
+            "order": 21,
+            "heading": "Example 22",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000052",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000053",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000054",
+            "order": 22,
+            "heading": "Example 23",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000055",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000056",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000057",
+            "order": 23,
+            "heading": "Example 24",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000058",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000059",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000005a",
+            "order": 24,
+            "heading": "Example 25",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000005b",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000005c",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000005d",
+            "order": 25,
+            "heading": "Example 26",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000005e",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000005f",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000060",
+            "order": 26,
+            "heading": "Example 27",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000061",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000062",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000063",
+            "order": 27,
+            "heading": "Example 28",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000064",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000065",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000066",
+            "order": 28,
+            "heading": "Example 29",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000067",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000068",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000069",
+            "order": 29,
+            "heading": "Example 30",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000006a",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000006b",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000006c",
+            "order": 30,
+            "heading": "Example 31",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000006d",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000006e",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000006f",
+            "order": 31,
+            "heading": "Example 32",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000070",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000071",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000072",
+            "order": 32,
+            "heading": "Example 33",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000073",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000074",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000075",
+            "order": 33,
+            "heading": "Example 34",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000076",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000077",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000078",
+            "order": 34,
+            "heading": "Example 35",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000079",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000007a",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000007b",
+            "order": 35,
+            "heading": "Example 36",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000007c",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000007d",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-00000000007e",
+            "order": 36,
+            "heading": "Example 37",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000007f",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000080",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          },
+          {
+            "id": "019a0000-0000-7000-8000-000000000081",
+            "order": 37,
+            "heading": "Example 38",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000082",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Rust, SQL",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-000000000083",
+                "order": 0,
+                "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures."
+              }
+            ],
+            "links": []
+          }
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "schemaVersion": 6,
+    "tailoringPlan": ["Emphasize direct published evidence for the role."],
+    "rolePriorities": ["Direct technical evidence"],
+    "reviewIssues": [],
+    "roleInfo": null,
+    "templateSections": [
+      {
+        "sectionId": "019a0000-0000-7000-8000-000000000011",
+        "entries": [
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000012",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000012"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000013",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000014"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000015",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000015"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000016",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000017"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000018",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000018"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000019",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000001a"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000001b",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000001b"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000001c",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000001d"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000001e",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000001e"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000001f",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000020"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000021",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000021"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000022",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000023"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000024",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000024"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000025",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000026"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000027",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000027"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000028",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000029"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000002a",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000002a"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000002b",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000002c"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000002d",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000002d"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000002e",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000002f"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000030",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000030"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000031",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000032"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000033",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000033"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000034",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000035"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000036",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000036"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000037",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000038"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000039",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000039"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000003a",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000003b"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000003c",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000003c"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000003d",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000003e"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000003f",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000003f"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000040",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000041"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000042",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000042"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000043",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000044"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000045",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000045"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000046",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000047"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000048",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000048"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000049",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000004a"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000004b",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000004b"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000004c",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000004d"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000004e",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000004e"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000004f",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000050"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000051",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000051"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000052",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000053"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000054",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000054"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000055",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000056"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000057",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000057"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000058",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000059"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000005a",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000005a"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000005b",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000005c"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000005d",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000005d"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000005e",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000005f"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000060",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000060"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000061",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000062"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000063",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000063"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000064",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000065"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000066",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000066"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000067",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000068"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000069",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000069"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000006a",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000006b"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000006c",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000006c"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000006d",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000006e"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000006f",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000006f"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000070",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000071"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000072",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000072"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000073",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000074"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000075",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000075"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000076",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000077"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000078",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000078"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000079",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000007a"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000007b",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000007b"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000007c",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000007d"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000007e",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000007e"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000007f",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000080"]
+                }
+              ]
+            }
+          },
+          {
+            "entryId": "019a0000-0000-7000-8000-000000000081",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000081"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-000000000082",
+                "itemIndexes": [0, 1]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Built Rust services and SQL reports for the support team. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures. Implemented tested database workflows with documented support procedures.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000083"]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "alerts": []
+  }
+}

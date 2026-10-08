@@ -9,6 +9,21 @@ export type AiActivityMonth = {
   label: string;
   toUnixMs: number;
 };
+export type AiAttemptFailure = {
+  attemptId: string;
+  callNumber: number;
+  category: string | null;
+  details: AiFailureDetails | null;
+  durationMs: number | null;
+  effectiveModel: string | null;
+  operationId: string;
+  operationType: string;
+  provider: string;
+  requestedModel: string;
+  startedAtUnixMs: number;
+  usage: Usage | null;
+  usageComplete: boolean;
+};
 export type AiCapActionRequest = { credentialId: string; period: AiPeriod };
 export type AiCapPolicySummary = {
   activatedAtUnixMs: number;
@@ -23,6 +38,14 @@ export type AiCapPolicySummary = {
   revision: number;
   timeZone: string;
   unresolvedMicros: number;
+};
+export type AiFailureDetails = {
+  code: string;
+  finishReason: string | null;
+  httpStatus: number | null;
+  pageCount: number | null;
+  providerReason: string | null;
+  validationIssues: Array<string>;
 };
 export type AiGeneralSettings = {
   cap: AiCapPolicySummary | null;
@@ -61,6 +84,7 @@ export type AiMonitoringSummary = {
   estimatedCostMicros: number;
   logicalOperations: number;
   partial: boolean;
+  recentFailures: Array<AiAttemptFailure>;
   timeBuckets: Array<AiMonitoringBucket>;
   totalTokens: number;
   unknownCount: number;
@@ -102,15 +126,15 @@ export type ApplicationContext = {
   aiLabel: string;
   aiReady: boolean;
   browserConnected: boolean;
-  preset: string | null;
-  presetLabel: string;
-  presetOptions: Array<ApplicationPresetOption>;
+  model: string | null;
+  modelOptions: Array<ApplicationModelOption>;
   profileId: string;
   publishedRevision: number | null;
   selectedKeyId: string | null;
   selectedKeyReady: boolean;
 };
 export type ApplicationExportFormat = "pdf" | "docx";
+export type ApplicationModelOption = { model: string };
 export type ApplicationPopupKind =
   | "job"
   | "url"
@@ -118,18 +142,13 @@ export type ApplicationPopupKind =
   | "resume-edit"
   | "cover"
   | "cover-view";
-export type ApplicationPresetOption = {
-  available: boolean;
-  label: string;
-  model: string | null;
-  preset: string;
-};
 export type ApplicationWorkspace = {
   alerts: Array<QualificationAlert>;
   alertsTruncated: boolean;
   answer: string;
   approvedAnswers: Array<ApprovedAnswer>;
   changePoints: Array<string>;
+  changeSummary?: Array<string>;
   coverLetter: string | null;
   dismissedAlertIds: Array<string>;
   ignoreAllAlerts: boolean;
@@ -396,6 +415,7 @@ export type ImportTextTarget =
   | { id: string; kind: "existing" }
   | { heading: string; kind: "new" };
 export type Link = { id?: string; label: string; order?: number; url: string };
+export type ListKind = "skills" | "coursework";
 export type LoadResumeRequest = {
   contractVersion: number;
   payload: EmptyPayload;
@@ -413,6 +433,7 @@ export type NamedField = {
   id: string;
   isSkill: boolean;
   label: string;
+  listKind?: ListKind;
   order: number;
   value: string;
 };
@@ -535,6 +556,7 @@ export type PortablePdfReplayRequest = {
 };
 export type PreparedApplicationExport = {
   docxReady: boolean;
+  pageCount: number;
   pdfReady: boolean;
   revision: number;
 };
@@ -655,9 +677,9 @@ export type SavedAiKey = {
   cleanupRequired: boolean;
   createdAt: string;
   credentialId: string;
+  model: string;
   name?: string | null;
   paused: boolean;
-  preset: Preset;
   provider: CredentialProvider;
   removed: boolean;
 };
@@ -675,7 +697,7 @@ export type SavedWorkspace = {
   revision: number;
   workspace: ApplicationWorkspace;
 };
-export type SetAiKeyPresetRequest = { credentialId: string; preset: string };
+export type SetAiKeyModelRequest = { credentialId: string; model: string };
 export type StageOneDraft = {
   jobDescription: string;
   jobUrl: string;
@@ -1051,8 +1073,8 @@ export type DesktopCommands = {
     args: { expectedRevision: number; id: string; metadata: TrackerMetadata };
     value: TrackerSummary;
   };
-  set_ai_key_preset: {
-    args: { request: SetAiKeyPresetRequest };
+  set_ai_key_model: {
+    args: { request: SetAiKeyModelRequest };
     value: AiKeyRegistry;
   };
   show_application_popup: {

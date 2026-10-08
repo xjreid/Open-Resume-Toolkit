@@ -1,7 +1,7 @@
 # Portable backup container v1 prototype
 
 - Extension: `.ort-backup`
-- Writer format: 1.6 (reader also accepts 1.0–1.5)
+- Writer format: 1.7 (reader also accepts 1.0–1.6)
 - Status: native export, read-only authenticated validation, restart-staged
   replace-restore, rollback, and exact safety-copy cleanup commands integrated;
   native cross-platform dialogs/vaults, low-disk injection, and hostile-input
@@ -16,7 +16,7 @@ associated data.
 | ---: | ---: | --- | --- |
 | 0 | 4 | magic | `ORTB` |
 | 4 | 2 | format major | `1` |
-| 6 | 2 | format minor | writer `6`; reader `0`–`6` |
+| 6 | 2 | format minor | writer `7`; reader `0`–`7` |
 | 8 | 1 | KDF identifier | `1` = Argon2id v1.3 |
 | 9 | 3 | reserved | zero |
 | 12 | 4 | memory KiB | writer 65,536; reader 65,536–262,144 |
@@ -37,7 +37,7 @@ hashes, renderer/template/font identities, bounded page/byte counts, generation
 times and repeat count. It never contains PDF bytes, resume content, filesystem
 paths or preview tickets. The payload manifest includes schema versions,
 inventory, and SHA-256 of the canonical profile. It contains no database key,
-vault reference, provider credential, native IPC secret, diagnostics, cache, or
+vault reference, provider credential, native IPC secret, general diagnostics, cache, or
 index.
 
 Version 1.2 supports document schema 2. Version 1.3 adds bounded, content-free
@@ -55,13 +55,19 @@ payload and container still have the shared 64 MiB size budget, and oversized
 exports fail explicitly. Earlier readers reject the new minor version rather
 than attempting an archive outside their count policy.
 
+Version 1.7 uses database schema 6 and preserves bounded AI failure diagnostics
+(error codes, HTTP/finish reasons, measured page count, and locally authored
+validation rules). It excludes provider messages, prompts, response bodies,
+resume/job text, and credentials. Older archives restore without these optional
+diagnostics.
+
 Reader validation is ordered: fixed header length/magic, versions and reserved
 bytes, KDF policy, ciphertext length/exact file length, Argon2id derivation, AEAD
 authentication, bounded JSON parsing, manifest/hash/inventory validation, then
 domain validation. The authenticated header version must match the encrypted
 manifest; version 1.0 requires database schema 1 and no render history, while
 1.1–1.2 require database schema 2, 1.3 requires database schema 3, and 1.4
-requires database schema 4; 1.5–1.6 require database schema 5. Wrong passphrase, ciphertext modification,
+requires database schema 4; 1.5–1.6 require database schema 5; 1.7 requires database schema 6. Wrong passphrase, ciphertext modification,
 truncation, and malformed encrypted content return the same invalid-backup
 category.
 
@@ -71,7 +77,9 @@ category.
 - Salt: sixteen `0x11` bytes
 - Nonce: twenty-four `0x22` bytes
 - Created time: `2026-09-01T12:00:00Z`
-- Version 1.6 SHA-256 of the complete container:
+- Version 1.7 SHA-256 of the complete container:
+  `7620b099ce32a90d1a195bc783170ec3870ff6a604c403370649c5c190e8b269`
+- Legacy version 1.6 SHA-256 (still read and verified):
   `93bea2f949c31e7b89f53f698a9a1c35fc7e18a7a90f4d25add4aeb7995f6ab4`
 - Legacy version 1.0 SHA-256 (still read and verified):
   `bad075c8e1369c6aa67f4b41d422826e84cde14070e43724caa063cae26e90aa`
@@ -82,7 +90,7 @@ vector change.
 
 ## Native export boundary
 
-The desktop command creates format 1.6 only from the already-open encrypted
+The desktop command creates format 1.7 only from the already-open encrypted
 profile. Its generated IPC request contains bounded request metadata and the
 user-entered passphrase, but no path, profile records, overwrite flag, key, or
 vault reference. The request types deliberately do not implement `Debug` or

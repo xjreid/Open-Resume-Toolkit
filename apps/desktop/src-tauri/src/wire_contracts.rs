@@ -41,7 +41,7 @@ pub fn desktop_wire_schemas() -> std::collections::BTreeMap<String, serde_json::
     );
     register!("RenameAiKeyRequest", ai_keys::RenameAiKeyRequest);
     register!("SavedAiKey", ai_keys::SavedAiKey);
-    register!("SetAiKeyPresetRequest", ai_keys::SetAiKeyPresetRequest);
+    register!("SetAiKeyModelRequest", ai_keys::SetAiKeyModelRequest);
     register!("AiProgress", ai_request::AiProgress);
     register!("AiTestPreview", ai_request::AiTestPreview);
     register!("AiTestResult", ai_request::AiTestResult);
@@ -56,8 +56,8 @@ pub fn desktop_wire_schemas() -> std::collections::BTreeMap<String, serde_json::
         application_exports::ApplicationExportFormat
     );
     register!(
-        "ApplicationPresetOption",
-        application_materials::ApplicationPresetOption
+        "ApplicationModelOption",
+        application_materials::ApplicationModelOption
     );
     register!("MaterialPdf", application_exports::MaterialPdf);
     register!(
@@ -195,6 +195,7 @@ pub fn desktop_wire_fixtures() -> std::collections::BTreeMap<String, serde_json:
         role_info: RoleInfo::default(),
         resume: resume.clone(),
         change_points: vec![],
+        change_summary: Vec::new(),
         alerts: vec![],
         alerts_truncated: false,
         dismissed_alert_ids: vec![],

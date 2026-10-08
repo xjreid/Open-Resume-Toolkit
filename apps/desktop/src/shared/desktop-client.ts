@@ -5,6 +5,13 @@ import type { DesktopCommands, ErrorEnvelope } from "@ort/contracts/wire";
 export type DesktopResponse<T> =
   | { ok: true; value: T }
   | { ok: false; error: ErrorEnvelope };
+
+export class DesktopCommandError extends Error {
+  constructor(public readonly envelope: ErrorEnvelope) {
+    super(envelope.code);
+    this.name = "DesktopCommandError";
+  }
+}
 type Arguments<K extends keyof DesktopCommands> =
   {} extends DesktopCommands[K]["args"]
     ? [args?: DesktopCommands[K]["args"]]
@@ -48,6 +55,6 @@ export async function desktopCommand<K extends keyof DesktopCommands>(
   ...args: Arguments<K>
 ): Promise<DesktopCommands[K]["value"]> {
   const result = await invokeDesktop(command, ...args);
-  if (!result.ok) throw new Error(result.error.code);
+  if (!result.ok) throw new DesktopCommandError(result.error);
   return result.value;
 }

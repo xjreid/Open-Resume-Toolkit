@@ -12,11 +12,11 @@ const model = (key: SavedKey, catalog: Catalog | null) =>
     (entry) =>
       entry.provider ===
         (key.provider === "openai" ? "open_ai" : key.provider) &&
-      entry.preset === key.preset &&
+      entry.model === key.model &&
       !entry.disabled,
-  )?.model ?? "Model unavailable";
-const preset = (value: SavedKey["preset"]) =>
-  value[0].toUpperCase() + value.slice(1);
+  )?.model ??
+  key.model ??
+  "Model unavailable";
 
 export function AiDataKeyPicker({
   keys,
@@ -124,8 +124,7 @@ export function AiDataKeyPicker({
                 <span className="ai-data-key-option-copy">
                   <strong>{keyDisplayName(key)}</strong>
                   <small>
-                    {providerName(key.provider)} · {preset(key.preset)}:{" "}
-                    {model(key, catalog)}
+                    {providerName(key.provider)} · {model(key, catalog)}
                     {key.removed ? " · Removed" : ""}
                   </small>
                 </span>
@@ -151,7 +150,7 @@ export function dataKeyDescription(
   return key
     ? {
         title: keyDisplayName(key),
-        detail: `${providerName(key.provider)} · ${preset(key.preset)}: ${model(key, catalog)}${key.removed ? " · Removed" : ""}`,
+        detail: `${providerName(key.provider)} · ${model(key, catalog)}${key.removed ? " · Removed" : ""}`,
       }
     : {
         title: "All keys",

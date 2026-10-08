@@ -424,16 +424,14 @@ pub fn save_ai_cap(
             Some("gemini") => ort_ai::Provider::Gemini,
             _ => return Err(ort_storage::StorageError::InvalidData),
         };
-        let preset = match connection.preset.as_deref() {
-            Some("economy") => ort_ai::Preset::Economy,
-            Some("balanced") => ort_ai::Preset::Balanced,
-            Some("quality") => ort_ai::Preset::Quality,
-            _ => return Err(ort_storage::StorageError::InvalidData),
-        };
+        let model = connection
+            .model
+            .as_deref()
+            .ok_or(ort_storage::StorageError::InvalidData)?;
         let catalog = ort_ai::builtin_catalog(&jiff::Timestamp::now().to_string(), None)
             .map_err(|_| ort_storage::StorageError::InvalidData)?;
         let currency = catalog
-            .resolve(provider, preset, ort_ai::OperationType::CredentialTest)
+            .resolve_model(provider, model, ort_ai::OperationType::CredentialTest)
             .map_err(|_| ort_storage::StorageError::InvalidData)?
             .currency
             .clone();

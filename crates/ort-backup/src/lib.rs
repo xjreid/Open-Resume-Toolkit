@@ -21,12 +21,13 @@ use zeroize::{Zeroize, Zeroizing};
 
 const MAGIC: &[u8; 4] = b"ORTB";
 const FORMAT_MAJOR: u16 = 1;
-pub const FORMAT_MINOR: u16 = 6;
+pub const FORMAT_MINOR: u16 = 7;
 const DATABASE_SCHEMA_V1_0: u16 = 1;
 const DATABASE_SCHEMA_V1_1: u16 = 2;
 const DATABASE_SCHEMA_V1_2: u16 = 3;
 const DATABASE_SCHEMA_V1_3: u16 = 4;
 const DATABASE_SCHEMA_V1_4: u16 = 5;
+const DATABASE_SCHEMA_V1_5: u16 = 6;
 const KDF_ARGON2ID: u8 = 1;
 const HEADER_LEN: usize = 76;
 const SALT_LEN: usize = 16;
@@ -165,6 +166,8 @@ pub struct PortableAiAttemptV1 {
     pub currency: String,
     pub estimate_completeness: String,
     pub error_category: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_details: Option<ort_domain::AiFailureDetails>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -302,7 +305,7 @@ fn create_backup_with_entropy(
         salt,
         nonce,
         format_minor,
-        DATABASE_SCHEMA_V1_4,
+        DATABASE_SCHEMA_V1_5,
     )
 }
 
@@ -323,13 +326,23 @@ fn create_backup_with_entropy_for_format(
         || (matches!(format_minor, 1 | 2) && database_schema == DATABASE_SCHEMA_V1_1)
         || (format_minor == 3 && database_schema == DATABASE_SCHEMA_V1_2)
         || (format_minor == 4 && database_schema == DATABASE_SCHEMA_V1_3)
-        || (matches!(format_minor, 5 | 6) && database_schema == DATABASE_SCHEMA_V1_4);
+        || (matches!(format_minor, 5 | 6) && database_schema == DATABASE_SCHEMA_V1_4)
+        || (format_minor == 7 && database_schema == DATABASE_SCHEMA_V1_5);
     let supported_writer = supported_writer
         && (format_minor >= 5 || request.profile.tracker_entries.is_empty())
         && ((format_minor <= 1 && document_schema == 1)
             || (format_minor == 2 && document_schema == 2)
             || (format_minor >= 3 && matches!(document_schema, 1 | 2)));
     if !supported_writer {
+        return Err(BackupError::InvalidContent);
+    }
+    if format_minor < 7
+        && request
+            .profile
+            .ai_attempts
+            .iter()
+            .any(|a| a.error_details.is_some())
+    {
         return Err(BackupError::InvalidContent);
     }
     if format_minor >= 4
@@ -575,12 +588,22 @@ fn validate_payload(
     payload: &PortableBackupV1,
     header: &BackupHeaderInfo,
 ) -> Result<(), BackupError> {
+    if header.format_minor < 7
+        && payload
+            .profile
+            .ai_attempts
+            .iter()
+            .any(|a| a.error_details.is_some())
+    {
+        return Err(BackupError::InvalidBackup);
+    }
     let expected_database_schema = match header.format_minor {
         0 => DATABASE_SCHEMA_V1_0,
         1 | 2 => DATABASE_SCHEMA_V1_1,
         3 => DATABASE_SCHEMA_V1_2,
         4 => DATABASE_SCHEMA_V1_3,
         5 | 6 => DATABASE_SCHEMA_V1_4,
+        7 => DATABASE_SCHEMA_V1_5,
         _ => return Err(BackupError::InvalidBackup),
     };
     if payload.manifest.format_major != FORMAT_MAJOR
@@ -810,6 +833,10 @@ fn validate_ai_activity(
                 ended < attempt.started_at_unix_ms || ended > MAX_JAVASCRIPT_DATE_MS
             })
             || !usage_valid
+            || attempt
+                .error_details
+                .as_ref()
+                .is_some_and(|details| !details.valid())
             || attempt.error_category.as_deref().is_some_and(|value| {
                 !matches!(
                     value,
@@ -1132,8 +1159,8 @@ mod tests {
             create_backup_with_entropy(&passphrase, request, [0x11; 16], [0x22; 24]).unwrap();
         let header = inspect_backup(&bytes).unwrap();
         let mut payload = restore_backup(&bytes, &passphrase).unwrap();
-        assert_eq!(header.format_minor, 6);
-        assert_eq!(payload.manifest.database_schema, 5);
+        assert_eq!(header.format_minor, 7);
+        assert_eq!(payload.manifest.database_schema, 6);
         assert_eq!(payload.manifest.document_schema, 2);
         payload.manifest.document_schema = 1;
         assert_eq!(
@@ -1151,13 +1178,33 @@ mod tests {
         let digest = hex::encode(Sha256::digest(&backup));
         assert_eq!(
             digest,
-            "93bea2f949c31e7b89f53f698a9a1c35fc7e18a7a90f4d25add4aeb7995f6ab4"
+            "7620b099ce32a90d1a195bc783170ec3870ff6a604c403370649c5c190e8b269"
         );
         let restored = restore_backup(&backup, &passphrase).expect("restore vector");
         assert_eq!(
             restored.profile.master_draft.expect("draft").document.title,
             MARKER
         );
+    }
+
+    #[test]
+    fn previous_v1_6_archives_remain_readable_without_diagnostics() {
+        let passphrase = BackupPassphrase::new("vector passphrase".into()).unwrap();
+        let archive = create_backup_with_entropy_for_format(
+            &passphrase,
+            sample_request(),
+            [0x11; 16],
+            [0x22; 24],
+            6,
+            super::DATABASE_SCHEMA_V1_4,
+        )
+        .unwrap();
+        assert_eq!(
+            hex::encode(Sha256::digest(&archive)),
+            "93bea2f949c31e7b89f53f698a9a1c35fc7e18a7a90f4d25add4aeb7995f6ab4"
+        );
+        let restored = restore_backup(&archive, &passphrase).unwrap();
+        assert_eq!(restored.manifest.format_minor, 6);
     }
 
     #[test]

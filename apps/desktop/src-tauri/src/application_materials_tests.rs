@@ -22,6 +22,7 @@ fn workspace() -> ApplicationWorkspace {
         },
         resume: ResumeDocument::empty("Resume"),
         change_points: vec!["Kept the published resume content.".into()],
+        change_summary: Vec::new(),
         alerts: vec![],
         alerts_truncated: false,
         dismissed_alert_ids: vec![],

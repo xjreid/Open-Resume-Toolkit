@@ -493,14 +493,14 @@
   color: #566c70;
   font-size: 12px;
 }
-.ai-workspace .ai-key-preset select {
+.ai-workspace .ai-key-model select {
   padding: 1px 18px 1px 0;
   min-height: 25px;
   border: 1px solid transparent;
   background-color: transparent;
   text-overflow: ellipsis;
 }
-.ai-workspace .ai-key-preset select:hover:not(:disabled) {
+.ai-workspace .ai-key-model select:hover:not(:disabled) {
   border-color: #d1d9e2;
   background-color: #fbfdfd;
 }
@@ -768,7 +768,7 @@
   font-size: 15px;
   font-weight: 650;
 }
-.ai-workspace .ai-key-preset select {
+.ai-workspace .ai-key-model select {
   color: #3b636a;
   font-size: 12px;
 }

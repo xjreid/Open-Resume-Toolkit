@@ -29,7 +29,7 @@ pub fn fixture(kind: &str) -> ResumeDocument {
             id: EntityId::new(), order: 0, heading: "Software Engineer".into(),
             subheading: "Synthetic Research Cooperative".into(), date_range: "2023–2026".into(),
             location: "Remote".into(),
-            fields: vec![NamedField { id: EntityId::new(), order: 0, label: "Tools".into(), value: "Rust, TypeScript & SQL".into(), is_skill: true }],
+            fields: vec![NamedField { id: EntityId::new(), order: 0, label: "Tools".into(), value: "Rust, TypeScript & SQL".into(), is_skill: true, list_kind: None }],
             bullets: vec![
                 Bullet { id: EntityId::new(), order: 0, text: "Built an offline document workflow with explicit review and recovery.".into() },
                 Bullet { id: EntityId::new(), order: 1, text: "Tested Unicode, links, and multi-line content.\r\nRetained a second line\twith a tab.".into() },
@@ -129,6 +129,7 @@ fn add_structured_content(doc: &mut ResumeDocument) {
             label: "Certification".into(),
             value: "Synthetic credential".into(),
             is_skill: false,
+            list_kind: None,
         }],
         bullets: vec![Bullet {
             id: EntityId::new(),
@@ -155,6 +156,7 @@ fn add_structured_content(doc: &mut ResumeDocument) {
                 label: String::new(),
                 value: "Community-maintained".into(),
                 is_skill: false,
+                list_kind: None,
             }],
             bullets: vec![Bullet {
                 id: EntityId::new(),

@@ -142,6 +142,7 @@ pub struct AiAttemptPreflight {
     pub estimated_input_tokens: u64,
     pub maximum_cost_micros: u64,
     pub currency: String,
+    /// Previous transport attempt, or a successful resume-quality stage.
     pub retry_of: Option<Uuid>,
 }
 
@@ -257,6 +258,26 @@ pub struct AiMonitoringSummary {
     pub by_preset: BTreeMap<String, u64>,
     pub by_operation_type: BTreeMap<String, u64>,
     pub time_buckets: Vec<AiMonitoringBucket>,
+    #[serde(default)]
+    pub recent_failures: Vec<AiAttemptFailure>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AiAttemptFailure {
+    pub operation_id: String,
+    pub attempt_id: String,
+    pub provider: String,
+    pub requested_model: String,
+    pub effective_model: Option<String>,
+    pub operation_type: String,
+    pub call_number: u64,
+    pub started_at_unix_ms: i64,
+    pub duration_ms: Option<u64>,
+    pub category: Option<String>,
+    pub details: Option<ort_domain::AiFailureDetails>,
+    pub usage: Option<Usage>,
+    pub usage_complete: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -411,6 +432,51 @@ pub fn ai_calendar_bounds(
 }
 
 impl EncryptedStore {
+    /// Attach locally authored diagnostics to a settled attempt. A rejected
+    /// material changes its outcome, never its settled billing or guardrails.
+    /// # Errors
+    /// Rejects invalid diagnostics, active/missing attempts, or storage failure.
+    pub fn record_ai_failure_details(
+        &self,
+        attempt_id: Uuid,
+        details: &ort_domain::AiFailureDetails,
+    ) -> Result<(), StorageError> {
+        if !details.valid() {
+            return Err(StorageError::InvalidData);
+        }
+        let rejected_material = matches!(
+            details.code.as_str(),
+            "AI_MATERIAL_INVALID"
+                | "AI_GROUNDING_FAILED"
+                | "AI_PAGE_FIT_FAILED"
+                | "AI_REVIEW_FAILED"
+                | "AI_TAILORING_FAILED"
+                | "AI_OUTPUT_INVALID"
+        );
+        let bytes = serde_json::to_vec(details).map_err(|_| StorageError::InvalidData)?;
+        let mut connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let tx = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|_| StorageError::Unavailable)?;
+        let changed = tx.execute(
+            "UPDATE ai_attempts SET error_details_json = ?1,
+            status = CASE WHEN status = 'succeeded' AND ?2 THEN 'failed' ELSE status END,
+            error_category = COALESCE(error_category, 'invalid_output')
+            WHERE attempt_id = ?3 AND profile_id = ?4
+            AND (status IN ('failed', 'cancelled', 'outcome_unknown') OR (status = 'succeeded' AND ?2))",
+            params![bytes, rejected_material, attempt_id.to_string(), self.manifest.profile_id.to_string()],
+        ).map_err(|_| StorageError::Unavailable)?;
+        if changed != 1 {
+            return Err(StorageError::RevisionConflict);
+        }
+        if rejected_material {
+            tx.execute("UPDATE ai_operations SET status = 'failed', ended_at_unix_ms = MAX(COALESCE(ended_at_unix_ms, 0), (SELECT ended_at_unix_ms FROM ai_attempts WHERE attempt_id = ?1)) WHERE operation_id = (SELECT operation_id FROM ai_attempts WHERE attempt_id = ?1) AND status IN ('active', 'succeeded')", [attempt_id.to_string()]).map_err(|_| StorageError::Unavailable)?;
+        }
+        tx.commit().map_err(|_| StorageError::Unavailable)
+    }
     /// Moves enabled cap configuration to a replacement credential identity,
     /// always starting the replacement at a zero baseline. The old identity's
     /// policies are removed in the same encrypted transaction.
@@ -793,10 +859,14 @@ impl EncryptedStore {
                     "SELECT COUNT(*) FROM ai_attempts previous
                     JOIN ai_operations operation ON operation.operation_id = previous.operation_id
                     WHERE previous.profile_id = ?1 AND previous.attempt_id = ?2
-                    AND previous.operation_id = ?3 AND previous.status = 'failed'
-                    AND previous.error_category = 'transient' AND operation.status = 'active'
+                    AND previous.operation_id = ?3 AND operation.status = 'active'
+                    AND previous.provider = ?4 AND previous.credential_id = ?5
+                    AND previous.requested_model = ?6 AND operation.operation_type = ?7
+                    AND ((previous.status = 'failed' AND previous.error_category = 'transient')
+                        OR (previous.status = 'succeeded' AND operation.operation_type IN ('tailor_resume','refine_resume')
+                            AND (SELECT COUNT(*) FROM ai_attempts a WHERE a.operation_id = ?3) < 4))
                     AND NOT EXISTS (SELECT 1 FROM ai_attempts retry WHERE retry.retry_of = previous.attempt_id)",
-                    params![profile, retry_of.to_string(), preflight.operation_id.to_string()],
+                    params![profile, retry_of.to_string(), preflight.operation_id.to_string(), preflight.provider.as_str(), preflight.credential_id.to_string(), preflight.requested_model, operation_type(preflight.operation_type)],
                     |row| row.get(0),
                 )
                 .map_err(|_| StorageError::Unavailable)?;
@@ -947,8 +1017,8 @@ impl EncryptedStore {
         }
     }
 
-    /// Terminates an active logical operation when a classified retry cannot
-    /// begin after its first attempt was settled as transient.
+    /// Terminates an active logical operation after a retry or resume-quality
+    /// sequence finishes, is cancelled, or cannot dispatch its next attempt.
     /// # Errors
     /// Rejects an operation with any active attempt or an invalid status.
     pub fn finish_ai_operation(
@@ -1057,6 +1127,7 @@ impl EncryptedStore {
             || result.status == AiTerminalStatus::Succeeded
                 && (result.usage.is_none() || result.effective_model.is_none())
             || result.keep_operation_active
+                && result.status != AiTerminalStatus::Succeeded
                 && (result.status != AiTerminalStatus::Failed
                     || result.error_category.as_deref() != Some("transient"))
             || result.error_category.as_deref().is_some_and(|category| {
@@ -1096,6 +1167,15 @@ impl EncryptedStore {
             || result.ended_at_unix_ms < started
         {
             return Err(StorageError::RevisionConflict);
+        }
+        if result.keep_operation_active && result.status == AiTerminalStatus::Succeeded {
+            let resume_operation: bool = tx.query_row(
+                "SELECT operation_type IN ('tailor_resume','refine_resume') FROM ai_operations WHERE operation_id = ?1 AND profile_id = ?2",
+                params![operation,profile], |row| row.get(0),
+            ).map_err(|_| StorageError::Unavailable)?;
+            if !resume_operation {
+                return Err(StorageError::InvalidData);
+            }
         }
         let usage_json = result
             .usage
@@ -1353,7 +1433,12 @@ impl EncryptedStore {
             "SELECT a.operation_id, a.provider, a.status, a.usage_json, a.usage_complete,
                     a.settled_cost_micros, a.reserved_cost_micros, a.currency,
                     a.started_at_unix_ms, COALESCE(a.effective_model, a.requested_model),
-                    a.preset_version, o.operation_type, a.credential_id
+                    a.preset_version, o.operation_type, a.credential_id,
+                    a.attempt_id, a.ended_at_unix_ms, a.error_category,
+                    a.error_details_json, a.requested_model, a.effective_model,
+                    (SELECT COUNT(*) FROM ai_attempts previous WHERE previous.operation_id = a.operation_id
+                    AND (previous.started_at_unix_ms < a.started_at_unix_ms OR
+                    (previous.started_at_unix_ms = a.started_at_unix_ms AND previous.attempt_id <= a.attempt_id)))
              FROM ai_attempts a JOIN ai_operations o ON o.operation_id = a.operation_id
              WHERE a.profile_id = ?1 AND a.started_at_unix_ms >= ?2
              AND a.started_at_unix_ms < ?3",
@@ -1395,6 +1480,13 @@ impl EncryptedStore {
                     row.get::<_, String>(10)?,
                     row.get::<_, String>(11)?,
                     row.get::<_, String>(12)?,
+                    row.get::<_, String>(13)?,
+                    row.get::<_, Option<i64>>(14)?,
+                    row.get::<_, Option<String>>(15)?,
+                    row.get::<_, Option<Vec<u8>>>(16)?,
+                    row.get::<_, String>(17)?,
+                    row.get::<_, Option<String>>(18)?,
+                    row.get::<_, u32>(19)?,
                 ))
             })
             .map_err(|_| StorageError::Unavailable)?;
@@ -1417,7 +1509,49 @@ impl EncryptedStore {
                 preset,
                 operation_type,
                 credential,
+                attempt_id,
+                ended,
+                error_category,
+                error_details,
+                requested_model,
+                effective_model,
+                call_number,
             ) = row.map_err(|_| StorageError::Unavailable)?;
+            if matches!(status.as_str(), "failed" | "outcome_unknown") {
+                let details: Option<ort_domain::AiFailureDetails> = error_details
+                    .as_deref()
+                    .map(serde_json::from_slice)
+                    .transpose()
+                    .map_err(|_| StorageError::InvalidData)?;
+                if details.as_ref().is_some_and(|d| !d.valid()) {
+                    return Err(StorageError::InvalidData);
+                }
+                if summary.recent_failures.len() == 10 {
+                    summary.recent_failures.remove(0);
+                }
+                summary.recent_failures.push(AiAttemptFailure {
+                    operation_id: operation.clone(),
+                    attempt_id,
+                    provider: provider.clone(),
+                    requested_model,
+                    effective_model,
+                    operation_type: operation_type.clone(),
+                    call_number: u64::from(call_number),
+                    started_at_unix_ms: started,
+                    duration_ms: ended
+                        .map(|end| u64::try_from(end - started))
+                        .transpose()
+                        .map_err(|_| StorageError::InvalidData)?,
+                    category: error_category,
+                    details,
+                    usage: usage
+                        .as_deref()
+                        .map(serde_json::from_slice)
+                        .transpose()
+                        .map_err(|_| StorageError::InvalidData)?,
+                    usage_complete: complete == 1,
+                });
+            }
             operations.insert(operation);
             summary.attempts = summary
                 .attempts
@@ -1509,6 +1643,7 @@ impl EncryptedStore {
             summary.partial = true;
         }
         summary.time_buckets = buckets.into_values().collect();
+        summary.recent_failures.reverse();
         Ok(summary)
     }
 
@@ -1919,6 +2054,83 @@ mod tests {
                 keep_operation_active: false,
             })
             .unwrap();
+    }
+
+    #[test]
+    fn failure_details_survive_reload_export_and_clear_without_changing_billing() {
+        let temp = tempfile::tempdir().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+        let mut attempt = preflight(1);
+        attempt.operation_type = OperationType::TailorResume;
+        attempt.credential_id = Uuid::now_v7();
+        settle_success(&store, &attempt);
+        let details = ort_domain::AiFailureDetails {
+            code: "AI_PAGE_FIT_FAILED".into(),
+            page_count: Some(2),
+            validation_issues: vec![
+                "Rendered PDF has 2 pages; exactly one page is required with the existing layout."
+                    .into(),
+            ],
+            ..ort_domain::AiFailureDetails::default()
+        };
+        store
+            .record_ai_failure_details(attempt.attempt_id, &details)
+            .unwrap();
+        let summary = store
+            .ai_monitoring_summary(0, 3000, "UTC", AiBucketSize::Day)
+            .unwrap();
+        assert_eq!(summary.by_status.get("failed"), Some(&1));
+        assert_eq!(summary.estimated_cost_micros, 1);
+        assert_eq!(summary.recent_failures[0].call_number, 1);
+        assert_eq!(summary.recent_failures[0].duration_ms, Some(1000));
+        assert_eq!(summary.recent_failures[0].details.as_ref(), Some(&details));
+        assert!(summary.recent_failures[0].usage_complete);
+        let portable = store.read_portable_profile().unwrap();
+        assert_eq!(
+            portable.ai_attempts[0].error_details.as_ref(),
+            Some(&details)
+        );
+        let passphrase =
+            ort_backup::BackupPassphrase::new("synthetic diagnostic archive".into()).unwrap();
+        let archive = ort_backup::create_backup(
+            &passphrase,
+            ort_backup::BackupExportRequestV1 {
+                app_version: "0.0.0-dev".into(),
+                created_at: "2026-10-08T20:00:00Z".into(),
+                profile: portable,
+            },
+        )
+        .unwrap();
+        let decoded = ort_backup::restore_backup(&archive, &passphrase).unwrap();
+        assert_eq!(
+            decoded.profile.ai_attempts[0].error_details.as_ref(),
+            Some(&details)
+        );
+        drop(store);
+        let store = EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+        let exported: AiMonitoringSummary = serde_json::from_slice(
+            &store
+                .export_ai_monitoring_json(0, 3000, "UTC", AiBucketSize::Day)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(exported, summary);
+        store.clear_ai_activity(0, 3000).unwrap();
+        assert!(
+            store
+                .ai_monitoring_summary(0, 3000, "UTC", AiBucketSize::Day)
+                .unwrap()
+                .recent_failures
+                .is_empty()
+        );
+        assert_eq!(
+            store
+                .ai_lifetime_spend(attempt.credential_id)
+                .unwrap()
+                .get("USD"),
+            Some(&1)
+        );
     }
 
     #[test]
@@ -2803,5 +3015,119 @@ mod tests {
         assert_eq!(copied[0].reserved_micros, 0);
         assert_eq!(copied[0].unresolved_micros, 0);
         assert_eq!(copied[0].activated_at_unix_ms, 1_725_192_100_000);
+    }
+    #[test]
+    fn resume_quality_stages_share_one_operation_with_four_attempt_cap() {
+        let temp = tempfile::tempdir().unwrap();
+        let store =
+            EncryptedStore::open_or_initialize(temp.path(), "test", &MemoryDatabaseKeyVault::new())
+                .unwrap();
+        let mut first = preflight(25);
+        first.operation_type = OperationType::TailorResume;
+        let mut attempt = first.clone();
+        for call in 0..4 {
+            store.reserve_ai_attempt(&attempt).unwrap();
+            store.mark_ai_dispatching(attempt.attempt_id).unwrap();
+            store
+                .settle_ai_attempt(&AiAttemptSettlement {
+                    attempt_id: attempt.attempt_id,
+                    status: AiTerminalStatus::Succeeded,
+                    effective_model: Some("fixture-model".into()),
+                    usage: Some(Usage {
+                        input_tokens: 10,
+                        output_tokens: 2,
+                        ..Usage::default()
+                    }),
+                    settled_cost_micros: Some(10),
+                    usage_complete: true,
+                    error_category: None,
+                    ended_at_unix_ms: attempt.started_at_unix_ms + 1,
+                    keep_operation_active: true,
+                })
+                .unwrap();
+            let mut next = first.clone();
+            next.attempt_id = Uuid::now_v7();
+            next.retry_of = Some(attempt.attempt_id);
+            next.started_at_unix_ms = 1100 + call * 100;
+            if call == 0 {
+                let mut switched = next.clone();
+                switched.requested_model = "different-model".into();
+                assert_eq!(
+                    store.reserve_ai_attempt(&switched),
+                    Err(StorageError::RevisionConflict)
+                );
+            }
+            attempt = next;
+        }
+        assert_eq!(
+            store.reserve_ai_attempt(&attempt),
+            Err(StorageError::RevisionConflict)
+        );
+        store
+            .finish_ai_operation(first.operation_id, AiTerminalStatus::Succeeded, 2000)
+            .unwrap();
+        let summary = store
+            .ai_monitoring_summary(0, 3000, "UTC", AiBucketSize::Day)
+            .unwrap();
+        assert_eq!(summary.logical_operations, 1);
+        assert_eq!(summary.attempts, 4);
+        assert_eq!(summary.cost_by_currency_micros.get("USD"), Some(&40));
+    }
+
+    #[test]
+    fn resume_review_cannot_bypass_spending_cap() {
+        let temp = tempfile::tempdir().unwrap();
+        let store =
+            EncryptedStore::open_or_initialize(temp.path(), "test", &MemoryDatabaseKeyVault::new())
+                .unwrap();
+        store
+            .save_ai_cap_policy(&AiCapPolicy {
+                credential_id: Uuid::from_u128(42),
+                period: AiPeriod::AllTime,
+                currency: "USD".into(),
+                time_zone: "UTC".into(),
+                limit_micros: 30,
+                activated_at_unix_ms: 1,
+                period_start_unix_ms: 1,
+                period_end_unix_ms: None,
+                expected_revision: None,
+            })
+            .unwrap();
+        let mut first = preflight(25);
+        first.operation_type = OperationType::RefineResume;
+        store.reserve_ai_attempt(&first).unwrap();
+        store.mark_ai_dispatching(first.attempt_id).unwrap();
+        store
+            .settle_ai_attempt(&AiAttemptSettlement {
+                attempt_id: first.attempt_id,
+                status: AiTerminalStatus::Succeeded,
+                effective_model: Some("fixture-model".into()),
+                usage: Some(Usage {
+                    input_tokens: 10,
+                    output_tokens: 2,
+                    ..Usage::default()
+                }),
+                settled_cost_micros: Some(10),
+                usage_complete: true,
+                error_category: None,
+                ended_at_unix_ms: 1500,
+                keep_operation_active: true,
+            })
+            .unwrap();
+        let mut review = first.clone();
+        review.attempt_id = Uuid::now_v7();
+        review.retry_of = Some(first.attempt_id);
+        review.started_at_unix_ms = 1600;
+        assert_eq!(
+            store.reserve_ai_attempt(&review),
+            Err(StorageError::InvalidData)
+        );
+        store
+            .finish_ai_operation(first.operation_id, AiTerminalStatus::Failed, 1700)
+            .unwrap();
+        let summary = store
+            .ai_monitoring_summary(0, 3000, "UTC", AiBucketSize::Day)
+            .unwrap();
+        assert_eq!(summary.attempts, 1);
     }
 }

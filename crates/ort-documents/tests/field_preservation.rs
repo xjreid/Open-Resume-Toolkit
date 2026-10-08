@@ -24,6 +24,7 @@ fn docx_preserves_all_valid_named_fields() {
                     label: "Language".into(),
                     value: "Rust".into(),
                     is_skill: false,
+                    list_kind: None,
                 },
                 NamedField {
                     id: EntityId::new(),
@@ -31,6 +32,7 @@ fn docx_preserves_all_valid_named_fields() {
                     label: "Certification".into(),
                     value: "CERTIFICATION-PRESERVATION-MARKER".into(),
                     is_skill: false,
+                    list_kind: None,
                 },
             ],
             bullets: vec![],

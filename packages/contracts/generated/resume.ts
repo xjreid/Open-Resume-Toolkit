@@ -222,12 +222,22 @@ function isResumeEntry(value: unknown, version: number): value is ResumeEntry {
 function isNamedField(value: unknown): value is NamedField {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ["id", "order", "label", "value", "isSkill"]) &&
+    hasExactKeys(value, [
+      "id",
+      "order",
+      "label",
+      "value",
+      "isSkill",
+      ...(value.listKind === undefined ? [] : ["listKind"]),
+    ]) &&
     typeof value.id === "string" &&
     isNonNegativeInteger(value.order) &&
     typeof value.label === "string" &&
     typeof value.value === "string" &&
-    typeof value.isSkill === "boolean"
+    typeof value.isSkill === "boolean" &&
+    (value.listKind === undefined ||
+      value.listKind === "skills" ||
+      value.listKind === "coursework")
   );
 }
 

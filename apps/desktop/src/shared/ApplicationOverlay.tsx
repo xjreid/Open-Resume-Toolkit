@@ -1,5 +1,9 @@
 import { SaveCoordinator } from "./save-coordinator";
-import { desktopCommand as command } from "./desktop-client";
+import {
+  desktopCommand as command,
+  DesktopCommandError,
+} from "./desktop-client";
+import { AiFailureDetailsView } from "./AiFailureDetailsView";
 import type * as Wire from "@ort/contracts/wire";
 import { emitTo } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -73,7 +77,6 @@ function trackerEntryFor(workspace: Workspace): TrackerEntry {
 type StageOne = Wire.StageOneDraft;
 type SavedStageOne = Wire.SavedStageOneDraft;
 type SavedPendingCapture = Wire.SavedPendingCapture;
-type Preset = "economy" | "balanced" | "quality";
 type Context = Wire.ApplicationContext;
 type CaptureMode = Wire.CaptureStatus;
 const idleCapture: CaptureMode = {
@@ -106,16 +109,24 @@ const errors: Record<string, string> = {
     "The provider returned a blocked, incomplete, or unreadable response. Nothing was saved.",
   AI_OUTPUT_INCOMPLETE:
     "The provider did not finish generating the material. Nothing was saved.",
+  AI_OUTPUT_LIMIT:
+    "The provider reached its output token limit before finishing the resume (MAX_TOKENS). Nothing was saved. Try a more selective instruction or another model; this is not an API key error.",
+  AI_OUTPUT_BLOCKED:
+    "The provider blocked generation under its safety or content policy. Nothing was saved. Review the supplied job text and source content before trying again.",
   AI_MODEL_MISMATCH:
     "The provider returned a different model than the one selected. Nothing was saved.",
   AI_MATERIAL_INVALID:
-    "The provider response did not match the required material format. Nothing was saved.",
+    "The provider response did not match the required material format. Nothing was saved. Review the validation details below and try a more selective instruction or another model.",
   AI_AUTHENTICATION_FAILED:
     "The provider rejected the active API key. Check the key and its permissions in My Keys.",
   AI_RATE_LIMITED:
     "The provider rate-limited this request. Check its usage limits before retrying.",
   AI_PROVIDER_SERVICE_UNAVAILABLE:
-    "The provider is temporarily unavailable. Try again later.",
+    "The provider is temporarily unavailable or overloaded (HTTP 503). Wait and retry, or select another model. Your saved resume is unchanged; this is not an API key format error.",
+  AI_PROVIDER_UNAVAILABLE:
+    "The connection to the provider failed or was interrupted. Check your network and retry when stable. The provider may have processed the call; check Monitoring for uncertain usage.",
+  AI_PROVIDER_TIMEOUT:
+    "The provider request timed out. The material was not saved, and usage may be uncertain. Check Monitoring before retrying; a smaller source or another model may finish faster.",
   AI_PROVIDER_TEMPORARY:
     "The provider returned a temporary server error. Try again later.",
   AI_PROVIDER_BAD_REQUEST:
@@ -126,8 +137,18 @@ const errors: Record<string, string> = {
     "This workspace already has 30 saved answers. Finish this application to start another.",
   AI_PROVIDER_FAILED:
     "The provider rejected the request. Check the active key, model, and Monitoring for the attempt category.",
+  AI_PAGE_FIT_FAILED:
+    "AI could not fit a supported resume onto one page within four calls. Nothing was saved. Your existing resume is unchanged. Try a more selective correction or edit the master.",
+  AI_GROUNDING_FAILED:
+    "AI could not produce valid references to the published evidence within four calls. Nothing was saved. Your existing resume is unchanged. Check the master and try a focused correction.",
+  AI_REVIEW_FAILED:
+    "The source and editorial review still found unresolved issues after four calls. Nothing was saved. Your existing resume is unchanged. Check the published master and try a focused correction.",
+  AI_TAILORING_FAILED:
+    "Tailoring could not finish within four calls. Nothing was saved. Your existing resume is unchanged. Try again with a focused instruction.",
   AI_BUSY: "Another AI request is in progress.",
   AI_CANCELLED: "The request was cancelled.",
+  AI_USAGE_UNKNOWN:
+    "Provider usage could not be confirmed, so tailoring stopped before another call. Your saved material is unchanged; check Monitoring before retrying.",
   AI_INPUT_TOO_LARGE:
     "The reviewed job and resume exceed the selected model's input limit.",
   PERSONAL_ANSWER_REQUIRED:
@@ -211,9 +232,39 @@ export function ApplicationOverlay() {
   const [tab, setTab] = useState<Tab>("resume");
   const [busy, setBusy] = useState(false);
   const [working, setWorking] = useState(false);
+  const [tailoringProgress, setTailoringProgress] = useState<{
+    phase: string;
+    call: number;
+    maximum: number;
+    pageCount?: number | null;
+  } | null>(null);
+  const [renderedPages, setRenderedPages] = useState<number | null>(null);
+  useEffect(() => {
+    const subscription = getCurrentWebviewWindow().listen<{
+      phase: string;
+      call: number;
+      maximum: number;
+      pageCount?: number | null;
+    }>("ort:tailoring-progress", (event) =>
+      setTailoringProgress((previous) => ({
+        ...event.payload,
+        pageCount:
+          typeof event.payload.pageCount === "number"
+            ? event.payload.pageCount
+            : previous?.pageCount,
+      })),
+    );
+    return () => {
+      void subscription.then((stop) => stop());
+    };
+  }, []);
   const [closePending, setClosePending] = useState(false);
   const closeDirty = useRef(true);
   const [notice, setNotice] = useState("");
+  const [noticeDetails, setNoticeDetails] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [instruction, setInstruction] = useState("");
   const [coverInstruction, setCoverInstruction] = useState("");
   const [question, setQuestion] = useState("");
@@ -429,7 +480,7 @@ export function ApplicationOverlay() {
     const subscriptions = Promise.all([
       overlayWindow.listen("ort:browser-capture", refreshContext),
       overlayWindow.listen("ort:capture-mode", refreshContext),
-      overlayWindow.listen("ort:ai-preset-changed", refreshContext),
+      overlayWindow.listen("ort:ai-model-changed", refreshContext),
     ]).catch(() => []);
     return () => {
       active = false;
@@ -537,12 +588,22 @@ export function ApplicationOverlay() {
   }
   async function run(action: () => Promise<void>, ai = false) {
     setBusy(true);
-    if (ai) setWorking(true);
+    if (ai) {
+      setWorking(true);
+      setTailoringProgress(null);
+    }
     setNotice("");
+    setNoticeDetails(null);
     try {
       await action();
     } catch (error) {
       setNotice(message(error));
+      if (
+        error instanceof DesktopCommandError &&
+        Object.keys(error.envelope.details).length
+      ) {
+        setNoticeDetails(error.envelope.details);
+      }
     } finally {
       setBusy(false);
       if (ai) setWorking(false);
@@ -569,13 +630,17 @@ export function ApplicationOverlay() {
       return;
     let active = true;
     setPrepared(null);
+    setRenderedPages(null);
     setExportError("");
     void command("prepare_application_exports", {
       expectedRevision: saved.revision,
       kind: materialKind,
     })
-      .then(() => {
-        if (active) setPrepared(exportKey);
+      .then((result) => {
+        if (active) {
+          setPrepared(exportKey);
+          if (materialKind === "resume") setRenderedPages(result.pageCount);
+        }
       })
       .catch((error: unknown) => {
         if (active) setExportError(message(error));
@@ -1016,32 +1081,40 @@ export function ApplicationOverlay() {
         </div>
         <div className="application-connection">
           <select
-            aria-label="AI model preset"
+            aria-label="AI model"
             title={context?.aiLabel}
-            value={context?.preset ?? ""}
+            value={context?.model ?? ""}
             disabled={!context?.selectedKeyId || busy || aiWorking}
             onChange={(event) =>
               void run(async () => {
-                await command("set_ai_key_preset", {
+                await command("set_ai_key_model", {
                   request: {
                     credentialId: context!.selectedKeyId!,
-                    preset: event.target.value,
+                    model: event.target.value,
                   },
                 });
                 setContext(await command("application_context"));
               })
             }
           >
-            {!context?.preset && (
+            {!context?.model && (
               <option value="">{context?.aiLabel ?? "Checking AI…"}</option>
             )}
-            {(context?.presetOptions ?? []).map((item) => (
+            {context?.model &&
+              !context.modelOptions.some(
+                (item) => item.model === context.model,
+              ) && (
+                <option value={context.model} disabled>
+                  {context.model}
+                </option>
+              )}
+            {(context?.modelOptions ?? []).map((item) => (
               <option
-                key={item.preset}
-                value={item.preset}
+                key={item.model}
+                value={item.model}
                 disabled={!item.model}
               >
-                {item.label}
+                {item.model}
               </option>
             ))}
           </select>
@@ -1050,7 +1123,9 @@ export function ApplicationOverlay() {
               className={`application-dot${aiWorking ? " application-dot--working" : context?.aiReady ? " application-dot--ready" : ""}`}
             />
             {aiWorking
-              ? "Working"
+              ? tailoringProgress
+                ? `${tailoringProgress.phase} · call ${tailoringProgress.call} of ${tailoringProgress.maximum}${tailoringProgress.pageCount == null ? "" : tailoringProgress.pageCount === 1 ? " · PDF: 1 page" : ` · PDF: ${tailoringProgress.pageCount} pages; target 1`}`
+                : "Working"
               : context?.aiReady
                 ? "Ready"
                 : "Select an API key in the main app"}
@@ -1104,6 +1179,9 @@ export function ApplicationOverlay() {
               ×
             </button>
           </p>
+        )}
+        {notice && noticeDetails && (
+          <AiFailureDetailsView details={noticeDetails} open />
         )}
         <fieldset
           className="application-workspace-fields"
@@ -1300,6 +1378,13 @@ export function ApplicationOverlay() {
                   <section className="application-panel">
                     <div className="application-tailoring-notes">
                       <h2>Tailoring notes</h2>
+                      {!dirty && renderedPages !== null && (
+                        <p className="application-note" role="status">
+                          {renderedPages === 1
+                            ? "One-page PDF verified"
+                            : `PDF is ${renderedPages} pages; one-page target exceeded`}
+                        </p>
+                      )}
                       {draft.changePoints.length ? (
                         <ul aria-label="Tailoring notes">
                           {draft.changePoints.map((point, index) => (
@@ -1312,6 +1397,16 @@ export function ApplicationOverlay() {
                         </p>
                       )}
                     </div>
+                    {!!draft.changeSummary?.length && (
+                      <div className="application-tailoring-notes">
+                        <h2>What changed</h2>
+                        <ul aria-label="Resume changes">
+                          {draft.changeSummary.map((point, index) => (
+                            <li key={index}>{point}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     {draft.alerts.length > 0 && (
                       <section
                         className="application-alerts"

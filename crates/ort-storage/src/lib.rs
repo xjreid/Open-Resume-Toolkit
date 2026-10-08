@@ -45,7 +45,7 @@ const RESTORE_SAFETY_DIRECTORY: &str = ".ort-restore-safety";
 const SAFETY_DELETE_DIRECTORY: &str = ".ort-safety-delete-pending";
 const DELETE_ALL_MARKER_FILENAME: &str = ".ort-delete-all-pending.json";
 const DATABASE_FORMAT_VERSION: u16 = 1;
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 6;
 const MAX_RENDER_MANIFESTS: i64 = 100;
 const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 const MAX_MANIFEST_BYTES: u64 = 16 * 1_024;
@@ -194,6 +194,8 @@ const MIGRATION_V5_SQL: &str = "CREATE TABLE tracker_entries (
          updated_at TEXT NOT NULL
      ) STRICT;
      CREATE INDEX tracker_entries_profile ON tracker_entries (profile_id, updated_at DESC);";
+
+const MIGRATION_V6_SQL: &str = "ALTER TABLE ai_attempts ADD COLUMN error_details_json BLOB;";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum StorageError {
@@ -2102,7 +2104,7 @@ fn read_portable_ai_attempts(
             pricing_components_json, started_at_unix_ms, ended_at_unix_ms,
             status, retry_of, usage_json, usage_complete, estimated_input_tokens,
             reserved_cost_micros, settled_cost_micros, currency, estimate_completeness,
-            error_category FROM ai_attempts WHERE profile_id = ?1
+            error_category, error_details_json FROM ai_attempts WHERE profile_id = ?1
             ORDER BY started_at_unix_ms, attempt_id",
         )
         .map_err(|_| StorageError::Unavailable)?;
@@ -2131,6 +2133,7 @@ fn read_portable_ai_attempts(
                 row.get::<_, String>(19)?,
                 row.get::<_, String>(20)?,
                 row.get::<_, Option<String>>(21)?,
+                row.get::<_, Option<Vec<u8>>>(22)?,
             ))
         })
         .map_err(|_| StorageError::Unavailable)?
@@ -2158,6 +2161,7 @@ fn read_portable_ai_attempts(
                 currency,
                 estimate_completeness,
                 error_category,
+                error_details,
             ) = row.map_err(|_| StorageError::Unavailable)?;
             let pricing_components =
                 serde_json::from_slice::<Vec<ort_ai::Price>>(&pricing_components)
@@ -2210,6 +2214,10 @@ fn read_portable_ai_attempts(
                 currency,
                 estimate_completeness,
                 error_category,
+                error_details: error_details
+                    .map(|bytes| serde_json::from_slice(&bytes))
+                    .transpose()
+                    .map_err(|_| StorageError::InvalidData)?,
             })
         })
         .collect()
@@ -2266,9 +2274,9 @@ fn restore_ai_activity(
                 catalog_effective_from, pricing_components_json,
                 started_at_unix_ms, ended_at_unix_ms, status, retry_of, usage_json,
                 usage_complete, estimated_input_tokens, reserved_cost_micros,
-                settled_cost_micros, currency, estimate_completeness, error_category)
+                settled_cost_micros, currency, estimate_completeness, error_category, error_details_json)
                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-                ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
+                ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
                 params![
                     attempt.attempt_id,
                     attempt.operation_id,
@@ -2304,6 +2312,7 @@ fn restore_ai_activity(
                     attempt.currency,
                     attempt.estimate_completeness,
                     attempt.error_category,
+                    attempt.error_details.as_ref().map(serde_json::to_vec).transpose().map_err(|_| StorageError::InvalidData)?,
                 ],
             )
             .map_err(|_| StorageError::Unavailable)?;
@@ -3429,6 +3438,10 @@ fn migrate_schema(connection: &Connection) -> Result<(), StorageError> {
         apply_migration(connection, 5, MIGRATION_V5_SQL, &migration_v5_checksum())?;
         latest = 5;
     }
+    if latest == 5 {
+        apply_migration(connection, 6, MIGRATION_V6_SQL, &migration_v6_checksum())?;
+        latest = 6;
+    }
     if latest == SCHEMA_VERSION {
         Ok(())
     } else {
@@ -3506,6 +3519,7 @@ fn verify_migration_receipts(migrations: &[(i64, String)]) -> Result<(), Storage
         (3, migration_v3_checksum()),
         (4, migration_v4_checksum()),
         (5, migration_v5_checksum()),
+        (6, migration_v6_checksum()),
     ];
     if migrations.len() > expected.len()
         || migrations.iter().zip(expected).any(
@@ -3537,6 +3551,10 @@ fn migration_v4_checksum() -> String {
 
 fn migration_v5_checksum() -> String {
     hex::encode(Sha256::digest(MIGRATION_V5_SQL.as_bytes()))
+}
+
+fn migration_v6_checksum() -> String {
+    hex::encode(Sha256::digest(MIGRATION_V6_SQL.as_bytes()))
 }
 
 fn verify_integrity(connection: &Connection) -> Result<(), StorageError> {
@@ -3833,7 +3851,7 @@ mod tests {
         let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("initialize encrypted store");
         let empty = store.storage_usage().expect("empty usage");
-        assert_eq!(empty.database_schema, 5);
+        assert_eq!(empty.database_schema, 6);
         assert_eq!(empty.drafts, 0);
         assert_eq!(empty.published_snapshots, 0);
         assert_eq!(empty.settings, 0);
@@ -4036,7 +4054,7 @@ mod tests {
                     "INSERT INTO schema_migrations \
                      (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
                       requires_safety_copy, applied_at) \
-                     VALUES (6, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
+                     VALUES (7, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
                     [super::now_string()],
                 )
                 .expect("seed newer schema marker");
@@ -4118,7 +4136,7 @@ mod tests {
 
         let upgraded = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("upgrade schema v1 profile");
-        assert_eq!(upgraded.manifest().schema_version, 5);
+        assert_eq!(upgraded.manifest().schema_version, 6);
         assert_eq!(
             upgraded
                 .load_draft()
@@ -4136,7 +4154,7 @@ mod tests {
             .expect("query migration versions")
             .collect::<Result<_, _>>()
             .expect("collect migration versions");
-        assert_eq!(versions, vec![1, 2, 3, 4, 5]);
+        assert_eq!(versions, vec![1, 2, 3, 4, 5, 6]);
     }
 
     #[test]

@@ -55,7 +55,7 @@ fn fixture() -> (TempDir, EncryptedStore, TestVault) {
     (temp, store, TestVault::default())
 }
 #[test]
-fn presets_are_saved_per_key_without_switching_primary_and_unavailable_models_are_rejected() {
+fn models_are_saved_per_key_without_switching_primary_and_unavailable_models_are_rejected() {
     let (_temp, store, vault) = fixture();
     let first = add(&store, &vault, "openai");
     let primary = first.keys[0].credential_id;
@@ -70,42 +70,70 @@ fn presets_are_saved_per_key_without_switching_primary_and_unavailable_models_ar
     .unwrap();
     let second = add(&store, &vault, "anthropic").keys[1].credential_id;
     let (mut registry, revision) = load_registry(&store).unwrap();
-    registry.keys[1].preset = "quality".into();
+    registry.keys[1].model = "unavailable-quality".into();
     registry.keys[1].paused = true;
     save_registry(&store, &registry, revision).unwrap();
-    let result = set_key_preset(
+    let result = set_key_model(
         &store,
-        &SetAiKeyPresetRequest {
+        &SetAiKeyModelRequest {
             credential_id: second,
-            preset: "balanced".into(),
+            model: "claude-sonnet-5".into(),
         },
     )
     .unwrap();
     assert_eq!(result.primary_credential_id, Some(primary));
-    assert_eq!(result.keys[1].preset, "balanced");
+    assert_eq!(result.keys[1].model, "claude-sonnet-5");
     assert!(result.keys[1].paused);
     assert_eq!(
-        set_key_preset(
+        set_key_model(
             &store,
-            &SetAiKeyPresetRequest {
+            &SetAiKeyModelRequest {
                 credential_id: second,
-                preset: "economy".into()
+                model: "gemini-3.5-flash-lite".into()
             }
         )
         .unwrap_err(),
-        "AI_PRESET_UNAVAILABLE"
+        "AI_MODEL_UNAVAILABLE"
     );
     let gemini = add(&store, &vault, "gemini").keys[2].credential_id;
-    let result = set_key_preset(
+    let result = set_key_model(
         &store,
-        &SetAiKeyPresetRequest {
+        &SetAiKeyModelRequest {
             credential_id: gemini,
-            preset: "economy".into(),
+            model: "gemini-3.5-flash-lite".into(),
         },
     )
     .unwrap();
     assert_eq!(result.primary_credential_id, Some(primary));
-    assert_eq!(result.keys[2].preset, "economy");
+    assert_eq!(result.keys[2].model, "gemini-3.5-flash-lite");
+}
+
+#[test]
+fn legacy_tiers_migrate_to_exact_models_once_without_changing_key_identity() {
+    let (_temp, store, _vault) = fixture();
+    let id = Uuid::now_v7();
+    store.save_setting(SETTING, None, &json!({
+        "keys": [{"credentialId": id, "createdAt": "2026-10-01T00:00:00Z", "name": "Personal",
+            "provider": "gemini", "preset": "economy", "paused": false, "removed": false, "cleanupRequired": false}],
+        "primaryCredentialId": id
+    })).unwrap();
+    let (registry, revision) = load_registry(&store).unwrap();
+    assert_eq!(registry.primary_credential_id, Some(id));
+    assert_eq!(registry.keys[0].model, "gemini-3.5-flash-lite");
+    assert_eq!(registry.keys[0].name.as_deref(), Some("Personal"));
+    assert!(!registry.keys[0].paused);
+    let stored = store.load_setting(SETTING).unwrap().unwrap();
+    assert!(stored.value["keys"][0].get("preset").is_none());
+    assert_eq!(stored.value["keys"][0]["model"], "gemini-3.5-flash-lite");
+    assert_eq!(load_registry(&store).unwrap().1, revision);
+
+    let (registry, _) = AiKeyRegistry::from_value_with_migration(json!({
+        "keys": [{"credentialId": id, "createdAt": "2026-10-01T00:00:00Z", "provider": "gemini",
+            "preset": "quality", "paused": true, "removed": false, "cleanupRequired": false}],
+        "primaryCredentialId": null
+    }))
+    .unwrap();
+    assert_eq!(registry.keys[0].model, "unavailable-quality");
 }
 #[test]
 fn renamed_keys_keep_identity_and_primary_and_accept_default_reset() {

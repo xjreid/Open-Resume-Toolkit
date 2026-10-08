@@ -8,3 +8,5 @@ pub mod import_session;
 
 pub mod application_workspace;
 pub mod material_document;
+
+pub mod tailoring;

@@ -105,6 +105,7 @@ mod content_tests {
             role_info: RoleInfo::default(),
             resume: ResumeDocument::empty("Final corrected resume"),
             change_points: Vec::new(),
+            change_summary: Vec::new(),
             alerts: Vec::new(),
             alerts_truncated: false,
             dismissed_alert_ids: Vec::new(),

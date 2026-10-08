@@ -536,6 +536,7 @@ fn append_text(
             label: String::new(),
             value: text.to_owned(),
             is_skill: false,
+            list_kind: None,
         });
     }
     section.entries.push(entry);

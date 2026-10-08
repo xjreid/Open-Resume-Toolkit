@@ -52,6 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     label: label.into(),
                     value: value.into(),
                     is_skill: false,
+                    list_kind: None,
                 })
                 .collect(),
             bullets: vec![Bullet {

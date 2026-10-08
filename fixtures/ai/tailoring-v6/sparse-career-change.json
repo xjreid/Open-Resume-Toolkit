@@ -1,0 +1,84 @@
+{
+  "name": "sparse-career-change",
+  "job": "Required: Python, Kubernetes, and five years of production experience.",
+  "source": {
+    "schemaVersion": 1,
+    "documentId": "019a0000-0000-7000-8000-00000000000b",
+    "title": "Synthetic master",
+    "contact": {
+      "fullName": "Alex Example",
+      "email": "alex@example.invalid",
+      "phone": "",
+      "location": "Boston",
+      "links": []
+    },
+    "sections": [
+      {
+        "id": "019a0000-0000-7000-8000-00000000000c",
+        "order": 0,
+        "heading": "Projects",
+        "entries": [
+          {
+            "id": "019a0000-0000-7000-8000-00000000000d",
+            "order": 0,
+            "heading": "Example 1",
+            "subheading": "Engineer",
+            "dateRange": "2023–2025",
+            "location": "",
+            "fields": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000000e",
+                "order": 0,
+                "label": "Technologies",
+                "value": "Python",
+                "isSkill": true
+              }
+            ],
+            "bullets": [
+              {
+                "id": "019a0000-0000-7000-8000-00000000000f",
+                "order": 0,
+                "text": "Completed an introductory Python course project."
+              }
+            ],
+            "links": []
+          }
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "schemaVersion": 6,
+    "tailoringPlan": ["Emphasize direct published evidence for the role."],
+    "rolePriorities": ["Direct technical evidence"],
+    "reviewIssues": [],
+    "roleInfo": null,
+    "templateSections": [
+      {
+        "sectionId": "019a0000-0000-7000-8000-00000000000c",
+        "entries": [
+          {
+            "entryId": "019a0000-0000-7000-8000-00000000000d",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-00000000000d"],
+            "selectedLists": [
+              {
+                "fieldId": "019a0000-0000-7000-8000-00000000000e",
+                "itemIndexes": [0]
+              }
+            ],
+            "mainInfo": {
+              "format": "bullets",
+              "items": [
+                {
+                  "text": "Completed an introductory Python course project.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-00000000000f"]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "alerts": []
+  }
+}

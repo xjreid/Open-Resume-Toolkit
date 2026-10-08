@@ -465,6 +465,7 @@ fn set_slot(entry: &mut ResumeEntry, label: &str, value: &str) {
             label: label.into(),
             value: value.into(),
             is_skill: false,
+            list_kind: None,
         });
     }
 }
@@ -540,6 +541,7 @@ fn append_body(entry: &mut ResumeEntry, text: &str) {
             label: BODY.into(),
             value: text.to_owned(),
             is_skill: false,
+            list_kind: None,
         });
     }
 }

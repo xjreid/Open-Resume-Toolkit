@@ -660,7 +660,7 @@ pub fn run() {
             ai_keys::clear_ai_primary,
             ai_keys::delete_removed_ai_key_data,
             ai_keys::rename_ai_key,
-            ai_keys::set_ai_key_preset,
+            ai_keys::set_ai_key_model,
             ai_settings::load_ai_catalog,
             application_materials::load_application_workspace,
             application_materials::load_application_stage_one,
