@@ -35,6 +35,47 @@
   min-width: 0;
   flex: 1;
 }
+.application-shell .application-provider-label {
+  display: block;
+  color: #566c70;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.application-shell .application-ai-disabled {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.application-shell .application-reasoning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #566c70;
+  font-size: 11px;
+}
+.application-shell .application-reasoning select {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.application-shell .application-quota {
+  display: grid;
+  gap: 3px;
+  margin: 6px 0;
+  padding: 0;
+  color: #566c70;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  list-style: none;
+}
+.application-shell .application-quota li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  column-gap: 8px;
+}
 .application-shell .application-connection select {
   width: 100%;
   min-height: 28px;

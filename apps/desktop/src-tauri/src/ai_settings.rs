@@ -265,7 +265,7 @@ fn cap_context(
     store: &ort_storage::EncryptedStore,
     credential: Uuid,
 ) -> Result<(AiConnectionState, Uuid), ort_storage::StorageError> {
-    let connection = crate::ai_keys::request_connection(store, Some(credential))?;
+    let connection = crate::ai_keys::saved_key_connection(store, credential)?;
     let registry = crate::ai_keys::load_registry(store)?.0;
     if !registry
         .keys
@@ -417,6 +417,7 @@ pub fn save_ai_cap(
         return storage_unavailable();
     };
     let result = state.with_store(|store| {
+        crate::ai_keys::require_api_keys(store)?;
         let (connection, credential) = cap_context(store, request.credential_id)?;
         let provider = match connection.provider.as_deref() {
             Some("openai") => ort_ai::Provider::OpenAi,
@@ -497,6 +498,7 @@ pub fn save_ai_general_cap(
         return storage_unavailable();
     };
     let result = state.with_store(|store| {
+        crate::ai_keys::require_api_keys(store)?;
         let existing = unified_cap(store, AI_GENERAL_CAP_CREDENTIAL_ID)?;
         let (activated, start) = existing.as_ref().map_or((now, now), |cap| {
             (cap.activated_at_unix_ms, cap.period_start_unix_ms)
@@ -539,9 +541,10 @@ pub fn disable_ai_general_cap(
     if window.label() != "main" {
         return window_not_authorized();
     }
-    match state
-        .with_store(|store| store.disable_ai_cap(AI_GENERAL_CAP_CREDENTIAL_ID, AiPeriod::AllTime))
-    {
+    match state.with_store(|store| {
+        crate::ai_keys::require_api_keys(store)?;
+        store.disable_ai_cap(AI_GENERAL_CAP_CREDENTIAL_ID, AiPeriod::AllTime)
+    }) {
         Ok(()) => CommandResponse::success(true),
         Err(ort_storage::StorageError::RevisionConflict) => {
             CommandResponse::failure("AI_BUSY", "errors.aiBusy", true)
@@ -560,6 +563,7 @@ pub fn reset_ai_general_cap(
         return window_not_authorized();
     }
     match state.with_store(|store| {
+        crate::ai_keys::require_api_keys(store)?;
         store.reset_ai_cap(
             AI_GENERAL_CAP_CREDENTIAL_ID,
             AiPeriod::AllTime,
@@ -585,6 +589,7 @@ pub fn disable_ai_cap(
         return window_not_authorized();
     }
     match state.with_store(|store| {
+        crate::ai_keys::require_api_keys(store)?;
         let (_, credential) = cap_context(store, request.credential_id)?;
         if request.period != AiPeriod::AllTime {
             return Err(ort_storage::StorageError::InvalidData);
@@ -613,6 +618,7 @@ pub fn reset_ai_cap(
         return CommandResponse::failure("AI_CAP_INVALID", "errors.aiCapInvalid", false);
     }
     match state.with_store(|store| {
+        crate::ai_keys::require_api_keys(store)?;
         let (_, credential) = cap_context(store, request.credential_id)?;
         store.reset_ai_cap(
             credential,
@@ -630,6 +636,7 @@ pub fn reset_ai_cap(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::too_many_arguments)]
 pub fn load_ai_monitoring(
     window: WebviewWindow,
     state: State<'_, DesktopState>,
@@ -638,6 +645,7 @@ pub fn load_ai_monitoring(
     time_zone: String,
     bucket_size: String,
     credential_id: Option<Uuid>,
+    connection_source: Option<ort_ai::plan::ConnectionSource>,
 ) -> CommandResponse<AiMonitoringSummary> {
     if window.label() != "main" {
         return window_not_authorized();
@@ -651,13 +659,48 @@ pub fn load_ai_monitoring(
         _ => return CommandResponse::failure("AI_PERIOD_INVALID", "errors.aiPeriodInvalid", false),
     };
     match state.with_store(|store| {
-        store.ai_monitoring_summary_for_key(
-            from_unix_ms,
-            to_unix_ms,
-            &time_zone,
-            bucket_size,
-            credential_id,
-        )
+        let sources = store.ai_connection_sources()?;
+        let ids: Vec<Uuid> = sources
+            .iter()
+            .filter(|(id, source)| {
+                credential_id.is_none_or(|key| key.to_string() == **id)
+                    && connection_source.is_none_or(|selection| {
+                        **source
+                            == if selection == ort_ai::plan::ConnectionSource::ChatgptPlan {
+                                "chatgpt_plan"
+                            } else {
+                                "direct_api"
+                            }
+                    })
+            })
+            .filter_map(|(id, _)| Uuid::parse_str(id).ok())
+            .collect();
+        let mut summary = if connection_source.is_some() && ids.is_empty() {
+            AiMonitoringSummary::default()
+        } else {
+            store.ai_monitoring_summary_for_keys(
+                from_unix_ms,
+                to_unix_ms,
+                &time_zone,
+                bucket_size,
+                if connection_source.is_some() {
+                    Some(ids.as_slice())
+                } else {
+                    None
+                },
+            )?
+        };
+        if connection_source.is_none() && credential_id.is_some() {
+            summary = store.ai_monitoring_summary_for_key(
+                from_unix_ms,
+                to_unix_ms,
+                &time_zone,
+                bucket_size,
+                credential_id,
+            )?;
+        }
+        summary.connection_sources = sources;
+        Ok(summary)
     }) {
         Ok(summary) => CommandResponse::success(summary),
         Err(_) => storage_unavailable(),

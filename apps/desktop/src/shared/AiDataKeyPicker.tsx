@@ -74,7 +74,13 @@ export function AiDataKeyPicker({
       >
         <span>
           <small>Activity view</small>
-          <strong>{selected ? keyDisplayName(selected) : "All keys"}</strong>
+          <strong>
+            {value === "chatgpt_plan"
+              ? "Codex"
+              : selected
+                ? keyDisplayName(selected)
+                : "All AI activity"}
+          </strong>
         </span>
         <svg viewBox="0 0 20 20" aria-hidden="true">
           <path d="m5.5 7.5 4.5 4 4.5-4" />
@@ -89,17 +95,17 @@ export function AiDataKeyPicker({
         >
           <div className="ai-data-picker-heading">
             <strong>Activity view</strong>
-            <span>Choose all activity or one API key.</span>
+            <span>Choose all activity, your plan, or one API key.</span>
           </div>
           <button
             type="button"
             className={`ai-data-key-option ai-data-key-option--all${value === "" ? " ai-data-key-option--selected" : ""}`}
-            aria-label="View activity for all keys"
+            aria-label="View all AI activity"
             aria-pressed={value === ""}
             onClick={() => choose("")}
           >
             <span className="ai-data-key-option-copy">
-              <strong>All keys</strong>
+              <strong>All AI activity</strong>
               <small>General activity · Every provider and model</small>
             </span>
             {value === "" && (
@@ -107,6 +113,18 @@ export function AiDataKeyPicker({
                 ✓
               </span>
             )}
+          </button>
+          <button
+            type="button"
+            aria-label="View activity for Codex"
+            className={`ai-data-key-option${value === "chatgpt_plan" ? " ai-data-key-option--selected" : ""}`}
+            aria-pressed={value === "chatgpt_plan"}
+            onClick={() => choose("chatgpt_plan")}
+          >
+            <span className="ai-data-key-option-copy">
+              <strong>Codex</strong>
+              <small>ORT token activity · All retained plan connections</small>
+            </span>
           </button>
           <div className="ai-data-key-options">
             {keys.map((key) => (
@@ -153,7 +171,7 @@ export function dataKeyDescription(
         detail: `${providerName(key.provider)} · ${model(key, catalog)}${key.removed ? " · Removed" : ""}`,
       }
     : {
-        title: "All keys",
+        title: "All AI activity",
         detail: "General activity · Every provider and model",
       };
 }

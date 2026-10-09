@@ -1,0 +1,43 @@
+# Authorization belongs to this supervised process only. Never fall back to a
+# credential file or the user's Keychain when the process stops.
+cli_auth_credentials_store = "ephemeral"
+forced_login_method = "chatgpt"
+web_search = "disabled"
+
+[tools.update_plan]
+enabled = false
+
+[tools.experimental_request_user_input]
+enabled = false
+
+[sandbox_workspace_write]
+network_access = false
+
+[history]
+persistence = "none"
+
+[features]
+shell_tool = false
+unified_exec = false
+shell_snapshot = false
+multi_agent = false
+multi_agent_v2 = false
+plugins = false
+connectors = false
+apps = false
+computer_use = false
+image_generation = false
+view_image = false
+request_permissions_tool = false
+tool_search = false
+tool_suggest = false
+js_repl = false
+current_time_reminder = false
+sleep_tool = false
+skip_host_skill_discovery = true
+remote_plugin = false
+hooks = false
+memories = false
+goals = false
+skill_mcp_dependency_install = false
+respect_system_proxy = false

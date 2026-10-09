@@ -11,7 +11,7 @@ use tauri::{Emitter, EventTarget, State, WebviewWindow};
 use uuid::Uuid;
 
 use crate::{DesktopState, ai_request::AiRequestGate, storage_unavailable, window_not_authorized};
-const SETTING: &str = "ai.connection.v1";
+pub(crate) const SETTING: &str = "ai.connection.v1";
 const STORAGE: &str = "STORAGE_UNAVAILABLE";
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -33,6 +33,8 @@ pub struct SavedAiKey {
     pub provider: String,
     pub model: String,
     pub paused: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pause_reason: Option<String>,
     pub removed: bool,
     pub cleanup_required: bool,
 }
@@ -133,6 +135,19 @@ impl AiKeyRegistry {
                     );
                     migrated = true;
                 }
+                // Retire the former Codex-only key pause. Manual pauses and
+                // removal/cleanup safeguards remain intact.
+                if key.get("pauseReason").and_then(serde_json::Value::as_str)
+                    == Some("chatgpt_plan")
+                {
+                    key.remove("pauseReason");
+                    if key.get("removed") == Some(&json!(false))
+                        && key.get("cleanupRequired") == Some(&json!(false))
+                    {
+                        key.insert("paused".into(), json!(false));
+                    }
+                    migrated = true;
+                }
             }
             serde_json::from_value(value).map_err(|_| StorageError::InvalidData)?
         } else {
@@ -151,6 +166,7 @@ impl AiKeyRegistry {
                         model: legacy_model(&provider, &preset)?,
                         provider,
                         paused: legacy.mode != "direct_api",
+                        pause_reason: None,
                         removed: false,
                         cleanup_required: false,
                     }],
@@ -163,7 +179,7 @@ impl AiKeyRegistry {
         registry.validate()?;
         Ok((registry, migrated))
     }
-    fn validate(&self) -> Result<(), StorageError> {
+    pub(crate) fn validate(&self) -> Result<(), StorageError> {
         let mut ids = std::collections::HashSet::new();
         for key in &self.keys {
             if serde_json::from_value::<CredentialProvider>(json!(key.provider)).is_err()
@@ -172,13 +188,20 @@ impl AiKeyRegistry {
                 || key.created_at.parse::<jiff::Timestamp>().is_err()
                 || key.name.as_ref().is_some_and(|name| !valid_key_name(name))
                 || ((key.removed || key.cleanup_required) && !key.paused)
+                || key
+                    .pause_reason
+                    .as_deref()
+                    .is_some_and(|reason| reason != "chatgpt_plan" || !key.paused)
             {
                 return Err(StorageError::InvalidData);
             }
         }
         if let Some(id) = self.primary_credential_id
             && !self.keys.iter().any(|key| {
-                key.credential_id == id && !key.paused && !key.removed && !key.cleanup_required
+                key.credential_id == id
+                    && (!key.paused || key.pause_reason.as_deref() == Some("chatgpt_plan"))
+                    && !key.removed
+                    && !key.cleanup_required
             })
         {
             return Err(StorageError::InvalidData);
@@ -222,6 +245,7 @@ impl AiKeyRegistry {
             return Err("AI_CREDENTIAL_CLEANUP_REQUIRED");
         }
         key.paused = paused;
+        key.pause_reason = None;
         if paused && self.primary_credential_id == Some(id) {
             self.primary_credential_id = None;
         }
@@ -280,7 +304,35 @@ pub(crate) fn request_connection(
     store: &EncryptedStore,
     target: Option<Uuid>,
 ) -> Result<AiConnectionState, StorageError> {
+    let plan = crate::chatgpt_plan::load_settings(store)?.0;
+    if plan.enabled {
+        if target.is_some() {
+            return Err(StorageError::InvalidData);
+        }
+        return Ok(AiConnectionState {
+            mode: "chatgpt_plan".into(),
+            provider: Some("openai".into()),
+            model: plan.model,
+            credential_id: plan.connection_id,
+        });
+    }
     load_registry(store)?.0.connection(target)
+}
+
+// Read-only key settings remain visible in the disabled My Keys section.
+pub(crate) fn saved_key_connection(
+    store: &EncryptedStore,
+    target: Uuid,
+) -> Result<AiConnectionState, StorageError> {
+    load_registry(store)?.0.connection(Some(target))
+}
+
+pub(crate) fn require_api_keys(store: &EncryptedStore) -> Result<(), StorageError> {
+    if crate::chatgpt_plan::load_settings(store)?.0.enabled {
+        Err(StorageError::InvalidData)
+    } else {
+        Ok(())
+    }
 }
 // An explicit, user-confirmed credential test can exercise a paused key without
 // enabling it for ordinary requests or changing the primary selection.
@@ -288,6 +340,9 @@ pub(crate) fn test_connection(
     store: &EncryptedStore,
     target: Uuid,
 ) -> Result<AiConnectionState, StorageError> {
+    if crate::chatgpt_plan::load_settings(store)?.0.enabled {
+        return Err(StorageError::InvalidData);
+    }
     let registry = load_registry(store)?.0;
     let key = registry
         .keys
@@ -376,6 +431,7 @@ fn add_key<V: ProviderCredentialVault>(
     vault: &V,
     request: AddAiKeyRequest,
 ) -> Result<AiKeyRegistry, &'static str> {
+    ensure_api_keys_enabled(store)?;
     let name = request
         .name
         .map(|name| name.trim().to_owned())
@@ -412,6 +468,7 @@ fn add_key<V: ProviderCredentialVault>(
         provider: request.provider,
         model: default_model,
         paused: true,
+        pause_reason: None,
         removed: false,
         cleanup_required: true,
     };
@@ -434,6 +491,7 @@ fn change_key<V: ProviderCredentialVault>(
     vault: &V,
     request: ChangeAiKeyRequest,
 ) -> Result<AiKeyRegistry, &'static str> {
+    ensure_api_keys_enabled(store)?;
     let (mut registry, revision) = load_registry(store).map_err(|_| STORAGE)?;
     let id = request.credential_id;
     let key = registry
@@ -489,11 +547,23 @@ fn change_key<V: ProviderCredentialVault>(
 }
 
 fn clear_primary(store: &EncryptedStore) -> Result<AiKeyRegistry, &'static str> {
+    ensure_api_keys_enabled(store)?;
     let (mut registry, revision) = load_registry(store).map_err(|_| STORAGE)?;
     if registry.primary_credential_id.take().is_some() {
         save_registry(store, &registry, revision)?;
     }
     Ok(registry)
+}
+
+fn ensure_api_keys_enabled(store: &EncryptedStore) -> Result<(), &'static str> {
+    if crate::chatgpt_plan::load_settings(store)
+        .map_err(|_| STORAGE)?
+        .0
+        .enabled
+    {
+        return Err("AI_KEY_PAUSED_BY_PLAN");
+    }
+    Ok(())
 }
 
 fn delete_removed_key_data(
@@ -566,6 +636,7 @@ fn set_key_model(
     store: &EncryptedStore,
     request: &SetAiKeyModelRequest,
 ) -> Result<AiKeyRegistry, &'static str> {
+    ensure_api_keys_enabled(store)?;
     let (mut registry, revision) = load_registry(store).map_err(|_| STORAGE)?;
     let key = registry
         .keys
@@ -632,6 +703,7 @@ fn rename_key(
     store: &EncryptedStore,
     request: &RenameAiKeyRequest,
 ) -> Result<AiKeyRegistry, &'static str> {
+    ensure_api_keys_enabled(store)?;
     let name = request.name.trim();
     if !name.is_empty() && !valid_key_name(name) {
         return Err("AI_KEY_NAME_INVALID");

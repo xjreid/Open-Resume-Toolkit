@@ -54,15 +54,21 @@ Each operation uses at most four paid provider calls:
 1. Draft a complete candidate.
 2. Always review its source support and editorial quality, returning a complete
    improved candidate. A malformed first response is repaired in this slot.
-3. Make up to two additional corrections for unresolved review issues, invalid
-   output, or measured PDF overflow.
-4. Accept only a locally valid candidate with no unresolved blocking review
-   issues and exactly one rendered PDF page.
+3. Correct unresolved review issues, invalid output, or measured PDF overflow.
+4. If another correction is needed, make a final revision that resolves as many
+   issues as possible. Use this locally valid final candidate even if the model
+   still reports review issues or the resume exceeds one rendered PDF page.
+
+Calls two and three may finish early when the candidate has no unresolved review
+issues and renders to one page. Call four explicitly returns the best complete
+revision rather than rejecting it on editorial quality or page fit. Unreadable
+responses, invalid document structure, and invalid source references still
+cannot be saved; these are local contract failures, not model review judgments.
 
 Every valid candidate is rendered with the frozen selected style. Corrections
 receive validation failures, content-length diagnostics and actual page count,
 or the renderer's layout-limit failure. Fonts, margins, spacing, layout, and glyphs never shrink to obtain a
-pass. A failure after four calls leaves the saved workspace intact. Cancellation,
+pass. A local contract failure after four calls leaves the saved workspace intact. Cancellation,
 provider failures, unknown provider usage, and spending-cap rejection stop the
 operation without dispatching another correction.
 
@@ -75,7 +81,9 @@ automatic transport retry is added. A profile or revision conflict prevents
 stale results from replacing saved work.
 
 Manual editing and export retain their existing behavior, including multipage
-exports. One-page enforcement applies to accepting AI-generated results.
+exports. One page remains the AI target; the final revision is accepted even
+when page fit fails. A renderer failure does not discard the final valid resume,
+but export may require a manual content adjustment before files can be prepared.
 
 ## Evidence and refinement
 

@@ -316,6 +316,7 @@ pub fn save_application_stage_one(
     reason = "independent readiness flags are serialized for the desktop UI"
 )]
 pub struct ApplicationContext {
+    pub connection_source: ort_ai::plan::ConnectionSource,
     pub profile_id: uuid::Uuid,
     pub published_revision: Option<i64>,
     pub ai_label: String,
@@ -354,14 +355,17 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
     match window.state::<DesktopState>().with_store(|store| {
         let published_revision = store.load_latest_published()?.map(|item| item.revision);
         let connection = crate::ai_keys::request_connection(store, None)?;
-        let ai_ready = connection.mode == "direct_api";
+        let using_plan = connection.mode == "chatgpt_plan";
+        let ai_ready = connection.mode == "direct_api" || using_plan;
         let provider_name = connection
             .provider
             .clone()
             .unwrap_or_else(|| "Direct AI".into());
         let provider = provider_from_name(&provider_name);
         let catalog = ort_ai::builtin_catalog(&jiff::Timestamp::now().to_string(), None).ok();
-        let model_options =
+        let model_options = if using_plan {
+            Vec::new()
+        } else {
             provider
                 .zip(catalog.as_ref())
                 .map_or_else(Vec::new, |(provider, catalog)| {
@@ -372,13 +376,29 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
                             model: entry.model.clone(),
                         })
                         .collect::<Vec<_>>()
-                });
+                })
+        };
         let selected_model = connection.model.clone();
         let model_available = selected_model
             .as_ref()
             .is_some_and(|model| model_options.iter().any(|option| &option.model == model));
-        let ai_ready = ai_ready && model_available;
-        let ai_label = if ai_ready {
+        let ai_busy = window.state::<ai_request::AiRequestGate>().is_busy();
+        let ai_ready = ai_ready
+            && if using_plan {
+                ai_busy
+                    || window
+                        .state::<crate::chatgpt_plan::PlanRuntime>()
+                        .is_connected(store.manifest().profile_id, connection.credential_id)
+            } else {
+                model_available
+            };
+        let ai_label = if using_plan {
+            if ai_ready {
+                "Using Codex".into()
+            } else {
+                "Check Codex in the main app".into()
+            }
+        } else if ai_ready {
             format!(
                 "{provider_name} · {}",
                 selected_model.unwrap_or_else(|| "model unavailable".into())
@@ -387,11 +407,16 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
             "AI not configured".into()
         };
         Ok(ApplicationContext {
+            connection_source: if using_plan {
+                ort_ai::plan::ConnectionSource::ChatgptPlan
+            } else {
+                ort_ai::plan::ConnectionSource::DirectApi
+            },
             profile_id: store.manifest().profile_id,
             published_revision,
             ai_label,
             ai_ready,
-            ai_busy: window.state::<ai_request::AiRequestGate>().is_busy(),
+            ai_busy,
             selected_key_ready: ai_ready,
             selected_key_id: connection.credential_id,
             model: connection.model,
@@ -572,7 +597,7 @@ pub async fn start_application(
                     approved_answers: Vec::new(),
                     style,
                 };
-                tailoring_progress(&window, "Saving one-page resume", call, Some(1));
+                tailoring_progress(&window, "Saving resume", call, run.page_count());
                 if cancelled() {
                     return Err("AI_CANCELLED");
                 }
@@ -661,7 +686,7 @@ pub async fn regenerate_application_resume(
                 }
                 revised.change_points = result.change_points;
                 merge_refinement_alerts(&mut revised, result.alerts, result.alerts_truncated);
-                tailoring_progress(&window, "Saving one-page resume", call, Some(1));
+                tailoring_progress(&window, "Saving resume", call, run.page_count());
                 if cancelled() {
                     return Err("AI_CANCELLED");
                 }

@@ -21,13 +21,14 @@ use zeroize::{Zeroize, Zeroizing};
 
 const MAGIC: &[u8; 4] = b"ORTB";
 const FORMAT_MAJOR: u16 = 1;
-pub const FORMAT_MINOR: u16 = 7;
+pub const FORMAT_MINOR: u16 = 8;
 const DATABASE_SCHEMA_V1_0: u16 = 1;
 const DATABASE_SCHEMA_V1_1: u16 = 2;
 const DATABASE_SCHEMA_V1_2: u16 = 3;
 const DATABASE_SCHEMA_V1_3: u16 = 4;
 const DATABASE_SCHEMA_V1_4: u16 = 5;
 const DATABASE_SCHEMA_V1_5: u16 = 6;
+const DATABASE_SCHEMA_V1_8: u16 = 7;
 const KDF_ARGON2ID: u8 = 1;
 const HEADER_LEN: usize = 76;
 const SALT_LEN: usize = 16;
@@ -142,6 +143,14 @@ pub struct PortableAiOperationV1 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PortableAiAttemptV1 {
+    #[serde(default = "direct_connection_source")]
+    pub connection_source: String,
+    #[serde(default)]
+    pub reasoning: Option<String>,
+    #[serde(default = "estimated_cost_tracking")]
+    pub monetary_cost_tracking: String,
+    #[serde(default)]
+    pub reported_retries: u32,
     pub attempt_id: String,
     pub operation_id: String,
     pub provider: String,
@@ -168,6 +177,12 @@ pub struct PortableAiAttemptV1 {
     pub error_category: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_details: Option<ort_domain::AiFailureDetails>,
+}
+fn direct_connection_source() -> String {
+    "direct_api".into()
+}
+fn estimated_cost_tracking() -> String {
+    "estimated".into()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -305,10 +320,11 @@ fn create_backup_with_entropy(
         salt,
         nonce,
         format_minor,
-        DATABASE_SCHEMA_V1_5,
+        DATABASE_SCHEMA_V1_8,
     )
 }
 
+#[allow(clippy::too_many_lines)]
 fn create_backup_with_entropy_for_format(
     passphrase: &BackupPassphrase,
     request: BackupExportRequestV1,
@@ -327,13 +343,24 @@ fn create_backup_with_entropy_for_format(
         || (format_minor == 3 && database_schema == DATABASE_SCHEMA_V1_2)
         || (format_minor == 4 && database_schema == DATABASE_SCHEMA_V1_3)
         || (matches!(format_minor, 5 | 6) && database_schema == DATABASE_SCHEMA_V1_4)
-        || (format_minor == 7 && database_schema == DATABASE_SCHEMA_V1_5);
+        || (format_minor == 7 && database_schema == DATABASE_SCHEMA_V1_5)
+        || (format_minor == 8 && database_schema == DATABASE_SCHEMA_V1_8);
     let supported_writer = supported_writer
         && (format_minor >= 5 || request.profile.tracker_entries.is_empty())
         && ((format_minor <= 1 && document_schema == 1)
             || (format_minor == 2 && document_schema == 2)
             || (format_minor >= 3 && matches!(document_schema, 1 | 2)));
     if !supported_writer {
+        return Err(BackupError::InvalidContent);
+    }
+    if format_minor < 8
+        && request.profile.ai_attempts.iter().any(|a| {
+            a.connection_source != "direct_api"
+                || a.reasoning.is_some()
+                || a.monetary_cost_tracking != "estimated"
+                || a.reported_retries != 0
+        })
+    {
         return Err(BackupError::InvalidContent);
     }
     if format_minor < 7
@@ -347,7 +374,9 @@ fn create_backup_with_entropy_for_format(
     }
     if format_minor >= 4
         && request.profile.ai_attempts.iter().any(|attempt| {
-            attempt.catalog_effective_from.is_empty() || attempt.pricing_components.is_empty()
+            attempt.catalog_effective_from.is_empty()
+                || (attempt.pricing_components.is_empty()
+                    && attempt.connection_source != "chatgpt_plan")
         })
     {
         return Err(BackupError::InvalidContent);
@@ -588,6 +617,16 @@ fn validate_payload(
     payload: &PortableBackupV1,
     header: &BackupHeaderInfo,
 ) -> Result<(), BackupError> {
+    if header.format_minor < 8
+        && payload.profile.ai_attempts.iter().any(|a| {
+            a.connection_source != "direct_api"
+                || a.reasoning.is_some()
+                || a.monetary_cost_tracking != "estimated"
+                || a.reported_retries != 0
+        })
+    {
+        return Err(BackupError::InvalidBackup);
+    }
     if header.format_minor < 7
         && payload
             .profile
@@ -604,6 +643,7 @@ fn validate_payload(
         4 => DATABASE_SCHEMA_V1_3,
         5 | 6 => DATABASE_SCHEMA_V1_4,
         7 => DATABASE_SCHEMA_V1_5,
+        8 => DATABASE_SCHEMA_V1_8,
         _ => return Err(BackupError::InvalidBackup),
     };
     if payload.manifest.format_major != FORMAT_MAJOR
@@ -618,7 +658,9 @@ fn validate_payload(
                 || !payload.profile.ai_attempts.is_empty()))
         || (header.format_minor >= 4
             && payload.profile.ai_attempts.iter().any(|attempt| {
-                attempt.catalog_effective_from.is_empty() || attempt.pricing_components.is_empty()
+                attempt.catalog_effective_from.is_empty()
+                    || (attempt.pricing_components.is_empty()
+                        && attempt.connection_source != "chatgpt_plan")
             }))
         || (header.format_minor == 0 && !payload.profile.render_manifests.is_empty())
         || (header.format_minor < 5 && !payload.profile.tracker_entries.is_empty())
@@ -785,7 +827,26 @@ fn validate_ai_activity(
                 })
         });
         let mut price_categories = BTreeSet::new();
-        if attempt_id.to_string() != attempt.attempt_id
+        let plan = attempt.connection_source == "chatgpt_plan";
+        if !matches!(
+            attempt.connection_source.as_str(),
+            "direct_api" | "chatgpt_plan"
+        ) || !matches!(
+            attempt.monetary_cost_tracking.as_str(),
+            "estimated" | "not_tracked"
+        ) || (plan != (attempt.monetary_cost_tracking == "not_tracked"))
+            || (plan
+                && (attempt.provider != "openai"
+                    || attempt.reserved_cost_micros != 0
+                    || attempt.settled_cost_micros.is_some_and(|c| c != 0)
+                    || !attempt.pricing_components.is_empty()))
+            || attempt
+                .reasoning
+                .as_ref()
+                .is_some_and(|r| !matches!(r.as_str(), "low" | "medium" | "high" | "xhigh"))
+            || (plan && attempt.reasoning.is_none())
+            || (!plan && attempt.reasoning.is_some())
+            || attempt_id.to_string() != attempt.attempt_id
             || credential_id.to_string() != attempt.credential_id
             || !attempt_ids.insert(attempt.attempt_id.as_str())
             || !operation_ids.contains(attempt.operation_id.as_str())
@@ -1159,8 +1220,8 @@ mod tests {
             create_backup_with_entropy(&passphrase, request, [0x11; 16], [0x22; 24]).unwrap();
         let header = inspect_backup(&bytes).unwrap();
         let mut payload = restore_backup(&bytes, &passphrase).unwrap();
-        assert_eq!(header.format_minor, 7);
-        assert_eq!(payload.manifest.database_schema, 6);
+        assert_eq!(header.format_minor, 8);
+        assert_eq!(payload.manifest.database_schema, 7);
         assert_eq!(payload.manifest.document_schema, 2);
         payload.manifest.document_schema = 1;
         assert_eq!(
@@ -1178,7 +1239,7 @@ mod tests {
         let digest = hex::encode(Sha256::digest(&backup));
         assert_eq!(
             digest,
-            "7620b099ce32a90d1a195bc783170ec3870ff6a604c403370649c5c190e8b269"
+            "06b0048880e68b58fc0d52d4ee701d446d1c13cf8fb51afc450c9ab33ccb1605"
         );
         let restored = restore_backup(&backup, &passphrase).expect("restore vector");
         assert_eq!(

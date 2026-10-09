@@ -27,6 +27,14 @@ pub fn desktop_wire_schemas() -> std::collections::BTreeMap<String, serde_json::
             );
         };
     }
+    register!("PlanStatus", crate::chatgpt_plan::PlanStatus);
+    register!("RuntimeReadiness", crate::codex_readiness::RuntimeReadiness);
+    register!(
+        "RuntimeInstallStatus",
+        crate::codex_install::RuntimeInstallStatus
+    );
+    register!("LoadPlanRequest", crate::chatgpt_plan::LoadPlanRequest);
+    register!("SavePlanRequest", crate::chatgpt_plan::SavePlanRequest);
     register!("AddAiKeyRequest", ai_keys::AddAiKeyRequest);
     register!("AiKeyAction", ai_keys::AiKeyAction);
     register!("AiKeyRegistry", ai_keys::AiKeyRegistry);
@@ -173,15 +181,22 @@ pub fn desktop_wire_schemas() -> std::collections::BTreeMap<String, serde_json::
     schemas
 }
 
+fn fixture_value(value: impl serde::Serialize) -> serde_json::Value {
+    serde_json::to_value(value).expect("fixture serializes")
+}
+
 /// Synthetic payloads serialized by the same Rust types returned by commands.
 /// # Panics
 /// Panics if a fixed development fixture or its serialization is invalid.
 #[must_use]
+#[allow(
+    clippy::too_many_lines,
+    reason = "declarative fixture registry, without workflow branches"
+)]
 pub fn desktop_wire_fixtures() -> std::collections::BTreeMap<String, serde_json::Value> {
     use ort_domain::{
         ApplicationWorkspace, DocumentStyle, ResumeDocument, RoleInfo, SavedWorkspace, TrackerEntry,
     };
-    use serde_json::to_value;
     let mut resume = ResumeDocument::empty("Wire fixture");
     // Fixed synthetic identity keeps regeneration deterministic.
     resume.document_id =
@@ -223,23 +238,22 @@ pub fn desktop_wire_fixtures() -> std::collections::BTreeMap<String, serde_json:
     std::collections::BTreeMap::from([
         (
             "export_portable_backup".into(),
-            to_value(ort_domain::ExportBackupResponse::Exported {
+            fixture_value(ort_domain::ExportBackupResponse::Exported {
                 byte_count: 1000,
                 format_major: 1,
                 format_minor: ort_backup::FORMAT_MINOR,
                 cleanup_pending: false,
                 durability_unconfirmed: false,
-            })
-            .expect("fixture serializes"),
+            }),
         ),
         (
             "validate_portable_backup".into(),
-            to_value(ort_domain::ValidateBackupResponse::Validated {
+            fixture_value(ort_domain::ValidateBackupResponse::Validated {
                 byte_count: 1000,
                 format_major: 1,
                 format_minor: ort_backup::FORMAT_MINOR,
                 app_version: "0.0.0-dev".into(),
-                database_schema: 5,
+                database_schema: 7,
                 document_schema: 2,
                 created_at: "2026-10-06T12:00:00Z".into(),
                 master_drafts: 1,
@@ -248,34 +262,40 @@ pub fn desktop_wire_fixtures() -> std::collections::BTreeMap<String, serde_json:
                 render_manifests: 0,
                 ai_operations: 10_001,
                 ai_attempts: 20_001,
-            })
-            .expect("fixture serializes"),
+            }),
         ),
         (
             "load_ai_connection".into(),
-            to_value(ai_keys::AiKeyRegistry::default()).expect("fixture serializes"),
+            fixture_value(ai_keys::AiKeyRegistry::default()),
+        ),
+        (
+            "check_codex_runtime".into(),
+            fixture_value(crate::codex_readiness::RuntimeReadiness::unavailable(
+                "PLAN_RUNTIME_MISSING",
+            )),
+        ),
+        (
+            "load_codex_runtime_install".into(),
+            fixture_value(crate::codex_install::RuntimeInstallStatus::default()),
         ),
         (
             "load_ai_monitoring".into(),
-            to_value(ort_storage::ai_activity::AiMonitoringSummary::default())
-                .expect("fixture serializes"),
+            fixture_value(ort_storage::ai_activity::AiMonitoringSummary::default()),
         ),
         (
             "load_application_workspace".into(),
-            to_value(SavedWorkspace {
+            fixture_value(SavedWorkspace {
                 revision: 1,
                 workspace,
-            })
-            .expect("fixture serializes"),
+            }),
         ),
         (
             "get_tracker_entry".into(),
-            to_value(tracker::SavedTrackerEntry {
+            fixture_value(tracker::SavedTrackerEntry {
                 id: "019a0000-0000-7000-8000-000000000002".into(),
                 revision: 1,
                 value: tracker,
-            })
-            .expect("fixture serializes"),
+            }),
         ),
     ])
 }

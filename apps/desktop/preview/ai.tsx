@@ -1,4 +1,5 @@
 // Development-only preview. No native commands, provider calls or persistent writes.
+import type * as Wire from "@ort/contracts/wire";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AiWorkspace } from "../src/shared/AiWorkspace";
@@ -14,6 +15,7 @@ type SavedKey = {
   provider: Provider;
   model: string;
   paused: boolean;
+  pauseReason?: string;
   removed: boolean;
   cleanupRequired: boolean;
 };
@@ -22,6 +24,96 @@ type Registry = {
   primaryCredentialId: string | null;
   nextIdentificationNumber: number;
 };
+const planParameters = new URLSearchParams(location.search);
+const codexEnabled =
+  !planParameters.has("disabled") &&
+  ["codex", "disconnected", "runtime-missing"].some((flag) =>
+    planParameters.has(flag),
+  );
+const codexConnected =
+  codexEnabled &&
+  !planParameters.has("disconnected") &&
+  !planParameters.has("runtime-missing");
+const plan: Wire.PlanStatus = {
+  settings: {
+    cleanupRequired: false,
+    connectionId: codexConnected ? fixturePlanId() : null,
+    enabled: codexEnabled,
+    model: "gpt-6.1-sol",
+    reasoning: "medium",
+    reserveEnabled: true,
+    reservePercent: 20,
+  },
+  revision: 1,
+  connected: codexConnected,
+  accountPlan: codexConnected ? "plus" : null,
+  loginPending: false,
+  operationActive: false,
+  runtimeVersion: codexEnabled ? "0.162.0" : null,
+  errorCode: null,
+  models: [
+    "gpt-5.6-luna",
+    "gpt-5.6-terra",
+    "gpt-5.6-sol",
+    "gpt-6-luna",
+    "gpt-6-sol",
+    "gpt-6.1-sol",
+  ].map((id) => ({
+    id,
+    name: `GPT-${id
+      .slice(4)
+      .replace("-", " ")
+      .replace(/(luna|terra|sol)$/, (s) => s[0].toUpperCase() + s.slice(1))}`,
+    supported: id !== "gpt-5.6-terra",
+    explanation:
+      id === "gpt-5.6-terra"
+        ? "This installed runtime does not offer this model."
+        : null,
+    reasoningEfforts: ["low", "medium", "high", "xhigh"],
+  })),
+  quota: {
+    fetchedAtUnixMs: Date.now(),
+    windows: [
+      {
+        limitId: "codex",
+        name: "Codex primary",
+        window: "primary",
+        remainingPercent: 64,
+        windowDurationMinutes: 300,
+        resetsAt: Math.floor(Date.now() / 1000) + 5400,
+      },
+      {
+        limitId: "codex",
+        name: "Codex secondary",
+        window: "secondary",
+        remainingPercent: 38,
+        windowDurationMinutes: 10080,
+        resetsAt: Math.floor(Date.now() / 1000) + 144000,
+      },
+    ],
+  },
+};
+const installation: Wire.RuntimeInstallStatus = {
+  phase: "idle",
+  downloadedBytes: 0,
+  totalBytes: 98089521,
+  errorCode: null,
+};
+const readiness: Wire.RuntimeReadiness = {
+  ready: !planParameters.has("runtime-missing"),
+  errorCode: planParameters.has("runtime-missing")
+    ? "PLAN_RUNTIME_MISSING"
+    : null,
+};
+if (new URLSearchParams(location.search).has("runtime-missing")) {
+  plan.connected = false;
+  plan.settings.connectionId = null;
+  plan.runtimeVersion = null;
+  plan.errorCode = "PLAN_RUNTIME_MISSING";
+}
+function fixturePlanId() {
+  return "019a0000-0000-7000-8000-000000000050";
+}
 const models = {
   openai: "gpt-5.6-terra",
   anthropic: "claude-sonnet-5",
@@ -45,7 +137,8 @@ const seed = () =>
     );
     return {
       at: date.getTime(),
-      credentialId: fixtureKey((index % 3) + 1),
+      credentialId:
+        index % 4 === 0 ? fixturePlanId() : fixtureKey((index % 3) + 1),
       label: dateLabel(date),
       attempts: index % 6 === 0 ? 0 : 2,
       usage: {
@@ -55,7 +148,9 @@ const seed = () =>
         cacheWriteTokens: 80,
         reasoningTokens: 120,
       },
-      costByCurrencyMicros: { USD: input * 2 + (540 + (index % 400)) * 8 },
+      costByCurrencyMicros: {
+        USD: index % 4 === 0 ? 0 : input * 2 + (540 + (index % 400)) * 8,
+      },
       partial: false,
       unknownCount: 0,
     };
@@ -156,7 +251,8 @@ function monitoring(args: Record<string, any>) {
     (record) =>
       record.at >= args.fromUnixMs &&
       record.at < args.toUnixMs &&
-      (!args.credentialId || record.credentialId === args.credentialId),
+      (!args.credentialId || record.credentialId === args.credentialId) &&
+      (!args.connectionSource || record.credentialId === fixturePlanId()),
   );
   const buckets = new Map<string, UsageBucket>();
   const usage: Usage = {
@@ -194,6 +290,14 @@ function monitoring(args: Record<string, any>) {
     bucket.unknownCount = 1;
   }
   return {
+    connectionSources: Object.fromEntries(
+      [...new Set(records.map((r) => r.credentialId))].map((id) => [
+        id,
+        id === fixturePlanId() ? "chatgpt_plan" : "direct_api",
+      ]),
+    ),
+    planAttempts:
+      selected.filter((r) => r.credentialId === fixturePlanId()).length * 2,
     logicalOperations: selected.length,
     attempts: selected.length * 2,
     usage,
@@ -249,6 +353,10 @@ function monitoring(args: Record<string, any>) {
               effectiveModel: null,
               operationType: "tailor_resume",
               callNumber: 2,
+              connectionSource: "direct_api",
+              reasoning: null,
+              monetaryCostTracking: "estimated",
+              reportedRetries: 0,
               startedAtUnixMs: now.getTime() - 120000,
               durationMs: 2350,
               category: "transient",
@@ -271,6 +379,10 @@ function monitoring(args: Record<string, any>) {
               effectiveModel: "gemini-3.5-flash-lite",
               operationType: "tailor_resume",
               callNumber: 4,
+              connectionSource: "direct_api",
+              reasoning: null,
+              monetaryCostTracking: "estimated",
+              reportedRetries: 0,
               startedAtUnixMs: now.getTime() - 240000,
               durationMs: 15420,
               category: "invalid_output",
@@ -310,10 +422,67 @@ Object.defineProperty(window, "__TAURI_INTERNALS__", {
     invoke: async (command: string, args: Record<string, any> = {}) => {
       let value: unknown;
       switch (command) {
+        case "check_codex_runtime":
+          value = { ...readiness };
+          break;
+        case "load_codex_runtime_install":
+          value = { ...installation };
+          break;
+        case "install_codex_runtime":
+          installation.phase = "downloading";
+          installation.downloadedBytes = 48000000;
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          installation.phase = "awaiting_approval";
+          installation.downloadedBytes = installation.totalBytes;
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          installation.phase = "failed";
+          installation.errorCode = "PLAN_INSTALL_PERMISSION_DENIED";
+          value = { ...installation };
+          break;
+        case "cancel_codex_runtime_install":
+          installation.phase = "cancelled";
+          installation.errorCode = "PLAN_INSTALL_CANCELLED";
+          value = { ...installation };
+          break;
         case "plugin:event|listen":
           return 1;
         case "plugin:event|unlisten":
           return null;
+        case "load_chatgpt_plan":
+          value = plan;
+          break;
+        case "save_chatgpt_plan": {
+          const { expectedRevision: _, ...settings } = args.request;
+          plan.settings = { ...plan.settings, ...settings };
+          plan.revision = (plan.revision ?? 0) + 1;
+          if (!plan.settings.enabled) {
+            plan.connected = false;
+            plan.settings.connectionId = null;
+            plan.runtimeVersion = null;
+            plan.quota = null;
+            plan.accountPlan = null;
+          } else if (!plan.runtimeVersion) plan.runtimeVersion = "0.162.0";
+          value = plan;
+          break;
+        }
+        case "connect_chatgpt_plan":
+          plan.connected = true;
+          plan.accountPlan = "plus";
+          plan.settings.connectionId = fixturePlanId();
+          value = plan;
+          break;
+        case "disconnect_chatgpt_plan":
+          plan.connected = false;
+          plan.settings.connectionId = null;
+          plan.runtimeVersion = null;
+          plan.quota = null;
+          plan.accountPlan = null;
+          value = plan;
+          break;
+        case "cancel_chatgpt_login":
+          plan.loginPending = false;
+          value = plan;
+          break;
         case "load_ai_connection":
           value = {
             keys: registry.keys,

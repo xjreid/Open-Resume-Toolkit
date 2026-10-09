@@ -5,6 +5,7 @@ members = [
     "crates/ort-backup",
     "crates/ort-application",
     "crates/ort-ai",
+    "crates/ort-codex-install",
     "crates/ort-contract-generator",
     "crates/ort-document-worker",
     "crates/ort-documents",
@@ -62,6 +63,7 @@ comemo = "=0.5.1"
 base64 = "=0.22.1"
 ed25519-dalek = "=2.2.0"
 reqwest = { version = "=0.13.4", default-features = false, features = ["rustls", "system-proxy"] }
+rustix = { version = "=1.1.4", features = ["fs", "process"] }
 tokio = { version = "=1.53.1", features = ["sync", "macros", "time"] }
 
 [workspace.lints.rust]

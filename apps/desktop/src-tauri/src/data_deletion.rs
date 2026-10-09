@@ -33,6 +33,15 @@ pub(crate) async fn delete_all_local_data(
         };
         let state = app.state::<DesktopState>();
         let previews = app.state::<PdfState>();
+        let plan_connected = state
+            .with_store(|s| {
+                crate::chatgpt_plan::load_settings(s)
+                    .map(|v| v.0.connection_id.is_some() || v.0.cleanup_required)
+            })
+            .unwrap_or(true);
+        if plan_connected && crate::chatgpt_plan::disconnect_profile(&window).is_err() {
+            return failure("LOCAL_DATA_CREDENTIAL_DELETE_UNAVAILABLE", true);
+        }
         let result = delete_and_reinitialize(
             &state,
             &previews,

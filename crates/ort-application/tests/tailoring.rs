@@ -81,7 +81,7 @@ fn correction_receives_specific_schema_and_selection_failures() {
     assert_eq!(run.page_count(), None);
 }
 #[test]
-fn unresolved_factual_review_issues_block_acceptance_and_stop_after_four() {
+fn final_revision_is_used_despite_unresolved_review_issues_and_stops_after_four() {
     let (source, job, mut candidate) = fixture("unsupported-metric");
     candidate["templateSections"][0]["entries"][0]["mainInfo"]["items"][0]["text"] =
         json!("Improved reporting speed by 90%.");
@@ -94,16 +94,30 @@ fn unresolved_factual_review_issues_block_acceptance_and_stop_after_four() {
         DocumentStyle::Technical,
         json!({}),
     );
-    for _ in 0..3 {
-        assert!(matches!(
-            run.advance(&candidate.to_string()).unwrap(),
-            TailoringStep::Continue(_)
-        ));
+    for call in 1..=3 {
+        let TailoringStep::Continue(next) = run.advance(&candidate.to_string()).unwrap() else {
+            panic!("unresolved issues must receive corrections before the final call");
+        };
+        assert_eq!(next["callNumber"], call + 1);
+        assert_eq!(
+            next["qualityPhase"],
+            match call {
+                1 => "review",
+                2 => "correction",
+                _ => "final_revision",
+            }
+        );
     }
-    assert!(matches!(
-        run.advance(&candidate.to_string()),
-        Err("AI_REVIEW_FAILED")
-    ));
+    candidate["templateSections"][0]["entries"][0]["mainInfo"]["items"][0]["text"] =
+        json!("Improved reporting speed.");
+    let TailoringStep::Ready(material) = run.advance(&candidate.to_string()).unwrap() else {
+        panic!("the best final revision must be used");
+    };
+    assert_eq!(material.review_issues.len(), 1);
+    assert_eq!(
+        material.resume.sections[0].entries[0].bullets[0].text,
+        "Improved reporting speed."
+    );
     assert!(matches!(
         run.advance(&candidate.to_string()),
         Err("AI_TAILORING_FAILED")
@@ -197,7 +211,7 @@ fn renderer_layout_limit_requests_reduction_without_acceptance() {
 }
 
 #[test]
-fn repeated_overflow_exhausts_cap_and_preserves_baseline() {
+fn final_revision_is_used_despite_page_fit_problems_and_preserves_baseline() {
     let (source, job, candidate) = fixture("oversized-master");
     let before = source.clone();
     let mut run = TailoringRun::new(
@@ -216,9 +230,58 @@ fn repeated_overflow_exhausts_cap_and_preserves_baseline() {
     }
     assert!(matches!(
         run.advance(&candidate.to_string()),
-        Err("AI_PAGE_FIT_FAILED")
+        Ok(TailoringStep::Ready(_))
     ));
     assert_eq!(source, before);
+}
+
+#[test]
+fn final_multipage_candidate_is_used_with_actual_page_count() {
+    let (source, job, mut candidate) = fixture("oversized-master");
+    candidate["templateSections"][0]["entries"]
+        .as_array_mut()
+        .unwrap()
+        .truncate(8);
+    let mut run = TailoringRun::new(
+        &source,
+        &source,
+        &job,
+        1,
+        DocumentStyle::Technical,
+        json!({}),
+    );
+    for _ in 0..3 {
+        assert!(matches!(
+            run.advance(&candidate.to_string()),
+            Ok(TailoringStep::Continue(_))
+        ));
+    }
+    assert!(matches!(
+        run.advance(&candidate.to_string()),
+        Ok(TailoringStep::Ready(_))
+    ));
+    assert!(run.page_count().unwrap() > 1);
+}
+
+#[test]
+fn final_revision_still_requires_readable_structure_and_valid_source_references() {
+    let (source, job, mut candidate) = fixture("student-backend");
+    candidate["templateSections"][0]["entries"][0]["mainInfo"]["items"][0]["sourceRefs"] =
+        json!([]);
+    for raw in ["not JSON".to_owned(), candidate.to_string()] {
+        let mut run = TailoringRun::new(
+            &source,
+            &source,
+            &job,
+            1,
+            DocumentStyle::Technical,
+            json!({}),
+        );
+        for _ in 0..3 {
+            assert!(matches!(run.advance(&raw), Ok(TailoringStep::Continue(_))));
+        }
+        assert!(run.advance(&raw).is_err());
+    }
 }
 #[test]
 fn fixture_corpus_contracts_and_actual_summary() {

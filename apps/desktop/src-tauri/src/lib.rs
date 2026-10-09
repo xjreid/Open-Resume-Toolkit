@@ -24,12 +24,22 @@ mod application_exports;
 mod application_materials;
 mod backup_export;
 mod browser_bridge;
+mod chatgpt_plan;
 mod close_guard;
+mod codex_archive;
+mod codex_egress;
+mod codex_install;
+mod codex_pass;
+mod codex_readiness;
+mod codex_runtime;
+mod codex_session;
+mod codex_transport;
 mod data_deletion;
 mod import_review;
 mod menu;
 mod overlay_position;
 mod pdf_preview;
+mod plan_runtime;
 mod text_export;
 mod tracker;
 use close_guard::CloseGuard;
@@ -620,6 +630,8 @@ pub fn run() {
         .manage(pdf_preview::PdfState::default())
         .manage(pdf_preview::PortablePdfState::default())
         .manage(ai_request::AiRequestGate::default())
+        .manage(chatgpt_plan::PlanRuntime::default())
+        .manage(codex_install::RuntimeInstaller::default())
         .manage(application_exports::DragFiles::default())
         .manage(application_exports::ApplicationExportState::default())
         .plugin(tauri_plugin_dialog::init())
@@ -655,6 +667,17 @@ pub fn run() {
             browser_bridge::connect_development_browser,
             browser_bridge::disconnect_development_browser,
             ai_keys::load_ai_connection,
+            chatgpt_plan::load_chatgpt_plan,
+            codex_readiness::check_codex_runtime,
+            codex_install::load_codex_runtime_install,
+            codex_install::install_codex_runtime,
+            codex_install::cancel_codex_runtime_install,
+            chatgpt_plan::open_chatgpt_plan_runtime_guidance,
+            chatgpt_plan::connect_chatgpt_plan,
+            chatgpt_plan::cancel_chatgpt_login,
+            chatgpt_plan::save_chatgpt_plan,
+            chatgpt_plan::disconnect_chatgpt_plan,
+            chatgpt_plan::stop_chatgpt_plan,
             ai_keys::add_ai_key,
             ai_keys::change_ai_key,
             ai_keys::clear_ai_primary,
@@ -815,6 +838,8 @@ pub fn run() {
                 let _ = app.state::<DesktopState>().reviews.clear();
             }
             RunEvent::Exit => {
+                app.state::<ai_request::AiRequestGate>().cancel_overlay();
+                app.state::<chatgpt_plan::PlanRuntime>().stop();
                 app.state::<browser_bridge::BrowserBridgeState>()
                     .disconnect();
                 let _ = app.state::<DesktopState>().reviews.clear();

@@ -147,7 +147,7 @@ export function AiRemovedKeyDataDialog({
             <p className="ai-data-action-warning">
               This cannot be undone. The selected keys will disappear from the
               Data key selector, and their activity will also be removed from
-              the All keys data display.
+              the All AI activity data display.
             </p>
             <p className="ai-help">
               Lifetime and general spending totals on My Keys will not change.

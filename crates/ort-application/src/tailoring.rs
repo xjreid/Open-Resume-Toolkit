@@ -50,7 +50,8 @@ impl<'a> TailoringRun<'a> {
         &self.validation_feedback
     }
     /// Every response consumes a slot, including malformed responses. Only a
-    /// reviewed, locally valid one-page candidate is eligible for persistence.
+    /// locally valid candidate is eligible for persistence. The final revision
+    /// is used even when editorial issues or page-fit problems remain.
     /// # Errors
     /// Returns the final recoverable failure when all four slots are exhausted.
     pub fn advance(&mut self, raw: &str) -> Result<TailoringStep, &'static str> {
@@ -88,19 +89,17 @@ impl<'a> TailoringRun<'a> {
                     self.validation_feedback.push(format!("The source and editorial review reported {} unresolved issues. Model-authored review text is excluded from activity diagnostics.", material.review_issues.len()));
                     feedback.extend(material.review_issues.iter().cloned());
                 }
-                match ort_render::render_pdf_with_style(&material.resume, self.style) {
+                let one_page = match ort_render::render_pdf_with_style(&material.resume, self.style)
+                {
                     Ok(pdf) => {
                         self.page_count = Some(pdf.receipt.page_count);
                         feedback.push(content_diagnostics(&material.resume));
-                        if pdf.receipt.page_count == 1 {
-                            if material.review_issues.is_empty() {
-                                accepted = Some(material);
-                            }
-                        } else {
+                        if pdf.receipt.page_count != 1 {
                             failure = "AI_PAGE_FIT_FAILED";
                             self.validation_feedback.push(format!("Rendered PDF has {} pages; exactly one page is required with the existing layout.", pdf.receipt.page_count));
                             feedback.push(format!("Rendered pageCount={}; target=1. Select and tighten content without changing formatting.",pdf.receipt.page_count));
                         }
+                        pdf.receipt.page_count == 1
                     }
                     Err(ort_render::PdfRenderError::LayoutLimit) => {
                         failure = "AI_PAGE_FIT_FAILED";
@@ -108,11 +107,18 @@ impl<'a> TailoringRun<'a> {
                             .push("The candidate exceeded the PDF renderer's layout limit.".into());
                         feedback.push(content_diagnostics(&material.resume));
                         feedback.push("PDF layout limit exceeded. Substantially reduce content; preserve the strongest direct evidence.".into());
+                        false
                     }
                     Err(_) => {
                         failure = "PDF_UNAVAILABLE";
                         feedback.push("The fixed renderer could not render this candidate. Remove malformed or unsupported content without altering protected values.".into());
+                        false
                     }
+                };
+                if self.calls == MAX_TAILORING_CALLS
+                    || (one_page && material.review_issues.is_empty())
+                {
+                    accepted = Some(material);
                 }
             }
         }
@@ -128,6 +134,8 @@ impl<'a> TailoringRun<'a> {
         let mut next = self.input.clone();
         next["qualityPhase"] = json!(if self.calls == 1 {
             "review"
+        } else if self.calls + 1 == MAX_TAILORING_CALLS {
+            "final_revision"
         } else {
             "correction"
         });

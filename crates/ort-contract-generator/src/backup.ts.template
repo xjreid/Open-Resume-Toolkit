@@ -96,7 +96,11 @@ export function isValidateBackupCommandResponse(
       typeof record.appVersion !== "string" ||
       !/^[A-Za-z0-9._+\-]{1,64}$/.test(record.appVersion) ||
       record.databaseSchema !==
-        (record.formatMinor === 0
+        (record.formatMinor === 8
+          ? 7
+          : record.formatMinor === 7
+            ? 6
+            : record.formatMinor === 0
           ? 1
           : record.formatMinor === 3
             ? 3

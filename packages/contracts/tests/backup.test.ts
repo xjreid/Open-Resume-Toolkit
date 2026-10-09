@@ -238,7 +238,7 @@ it("accepts explicit current exports but refuses future backup formats", () => {
     status: "exported",
     byteCount: 1000,
     formatMajor: 1,
-    formatMinor: 7,
+    formatMinor: 8,
     cleanupPending: false,
     durabilityUnconfirmed: false,
   };
@@ -248,7 +248,7 @@ it("accepts explicit current exports but refuses future backup formats", () => {
   expect(
     isExportBackupCommandResponse({
       ok: true,
-      value: { ...receipt, formatMinor: 8 },
+      value: { ...receipt, formatMinor: 9 },
     }),
   ).toBe(false);
 });

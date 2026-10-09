@@ -4,12 +4,24 @@ The application workspace opens as a fixed 360 × 760 logical-pixel rail at the
 left edge of the monitor work area, vertically centered. Its height is clamped
 on smaller displays. Drag the header to move it within the monitor work area;
 the rail cannot be resized.
-The model preset selector uses the active key's signed catalog choices and the
-same preset-setting command as My Keys. Preset changes refresh in both windows.
 The header shows request activity and a red Stop text control while a request
 is running. The native red window control requests an app quit and shows the
 existing confirmation for unsaved work. Opening the overlay leaves the main
 window visible; the native yellow control minimizes only the overlay.
+
+## Provider controls
+
+The fixed top banner identifies the active connection as **API key** or **Codex**.
+API key connections show the active key's model selector. Connected Codex accounts show
+model and reasoning selectors using the qualified runtime's available options;
+unavailable options remain disabled. Selecting a model preserves the current
+reasoning when supported, otherwise selects the first supported level. Changes
+are saved through the same settings boundary as the main app and broadcast to
+both windows immediately. Controls are locked during AI work and settings saves.
+
+When Codex reports account-wide remaining usage, the banner shows each reported
+window and remaining percentage, including zero. Unknown usage is omitted. Usage
+refreshes on opening the overlay, every 30 seconds, and after AI work finishes.
 
 ## Capture and tailor
 
@@ -24,8 +36,8 @@ disables Capture. The request command also fails explicitly if invoked without
 a bridge. Users can enter text and a URL through the card popups. Existing
 browser captures still require the review/accept step before replacing job text.
 
-Tailor requires an active AI key, a published master resume, and a nonempty job
-within the existing input limits. It saves reviewed job details before starting
+Tailor requires a ready API key or Codex connection, a published master resume,
+and a nonempty job within the existing input limits. It saves reviewed job details before starting
 the request. No live API request is sent just by capturing or editing text.
 
 ## Review, edit, export
@@ -75,3 +87,10 @@ question capture, or Finish Application ends that question. Finish Application
 saves the current resume, cover letter, and final answers to the tracker with
 found role details and today's date. The pencil opens editable tracker details;
 the red X confirms discarding the application without a tracker entry.
+
+Codex enablement is the exclusive provider choice even while signed out. The
+banner keeps showing Codex, with “AI is disabled until an account is connected.”
+instead of model/reasoning controls. Remaining usage and API key selectors are
+also hidden while signed out. Controls return when the account connects.
+Sign out keeps this choice; disabling Codex
+restores the selected API key automatically without unpausing it.

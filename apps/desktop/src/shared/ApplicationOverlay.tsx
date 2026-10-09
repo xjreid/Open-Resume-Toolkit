@@ -1,9 +1,11 @@
+import { planErrorMessage } from "./chatgpt-plan-presentation";
 import { SaveCoordinator } from "./save-coordinator";
 import {
   desktopCommand as command,
   DesktopCommandError,
 } from "./desktop-client";
 import { AiFailureDetailsView } from "./AiFailureDetailsView";
+import { ApplicationCodexControls } from "./ApplicationCodexControls";
 import type * as Wire from "@ort/contracts/wire";
 import { emitTo } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -173,6 +175,7 @@ const errors: Record<string, string> = {
 };
 function message(error: unknown): string {
   const code = error instanceof Error ? error.message : "UNKNOWN";
+  if (code.startsWith("PLAN_")) return planErrorMessage(code);
   return (
     errors[code] ??
     `The action could not be completed (${code}). Your workspace is unchanged.`
@@ -1010,7 +1013,7 @@ export function ApplicationOverlay() {
         onPointerDown={(event) => {
           if (
             event.button !== 0 ||
-            (event.target as Element).closest("button, select, input")
+            (event.target as Element).closest("button, select, input, label")
           )
             return;
           const pointerId = event.pointerId;
@@ -1080,55 +1083,70 @@ export function ApplicationOverlay() {
           <img src={logo} alt="Open Resume Toolkit" width="30" height="30" />
         </div>
         <div className="application-connection">
-          <select
-            aria-label="AI model"
-            title={context?.aiLabel}
-            value={context?.model ?? ""}
-            disabled={!context?.selectedKeyId || busy || aiWorking}
-            onChange={(event) =>
-              void run(async () => {
-                await command("set_ai_key_model", {
-                  request: {
-                    credentialId: context!.selectedKeyId!,
-                    model: event.target.value,
-                  },
-                });
-                setContext(await command("application_context"));
-              })
-            }
-          >
-            {!context?.model && (
-              <option value="">{context?.aiLabel ?? "Checking AI…"}</option>
-            )}
-            {context?.model &&
-              !context.modelOptions.some(
-                (item) => item.model === context.model,
-              ) && (
-                <option value={context.model} disabled>
-                  {context.model}
-                </option>
+          <strong className="application-provider-label">
+            {context?.connectionSource === "chatgpt_plan" ? "Codex" : "API key"}
+          </strong>
+          {context?.connectionSource === "chatgpt_plan" ? (
+            <ApplicationCodexControls
+              key={context.profileId}
+              disabled={busy || aiWorking || closePending}
+              onNotice={setNotice}
+            />
+          ) : (
+            <select
+              aria-label="AI model"
+              title={context?.aiLabel}
+              value={context?.model ?? ""}
+              disabled={
+                !context?.selectedKeyId || busy || aiWorking || closePending
+              }
+              onChange={(event) =>
+                void run(async () => {
+                  await command("set_ai_key_model", {
+                    request: {
+                      credentialId: context!.selectedKeyId!,
+                      model: event.target.value,
+                    },
+                  });
+                  setContext(await command("application_context"));
+                })
+              }
+            >
+              {!context?.model && (
+                <option value="">{context?.aiLabel ?? "Checking AI…"}</option>
               )}
-            {(context?.modelOptions ?? []).map((item) => (
-              <option
-                key={item.model}
-                value={item.model}
-                disabled={!item.model}
-              >
-                {item.model}
-              </option>
-            ))}
-          </select>
+              {context?.model &&
+                !context.modelOptions.some(
+                  (item) => item.model === context.model,
+                ) && (
+                  <option value={context.model} disabled>
+                    {context.model}
+                  </option>
+                )}
+              {(context?.modelOptions ?? []).map((item) => (
+                <option
+                  key={item.model}
+                  value={item.model}
+                  disabled={!item.model}
+                >
+                  {item.model}
+                </option>
+              ))}
+            </select>
+          )}
           <div className="application-key-status" role="status">
             <span
               className={`application-dot${aiWorking ? " application-dot--working" : context?.aiReady ? " application-dot--ready" : ""}`}
             />
             {aiWorking
               ? tailoringProgress
-                ? `${tailoringProgress.phase} · call ${tailoringProgress.call} of ${tailoringProgress.maximum}${tailoringProgress.pageCount == null ? "" : tailoringProgress.pageCount === 1 ? " · PDF: 1 page" : ` · PDF: ${tailoringProgress.pageCount} pages; target 1`}`
+                ? `${tailoringProgress.phase} · ${context?.connectionSource === "chatgpt_plan" ? "pass" : "call"} ${tailoringProgress.call} of ${tailoringProgress.maximum}${tailoringProgress.pageCount == null ? "" : tailoringProgress.pageCount === 1 ? " · PDF: 1 page" : ` · PDF: ${tailoringProgress.pageCount} pages; target 1`}`
                 : "Working"
               : context?.aiReady
                 ? "Ready"
-                : "Select an API key in the main app"}
+                : context?.connectionSource === "chatgpt_plan"
+                  ? "Check Codex connection in the main app"
+                  : "Select an API key in the main app"}
             {aiWorking && (
               <button
                 type="button"

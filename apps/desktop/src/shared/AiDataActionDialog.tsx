@@ -38,6 +38,7 @@ function monthName(label: string) {
 
 export function AiDataActionDialog({
   action,
+  planConnectionIds = [],
   keys,
   catalog,
   disabled,
@@ -45,6 +46,7 @@ export function AiDataActionDialog({
   onConfirm,
 }: {
   action: DataAction | null;
+  planConnectionIds?: string[];
   keys: SavedKey[];
   catalog: Catalog | null;
   disabled: boolean;
@@ -133,10 +135,12 @@ export function AiDataActionDialog({
     selectedKeys.includes(key.credentialId),
   );
   const selectedDescription = allKeysSelected
-    ? "All keys"
-    : selectedKeyRecords.length === 1
-      ? dataKeyDescription(selectedKeyRecords[0], catalog).title
-      : `${selectedKeyRecords.length} keys`;
+    ? "All AI activity"
+    : selectedKeys.some((id) => planConnectionIds.includes(id))
+      ? `Codex${selectedKeyRecords.length ? ` + ${selectedKeyRecords.length} keys` : ""}`
+      : selectedKeyRecords.length === 1
+        ? dataKeyDescription(selectedKeyRecords[0], catalog).title
+        : `${selectedKeyRecords.length} keys`;
   const allSelected =
     months.length > 0 && selectedMonths.length === months.length;
 
@@ -195,23 +199,48 @@ export function AiDataActionDialog({
           <>
             <div className="ai-data-action-copy">
               <strong>Which activity?</strong>
-              <span>Choose one or more API keys, or select All keys.</span>
+              <span>Choose API keys, Codex activity, or All AI activity.</span>
             </div>
             <div className="ai-data-action-options">
               <button
                 ref={firstChoice}
                 type="button"
                 className={`ai-data-key-option ai-data-key-option--all${allKeysSelected ? " ai-data-key-option--selected" : ""}`}
-                aria-label={`${allKeysSelected ? "Deselect" : "Select"} all keys`}
+                aria-label={`${allKeysSelected ? "Deselect" : "Select"} all AI activity`}
                 aria-pressed={allKeysSelected}
                 onClick={() => toggleKey("")}
               >
                 <span className="ai-data-key-option-copy">
-                  <strong>All keys</strong>
+                  <strong>All AI activity</strong>
                   <small>Activity from every provider and model</small>
                 </span>
                 {allKeysSelected && <span aria-hidden="true">✓</span>}
               </button>
+              {planConnectionIds.length > 0 && (
+                <button
+                  type="button"
+                  className="ai-data-key-option"
+                  aria-pressed={planConnectionIds.every((id) =>
+                    selectedKeys.includes(id),
+                  )}
+                  onClick={() =>
+                    setSelectedKeys((current) =>
+                      planConnectionIds.every((id) => current.includes(id))
+                        ? current.filter(
+                            (id) => !planConnectionIds.includes(id),
+                          )
+                        : [...new Set([...current, ...planConnectionIds])],
+                    )
+                  }
+                >
+                  <span className="ai-data-key-option-copy">
+                    <strong>Codex</strong>
+                    <small>
+                      All retained plan connections · Monetary cost not tracked
+                    </small>
+                  </span>
+                </button>
+              )}
               {keys.map((key) => {
                 const description = dataKeyDescription(key, catalog);
                 const selected = selectedKeys.includes(key.credentialId);

@@ -87,7 +87,7 @@ fn lifetime_counter(
         return i64::try_from(total).map_err(|_| StorageError::InvalidData);
     }
     let sql = if unknown {
-        "SELECT COALESCE(SUM(reserved_cost_micros), 0) FROM ai_attempts WHERE profile_id = ?1 AND credential_id = ?2 AND currency = ?3 AND estimate_completeness != 'complete' AND status NOT IN ('reserved', 'dispatching', 'streaming')"
+        "SELECT COALESCE(SUM(reserved_cost_micros), 0) FROM ai_attempts WHERE profile_id = ?1 AND credential_id = ?2 AND currency = ?3 AND estimate_completeness != 'complete' AND connection_source = 'direct_api' AND status NOT IN ('reserved', 'dispatching', 'streaming')"
     } else {
         "SELECT COALESCE(SUM(settled_cost_micros), 0) FROM ai_attempts WHERE profile_id = ?1 AND credential_id = ?2 AND currency = ?3"
     };
@@ -121,8 +121,8 @@ fn preserve_lifetime_totals(
     profile: &str,
 ) -> Result<(), StorageError> {
     connection.execute("INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) SELECT profile_id, 'ai.lifetime.v1.' || credential_id || '.' || currency, 1, CAST(CAST(SUM(settled_cost_micros) AS TEXT) AS BLOB), CURRENT_TIMESTAMP FROM ai_attempts WHERE profile_id = ?1 AND settled_cost_micros IS NOT NULL GROUP BY profile_id, credential_id, currency ON CONFLICT (profile_id, setting_key) DO NOTHING", [profile]).map_err(|_| StorageError::Unavailable)?;
-    connection.execute("INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) SELECT profile_id, 'ai.lifetime_unknown.v1.' || credential_id || '.' || currency, 1, CAST(CAST(SUM(reserved_cost_micros) AS TEXT) AS BLOB), CURRENT_TIMESTAMP FROM ai_attempts WHERE profile_id = ?1 AND estimate_completeness != 'complete' AND status NOT IN ('reserved', 'dispatching', 'streaming') GROUP BY profile_id, credential_id, currency ON CONFLICT (profile_id, setting_key) DO NOTHING", [profile]).map_err(|_| StorageError::Unavailable)?;
-    connection.execute("INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) SELECT DISTINCT profile_id, 'ai.lifetime_partial.v1.' || credential_id, 1, CAST('true' AS BLOB), CURRENT_TIMESTAMP FROM ai_attempts WHERE profile_id = ?1 AND estimate_completeness != 'complete' AND status NOT IN ('reserved', 'dispatching', 'streaming') ON CONFLICT (profile_id, setting_key) DO NOTHING", [profile]).map_err(|_| StorageError::Unavailable)?;
+    connection.execute("INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) SELECT profile_id, 'ai.lifetime_unknown.v1.' || credential_id || '.' || currency, 1, CAST(CAST(SUM(reserved_cost_micros) AS TEXT) AS BLOB), CURRENT_TIMESTAMP FROM ai_attempts WHERE profile_id = ?1 AND estimate_completeness != 'complete' AND connection_source = 'direct_api' AND status NOT IN ('reserved', 'dispatching', 'streaming') GROUP BY profile_id, credential_id, currency ON CONFLICT (profile_id, setting_key) DO NOTHING", [profile]).map_err(|_| StorageError::Unavailable)?;
+    connection.execute("INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) SELECT DISTINCT profile_id, 'ai.lifetime_partial.v1.' || credential_id, 1, CAST('true' AS BLOB), CURRENT_TIMESTAMP FROM ai_attempts WHERE profile_id = ?1 AND estimate_completeness != 'complete' AND connection_source = 'direct_api' AND status NOT IN ('reserved', 'dispatching', 'streaming') ON CONFLICT (profile_id, setting_key) DO NOTHING", [profile]).map_err(|_| StorageError::Unavailable)?;
     Ok(())
 }
 
@@ -253,6 +253,10 @@ pub struct AiMonitoringSummary {
     pub by_provider: BTreeMap<String, u64>,
     #[serde(default)]
     pub by_credential_id: BTreeMap<String, u64>,
+    #[serde(default)]
+    pub connection_sources: BTreeMap<String, String>,
+    #[serde(default)]
+    pub plan_attempts: u64,
     pub by_status: BTreeMap<String, u64>,
     pub by_model: BTreeMap<String, u64>,
     pub by_preset: BTreeMap<String, u64>,
@@ -278,6 +282,14 @@ pub struct AiAttemptFailure {
     pub details: Option<ort_domain::AiFailureDetails>,
     pub usage: Option<Usage>,
     pub usage_complete: bool,
+    #[serde(default)]
+    pub connection_source: ort_ai::plan::ConnectionSource,
+    #[serde(default)]
+    pub reasoning: Option<ort_ai::plan::ReasoningEffort>,
+    #[serde(default)]
+    pub monetary_cost_tracking: ort_ai::plan::MonetaryCostTracking,
+    #[serde(default)]
+    pub reported_retries: u32,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -355,7 +367,7 @@ fn operation_type(value: OperationType) -> &'static str {
 
 fn valid_preflight(value: &AiAttemptPreflight) -> bool {
     value.started_at_unix_ms > 0
-        && value.maximum_cost_micros > 0
+        && (value.maximum_cost_micros > 0 || value.preset_version == "codex-plan@v1")
         && i64::try_from(value.maximum_cost_micros).is_ok()
         && i64::try_from(value.estimated_input_tokens).is_ok()
         && value.requested_model.len() <= 128
@@ -365,7 +377,7 @@ fn valid_preflight(value: &AiAttemptPreflight) -> bool {
         && (1..=128).contains(&value.catalog_id.len())
         && (1..=64).contains(&value.catalog_effective_from.len())
         && !value.catalog_effective_from.chars().any(char::is_control)
-        && !value.pricing_components.is_empty()
+        && (!value.pricing_components.is_empty() || value.preset_version == "codex-plan@v1")
         && value.pricing_components.len() <= 5
         && value
             .pricing_components
@@ -432,6 +444,56 @@ pub fn ai_calendar_bounds(
 }
 
 impl EncryptedStore {
+    /// Terminates a plan preflight that never reached inference dispatch.
+    /// # Errors
+    /// Rejects stale or non-plan attempts.
+    pub fn reject_reserved_plan_attempt(
+        &self,
+        settlement: &AiAttemptSettlement,
+    ) -> Result<(), StorageError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let changed=connection.execute("UPDATE ai_attempts SET status=?1, ended_at_unix_ms=?2, usage_json=?3, usage_complete=1, settled_cost_micros=0, error_category=?4 WHERE profile_id=?5 AND attempt_id=?6 AND status='reserved' AND connection_source='chatgpt_plan'",params![settlement.status.as_str(),settlement.ended_at_unix_ms,serde_json::to_vec(&Usage::default()).map_err(|_|StorageError::InvalidData)?,settlement.error_category,self.manifest.profile_id.to_string(),settlement.attempt_id.to_string()]).map_err(|_|StorageError::Unavailable)?;
+        if changed == 1 {
+            Ok(())
+        } else {
+            Err(StorageError::RevisionConflict)
+        }
+    }
+    /// Lists retained connection identities without interpreting plans as keys.
+    /// # Errors
+    /// Returns an error when accounting storage is unavailable.
+    pub fn ai_connection_sources(&self) -> Result<BTreeMap<String, String>, StorageError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let mut statement=connection.prepare("SELECT DISTINCT credential_id, connection_source FROM ai_attempts WHERE profile_id=?1").map_err(|_|StorageError::Unavailable)?;
+        statement
+            .query_map([self.manifest.profile_id.to_string()], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .map_err(|_| StorageError::Unavailable)?
+            .collect::<Result<_, _>>()
+            .map_err(|_| StorageError::Unavailable)
+    }
+    /// Stores a provider-reported retry count; this is not an HTTP call count.
+    /// # Errors
+    /// Returns an error for unavailable storage or a missing pass.
+    pub fn record_plan_retries(&self, attempt_id: Uuid, retries: u32) -> Result<(), StorageError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let changed=connection.execute("UPDATE ai_attempts SET reported_retries=?1 WHERE profile_id=?2 AND attempt_id=?3 AND connection_source='chatgpt_plan'",params![retries,self.manifest.profile_id.to_string(),attempt_id.to_string()]).map_err(|_|StorageError::Unavailable)?;
+        if changed == 1 {
+            Ok(())
+        } else {
+            Err(StorageError::NotFound)
+        }
+    }
     /// Attach locally authored diagnostics to a settled attempt. A rejected
     /// material changes its outcome, never its settled billing or guardrails.
     /// # Errors
@@ -826,7 +888,35 @@ impl EncryptedStore {
     /// includes cap rejection. Neither leaves a dispatchable attempt behind.
     #[allow(clippy::too_many_lines)]
     pub fn reserve_ai_attempt(&self, preflight: &AiAttemptPreflight) -> Result<(), StorageError> {
-        if !valid_preflight(preflight) {
+        self.reserve_ai_attempt_inner(preflight, None)
+    }
+
+    /// Records a quota-backed pass without dollar reservations.
+    /// # Errors
+    /// Rejects invalid metadata, an overlapping operation, or stale pass ancestry.
+    pub fn reserve_plan_attempt(
+        &self,
+        preflight: &AiAttemptPreflight,
+        reasoning: ort_ai::plan::ReasoningEffort,
+    ) -> Result<(), StorageError> {
+        if preflight.preset_version != "codex-plan@v1"
+            || preflight.maximum_cost_micros != 0
+            || preflight.provider != Provider::OpenAi
+            || !preflight.pricing_components.is_empty()
+        {
+            return Err(StorageError::InvalidData);
+        }
+        self.reserve_ai_attempt_inner(preflight, Some(reasoning))
+    }
+    #[allow(clippy::too_many_lines)]
+    fn reserve_ai_attempt_inner(
+        &self,
+        preflight: &AiAttemptPreflight,
+        reasoning: Option<ort_ai::plan::ReasoningEffort>,
+    ) -> Result<(), StorageError> {
+        if (reasoning.is_none() && preflight.preset_version == "codex-plan@v1")
+            || !valid_preflight(preflight)
+        {
             return Err(StorageError::InvalidData);
         }
         let maximum_cost =
@@ -862,11 +952,12 @@ impl EncryptedStore {
                     AND previous.operation_id = ?3 AND operation.status = 'active'
                     AND previous.provider = ?4 AND previous.credential_id = ?5
                     AND previous.requested_model = ?6 AND operation.operation_type = ?7
+                    AND previous.connection_source = ?8 AND previous.reasoning IS ?9
                     AND ((previous.status = 'failed' AND previous.error_category = 'transient')
                         OR (previous.status = 'succeeded' AND operation.operation_type IN ('tailor_resume','refine_resume')
                             AND (SELECT COUNT(*) FROM ai_attempts a WHERE a.operation_id = ?3) < 4))
                     AND NOT EXISTS (SELECT 1 FROM ai_attempts retry WHERE retry.retry_of = previous.attempt_id)",
-                    params![profile, retry_of.to_string(), preflight.operation_id.to_string(), preflight.provider.as_str(), preflight.credential_id.to_string(), preflight.requested_model, operation_type(preflight.operation_type)],
+                    params![profile, retry_of.to_string(), preflight.operation_id.to_string(), preflight.provider.as_str(), preflight.credential_id.to_string(), preflight.requested_model, operation_type(preflight.operation_type), if reasoning.is_some() {"chatgpt_plan"} else {"direct_api"}, reasoning.map(|r| serde_json::to_value(r).unwrap().as_str().unwrap().to_owned())],
                     |row| row.get(0),
                 )
                 .map_err(|_| StorageError::Unavailable)?;
@@ -876,83 +967,85 @@ impl EncryptedStore {
         } else if active != 0 {
             return Err(StorageError::RevisionConflict);
         }
-        let expired = {
-            let mut statement = tx.prepare("SELECT credential_id, period, time_zone FROM ai_guardrail_policies
+        if reasoning.is_none() {
+            let expired = {
+                let mut statement = tx.prepare("SELECT credential_id, period, time_zone FROM ai_guardrail_policies
                 WHERE profile_id = ?1 AND period_end_unix_ms IS NOT NULL AND period_end_unix_ms <= ?2")
                 .map_err(|_| StorageError::Unavailable)?;
-            statement
-                .query_map(params![profile, preflight.started_at_unix_ms], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                    ))
-                })
-                .map_err(|_| StorageError::Unavailable)?
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|_| StorageError::Unavailable)?
-        };
-        for (credential, period, time_zone) in expired {
-            let period = AiPeriod::from_db(&period).ok_or(StorageError::InvalidData)?;
-            let (start, end) =
-                ai_calendar_bounds(preflight.started_at_unix_ms, &time_zone, period)?;
-            tx.execute(
-                "UPDATE ai_guardrail_policies SET period_start_unix_ms = ?1,
+                statement
+                    .query_map(params![profile, preflight.started_at_unix_ms], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                        ))
+                    })
+                    .map_err(|_| StorageError::Unavailable)?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| StorageError::Unavailable)?
+            };
+            for (credential, period, time_zone) in expired {
+                let period = AiPeriod::from_db(&period).ok_or(StorageError::InvalidData)?;
+                let (start, end) =
+                    ai_calendar_bounds(preflight.started_at_unix_ms, &time_zone, period)?;
+                tx.execute(
+                    "UPDATE ai_guardrail_policies SET period_start_unix_ms = ?1,
                 period_end_unix_ms = ?2, counted_micros = 0, reserved_micros = 0,
                 unresolved_micros = 0, revision = revision + 1
                 WHERE profile_id = ?3 AND credential_id = ?4 AND period = ?5",
-                params![start, end, profile, credential, period.as_str()],
-            )
-            .map_err(|_| StorageError::Unavailable)?;
-        }
-        let wrong_currency: i64 = tx.query_row(
+                    params![start, end, profile, credential, period.as_str()],
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+            }
+            let wrong_currency: i64 = tx.query_row(
             "SELECT COUNT(*) FROM ai_guardrail_policies WHERE profile_id = ?1 AND credential_id IN (?2, ?5)
              AND currency != ?3 AND activated_at_unix_ms <= ?4 AND period_start_unix_ms <= ?4
              AND (period_end_unix_ms IS NULL OR ?4 < period_end_unix_ms)",
             params![profile, preflight.credential_id.to_string(), preflight.currency, preflight.started_at_unix_ms, AI_GENERAL_CAP_CREDENTIAL_ID.to_string()],
             |row| row.get(0),
         ).map_err(|_| StorageError::Unavailable)?;
-        if wrong_currency != 0 {
-            return Err(StorageError::InvalidData);
-        }
-        let mut cap_statement = tx.prepare(
+            if wrong_currency != 0 {
+                return Err(StorageError::InvalidData);
+            }
+            let mut cap_statement = tx.prepare(
             "SELECT limit_micros, counted_micros, reserved_micros, unresolved_micros
              FROM ai_guardrail_policies WHERE profile_id = ?1 AND credential_id IN (?2, ?5)
              AND currency = ?3 AND activated_at_unix_ms <= ?4
              AND period_start_unix_ms <= ?4 AND (period_end_unix_ms IS NULL OR ?4 < period_end_unix_ms)",
         ).map_err(|_| StorageError::Unavailable)?;
-        let caps = cap_statement
-            .query_map(
-                params![
-                    profile,
-                    preflight.credential_id.to_string(),
-                    preflight.currency,
-                    preflight.started_at_unix_ms,
-                    AI_GENERAL_CAP_CREDENTIAL_ID.to_string()
-                ],
-                |row| {
-                    Ok((
-                        row.get::<_, i64>(0)?,
-                        row.get::<_, i64>(1)?,
-                        row.get::<_, i64>(2)?,
-                        row.get::<_, i64>(3)?,
-                    ))
-                },
-            )
-            .map_err(|_| StorageError::Unavailable)?;
-        for cap in caps {
-            let (limit, counted, reserved, unresolved) =
-                cap.map_err(|_| StorageError::Unavailable)?;
-            let total = counted
-                .checked_add(reserved)
-                .and_then(|value| value.checked_add(unresolved))
-                .and_then(|value| value.checked_add(maximum_cost))
-                .ok_or(StorageError::InvalidData)?;
-            if total > limit {
-                return Err(StorageError::InvalidData);
+            let caps = cap_statement
+                .query_map(
+                    params![
+                        profile,
+                        preflight.credential_id.to_string(),
+                        preflight.currency,
+                        preflight.started_at_unix_ms,
+                        AI_GENERAL_CAP_CREDENTIAL_ID.to_string()
+                    ],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, i64>(2)?,
+                            row.get::<_, i64>(3)?,
+                        ))
+                    },
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+            for cap in caps {
+                let (limit, counted, reserved, unresolved) =
+                    cap.map_err(|_| StorageError::Unavailable)?;
+                let total = counted
+                    .checked_add(reserved)
+                    .and_then(|value| value.checked_add(unresolved))
+                    .and_then(|value| value.checked_add(maximum_cost))
+                    .ok_or(StorageError::InvalidData)?;
+                if total > limit {
+                    return Err(StorageError::InvalidData);
+                }
             }
+            drop(cap_statement);
         }
-        drop(cap_statement);
         if preflight.retry_of.is_none() {
             tx.execute(
                 "INSERT INTO ai_operations (operation_id, profile_id, operation_type, started_at_unix_ms, status, cancelled)
@@ -961,17 +1054,19 @@ impl EncryptedStore {
             ).map_err(|_| StorageError::RevisionConflict)?;
         }
         tx.execute(
-            "INSERT INTO ai_attempts (attempt_id, operation_id, profile_id, provider, credential_id, requested_model, preset_version, catalog_id, catalog_effective_from, pricing_components_json, started_at_unix_ms, status, retry_of, usage_complete, estimated_input_tokens, reserved_cost_micros, currency, estimate_completeness)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'reserved', ?12, 0, ?13, ?14, ?15, 'complete')",
-            params![preflight.attempt_id.to_string(), preflight.operation_id.to_string(), profile, preflight.provider.as_str(), preflight.credential_id.to_string(), preflight.requested_model, preflight.preset_version, preflight.catalog_id, preflight.catalog_effective_from, pricing_components, preflight.started_at_unix_ms, preflight.retry_of.map(|id| id.to_string()), input_tokens, maximum_cost, preflight.currency],
+            "INSERT INTO ai_attempts (attempt_id, operation_id, profile_id, provider, credential_id, requested_model, preset_version, catalog_id, catalog_effective_from, pricing_components_json, started_at_unix_ms, status, retry_of, usage_complete, estimated_input_tokens, reserved_cost_micros, currency, estimate_completeness, connection_source, reasoning, monetary_cost_tracking)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'reserved', ?12, 0, ?13, ?14, ?15, 'complete', ?16, ?17, ?18)",
+            params![preflight.attempt_id.to_string(), preflight.operation_id.to_string(), profile, preflight.provider.as_str(), preflight.credential_id.to_string(), preflight.requested_model, preflight.preset_version, preflight.catalog_id, preflight.catalog_effective_from, pricing_components, preflight.started_at_unix_ms, preflight.retry_of.map(|id| id.to_string()), input_tokens, maximum_cost, preflight.currency, if reasoning.is_some() { "chatgpt_plan" } else { "direct_api" }, reasoning.map(|r|serde_json::to_value(r).expect("reasoning").as_str().expect("reasoning string").to_owned()), if reasoning.is_some() { "not_tracked" } else { "estimated" }],
         ).map_err(|_| StorageError::Unavailable)?;
-        tx.execute(
+        if reasoning.is_none() {
+            tx.execute(
             "UPDATE ai_guardrail_policies SET reserved_micros = reserved_micros + ?1, revision = revision + 1
              WHERE profile_id = ?2 AND credential_id IN (?3, ?6) AND currency = ?4
              AND activated_at_unix_ms <= ?5 AND period_start_unix_ms <= ?5
              AND (period_end_unix_ms IS NULL OR ?5 < period_end_unix_ms)",
             params![maximum_cost, profile, preflight.credential_id.to_string(), preflight.currency, preflight.started_at_unix_ms, AI_GENERAL_CAP_CREDENTIAL_ID.to_string()],
         ).map_err(|_| StorageError::Unavailable)?;
+        }
         tx.commit().map_err(|_| StorageError::Unavailable)
     }
 
@@ -1124,8 +1219,7 @@ impl EncryptedStore {
             || result
                 .settled_cost_micros
                 .is_some_and(|cost| i64::try_from(cost).is_err())
-            || result.status == AiTerminalStatus::Succeeded
-                && (result.usage.is_none() || result.effective_model.is_none())
+            || result.status == AiTerminalStatus::Succeeded && result.effective_model.is_none()
             || result.keep_operation_active
                 && result.status != AiTerminalStatus::Succeeded
                 && (result.status != AiTerminalStatus::Failed
@@ -1154,15 +1248,21 @@ impl EncryptedStore {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|_| StorageError::Unavailable)?;
         let profile = self.manifest.profile_id.to_string();
-        let row: Option<(String, String, i64, i64, String, String)> = tx.query_row(
-            "SELECT operation_id, credential_id, reserved_cost_micros, started_at_unix_ms, currency, status
+        let row: Option<(String, String, i64, i64, String, String, String)> = tx.query_row(
+            "SELECT operation_id, credential_id, reserved_cost_micros, started_at_unix_ms, currency, status, connection_source
              FROM ai_attempts WHERE attempt_id = ?1 AND profile_id = ?2",
             params![result.attempt_id.to_string(), profile],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?)),
         ).optional().map_err(|_| StorageError::Unavailable)?;
-        let Some((operation, credential, reserved, started, currency, status)) = row else {
+        let Some((operation, credential, reserved, started, currency, status, source)) = row else {
             return Err(StorageError::NotFound);
         };
+        let plan = source == "chatgpt_plan";
+        if (plan && result.settled_cost_micros != Some(0))
+            || (!plan && result.status == AiTerminalStatus::Succeeded && result.usage.is_none())
+        {
+            return Err(StorageError::InvalidData);
+        }
         if !matches!(status.as_str(), "dispatching" | "streaming")
             || result.ended_at_unix_ms < started
         {
@@ -1189,7 +1289,9 @@ impl EncryptedStore {
                     .settled_cost_micros
                     .is_some_and(|cost| cost <= maximum)
             });
-        let actual = if complete {
+        let actual = if plan {
+            Some(0)
+        } else if complete {
             result
                 .settled_cost_micros
                 .map(i64::try_from)
@@ -1198,14 +1300,16 @@ impl EncryptedStore {
         } else {
             None
         };
-        record_lifetime_counter(
-            &tx,
-            &profile,
-            &credential,
-            &currency,
-            actual.unwrap_or(reserved),
-            actual.is_none(),
-        )?;
+        if !plan {
+            record_lifetime_counter(
+                &tx,
+                &profile,
+                &credential,
+                &currency,
+                actual.unwrap_or(reserved),
+                actual.is_none(),
+            )?;
+        }
         tx.execute(
             "UPDATE ai_attempts SET status = ?1, ended_at_unix_ms = ?2, effective_model = ?3,
              usage_json = ?4, usage_complete = ?5, settled_cost_micros = ?6,
@@ -1219,7 +1323,7 @@ impl EncryptedStore {
              counted_micros = counted_micros + ?2, unresolved_micros = unresolved_micros + ?3,
              revision = revision + 1 WHERE profile_id = ?4 AND credential_id IN (?5, ?8) AND currency = ?6
              AND activated_at_unix_ms <= ?7 AND period_start_unix_ms <= ?7
-             AND (period_end_unix_ms IS NULL OR ?7 < period_end_unix_ms)",
+             AND (period_end_unix_ms IS NULL OR ?7 < period_end_unix_ms) AND ?9 = 0",
             params![
                 reserved,
                 actual.unwrap_or(0),
@@ -1228,7 +1332,7 @@ impl EncryptedStore {
                 credential,
                 currency,
                 started
-                , AI_GENERAL_CAP_CREDENTIAL_ID.to_string()
+                , AI_GENERAL_CAP_CREDENTIAL_ID.to_string(), i64::from(plan)
             ],
         )
         .map_err(|_| StorageError::Unavailable)?;
@@ -1253,6 +1357,7 @@ impl EncryptedStore {
     /// moves their reservations to unresolved cap state.
     /// # Errors
     /// Returns `Unavailable` when the transaction cannot commit.
+    #[allow(clippy::too_many_lines)]
     pub fn recover_ai_attempts(&self, now_unix_ms: i64) -> Result<u64, StorageError> {
         if now_unix_ms <= 0 {
             return Err(StorageError::InvalidData);
@@ -1266,7 +1371,7 @@ impl EncryptedStore {
             .map_err(|_| StorageError::Unavailable)?;
         let profile = self.manifest.profile_id.to_string();
         let mut statement = tx.prepare(
-            "SELECT attempt_id, operation_id, credential_id, reserved_cost_micros, started_at_unix_ms, currency, status
+            "SELECT attempt_id, operation_id, credential_id, reserved_cost_micros, started_at_unix_ms, currency, status, connection_source
              FROM ai_attempts WHERE profile_id = ?1 AND status IN ('reserved','dispatching','streaming')",
         ).map_err(|_| StorageError::Unavailable)?;
         let rows = statement
@@ -1279,15 +1384,17 @@ impl EncryptedStore {
                     row.get::<_, i64>(4)?,
                     row.get::<_, String>(5)?,
                     row.get::<_, String>(6)?,
+                    row.get::<_, String>(7)?,
                 ))
             })
             .map_err(|_| StorageError::Unavailable)?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| StorageError::Unavailable)?;
         drop(statement);
-        for (attempt, operation, credential, reserved, started, currency, status) in &rows {
+        for (attempt, operation, credential, reserved, started, currency, status, source) in &rows {
             let dispatched = status != "reserved";
-            if dispatched {
+            let plan = source == "chatgpt_plan";
+            if dispatched && !plan {
                 record_lifetime_counter(&tx, &profile, credential, currency, *reserved, true)?;
             }
             tx.execute(
@@ -1304,7 +1411,11 @@ impl EncryptedStore {
                     now_unix_ms.max(*started),
                     if dispatched { "partial" } else { "complete" },
                     if dispatched { "provider" } else { "cancelled" },
-                    if dispatched { None } else { Some(0_i64) },
+                    if dispatched && !plan {
+                        None
+                    } else {
+                        Some(0_i64)
+                    },
                     i64::from(!dispatched),
                     attempt
                 ],
@@ -1330,7 +1441,7 @@ impl EncryptedStore {
                 unresolved_micros = unresolved_micros + ?2, revision = revision + 1
                 WHERE profile_id = ?3 AND credential_id IN (?4, ?7) AND currency = ?5
                 AND activated_at_unix_ms <= ?6 AND period_start_unix_ms <= ?6
-                AND (period_end_unix_ms IS NULL OR ?6 < period_end_unix_ms)",
+                AND (period_end_unix_ms IS NULL OR ?6 < period_end_unix_ms) AND ?8 = 0",
                 params![
                     reserved,
                     if dispatched { *reserved } else { 0 },
@@ -1338,7 +1449,8 @@ impl EncryptedStore {
                     credential,
                     currency,
                     started,
-                    AI_GENERAL_CAP_CREDENTIAL_ID.to_string()
+                    AI_GENERAL_CAP_CREDENTIAL_ID.to_string(),
+                    i64::from(plan)
                 ],
             )
             .map_err(|_| StorageError::Unavailable)?;
@@ -1438,7 +1550,7 @@ impl EncryptedStore {
                     a.error_details_json, a.requested_model, a.effective_model,
                     (SELECT COUNT(*) FROM ai_attempts previous WHERE previous.operation_id = a.operation_id
                     AND (previous.started_at_unix_ms < a.started_at_unix_ms OR
-                    (previous.started_at_unix_ms = a.started_at_unix_ms AND previous.attempt_id <= a.attempt_id)))
+                    (previous.started_at_unix_ms = a.started_at_unix_ms AND previous.attempt_id <= a.attempt_id))), a.connection_source, a.reasoning, a.monetary_cost_tracking, a.reported_retries
              FROM ai_attempts a JOIN ai_operations o ON o.operation_id = a.operation_id
              WHERE a.profile_id = ?1 AND a.started_at_unix_ms >= ?2
              AND a.started_at_unix_ms < ?3",
@@ -1487,6 +1599,10 @@ impl EncryptedStore {
                     row.get::<_, String>(17)?,
                     row.get::<_, Option<String>>(18)?,
                     row.get::<_, u32>(19)?,
+                    row.get::<_, String>(20)?,
+                    row.get::<_, Option<String>>(21)?,
+                    row.get::<_, String>(22)?,
+                    row.get::<_, u32>(23)?,
                 ))
             })
             .map_err(|_| StorageError::Unavailable)?;
@@ -1516,6 +1632,10 @@ impl EncryptedStore {
                 requested_model,
                 effective_model,
                 call_number,
+                connection_source,
+                reasoning,
+                monetary_cost_tracking,
+                reported_retries,
             ) = row.map_err(|_| StorageError::Unavailable)?;
             if matches!(status.as_str(), "failed" | "outcome_unknown") {
                 let details: Option<ort_domain::AiFailureDetails> = error_details
@@ -1550,6 +1670,17 @@ impl EncryptedStore {
                         .transpose()
                         .map_err(|_| StorageError::InvalidData)?,
                     usage_complete: complete == 1,
+                    connection_source: serde_json::from_value(serde_json::json!(connection_source))
+                        .map_err(|_| StorageError::InvalidData)?,
+                    reasoning: reasoning
+                        .map(|r| serde_json::from_value(serde_json::json!(r)))
+                        .transpose()
+                        .map_err(|_| StorageError::InvalidData)?,
+                    monetary_cost_tracking: serde_json::from_value(serde_json::json!(
+                        monetary_cost_tracking
+                    ))
+                    .map_err(|_| StorageError::InvalidData)?,
+                    reported_retries,
                 });
             }
             operations.insert(operation);
@@ -1558,6 +1689,12 @@ impl EncryptedStore {
                 .checked_add(1)
                 .ok_or(StorageError::InvalidData)?;
             *summary.by_provider.entry(provider.clone()).or_default() += 1;
+            summary
+                .connection_sources
+                .insert(credential.clone(), connection_source.clone());
+            if connection_source == "chatgpt_plan" {
+                summary.plan_attempts += 1;
+            }
             *summary.by_credential_id.entry(credential).or_default() += 1;
             *summary.by_status.entry(status).or_default() += 1;
             *summary.by_model.entry(model).or_default() += 1;
@@ -1980,7 +2117,7 @@ impl EncryptedStore {
             return Ok(true);
         }
         let attempts: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1 AND estimate_completeness != 'complete' AND status NOT IN ('reserved', 'dispatching', 'streaming')",
+            "SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1 AND estimate_completeness != 'complete' AND connection_source = 'direct_api' AND status NOT IN ('reserved', 'dispatching', 'streaming')",
             [&profile], |row| row.get(0)).map_err(|_| StorageError::Unavailable)?;
         Ok(attempts != 0)
     }
@@ -2001,7 +2138,7 @@ impl EncryptedStore {
             .connection
             .lock()
             .map_err(|_| StorageError::Unavailable)?;
-        let count: i64 = connection.query_row("SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1 AND credential_id = ?2 AND estimate_completeness != 'complete' AND status NOT IN ('reserved', 'dispatching', 'streaming')", params![self.manifest.profile_id.to_string(), credential_id.to_string()], |row| row.get(0)).map_err(|_| StorageError::Unavailable)?;
+        let count: i64 = connection.query_row("SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1 AND credential_id = ?2 AND estimate_completeness != 'complete' AND connection_source = 'direct_api' AND status NOT IN ('reserved', 'dispatching', 'streaming')", params![self.manifest.profile_id.to_string(), credential_id.to_string()], |row| row.get(0)).map_err(|_| StorageError::Unavailable)?;
         Ok(count != 0)
     }
 }
@@ -2054,6 +2191,179 @@ mod tests {
                 keep_operation_active: false,
             })
             .unwrap();
+    }
+
+    #[test]
+    fn plan_passes_preserve_unknown_tokens_bypass_caps_and_round_trip_history() {
+        let temp = tempfile::tempdir().unwrap();
+        let store =
+            EncryptedStore::open_or_initialize(temp.path(), "test", &MemoryDatabaseKeyVault::new())
+                .unwrap();
+        store
+            .save_ai_cap_policy(&AiCapPolicy {
+                credential_id: AI_GENERAL_CAP_CREDENTIAL_ID,
+                period: AiPeriod::AllTime,
+                currency: "USD".into(),
+                time_zone: "UTC".into(),
+                limit_micros: 1,
+                activated_at_unix_ms: 1,
+                period_start_unix_ms: 1,
+                period_end_unix_ms: None,
+                expected_revision: None,
+            })
+            .unwrap();
+        let cap_before =
+            serde_json::to_value(store.ai_cap_policies(AI_GENERAL_CAP_CREDENTIAL_ID).unwrap())
+                .unwrap();
+        let mut first = preflight(0);
+        first.operation_type = OperationType::TailorResume;
+        first.credential_id = Uuid::now_v7();
+        first.preset_version = "codex-plan@v1".into();
+        first.pricing_components.clear();
+        first.requested_model = "gpt-6.1-sol".into();
+        let mut pass = first.clone();
+        for number in 1..=4 {
+            store
+                .reserve_plan_attempt(&pass, ort_ai::plan::ReasoningEffort::Medium)
+                .unwrap();
+            store.mark_ai_dispatching(pass.attempt_id).unwrap();
+            store
+                .settle_ai_attempt(&AiAttemptSettlement {
+                    attempt_id: pass.attempt_id,
+                    status: AiTerminalStatus::Succeeded,
+                    effective_model: Some(first.requested_model.clone()),
+                    usage: (number != 1).then_some(Usage {
+                        input_tokens: 10,
+                        cached_input_tokens: 5,
+                        output_tokens: 7,
+                        reasoning_tokens: 3,
+                        ..Usage::default()
+                    }),
+                    usage_complete: number != 1,
+                    settled_cost_micros: Some(0),
+                    error_category: None,
+                    ended_at_unix_ms: pass.started_at_unix_ms + 10,
+                    keep_operation_active: true,
+                })
+                .unwrap();
+            store.record_plan_retries(pass.attempt_id, 2).unwrap();
+            pass.retry_of = Some(pass.attempt_id);
+            pass.attempt_id = Uuid::now_v7();
+            pass.started_at_unix_ms += 20;
+            if number == 1 {
+                assert_eq!(
+                    store.reserve_plan_attempt(&pass, ort_ai::plan::ReasoningEffort::High),
+                    Err(StorageError::RevisionConflict)
+                );
+            }
+        }
+        assert_eq!(
+            store.reserve_plan_attempt(&pass, ort_ai::plan::ReasoningEffort::Medium),
+            Err(StorageError::RevisionConflict)
+        );
+        store
+            .finish_ai_operation(first.operation_id, AiTerminalStatus::Succeeded, 2000)
+            .unwrap();
+        let summary = store
+            .ai_monitoring_summary(0, 3000, "UTC", AiBucketSize::Day)
+            .unwrap();
+        assert_eq!(summary.plan_attempts, 4);
+        assert_eq!(summary.total_tokens, 66);
+        assert_eq!(summary.unknown_count, 1);
+        assert_eq!(summary.cost_by_currency_micros["USD"], 0);
+        assert_eq!(
+            serde_json::to_value(store.ai_cap_policies(AI_GENERAL_CAP_CREDENTIAL_ID).unwrap())
+                .unwrap(),
+            cap_before
+        );
+        assert!(!store.ai_lifetime_spend_all_is_partial().unwrap());
+        store
+            .save_setting(
+                "ai.chatgpt_plan.v1",
+                None,
+                &serde_json::json!({"connectionId":first.credential_id,"enabled":true}),
+            )
+            .unwrap();
+        let backup = store.read_portable_profile().unwrap();
+        assert_plan_backup_round_trip(&store, &backup);
+        store
+            .clear_ai_activity_for_key(0, 3000, Some(first.credential_id))
+            .unwrap();
+        assert!(!store.ai_lifetime_spend_all_is_partial().unwrap());
+    }
+
+    fn assert_plan_backup_round_trip(
+        store: &EncryptedStore,
+        backup: &ort_backup::PortableProfileV1,
+    ) {
+        assert_eq!(backup.ai_attempts.len(), 4);
+        assert!(
+            backup
+                .ai_attempts
+                .iter()
+                .all(|a| a.connection_source == "chatgpt_plan"
+                    && a.monetary_cost_tracking == "not_tracked"
+                    && a.settled_cost_micros == Some(0)
+                    && a.reported_retries == 2)
+        );
+        assert!(!backup.settings.contains_key("ai.chatgpt_plan.v1"));
+        let passphrase =
+            ort_backup::BackupPassphrase::new("synthetic plan metadata restore passphrase".into())
+                .unwrap();
+        let bytes = store
+            .create_portable_backup(&passphrase, "0.0.0-dev")
+            .unwrap();
+        let destination_root = tempfile::tempdir().unwrap();
+        let destination = EncryptedStore::open_or_initialize(
+            destination_root.path(),
+            "test",
+            &MemoryDatabaseKeyVault::new(),
+        )
+        .unwrap();
+        destination
+            .restore_portable_backup(&bytes, &passphrase)
+            .unwrap();
+        assert!(
+            destination
+                .load_setting("ai.chatgpt_plan.v1")
+                .unwrap()
+                .is_none()
+        );
+        let restored = destination.read_portable_profile().unwrap();
+        assert_eq!(restored.ai_attempts, backup.ai_attempts);
+        assert_eq!(
+            destination
+                .ai_monitoring_summary(0, 3000, "UTC", AiBucketSize::Day)
+                .unwrap()
+                .total_tokens,
+            66
+        );
+    }
+
+    #[test]
+    fn crashed_plan_dispatch_keeps_cost_zero_with_unknown_usage() {
+        let temp = tempfile::tempdir().unwrap();
+        let store =
+            EncryptedStore::open_or_initialize(temp.path(), "test", &MemoryDatabaseKeyVault::new())
+                .unwrap();
+        let mut attempt = preflight(0);
+        attempt.preset_version = "codex-plan@v1".into();
+        attempt.pricing_components.clear();
+        store
+            .reserve_plan_attempt(&attempt, ort_ai::plan::ReasoningEffort::Medium)
+            .unwrap();
+        store.mark_ai_dispatching(attempt.attempt_id).unwrap();
+        store.recover_ai_attempts(2000).unwrap();
+        let summary = store
+            .ai_monitoring_summary(0, 3000, "UTC", AiBucketSize::Day)
+            .unwrap();
+        assert_eq!(summary.unknown_count, 1);
+        assert_eq!(summary.cost_by_currency_micros["USD"], 0);
+        assert_eq!(
+            summary.recent_failures[0].monetary_cost_tracking,
+            ort_ai::plan::MonetaryCostTracking::NotTracked
+        );
+        assert!(!store.ai_lifetime_spend_all_is_partial().unwrap());
     }
 
     #[test]
@@ -3024,6 +3334,7 @@ mod tests {
                 .unwrap();
         let mut first = preflight(25);
         first.operation_type = OperationType::TailorResume;
+        first.credential_id = Uuid::now_v7();
         let mut attempt = first.clone();
         for call in 0..4 {
             store.reserve_ai_attempt(&attempt).unwrap();

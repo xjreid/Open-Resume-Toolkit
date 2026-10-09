@@ -16,7 +16,7 @@ use ort_ai::{
     OperationType, Provider, ProviderAdapter, StreamEvent, Usage, builtin_catalog, estimate_cost,
 };
 use ort_domain::CommandResponse;
-use ort_storage::ai_activity::{AiAttemptPreflight, AiTerminalStatus};
+use ort_storage::ai_activity::AiAttemptPreflight;
 use ort_vault::{OsProviderCredentialVault, ProviderCredentialReference, ProviderCredentialVault};
 use reqwest::{Client, Method, Url, redirect::Policy};
 use serde::Serialize;
@@ -36,7 +36,7 @@ const TEST_INPUT_RESERVATION_BOUND: u32 = 4_096;
 pub(crate) struct AiRequestGate(Mutex<Option<(Uuid, bool, Arc<CancelSignal>)>>);
 
 #[derive(Default)]
-struct CancelSignal {
+pub(crate) struct CancelSignal {
     cancelled: AtomicBool,
     notify: Notify,
 }
@@ -45,10 +45,10 @@ impl CancelSignal {
         self.cancelled.store(true, Ordering::Release);
         self.notify.notify_one();
     }
-    fn is_cancelled(&self) -> bool {
+    pub(crate) fn is_cancelled(&self) -> bool {
         self.cancelled.load(Ordering::Acquire)
     }
-    async fn wait(&self) {
+    pub(crate) async fn wait(&self) {
         let notified = self.notify.notified();
         if !self.is_cancelled() {
             notified.await;
@@ -60,6 +60,11 @@ pub(crate) struct AiRequestLease<'a> {
     gate: &'a AiRequestGate,
     id: Uuid,
     signal: Arc<CancelSignal>,
+}
+impl AiRequestLease<'_> {
+    pub(crate) fn cancellation_signal(&self) -> Arc<CancelSignal> {
+        Arc::clone(&self.signal)
+    }
 }
 impl Drop for AiRequestLease<'_> {
     fn drop(&mut self) {
@@ -335,6 +340,13 @@ pub fn preview_ai_test(
     if window.label() != "main" {
         return window_not_authorized();
     }
+    if window
+        .state::<DesktopState>()
+        .with_store(|s| crate::chatgpt_plan::load_settings(s).map(|v| v.0.enabled))
+        .unwrap_or(true)
+    {
+        return CommandResponse::failure("AI_KEY_PAUSED_BY_PLAN", "errors.aiKey", true);
+    }
     let Ok(connection) =
         state.with_store(|store| crate::ai_keys::test_connection(store, credential_id))
     else {
@@ -415,6 +427,13 @@ pub async fn test_ai_connection(
 ) -> CommandResponse<AiTestResult> {
     if window.label() != "main" {
         return window_not_authorized();
+    }
+    if window
+        .state::<DesktopState>()
+        .with_store(|s| crate::chatgpt_plan::load_settings(s).map(|v| v.0.enabled))
+        .unwrap_or(true)
+    {
+        return CommandResponse::failure("AI_KEY_PAUSED_BY_PLAN", "errors.aiKey", true);
     }
     let app = window.app_handle().clone();
     let state = app.state::<DesktopState>();
@@ -608,6 +627,7 @@ fn material_schema_bytes(
 #[path = "ai_request_tests.rs"]
 mod tests;
 
+#[derive(Debug)]
 pub(crate) struct MaterialFailure {
     pub code: &'static str,
     pub details: serde_json::Map<String, Value>,
@@ -627,7 +647,7 @@ impl From<&'static str> for MaterialFailure {
 }
 impl MaterialFailure {
     #[allow(clippy::too_many_arguments)]
-    fn attempt(
+    pub(crate) fn attempt(
         code: &'static str,
         diagnostic: &ort_domain::AiFailureDetails,
         operation_id: Uuid,
@@ -646,294 +666,24 @@ impl MaterialFailure {
             attempt_id: Some(attempt_id),
         }
     }
-}
-
-/// Sends one user-initiated application-material request through the same
-/// credential, pinned-host, cancellation, and accounting boundary as tests.
-/// The caller validates the returned structured text before making it current.
-#[allow(
-    clippy::too_many_lines,
-    clippy::manual_let_else,
-    clippy::single_match_else
-)]
-pub(crate) async fn execute_material_sequence<T>(
-    window: &WebviewWindow,
-    operation: OperationType,
-    system: &str,
-    mut input: Value,
-    max_calls: u8,
-    expected_profile: Option<Uuid>,
-    mut advance: impl FnMut(&str, u8, &dyn Fn() -> bool) -> Result<MaterialDecision<T>, &'static str>,
-) -> Result<T, MaterialFailure> {
-    if window.label() != "overlay" {
-        return Err("WINDOW_NOT_AUTHORIZED".into());
-    }
-    let app = window.app_handle().clone();
-    let state = app.state::<DesktopState>();
-    let gate = app.state::<AiRequestGate>();
-    let operation_id = Uuid::now_v7();
-    let lease = gate.begin_overlay(operation_id).ok_or("AI_BUSY")?;
-    let (connection, channel, install, profile) = state
-        .with_store(|store| {
-            let connection = crate::ai_keys::request_connection(store, None)?;
-            let (channel, install, profile) = store.vault_identity();
-            Ok((connection, channel.to_owned(), install, profile))
-        })
-        .map_err(|_| "STORAGE_UNAVAILABLE")?;
-    if expected_profile.is_some_and(|expected| expected != profile) {
-        return Err("REVISION_CONFLICT".into());
-    }
-    if connection.mode != "direct_api" {
-        return Err("AI_DISABLED".into());
-    }
-    let provider = connection
-        .provider
-        .as_deref()
-        .and_then(provider)
-        .ok_or("AI_CONFIGURATION_INVALID")?;
-    let model = connection
-        .model
-        .as_deref()
-        .ok_or("AI_CONFIGURATION_INVALID")?;
-    let credential_id = connection.credential_id.ok_or("AI_CREDENTIAL_MISSING")?;
-    let catalog = builtin_catalog(&jiff::Timestamp::now().to_string(), None)
-        .map_err(|_| "AI_CATALOG_UNAVAILABLE")?;
-    let entry = catalog
-        .resolve_model(provider, model, operation)
-        .map_err(|_| "AI_MODEL_UNAVAILABLE")?
-        .clone();
-    let mut logical = MaterialOperation {
-        state: &state,
-        profile,
-        operation_id,
-        signal: Arc::clone(&lease.signal),
-        status: AiTerminalStatus::Failed,
-    };
-    let mut previous_attempt = None;
-    for call in 1..=max_calls.min(4) {
-        if lease.signal.is_cancelled() {
-            return Err("AI_CANCELLED".into());
-        }
-        state
-            .with_store(|store| {
-                ort_application::application_workspace::ensure_profile(store, profile)
-            })
-            .map_err(|_| "REVISION_CONFLICT")?;
-        let attempt_id = Uuid::now_v7();
-        if max_calls > 1 {
-            use tauri::Emitter;
-            let phase = match call {
-                1 => "Drafting",
-                2 => "Checking sources and editing",
-                _ => "Correcting",
-            };
-            let _ = window.emit(
-                "ort:tailoring-progress",
-                json!({"phase":phase,"call":call,"maximum":4}),
-            );
-        }
-        let input_bytes = serde_json::to_vec(&input).map_err(|_| "AI_INPUT_INVALID")?;
-        if input_bytes.len() > 100_000 || system.len() > 12_000 {
-            return Err("AI_INPUT_INVALID".into());
-        }
-        // Include provider output schemas in the spending-cap reservation.
-        let schema_bytes = material_schema_bytes(provider, operation)?;
-        let input_bound = u32::try_from(
-            input_bytes
-                .len()
-                .checked_add(system.len())
-                .and_then(|value| value.checked_add(schema_bytes))
-                .and_then(|value| value.checked_add(2_048))
-                .ok_or("AI_INPUT_INVALID")?,
-        )
-        .map_err(|_| "AI_INPUT_INVALID")?;
-        let output_bound = entry.max_output_tokens.min(ort_ai::MAX_OUTPUT_TOKENS);
-        if input_bound > entry.max_input_tokens {
-            return Err("AI_INPUT_TOO_LARGE".into());
-        }
-        let mut max_usage = Usage {
-            input_tokens: u64::from(input_bound),
-            output_tokens: u64::from(output_bound),
-            ..Usage::default()
-        };
-        for price in &entry.prices {
-            match price.category {
-                ort_ai::PriceCategory::CachedInput => {
-                    max_usage.cached_input_tokens = u64::from(input_bound);
-                }
-                ort_ai::PriceCategory::CacheWrite => {
-                    max_usage.cache_write_tokens = u64::from(input_bound);
-                }
-                ort_ai::PriceCategory::Reasoning => {
-                    max_usage.reasoning_tokens = u64::from(output_bound);
-                }
-                _ => {}
-            }
-        }
-        let maximum_cost_micros =
-            estimate_cost(&entry, max_usage).map_err(|_| "AI_PRICE_UNAVAILABLE")?;
-        let request = NormalizedRequest {
-            operation,
-            model: entry.model.clone(),
-            system: system.into(),
-            input: input.clone(),
-            max_output_tokens: output_bound,
-        };
-        let reference = ProviderCredentialReference::new(
-            &channel,
-            &install.to_string(),
-            &profile.to_string(),
-            provider.as_str(),
-            &credential_id.to_string(),
-        )
-        .map_err(|_| "AI_CREDENTIAL_MISSING")?;
-        let provider_adapter = adapter(provider);
-        let built = OsProviderCredentialVault::new().use_secret(&reference, |secret| {
-            secret.expose_for(|bytes| {
-                let key = ApiKey::new(bytes)?;
-                provider_adapter.build_request(&request, &key)
-            })
-        });
-        let http_request = built
-            .map_err(|_| "AI_CREDENTIAL_MISSING")?
-            .map_err(|_| "AI_PROVIDER_INVALID")?;
-        let url = pinned_url(provider, &entry.model, &http_request).ok_or("AI_PROVIDER_INVALID")?;
-        let started = now_unix_ms().ok_or("STORAGE_UNAVAILABLE")?;
-        let preflight = AiAttemptPreflight {
-            operation_id,
-            attempt_id,
-            operation_type: operation,
-            provider,
-            credential_id,
-            requested_model: entry.model.clone(),
-            preset_version: "explicit-model@direct-v2".into(),
-            catalog_id: catalog.catalog_id.clone(),
-            catalog_effective_from: entry.effective_from.clone(),
-            pricing_components: entry.prices.clone(),
-            started_at_unix_ms: started,
-            estimated_input_tokens: u64::from(input_bound),
-            maximum_cost_micros,
-            currency: entry.currency.clone(),
-            retry_of: previous_attempt,
-        };
-        let completed = execution::execute(
-            &state,
-            &lease.signal,
-            preflight,
-            http_request,
-            url,
-            &*provider_adapter,
-            execution::Policy {
-                timeout: Duration::from_secs(120),
-                retry_server_error: false,
-                keep_success_active: max_calls > 1,
-            },
-            |_, _| {},
-            |output| {
-                if let Some(code) = output.material_error(&entry.model) {
-                    return Err(code);
-                }
-                if max_calls > 1 && output.usage.is_none() {
-                    return Err("AI_USAGE_UNKNOWN");
-                }
-                Ok(output.text.clone())
-            },
-        )
-        .await
-        .map_err(|error| {
-            MaterialFailure::attempt(
-                error.code,
-                &error.details,
-                operation_id,
-                attempt_id,
-                provider,
-                operation,
-                &entry.model,
-                call,
-                max_calls.min(4),
-                started,
-            )
-        })?;
-        previous_attempt = Some(completed.attempt_id);
-        if lease.signal.is_cancelled() {
-            return Err("AI_CANCELLED".into());
-        }
-        let decision =
-            advance(&completed.value, call, &|| lease.signal.is_cancelled()).map_err(|code| {
-                let details = execution::failure_details(code);
-                if code.starts_with("AI_") && code != "AI_CANCELLED" {
-                    let _ = state.with_store(|store| {
-                        store.record_ai_failure_details(completed.attempt_id, &details)
-                    });
-                }
-                MaterialFailure::attempt(
-                    code,
-                    &details,
-                    operation_id,
-                    completed.attempt_id,
-                    provider,
-                    operation,
-                    &entry.model,
-                    call,
-                    max_calls.min(4),
-                    started,
-                )
-            })?;
-        match decision {
-            MaterialDecision::Complete(value) => {
-                logical.status = AiTerminalStatus::Succeeded;
-                return Ok(value);
-            }
-            MaterialDecision::Continue(next) => input = next,
-        }
-    }
-    Err("AI_TAILORING_FAILED".into())
-}
-
-// Keep the ledger's logical operation open between paid semantic stages, and
-// close it on every exit path (including cap failure and local validation).
-struct MaterialOperation<'a> {
-    state: &'a DesktopState,
-    profile: Uuid,
-    operation_id: Uuid,
-    signal: Arc<CancelSignal>,
-    status: AiTerminalStatus,
-}
-impl Drop for MaterialOperation<'_> {
-    fn drop(&mut self) {
-        let status = if self.status != AiTerminalStatus::Succeeded && self.signal.is_cancelled() {
-            AiTerminalStatus::Cancelled
-        } else {
-            self.status
-        };
-        let _ = self.state.with_store(|store| {
-            ort_application::application_workspace::ensure_profile(store, self.profile)?;
-            store.finish_ai_operation(
-                self.operation_id,
-                status,
-                now_unix_ms().ok_or(ort_storage::StorageError::Unavailable)?,
-            )
-        });
+    pub(crate) fn with_plan(
+        mut self,
+        reasoning: ort_ai::plan::ReasoningEffort,
+        retries: u32,
+    ) -> Self {
+        self.details
+            .insert("connectionSource".into(), json!("chatgpt_plan"));
+        self.details.insert("reasoning".into(), json!(reasoning));
+        self.details
+            .insert("monetaryCostTracking".into(), json!("not_tracked"));
+        self.details
+            .insert("reportedRetries".into(), json!(retries));
+        self
     }
 }
 
-pub(crate) enum MaterialDecision<T> {
-    Complete(T),
-    Continue(Value),
-}
-
-pub(crate) async fn execute_material<T>(
-    window: &WebviewWindow,
-    operation: OperationType,
-    system: &str,
-    input: Value,
-    validate: impl FnOnce(&str) -> Result<T, ()>,
-) -> Result<T, MaterialFailure> {
-    let mut validate = Some(validate);
-    execute_material_sequence(window, operation, system, input, 1, None, |raw, _, _| {
-        validate.take().ok_or("AI_OUTPUT_INVALID")?(raw)
-            .map(MaterialDecision::Complete)
-            .map_err(|()| "AI_OUTPUT_INVALID")
-    })
-    .await
-}
+#[path = "ai_material_provider.rs"]
+pub(crate) mod material_provider;
+#[path = "ai_material_request.rs"]
+mod materials;
+pub(crate) use materials::{MaterialDecision, execute_material, execute_material_sequence};

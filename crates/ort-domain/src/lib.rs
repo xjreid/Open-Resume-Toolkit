@@ -145,7 +145,7 @@ pub struct AiFailureDetails {
 impl AiFailureDetails {
     #[must_use]
     pub fn valid(&self) -> bool {
-        self.code.starts_with("AI_")
+        (self.code.starts_with("AI_") || self.code.starts_with("PLAN_"))
             && self.code.len() <= 64
             && self
                 .code

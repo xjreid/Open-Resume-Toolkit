@@ -9,6 +9,7 @@ import {
   type FormEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { ChatGptPlanPage } from "./ChatGptPlanPage";
 import { AiKeyName } from "./AiKeyName";
 import { AiRecentFailuresDialog } from "./AiRecentFailuresDialog";
 import { AiKeyMenu } from "./AiKeyMenu";
@@ -100,7 +101,10 @@ function testFailureMessage(code: string) {
 }
 
 export function AiWorkspace({ blocked }: { blocked: boolean }) {
-  const [page, setPage] = useState<"general" | "data">("general");
+  const [page, setPage] = useState<"general" | "plan" | "data">("general");
+  const [planStatus, setPlanStatus] = useState<Wire.PlanStatus | null>(null);
+  const planEnabled = !!planStatus?.settings.enabled;
+  const keysLocked = !planStatus || planEnabled;
   const [registry, setRegistry] = useState<KeyRegistry | null>(null);
   const keyRefreshGeneration = useRef(0);
   const [keysUnavailable, setKeysUnavailable] = useState(false);
@@ -232,7 +236,8 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     setMonitoringError(false);
     void invoke("load_ai_monitoring", {
       ...monitoringArgs(period),
-      credentialId: keyFilter || null,
+      credentialId: keyFilter === "chatgpt_plan" ? null : keyFilter || null,
+      connectionSource: keyFilter === "chatgpt_plan" ? "chatgpt_plan" : null,
     })
       .then((response) => {
         if (!current) return;
@@ -443,7 +448,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
         if (credentialIds.includes(keyFilter)) setKeyFilter("");
         setMonitoring(null);
         setNotice(
-          `${response.value.clearedOperations} completed AI operations permanently deleted. All keys data was updated; My Keys spending totals were not changed.`,
+          `${response.value.clearedOperations} completed AI operations permanently deleted. All AI activity data was updated; My Keys spending totals were not changed.`,
         );
         setMonitoringRevision((value) => value + 1);
       } else {
@@ -577,6 +582,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     target: "active" | "available",
   ) {
     const isActive = saved.credentialId === primaryKey?.credentialId;
+    if (planEnabled) return;
     if (target === "active" && !isActive)
       await changeKey(saved, "select_primary");
     if (target === "available" && isActive) await clearActiveKey();
@@ -588,6 +594,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     source: "active" | "available",
   ) {
     if (
+      planEnabled ||
       event.button !== 0 ||
       blocked ||
       working ||
@@ -713,7 +720,10 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
     );
   const activityKeys = [...(registry?.keys ?? [])];
   for (const id of Object.keys(monitoring?.byCredentialId ?? {})) {
-    if (!activityKeys.some((key) => key.credentialId === id))
+    if (
+      monitoring?.connectionSources?.[id] !== "chatgpt_plan" &&
+      !activityKeys.some((key) => key.credentialId === id)
+    )
       activityKeys.push({
         credentialId: id,
         createdAt: "",
@@ -731,11 +741,21 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   const selectedActivityKey = activityKeys.find(
     (saved) => saved.credentialId === keyFilter,
   );
-  const activityView = dataKeyDescription(selectedActivityKey, catalog);
+  const planConnectionIds = Object.entries(monitoring?.connectionSources ?? {})
+    .filter(([, source]) => source === "chatgpt_plan")
+    .map(([id]) => id);
+  const activityView =
+    keyFilter === "chatgpt_plan"
+      ? {
+          title: "Codex",
+          detail: "ORT token activity · All retained plan connections",
+        }
+      : dataKeyDescription(selectedActivityKey, catalog);
 
   function renderKeyCard(saved: SavedKey, bucket: "active" | "available") {
     const isActive = bucket === "active";
     const dragDisabled =
+      planEnabled ||
       blocked ||
       working ||
       saved.cleanupRequired ||
@@ -769,7 +789,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
         <AiKeyCustomization
           saved={saved}
           catalog={catalog}
-          blocked={blocked || working || saved.paused}
+          blocked={blocked || working || keysLocked || saved.paused}
           refreshRevision={monitoringRevision}
           setWorking={setWorking}
           onRegistry={applyRegistry}
@@ -785,7 +805,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
             ) : (
               <AiKeyName
                 saved={saved}
-                blocked={blocked || working}
+                blocked={blocked || working || keysLocked}
                 workspaceBlocked={blocked}
                 setWorking={setWorking}
                 onSaved={savedName}
@@ -795,7 +815,8 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
           actions={
             <AiKeyMenu
               saved={saved}
-              blocked={blocked || working}
+              blocked={blocked || working || keysLocked}
+              testDisabled={planEnabled}
               onTest={() => {
                 setRemoveConfirm(null);
                 void reviewTest(saved);
@@ -818,7 +839,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
   return (
     <section className="ai-workspace" aria-label="AI settings">
       <nav className="workflow-steps" aria-label="AI section">
-        {(["general", "data"] as const).map((tab) => (
+        {(["general", "plan", "data"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -826,7 +847,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
             aria-current={page === tab ? "page" : undefined}
             onClick={() => setPage(tab)}
           >
-            {tab === "general" ? "My Keys" : "Data"}
+            {tab === "general" ? "My Keys" : tab === "plan" ? "Codex" : "Data"}
           </button>
         ))}
       </nav>
@@ -836,65 +857,75 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
             {notice}
           </p>
         )}
+        <ChatGptPlanPage
+          visible={page === "plan"}
+          blocked={blocked}
+          status={planStatus}
+          onStatus={setPlanStatus}
+        />
         <div
           className="ai-page-panels"
           hidden={page !== "general"}
           aria-label="My Keys settings"
         >
-          <section className="ai-panel" aria-labelledby="ai-connection-title">
-            <div className="ai-panel-heading">
-              <div>
-                <h3 id="ai-connection-title">API keys</h3>
-                <p className="ai-help">
-                  Keys stay in your operating-system vault. Drag one into Active
-                  key to use it for AI.
-                </p>
-              </div>
+          {planEnabled && (
+            <div className="notice plan-key-pause-message">
+              <p>Codex must be disabled to use API keys.</p>
               <button
                 type="button"
-                className="ai-add-key-trigger"
-                disabled={blocked || working || !registry}
-                aria-expanded={addOpen}
-                aria-label="Add key"
-                title="Add key"
-                onClick={() => {
-                  setKey("");
-                  setNewKeyName("");
-                  setProvider("");
-                  setShowKey(false);
-                  setAddOpen(true);
-                }}
+                className="button--quiet"
+                onClick={() => setPage("plan")}
               >
-                <svg
-                  className="workspace-icon"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                <span>Add key</span>
+                Open Codex
               </button>
             </div>
-            {addOpen && (
-              <div
-                className="ai-key-action-backdrop"
-                role="presentation"
-                onPointerDown={(event) => {
-                  if (event.target === event.currentTarget && !working) {
-                    setAddOpen(false);
+          )}
+          <fieldset
+            className={`ai-keys-controls${planEnabled ? " ai-keys-controls--disabled" : ""}`}
+            disabled={keysLocked}
+            inert={keysLocked}
+            aria-disabled={keysLocked}
+          >
+            <section className="ai-panel" aria-labelledby="ai-connection-title">
+              <div className="ai-panel-heading">
+                <div>
+                  <h3 id="ai-connection-title">API keys</h3>
+                  <p className="ai-help">
+                    Keys stay in your operating-system vault. Drag one into
+                    Active key to use it for AI.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="ai-add-key-trigger"
+                  disabled={blocked || working || keysLocked || !registry}
+                  aria-expanded={addOpen}
+                  aria-label="Add key"
+                  title="Add key"
+                  onClick={() => {
                     setKey("");
                     setNewKeyName("");
                     setProvider("");
                     setShowKey(false);
-                  }
-                }}
-              >
-                <form
-                  className="ai-key-action-popup ai-add-key-popup"
-                  aria-label="Add new API key"
-                  onSubmit={(event) => void addKey(event)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape" && !working) {
+                    setAddOpen(true);
+                  }}
+                >
+                  <svg
+                    className="workspace-icon"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  <span>Add key</span>
+                </button>
+              </div>
+              {addOpen && (
+                <div
+                  className="ai-key-action-backdrop"
+                  role="presentation"
+                  onPointerDown={(event) => {
+                    if (event.target === event.currentTarget && !working) {
                       setAddOpen(false);
                       setKey("");
                       setNewKeyName("");
@@ -903,365 +934,391 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                     }
                   }}
                 >
-                  <div className="ai-add-key-popup__heading">
-                    <strong>Add API key</strong>
-                    <span>Choose a provider, then enter its API key.</span>
-                  </div>
-                  <div className="field ai-api-key-field">
-                    <input
-                      name="keyName"
-                      type="text"
-                      aria-label="Key name"
-                      autoComplete="off"
-                      maxLength={80}
-                      placeholder={
-                        provider
-                          ? `${providerName(provider)} key`
-                          : "Enter a name"
-                      }
-                      value={newKeyName}
-                      disabled={blocked || working}
-                      onChange={(event) => setNewKeyName(event.target.value)}
-                    />
-                  </div>
-                  <fieldset className="ai-provider-picker">
-                    <legend>Provider</legend>
-                    <div className="ai-provider-options">
-                      {(["openai", "anthropic", "gemini"] as const).map(
-                        (option, index) => (
-                          <button
-                            autoFocus={index === 0}
-                            key={option}
-                            type="button"
-                            className={
-                              provider === option
-                                ? "ai-provider-option ai-provider-option--selected"
-                                : "ai-provider-option"
-                            }
-                            aria-label={`Select ${providerName(option)}`}
-                            aria-pressed={provider === option}
-                            disabled={blocked || working}
-                            onClick={() =>
-                              setProvider((current) =>
-                                current === option ? "" : option,
-                              )
-                            }
-                          >
-                            <span className="ai-provider-mark">
-                              <ProviderLogo provider={option} />
-                            </span>
-                            <span>{providerName(option)}</span>
-                            <span
-                              className="ai-provider-check"
-                              aria-hidden="true"
-                            >
-                              {provider === option ? "✓" : ""}
-                            </span>
-                          </button>
-                        ),
-                      )}
-                    </div>
-                  </fieldset>
-                  <label className="field ai-api-key-field">
-                    API key
-                    <span className="ai-api-key-input">
-                      <input
-                        type={showKey ? "text" : "password"}
-                        autoComplete="off"
-                        placeholder="Paste your API key"
-                        value={key}
-                        disabled={blocked || working}
-                        onChange={(event) => setKey(event.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="ai-api-key-visibility"
-                        aria-label={showKey ? "Hide API key" : "Show API key"}
-                        aria-pressed={showKey}
-                        disabled={blocked || working || !key}
-                        onClick={() => setShowKey((visible) => !visible)}
-                      >
-                        {showKey ? "Hide" : "Show"}
-                      </button>
-                    </span>
-                  </label>
-                  <p className="ai-help">
-                    The selected provider is fixed after saving. This won’t
-                    change your active key.
-                  </p>
-                  <div className="button-row ai-key-action-popup__actions">
-                    <button
-                      type="button"
-                      className="button--secondary"
-                      disabled={working}
-                      onClick={() => {
+                  <form
+                    className="ai-key-action-popup ai-add-key-popup"
+                    aria-label="Add new API key"
+                    onSubmit={(event) => void addKey(event)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape" && !working) {
                         setAddOpen(false);
                         setKey("");
                         setNewKeyName("");
                         setProvider("");
                         setShowKey(false);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={blocked || working || !key.trim() || !provider}
-                    >
-                      Save key
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-            {keysUnavailable ? (
-              <p role="alert">
-                Saved keys are unavailable. Reload before sending a request.
-              </p>
-            ) : (
-              !registry && <p className="ai-help">Loading saved keys…</p>
-            )}
-            <div
-              className={`ai-key-buckets${draggingKey ? " ai-key-buckets--dragging" : ""}`}
-              ref={keyBuckets}
-            >
-              <div
-                ref={activeKeyBucket}
-                className={`ai-key-bucket ai-key-bucket--active ai-primary${keyDropTarget === "active" ? " ai-key-bucket--drop-target" : ""}`}
-                aria-labelledby="ai-active-key-title"
-              >
-                <div className="ai-key-bucket__heading">
-                  <div>
-                    <h4 id="ai-active-key-title">Active key</h4>
-                    <p>AI requests use the one key placed here.</p>
-                  </div>
-                  <span className="ai-key-bucket__count">
-                    {primaryKey ? "1 of 1" : "0 of 1"}
-                  </span>
-                </div>
-                <div className="ai-key-bucket__slot">
-                  {keysUnavailable ? (
-                    <div className="ai-key-bucket__empty">
-                      <strong>Active key unavailable</strong>
-                      <span>Reload before sending an AI request.</span>
-                    </div>
-                  ) : primaryKey ? (
-                    renderKeyCard(primaryKey, "active")
-                  ) : (
-                    <div className="ai-key-bucket__empty">
-                      <strong>No active key selected</strong>
-                      <span>Drag an unpaused key here to make it active.</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div
-                ref={availableKeyBucket}
-                className={`ai-key-bucket ai-key-bucket--available${keyDropTarget === "available" ? " ai-key-bucket--drop-target" : ""}`}
-                aria-labelledby="ai-all-keys-title"
-              >
-                <div className="ai-key-bucket__heading">
-                  <div>
-                    <h4 id="ai-all-keys-title">All keys</h4>
-                    <p>Stored keys are sorted by creation date.</p>
-                  </div>
-                  <span className="ai-key-bucket__count">
-                    {availableKeys.length}
-                  </span>
-                </div>
-                <div className="ai-key-list">
-                  {availableKeys.length ? (
-                    availableKeys.map((saved) =>
-                      renderKeyCard(saved, "available"),
-                    )
-                  ) : (
-                    <div className="ai-key-bucket__empty ai-key-bucket__empty--compact">
-                      <strong>
-                        {visibleKeys.length
-                          ? "No other saved keys"
-                          : "No saved keys"}
-                      </strong>
-                      <span>
-                        {visibleKeys.length
-                          ? "Drag the active key here to stop using it."
-                          : "Add a key to get started."}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {keyDragPosition ? (
-                <div
-                  className="ai-key-drag-ghost"
-                  style={{
-                    left: keyDragPosition.x,
-                    top: keyDragPosition.y,
-                    width: keyDragPosition.width,
-                  }}
-                  aria-hidden="true"
-                >
-                  <span>
-                    <strong>{keyDragPosition.label}</strong>
-                    <small>{keyDragPosition.provider}</small>
-                  </span>
-                </div>
-              ) : null}
-            </div>
-            {(() => {
-              const target = visibleKeys.find(
-                (saved) => saved.credentialId === removeConfirm,
-              );
-              if (!target) return null;
-              const isPrimary =
-                target.credentialId === primaryKey?.credentialId;
-              return (
-                <div
-                  className="ai-key-action-backdrop"
-                  role="presentation"
-                  onPointerDown={(event) => {
-                    if (event.target === event.currentTarget && !working)
-                      setRemoveConfirm(null);
-                  }}
-                >
-                  <div
-                    className="ai-key-action-popup"
-                    role="dialog"
-                    aria-modal="false"
-                    aria-label="Confirm provider credential removal"
-                    onKeyDown={(event) => {
-                      if (event.key === "Escape" && !working)
-                        setRemoveConfirm(null);
+                      }
                     }}
                   >
-                    <strong>
-                      {target.cleanupRequired ? "Retry removing" : "Remove"}{" "}
-                      {keyName(target)}?
-                    </strong>
-                    <p>
-                      {target.cleanupRequired
-                        ? "The previous removal did not finish. Retry removing the key from the secure vault. Its activity history will stay."
-                        : `This removes the key from the vault. Its activity history stays. ${isPrimary ? "No active key will remain selected." : "Your active key won’t change."}`}
+                    <div className="ai-add-key-popup__heading">
+                      <strong>Add API key</strong>
+                      <span>Choose a provider, then enter its API key.</span>
+                    </div>
+                    <div className="field ai-api-key-field">
+                      <input
+                        name="keyName"
+                        type="text"
+                        aria-label="Key name"
+                        autoComplete="off"
+                        maxLength={80}
+                        placeholder={
+                          provider
+                            ? `${providerName(provider)} key`
+                            : "Enter a name"
+                        }
+                        value={newKeyName}
+                        disabled={blocked || working}
+                        onChange={(event) => setNewKeyName(event.target.value)}
+                      />
+                    </div>
+                    <fieldset className="ai-provider-picker">
+                      <legend>Provider</legend>
+                      <div className="ai-provider-options">
+                        {(["openai", "anthropic", "gemini"] as const).map(
+                          (option, index) => (
+                            <button
+                              autoFocus={index === 0}
+                              key={option}
+                              type="button"
+                              className={
+                                provider === option
+                                  ? "ai-provider-option ai-provider-option--selected"
+                                  : "ai-provider-option"
+                              }
+                              aria-label={`Select ${providerName(option)}`}
+                              aria-pressed={provider === option}
+                              disabled={blocked || working}
+                              onClick={() =>
+                                setProvider((current) =>
+                                  current === option ? "" : option,
+                                )
+                              }
+                            >
+                              <span className="ai-provider-mark">
+                                <ProviderLogo provider={option} />
+                              </span>
+                              <span>{providerName(option)}</span>
+                              <span
+                                className="ai-provider-check"
+                                aria-hidden="true"
+                              >
+                                {provider === option ? "✓" : ""}
+                              </span>
+                            </button>
+                          ),
+                        )}
+                      </div>
+                    </fieldset>
+                    <label className="field ai-api-key-field">
+                      API key
+                      <span className="ai-api-key-input">
+                        <input
+                          type={showKey ? "text" : "password"}
+                          autoComplete="off"
+                          placeholder="Paste your API key"
+                          value={key}
+                          disabled={blocked || working}
+                          onChange={(event) => setKey(event.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="ai-api-key-visibility"
+                          aria-label={showKey ? "Hide API key" : "Show API key"}
+                          aria-pressed={showKey}
+                          disabled={blocked || working || !key}
+                          onClick={() => setShowKey((visible) => !visible)}
+                        >
+                          {showKey ? "Hide" : "Show"}
+                        </button>
+                      </span>
+                    </label>
+                    <p className="ai-help">
+                      The selected provider is fixed after saving. This won’t
+                      change your active key.
                     </p>
                     <div className="button-row ai-key-action-popup__actions">
                       <button
-                        autoFocus
                         type="button"
                         className="button--secondary"
-                        onClick={() => setRemoveConfirm(null)}
+                        disabled={working}
+                        onClick={() => {
+                          setAddOpen(false);
+                          setKey("");
+                          setNewKeyName("");
+                          setProvider("");
+                          setShowKey(false);
+                        }}
                       >
                         Cancel
                       </button>
                       <button
-                        type="button"
-                        className="button--danger"
-                        disabled={blocked || working}
-                        onClick={() => void changeKey(target, "remove")}
+                        type="submit"
+                        disabled={
+                          blocked || working || !key.trim() || !provider
+                        }
                       >
-                        {target.cleanupRequired
-                          ? "Retry removal"
-                          : "Remove key"}
+                        Save key
                       </button>
                     </div>
-                  </div>
+                  </form>
                 </div>
-              );
-            })()}
-            {testTarget && (testPreview || testActive || testOutput) && (
+              )}
+              {keysUnavailable ? (
+                <p role="alert">
+                  Saved keys are unavailable. Reload before sending a request.
+                </p>
+              ) : (
+                !registry && <p className="ai-help">Loading saved keys…</p>
+              )}
               <div
-                className="ai-key-action-backdrop"
-                role="presentation"
-                onPointerDown={(event) => {
-                  if (event.target === event.currentTarget && !testActive) {
-                    setTestPreview(null);
-                    setTestTarget(null);
-                  }
-                }}
+                className={`ai-key-buckets${draggingKey ? " ai-key-buckets--dragging" : ""}`}
+                ref={keyBuckets}
               >
                 <div
-                  className="ai-key-action-popup ai-key-test-popup"
-                  role="dialog"
-                  aria-modal="false"
-                  aria-label="Confirm synthetic provider request"
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape" && !testActive) {
-                      setTestPreview(null);
-                      setTestTarget(null);
-                    }
-                  }}
+                  ref={activeKeyBucket}
+                  className={`ai-key-bucket ai-key-bucket--active ai-primary${keyDropTarget === "active" ? " ai-key-bucket--drop-target" : ""}`}
+                  aria-labelledby="ai-active-key-title"
                 >
-                  {testPreview && (
-                    <>
+                  <div className="ai-key-bucket__heading">
+                    <div>
+                      <h4 id="ai-active-key-title">Active key</h4>
+                      <p>
+                        {planEnabled
+                          ? "Your active key is saved and resumes when Codex is disabled."
+                          : "AI requests use the one key placed here."}
+                      </p>
+                    </div>
+                    <span className="ai-key-bucket__count">
+                      {primaryKey ? "1 of 1" : "0 of 1"}
+                    </span>
+                  </div>
+                  <div className="ai-key-bucket__slot">
+                    {keysUnavailable ? (
+                      <div className="ai-key-bucket__empty">
+                        <strong>Active key unavailable</strong>
+                        <span>Reload before sending an AI request.</span>
+                      </div>
+                    ) : primaryKey ? (
+                      renderKeyCard(primaryKey, "active")
+                    ) : (
+                      <div className="ai-key-bucket__empty">
+                        <strong>No active key selected</strong>
+                        <span>
+                          Drag an unpaused key here to make it active.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  ref={availableKeyBucket}
+                  className={`ai-key-bucket ai-key-bucket--available${keyDropTarget === "available" ? " ai-key-bucket--drop-target" : ""}`}
+                  aria-labelledby="ai-all-keys-title"
+                >
+                  <div className="ai-key-bucket__heading">
+                    <div>
+                      <h4 id="ai-all-keys-title">All keys</h4>
+                      <p>Stored keys are sorted by creation date.</p>
+                    </div>
+                    <span className="ai-key-bucket__count">
+                      {availableKeys.length}
+                    </span>
+                  </div>
+                  <div className="ai-key-list">
+                    {availableKeys.length ? (
+                      availableKeys.map((saved) =>
+                        renderKeyCard(saved, "available"),
+                      )
+                    ) : (
+                      <div className="ai-key-bucket__empty ai-key-bucket__empty--compact">
+                        <strong>
+                          {visibleKeys.length
+                            ? "No other saved keys"
+                            : "No saved keys"}
+                        </strong>
+                        <span>
+                          {visibleKeys.length
+                            ? "Drag the active key here to stop using it."
+                            : "Add a key to get started."}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {keyDragPosition ? (
+                  <div
+                    className="ai-key-drag-ghost"
+                    style={{
+                      left: keyDragPosition.x,
+                      top: keyDragPosition.y,
+                      width: keyDragPosition.width,
+                    }}
+                    aria-hidden="true"
+                  >
+                    <span>
+                      <strong>{keyDragPosition.label}</strong>
+                      <small>{keyDragPosition.provider}</small>
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+              {(() => {
+                const target = visibleKeys.find(
+                  (saved) => saved.credentialId === removeConfirm,
+                );
+                if (!target) return null;
+                const isPrimary =
+                  target.credentialId === primaryKey?.credentialId;
+                return (
+                  <div
+                    className="ai-key-action-backdrop"
+                    role="presentation"
+                    onPointerDown={(event) => {
+                      if (event.target === event.currentTarget && !working)
+                        setRemoveConfirm(null);
+                    }}
+                  >
+                    <div
+                      className="ai-key-action-popup"
+                      role="dialog"
+                      aria-modal="false"
+                      aria-label="Confirm provider credential removal"
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape" && !working)
+                          setRemoveConfirm(null);
+                      }}
+                    >
                       <strong>
-                        Test {keyName(testTarget)} · {testPreview.model}
+                        {target.cleanupRequired ? "Retry removing" : "Remove"}{" "}
+                        {keyName(target)}?
                       </strong>
                       <p>
-                        Fixed test only; no resume or personal content. At most{" "}
-                        {testPreview.estimatedInputTokens} tokens of input.
-                      </p>
-                      <p>
-                        Conservative maximum reservation:{" "}
-                        {(testPreview.maximumCostMicros / 1_000_000).toFixed(4)}{" "}
-                        {testPreview.currency}.
-                      </p>
-                      <p className="ai-help">
-                        Provider terms, retention and privacy practices apply.
-                        Actual billing may differ.
+                        {target.cleanupRequired
+                          ? "The previous removal did not finish. Retry removing the key from the secure vault. Its activity history will stay."
+                          : `This removes the key from the vault. Its activity history stays. ${isPrimary ? "No active key will remain selected." : "Your active key won’t change."}`}
                       </p>
                       <div className="button-row ai-key-action-popup__actions">
                         <button
                           autoFocus
                           type="button"
                           className="button--secondary"
-                          onClick={() => {
-                            setTestPreview(null);
-                            setTestTarget(null);
-                          }}
+                          onClick={() => setRemoveConfirm(null)}
                         >
                           Cancel
                         </button>
                         <button
                           type="button"
+                          className="button--danger"
                           disabled={blocked || working}
-                          onClick={() => void confirmTest()}
+                          onClick={() => void changeKey(target, "remove")}
                         >
-                          Confirm and send test
+                          {target.cleanupRequired
+                            ? "Retry removal"
+                            : "Remove key"}
                         </button>
                       </div>
-                    </>
-                  )}
-                  {testActive && (
-                    <>
-                      <strong>Testing {keyName(testTarget)}…</strong>
-                      <p className="ai-help">
-                        Waiting for the provider response.
-                      </p>
-                      <button
-                        type="button"
-                        className="button--secondary"
-                        onClick={() => void cancelTest()}
-                      >
-                        Cancel active test
-                      </button>
-                    </>
-                  )}
-                  {testOutput && (
-                    <details open>
-                      <summary>Test response</summary>
-                      <pre>{testOutput}</pre>
-                    </details>
-                  )}
+                    </div>
+                  </div>
+                );
+              })()}
+              {testTarget && (testPreview || testActive || testOutput) && (
+                <div
+                  className="ai-key-action-backdrop"
+                  role="presentation"
+                  onPointerDown={(event) => {
+                    if (event.target === event.currentTarget && !testActive) {
+                      setTestPreview(null);
+                      setTestTarget(null);
+                    }
+                  }}
+                >
+                  <div
+                    className="ai-key-action-popup ai-key-test-popup"
+                    role="dialog"
+                    aria-modal="false"
+                    aria-label="Confirm synthetic provider request"
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape" && !testActive) {
+                        setTestPreview(null);
+                        setTestTarget(null);
+                      }
+                    }}
+                  >
+                    {testPreview && (
+                      <>
+                        <strong>
+                          Test {keyName(testTarget)} · {testPreview.model}
+                        </strong>
+                        <p>
+                          Fixed test only; no resume or personal content. At
+                          most {testPreview.estimatedInputTokens} tokens of
+                          input.
+                        </p>
+                        <p>
+                          Conservative maximum reservation:{" "}
+                          {(testPreview.maximumCostMicros / 1_000_000).toFixed(
+                            4,
+                          )}{" "}
+                          {testPreview.currency}.
+                        </p>
+                        <p className="ai-help">
+                          Provider terms, retention and privacy practices apply.
+                          Actual billing may differ.
+                        </p>
+                        <div className="button-row ai-key-action-popup__actions">
+                          <button
+                            autoFocus
+                            type="button"
+                            className="button--secondary"
+                            onClick={() => {
+                              setTestPreview(null);
+                              setTestTarget(null);
+                            }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={blocked || working}
+                            onClick={() => void confirmTest()}
+                          >
+                            Confirm and send test
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    {testActive && (
+                      <>
+                        <strong>Testing {keyName(testTarget)}…</strong>
+                        <p className="ai-help">
+                          Waiting for the provider response.
+                        </p>
+                        <button
+                          type="button"
+                          className="button--secondary"
+                          onClick={() => void cancelTest()}
+                        >
+                          Cancel active test
+                        </button>
+                      </>
+                    )}
+                    {testOutput && (
+                      <details open>
+                        <summary>Test response</summary>
+                        <pre>{testOutput}</pre>
+                      </details>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </section>
-          <AiGeneralSpending
-            blocked={blocked || working}
-            refreshRevision={monitoringRevision}
-            setWorking={setWorking}
-            onChanged={() => setMonitoringRevision((value) => value + 1)}
-          />
+              )}
+            </section>
+            <AiGeneralSpending
+              blocked={blocked || working || keysLocked}
+              refreshRevision={monitoringRevision}
+              setWorking={setWorking}
+              onChanged={() => setMonitoringRevision((value) => value + 1)}
+            />
+          </fieldset>
         </div>
         <div
           className="ai-page-panels"
@@ -1283,6 +1340,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                 disabled={blocked || working || keysUnavailable}
                 onChange={(value) => {
                   setKeyFilter(value);
+                  if (value === "chatgpt_plan") setMetric("tokens");
                 }}
               />
             </div>
@@ -1307,8 +1365,8 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                   summary={{
                     label:
                       metric === "cost"
-                        ? `Recorded estimate · ${period}`
-                        : `Estimated tokens · ${period}`,
+                        ? `${keyFilter === "chatgpt_plan" ? "Monetary cost not tracked" : "Recorded estimate"} · ${period}`
+                        : `${keyFilter === "chatgpt_plan" ? "Reported tokens" : "Recorded tokens"} · ${period}`,
                     value:
                       metric === "cost"
                         ? Object.entries(monitoring.costByCurrencyMicros)
@@ -1321,9 +1379,17 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                             monitoring.usage,
                             monitoring.totalTokens,
                           ).toLocaleString(),
-                    detail: `${monitoring.logicalOperations} operations · ${monitoring.attempts} attempts`,
+                    detail: `${monitoring.logicalOperations} operations · ${monitoring.attempts} ${keyFilter === "chatgpt_plan" ? "passes" : "attempts"}`,
                   }}
                 />
+                {(keyFilter === "chatgpt_plan" ||
+                  (!keyFilter && (monitoring?.planAttempts ?? 0) > 0)) && (
+                  <p className="ai-help">
+                    Codex monetary cost is not tracked. Plan requests display
+                    $0; token usage is shown when reported.
+                  </p>
+                )}
+
                 {monitoring.partial && (
                   <p className="ai-partial" role="status">
                     Partial or unknown usage: {monitoring.unknownCount}{" "}
@@ -1377,7 +1443,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                 <div>
                   <strong>Export activity</strong>
                   <span>
-                    Choose a key and one or more active months to export.
+                    Choose AI activity and one or more active months to export.
                   </span>
                 </div>
                 <button
@@ -1552,6 +1618,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
               onClose={() => setFailuresOpen(false)}
             />
             <AiDataActionDialog
+              planConnectionIds={planConnectionIds}
               action={dataAction}
               keys={activityKeys}
               catalog={catalog}

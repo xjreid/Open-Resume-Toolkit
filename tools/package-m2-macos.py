@@ -31,9 +31,12 @@ def main():
         raise SystemExit("Use the exact fingerprint of an existing local signing identity")
     run(["python3", "tools/package-parser-helper.py"])
     helper_manifest = json.loads((ROOT / "target/parser-helper-package.json").read_text())
+    run(["python3", "tools/package-codex-installer.py"])
+    codex_manifest = json.loads((ROOT / "target/codex-installer-package.json").read_text())
     environment = dict(os.environ,
                        ORT_PARSER_HELPER_SHA256=helper_manifest["executableSha256"],
-                       ORT_PARSER_HELPER_CDHASH=helper_manifest["cdhash"])
+                       ORT_PARSER_HELPER_CDHASH=helper_manifest["cdhash"],
+                       ORT_CODEX_INSTALLER_SHA256=codex_manifest["executableSha256"])
     override = json.dumps({"bundle": {"active": True, "targets": ["app"],
                                       "macOS": {"signingIdentity": args.identity, "hardenedRuntime": True}}})
     run(["pnpm", "--filter", "@ort/desktop", "tauri", "build", "--config", override, "--bundles", "app"], env=environment)
@@ -43,6 +46,9 @@ def main():
     shutil.copytree(original, destination)
     helper = destination / "Contents/Helpers/ORT Parser Helper.app"
     shutil.copytree(ROOT / "target/ORT Parser Helper.app", helper)
+    codex_helper = destination / "Contents/Helpers/ORT Codex Installer.app"
+    shutil.copytree(ROOT / "target/ORT Codex Installer.app", codex_helper)
+    assert hashlib.sha256((codex_helper / "Contents/MacOS/ort-codex-install").read_bytes()).hexdigest() == codex_manifest["executableSha256"]
     executable = helper / "Contents/MacOS/ort-parser-helper"
     assert hashlib.sha256(executable.read_bytes()).hexdigest() == helper_manifest["executableSha256"]
     # Sign only the outer bundle: never recursively re-sign the pinned helper.
@@ -52,7 +58,7 @@ def main():
     desktop = destination / "Contents/MacOS/ort-desktop"
     manifest = {"schemaVersion": 1, "developmentOnly": True,
                 "desktopSha256": hashlib.sha256(desktop.read_bytes()).hexdigest(),
-                "parser": helper_manifest, "signingIdentityFingerprint": args.identity,
+                "parser": helper_manifest, "codexInstaller": codex_manifest, "signingIdentityFingerprint": args.identity,
                 "nativeAcceptance": "pending-standard-account-and-accessibility-matrix"}
     (destination.parent / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print("M2 candidate assembled and signatures verified; installed application unchanged")

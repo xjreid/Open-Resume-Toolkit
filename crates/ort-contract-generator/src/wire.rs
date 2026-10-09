@@ -88,6 +88,9 @@ fn command_signatures(root: &Path) -> Result<BTreeMap<String, Value>, Box<dyn st
     let mut signatures = BTreeMap::new();
     for module in [
         "ai_keys",
+        "chatgpt_plan",
+        "codex_readiness",
+        "codex_install",
         "ai_settings",
         "ai_request",
         "application_materials",

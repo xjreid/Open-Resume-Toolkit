@@ -626,3 +626,128 @@ fn legacy_migration_keeps_existing_cap_identity_and_new_rosters_are_excluded_fro
     let backup = ort_backup::restore_backup(&bytes, &phrase).unwrap();
     assert!(!backup.profile.settings.contains_key(SETTING));
 }
+
+#[test]
+fn codex_permission_locks_all_keys_without_pausing_and_disabling_restores_primary() {
+    let (_temp, store, vault) = fixture();
+    let id = add(&store, &vault, "openai").keys[0].credential_id;
+    let other = add(&store, &vault, "anthropic").keys[1].credential_id;
+    action(&store, &vault, id, AiKeyAction::SelectPrimary);
+    let plan = ort_ai::plan::PlanSettings {
+        enabled: true,
+        ..Default::default()
+    };
+    assert!(plan.valid()); // Permission does not require sign-in or a selected model.
+    crate::chatgpt_plan::persist_selection(&store, None, &plan).unwrap();
+    let keys = load_registry(&store).unwrap().0;
+    assert_eq!(keys.primary_credential_id, Some(id));
+    assert!(!keys.keys[0].paused);
+    assert!(keys.keys[0].pause_reason.is_none());
+    assert_eq!(
+        request_connection(&store, None).unwrap().mode,
+        "chatgpt_plan"
+    );
+    assert!(request_connection(&store, Some(id)).is_err());
+    for target in [id, other] {
+        for change in [
+            AiKeyAction::Unpause,
+            AiKeyAction::SelectPrimary,
+            AiKeyAction::Remove,
+            AiKeyAction::Pause,
+        ] {
+            assert_eq!(
+                change_key(
+                    &store,
+                    &vault,
+                    ChangeAiKeyRequest {
+                        credential_id: target,
+                        action: change
+                    }
+                )
+                .unwrap_err(),
+                "AI_KEY_PAUSED_BY_PLAN"
+            );
+        }
+        assert_eq!(
+            rename_key(
+                &store,
+                &RenameAiKeyRequest {
+                    credential_id: target,
+                    name: "changed".into()
+                }
+            )
+            .unwrap_err(),
+            "AI_KEY_PAUSED_BY_PLAN"
+        );
+        assert_eq!(
+            set_key_model(
+                &store,
+                &SetAiKeyModelRequest {
+                    credential_id: target,
+                    model: "gpt-6-sol".into()
+                }
+            )
+            .unwrap_err(),
+            "AI_KEY_PAUSED_BY_PLAN"
+        );
+        assert!(test_connection(&store, target).is_err());
+    }
+    assert_eq!(clear_primary(&store).unwrap_err(), "AI_KEY_PAUSED_BY_PLAN");
+    assert_eq!(
+        add_key(
+            &store,
+            &vault,
+            AddAiKeyRequest {
+                provider: "gemini".into(),
+                api_key: "synthetic-key".into(),
+                name: None
+            }
+        )
+        .unwrap_err(),
+        "AI_KEY_PAUSED_BY_PLAN"
+    );
+    assert_eq!(load_registry(&store).unwrap().0.keys.len(), 2);
+    let disabled = ort_ai::plan::PlanSettings {
+        enabled: false,
+        ..plan
+    };
+    assert_eq!(
+        crate::chatgpt_plan::persist_selection(&store, None, &disabled),
+        Err(StorageError::RevisionConflict)
+    );
+    assert!(
+        crate::chatgpt_plan::load_settings(&store)
+            .unwrap()
+            .0
+            .enabled
+    );
+    let revision = crate::chatgpt_plan::load_settings(&store).unwrap().1;
+    crate::chatgpt_plan::persist_selection(&store, revision, &disabled).unwrap();
+    assert_eq!(request_connection(&store, None).unwrap().mode, "direct_api");
+    assert_eq!(
+        request_connection(&store, None).unwrap().credential_id,
+        Some(id)
+    );
+    assert!(!load_registry(&store).unwrap().0.keys[0].paused);
+}
+
+#[test]
+fn old_codex_key_pauses_migrate_without_changing_manual_pauses_or_primary() {
+    let (_temp, store, vault) = fixture();
+    let id = add(&store, &vault, "openai").keys[0].credential_id;
+    let other = add(&store, &vault, "anthropic").keys[1].credential_id;
+    action(&store, &vault, id, AiKeyAction::SelectPrimary);
+    action(&store, &vault, other, AiKeyAction::Pause);
+    let (mut registry, revision) = load_registry(&store).unwrap();
+    registry.keys[0].paused = true;
+    registry.keys[0].pause_reason = Some("chatgpt_plan".into());
+    store
+        .save_setting(SETTING, revision, &json!(registry))
+        .unwrap();
+    let (migrated, revision) = load_registry(&store).unwrap();
+    assert_eq!(migrated.primary_credential_id, Some(id));
+    assert!(!migrated.keys[0].paused);
+    assert!(migrated.keys[0].pause_reason.is_none());
+    assert!(migrated.keys[1].paused);
+    assert_eq!(load_registry(&store).unwrap().1, revision);
+}

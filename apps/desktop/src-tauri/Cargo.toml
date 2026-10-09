@@ -41,6 +41,11 @@ reqwest.workspace = true
 tokio.workspace = true
 jiff.workspace = true
 tempfile.workspace = true
+sha2.workspace = true
+hex.workspace = true
+flate2.workspace = true
+rustix.workspace = true
+ort-codex-install = { path = "../../../crates/ort-codex-install" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 ort-macos-lifecycle = { path = "../../../crates/ort-macos-lifecycle" }

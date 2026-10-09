@@ -45,7 +45,7 @@ const RESTORE_SAFETY_DIRECTORY: &str = ".ort-restore-safety";
 const SAFETY_DELETE_DIRECTORY: &str = ".ort-safety-delete-pending";
 const DELETE_ALL_MARKER_FILENAME: &str = ".ort-delete-all-pending.json";
 const DATABASE_FORMAT_VERSION: u16 = 1;
-const SCHEMA_VERSION: i64 = 6;
+const SCHEMA_VERSION: i64 = 7;
 const MAX_RENDER_MANIFESTS: i64 = 100;
 const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 const MAX_MANIFEST_BYTES: u64 = 16 * 1_024;
@@ -196,6 +196,10 @@ const MIGRATION_V5_SQL: &str = "CREATE TABLE tracker_entries (
      CREATE INDEX tracker_entries_profile ON tracker_entries (profile_id, updated_at DESC);";
 
 const MIGRATION_V6_SQL: &str = "ALTER TABLE ai_attempts ADD COLUMN error_details_json BLOB;";
+const MIGRATION_V7_SQL: &str = "ALTER TABLE ai_attempts ADD COLUMN connection_source TEXT NOT NULL DEFAULT 'direct_api' CHECK(connection_source IN ('direct_api','chatgpt_plan'));
+ALTER TABLE ai_attempts ADD COLUMN reasoning TEXT CHECK(reasoning IN ('low','medium','high','xhigh'));
+ALTER TABLE ai_attempts ADD COLUMN monetary_cost_tracking TEXT NOT NULL DEFAULT 'estimated' CHECK(monetary_cost_tracking IN ('estimated','not_tracked'));
+ALTER TABLE ai_attempts ADD COLUMN reported_retries INTEGER NOT NULL DEFAULT 0 CHECK(reported_retries >= 0);";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum StorageError {
@@ -1069,6 +1073,52 @@ impl EncryptedStore {
         })
     }
 
+    /// Writes related settings atomically with independent revision checks.
+    /// A stale revision leaves every setting unchanged.
+    /// # Errors
+    /// Rejects invalid settings, stale revisions, and unavailable storage.
+    pub fn save_settings_atomic(
+        &self,
+        settings: &[(&str, Option<i64>, Value)],
+    ) -> Result<(), StorageError> {
+        if settings.is_empty() || settings.len() > 16 {
+            return Err(StorageError::InvalidData);
+        }
+        let mut keys = std::collections::HashSet::new();
+        let mut connection = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        let tx = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|_| StorageError::Unavailable)?;
+        for (key, expected, value) in settings {
+            validate_setting_key(key)?;
+            let bytes = serde_json::to_vec(value).map_err(|_| StorageError::InvalidData)?;
+            if !keys.insert(*key) || bytes.len() > setting_size_limit(key) {
+                return Err(StorageError::InvalidData);
+            }
+            match expected {
+                None => {
+                    tx.execute("INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) VALUES (?1, ?2, 1, ?3, ?4)",
+                        params![self.manifest.profile_id.to_string(), key, bytes, now_string()])
+                        .map_err(|_| StorageError::RevisionConflict)?;
+                }
+                Some(revision) if *revision > 0 => {
+                    let next = revision.checked_add(1).ok_or(StorageError::InvalidData)?;
+                    let changed = tx.execute("UPDATE settings SET revision = ?1, value_json = ?2, updated_at = ?3 WHERE profile_id = ?4 AND setting_key = ?5 AND revision = ?6",
+                        params![next, bytes, now_string(), self.manifest.profile_id.to_string(), key, revision])
+                        .map_err(|_| StorageError::Unavailable)?;
+                    if changed != 1 {
+                        return Err(StorageError::RevisionConflict);
+                    }
+                }
+                _ => return Err(StorageError::InvalidData),
+            }
+        }
+        tx.commit().map_err(|_| StorageError::Unavailable)
+    }
+
     /// Applies a reviewed browser capture to Stage 1 or Stage 2 and removes
     /// the pending capture in one transaction. A conflict or failed write
     /// preserves the pending capture and the previous workspace.
@@ -1580,7 +1630,7 @@ impl EncryptedStore {
         }
         for (key, setting) in &backup.profile.settings {
             // A portable backup never rebinds an OS-vault-only credential ID.
-            if key == AI_CONNECTION_SETTING_KEY {
+            if key == AI_CONNECTION_SETTING_KEY || key == "ai.chatgpt_plan.v1" {
                 continue;
             }
             validate_setting_key(key)?;
@@ -1930,6 +1980,7 @@ impl EncryptedStore {
         };
         let mut settings = settings;
         settings.remove(AI_CONNECTION_SETTING_KEY);
+        settings.remove("ai.chatgpt_plan.v1");
         let tracker_entries = {
             let mut statement = transaction.prepare(
                 "SELECT entry_id, revision, entry_json FROM tracker_entries WHERE profile_id = ?1 ORDER BY entry_id",
@@ -2104,7 +2155,7 @@ fn read_portable_ai_attempts(
             pricing_components_json, started_at_unix_ms, ended_at_unix_ms,
             status, retry_of, usage_json, usage_complete, estimated_input_tokens,
             reserved_cost_micros, settled_cost_micros, currency, estimate_completeness,
-            error_category, error_details_json FROM ai_attempts WHERE profile_id = ?1
+            error_category, error_details_json, connection_source, reasoning, monetary_cost_tracking, reported_retries FROM ai_attempts WHERE profile_id = ?1
             ORDER BY started_at_unix_ms, attempt_id",
         )
         .map_err(|_| StorageError::Unavailable)?;
@@ -2134,6 +2185,10 @@ fn read_portable_ai_attempts(
                 row.get::<_, String>(20)?,
                 row.get::<_, Option<String>>(21)?,
                 row.get::<_, Option<Vec<u8>>>(22)?,
+                row.get::<_, String>(23)?,
+                row.get::<_, Option<String>>(24)?,
+                row.get::<_, String>(25)?,
+                row.get::<_, u32>(26)?,
             ))
         })
         .map_err(|_| StorageError::Unavailable)?
@@ -2162,6 +2217,10 @@ fn read_portable_ai_attempts(
                 estimate_completeness,
                 error_category,
                 error_details,
+                connection_source,
+                reasoning,
+                monetary_cost_tracking,
+                reported_retries,
             ) = row.map_err(|_| StorageError::Unavailable)?;
             let pricing_components =
                 serde_json::from_slice::<Vec<ort_ai::Price>>(&pricing_components)
@@ -2180,6 +2239,10 @@ fn read_portable_ai_attempts(
                     })
                     .collect();
             Ok(PortableAiAttemptV1 {
+                connection_source,
+                reasoning,
+                monetary_cost_tracking,
+                reported_retries,
                 attempt_id,
                 operation_id,
                 provider,
@@ -2316,6 +2379,7 @@ fn restore_ai_activity(
                 ],
             )
             .map_err(|_| StorageError::Unavailable)?;
+        transaction.execute("UPDATE ai_attempts SET connection_source=?1, reasoning=?2, monetary_cost_tracking=?3, reported_retries=?4 WHERE attempt_id=?5",params![attempt.connection_source,attempt.reasoning,attempt.monetary_cost_tracking,attempt.reported_retries,attempt.attempt_id]).map_err(|_|StorageError::InvalidData)?;
     }
     Ok(())
 }
@@ -3442,6 +3506,10 @@ fn migrate_schema(connection: &Connection) -> Result<(), StorageError> {
         apply_migration(connection, 6, MIGRATION_V6_SQL, &migration_v6_checksum())?;
         latest = 6;
     }
+    if latest == 6 {
+        apply_migration(connection, 7, MIGRATION_V7_SQL, &migration_v7_checksum())?;
+        latest = 7;
+    }
     if latest == SCHEMA_VERSION {
         Ok(())
     } else {
@@ -3520,6 +3588,7 @@ fn verify_migration_receipts(migrations: &[(i64, String)]) -> Result<(), Storage
         (4, migration_v4_checksum()),
         (5, migration_v5_checksum()),
         (6, migration_v6_checksum()),
+        (7, migration_v7_checksum()),
     ];
     if migrations.len() > expected.len()
         || migrations.iter().zip(expected).any(
@@ -3555,6 +3624,10 @@ fn migration_v5_checksum() -> String {
 
 fn migration_v6_checksum() -> String {
     hex::encode(Sha256::digest(MIGRATION_V6_SQL.as_bytes()))
+}
+
+fn migration_v7_checksum() -> String {
+    hex::encode(Sha256::digest(MIGRATION_V7_SQL.as_bytes()))
 }
 
 fn verify_integrity(connection: &Connection) -> Result<(), StorageError> {
@@ -3851,7 +3924,7 @@ mod tests {
         let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("initialize encrypted store");
         let empty = store.storage_usage().expect("empty usage");
-        assert_eq!(empty.database_schema, 6);
+        assert_eq!(empty.database_schema, 7);
         assert_eq!(empty.drafts, 0);
         assert_eq!(empty.published_snapshots, 0);
         assert_eq!(empty.settings, 0);
@@ -4054,7 +4127,7 @@ mod tests {
                     "INSERT INTO schema_migrations \
                      (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
                       requires_safety_copy, applied_at) \
-                     VALUES (7, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
+                     VALUES (8, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
                     [super::now_string()],
                 )
                 .expect("seed newer schema marker");
@@ -4136,7 +4209,7 @@ mod tests {
 
         let upgraded = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("upgrade schema v1 profile");
-        assert_eq!(upgraded.manifest().schema_version, 6);
+        assert_eq!(upgraded.manifest().schema_version, 7);
         assert_eq!(
             upgraded
                 .load_draft()
@@ -4154,7 +4227,7 @@ mod tests {
             .expect("query migration versions")
             .collect::<Result<_, _>>()
             .expect("collect migration versions");
-        assert_eq!(versions, vec![1, 2, 3, 4, 5, 6]);
+        assert_eq!(versions, vec![1, 2, 3, 4, 5, 6, 7]);
     }
 
     #[test]

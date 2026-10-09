@@ -62,6 +62,10 @@
             "null"
           ]
         },
+        "connectionSource": {
+          "$ref": "#/$defs/ConnectionSource",
+          "default": "direct_api"
+        },
         "details": {
           "anyOf": [
             {
@@ -86,6 +90,10 @@
             "null"
           ]
         },
+        "monetaryCostTracking": {
+          "$ref": "#/$defs/MonetaryCostTracking",
+          "default": "estimated"
+        },
         "operationId": {
           "type": "string"
         },
@@ -94,6 +102,23 @@
         },
         "provider": {
           "type": "string"
+        },
+        "reasoning": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReasoningEffort"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reportedRetries": {
+          "default": 0,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
         },
         "requestedModel": {
           "type": "string"
@@ -129,7 +154,11 @@
         "category",
         "details",
         "usage",
-        "usageComplete"
+        "usageComplete",
+        "connectionSource",
+        "reasoning",
+        "monetaryCostTracking",
+        "reportedRetries"
       ],
       "type": "object"
     },
@@ -479,6 +508,13 @@
           },
           "type": "object"
         },
+        "connectionSources": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "type": "object"
+        },
         "costByCurrencyMicros": {
           "additionalProperties": {
             "format": "uint64",
@@ -505,6 +541,12 @@
         },
         "partial": {
           "type": "boolean"
+        },
+        "planAttempts": {
+          "default": 0,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
         },
         "recentFailures": {
           "default": [],
@@ -552,6 +594,8 @@
         "unknownCount",
         "byProvider",
         "byCredentialId",
+        "connectionSources",
+        "planAttempts",
         "byStatus",
         "byModel",
         "byPreset",
@@ -733,6 +777,9 @@
         "browserConnected": {
           "type": "boolean"
         },
+        "connectionSource": {
+          "$ref": "#/$defs/ConnectionSource"
+        },
         "model": {
           "type": [
             "string",
@@ -768,6 +815,7 @@
         }
       },
       "required": [
+        "connectionSource",
         "profileId",
         "publishedRevision",
         "aiLabel",
@@ -1393,6 +1441,13 @@
       ],
       "title": "CloseStatusResponse",
       "type": "object"
+    },
+    "ConnectionSource": {
+      "enum": [
+        "direct_api",
+        "chatgpt_plan"
+      ],
+      "type": "string"
     },
     "ConnectionStatus": {
       "properties": {
@@ -2467,6 +2522,19 @@
         }
       ]
     },
+    "InstallPhase": {
+      "enum": [
+        "idle",
+        "downloading",
+        "verifying",
+        "awaiting_approval",
+        "checking",
+        "complete",
+        "cancelled",
+        "failed"
+      ],
+      "type": "string"
+    },
     "Link": {
       "additionalProperties": false,
       "properties": {
@@ -2499,6 +2567,17 @@
         "coursework"
       ],
       "type": "string"
+    },
+    "LoadPlanRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "refreshUsage": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "title": "LoadPlanRequest",
+      "type": "object"
     },
     "LoadResumeRequest": {
       "$defs": {},
@@ -2591,6 +2670,13 @@
       ],
       "title": "MaterialPdf",
       "type": "object"
+    },
+    "MonetaryCostTracking": {
+      "enum": [
+        "estimated",
+        "not_tracked"
+      ],
+      "type": "string"
     },
     "NamedField": {
       "additionalProperties": false,
@@ -3050,6 +3136,158 @@
       "title": "PdfTicketRequest",
       "type": "object"
     },
+    "PlanModel": {
+      "properties": {
+        "explanation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reasoningEfforts": {
+          "items": {
+            "$ref": "#/$defs/ReasoningEffort"
+          },
+          "type": "array"
+        },
+        "supported": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "supported",
+        "explanation",
+        "reasoningEfforts"
+      ],
+      "type": "object"
+    },
+    "PlanSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "cleanupRequired": {
+          "default": false,
+          "type": "boolean"
+        },
+        "connectionId": {
+          "format": "uuid",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reasoning": {
+          "$ref": "#/$defs/ReasoningEffort"
+        },
+        "reserveEnabled": {
+          "type": "boolean"
+        },
+        "reservePercent": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cleanupRequired",
+        "connectionId",
+        "enabled",
+        "model",
+        "reasoning",
+        "reserveEnabled",
+        "reservePercent"
+      ],
+      "type": "object"
+    },
+    "PlanStatus": {
+      "$defs": {},
+      "properties": {
+        "accountPlan": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "connected": {
+          "type": "boolean"
+        },
+        "errorCode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "loginPending": {
+          "type": "boolean"
+        },
+        "models": {
+          "items": {
+            "$ref": "#/$defs/PlanModel"
+          },
+          "type": "array"
+        },
+        "operationActive": {
+          "type": "boolean"
+        },
+        "quota": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QuotaSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revision": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "runtimeVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "settings": {
+          "$ref": "#/$defs/PlanSettings"
+        }
+      },
+      "required": [
+        "settings",
+        "revision",
+        "connected",
+        "accountPlan",
+        "loginPending",
+        "operationActive",
+        "runtimeVersion",
+        "models",
+        "quota",
+        "errorCode"
+      ],
+      "title": "PlanStatus",
+      "type": "object"
+    },
     "PortablePdfArchivePayload": {
       "additionalProperties": false,
       "properties": {
@@ -3441,6 +3679,75 @@
         "publishedRevision"
       ],
       "type": "object"
+    },
+    "QuotaSnapshot": {
+      "properties": {
+        "fetchedAtUnixMs": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "windows": {
+          "items": {
+            "$ref": "#/$defs/QuotaWindow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "fetchedAtUnixMs",
+        "windows"
+      ],
+      "type": "object"
+    },
+    "QuotaWindow": {
+      "properties": {
+        "limitId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "remainingPercent": {
+          "format": "double",
+          "type": "number"
+        },
+        "resetsAt": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "window": {
+          "type": "string"
+        },
+        "windowDurationMinutes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "limitId",
+        "name",
+        "window",
+        "remainingPercent",
+        "windowDurationMinutes",
+        "resetsAt"
+      ],
+      "type": "object"
+    },
+    "ReasoningEffort": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ],
+      "type": "string"
     },
     "RenameAiKeyRequest": {
       "additionalProperties": false,
@@ -3853,11 +4160,62 @@
       "title": "RollbackSafetyCopyResponse",
       "type": "object"
     },
+    "RuntimeInstallStatus": {
+      "$defs": {},
+      "properties": {
+        "downloadedBytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "errorCode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phase": {
+          "$ref": "#/$defs/InstallPhase"
+        },
+        "totalBytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "phase",
+        "downloadedBytes",
+        "totalBytes",
+        "errorCode"
+      ],
+      "title": "RuntimeInstallStatus",
+      "type": "object"
+    },
     "RuntimeProfile": {
       "enum": [
         "development"
       ],
       "type": "string"
+    },
+    "RuntimeReadiness": {
+      "properties": {
+        "errorCode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ready": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ready",
+        "errorCode"
+      ],
+      "title": "RuntimeReadiness",
+      "type": "object"
     },
     "SafetyCopyActionPayload": {
       "additionalProperties": false,
@@ -3906,6 +4264,48 @@
         "timeZone"
       ],
       "title": "SaveAiCapRequest",
+      "type": "object"
+    },
+    "SavePlanRequest": {
+      "$defs": {},
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "expectedRevision": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reasoning": {
+          "$ref": "#/$defs/ReasoningEffort"
+        },
+        "reserveEnabled": {
+          "type": "boolean"
+        },
+        "reservePercent": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "reasoning",
+        "reserveEnabled",
+        "reservePercent"
+      ],
+      "title": "SavePlanRequest",
       "type": "object"
     },
     "SaveResumePayload": {
@@ -3970,6 +4370,12 @@
           "type": "string"
         },
         "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pauseReason": {
           "type": [
             "string",
             "null"
@@ -4790,6 +5196,28 @@
         "type": "boolean"
       }
     },
+    "cancel_chatgpt_login": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/PlanStatus"
+      }
+    },
+    "cancel_codex_runtime_install": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/RuntimeInstallStatus"
+      }
+    },
     "change_ai_key": {
       "args": {
         "additionalProperties": false,
@@ -4805,6 +5233,17 @@
       },
       "value": {
         "$ref": "#/$defs/AiKeyRegistry"
+      }
+    },
+    "check_codex_runtime": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/RuntimeReadiness"
       }
     },
     "clear_ai_monitoring": {
@@ -4866,6 +5305,17 @@
       },
       "value": {
         "$ref": "#/$defs/CloseStatusResponse"
+      }
+    },
+    "connect_chatgpt_plan": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/PlanStatus"
       }
     },
     "connect_development_browser": {
@@ -4960,6 +5410,17 @@
       },
       "value": {
         "type": "boolean"
+      }
+    },
+    "disconnect_chatgpt_plan": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/PlanStatus"
       }
     },
     "disconnect_development_browser": {
@@ -5191,6 +5652,17 @@
         "type": "boolean"
       }
     },
+    "install_codex_runtime": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/RuntimeInstallStatus"
+      }
+    },
     "list_tracker_entries": {
       "args": {
         "additionalProperties": false,
@@ -5328,6 +5800,16 @@
           "bucketSize": {
             "type": "string"
           },
+          "connectionSource": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ConnectionSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "credentialId": {
             "anyOf": [
               {
@@ -5442,6 +5924,34 @@
         "$ref": "#/$defs/BackupRecoveryStatusResponse"
       }
     },
+    "load_chatgpt_plan": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/LoadPlanRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/PlanStatus"
+      }
+    },
+    "load_codex_runtime_install": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/RuntimeInstallStatus"
+      }
+    },
     "load_resume": {
       "args": {
         "additionalProperties": false,
@@ -5474,6 +5984,17 @@
       },
       "value": {
         "$ref": "#/$defs/StorageUsageResponse"
+      }
+    },
+    "open_chatgpt_plan_runtime_guidance": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
       }
     },
     "open_tracker_link": {
@@ -5937,6 +6458,23 @@
         "$ref": "#/$defs/SavedWorkspace"
       }
     },
+    "save_chatgpt_plan": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "$ref": "#/$defs/SavePlanRequest"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/PlanStatus"
+      }
+    },
     "save_resume": {
       "args": {
         "additionalProperties": false,
@@ -6073,6 +6611,17 @@
       },
       "value": {
         "$ref": "#/$defs/SavedWorkspace"
+      }
+    },
+    "stop_chatgpt_plan": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
       }
     },
     "test_ai_connection": {

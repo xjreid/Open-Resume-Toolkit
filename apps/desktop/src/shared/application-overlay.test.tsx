@@ -9,8 +9,9 @@ import { ApplicationOverlay } from "./ApplicationOverlay";
 import type * as Wire from "@ort/contracts/wire";
 import type { UseApplicationPopupOptions } from "./application-popup";
 
-const { listeners, popup, dragWindow } = vi.hoisted(() => ({
+const { listeners, planListeners, popup, dragWindow } = vi.hoisted(() => ({
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
+  planListeners: new Map<string, (event: { payload: unknown }) => void>(),
   dragWindow: { setPosition: vi.fn(async (_position: unknown) => {}) },
   popup: {
     options: null as UseApplicationPopupOptions | null,
@@ -19,7 +20,16 @@ const { listeners, popup, dragWindow } = vi.hoisted(() => ({
   },
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("@tauri-apps/api/event", () => ({ emitTo: vi.fn() }));
+vi.mock("@tauri-apps/api/event", () => ({
+  emitTo: vi.fn(),
+  listen: async (
+    name: string,
+    handler: (event: { payload: unknown }) => void,
+  ) => {
+    planListeners.set(name, handler);
+    return () => planListeners.delete(name);
+  },
+}));
 vi.mock("@tauri-apps/api/window", () => ({
   availableMonitors: async () => [
     {
@@ -59,6 +69,7 @@ const context = {
   selectedKeyReady: true,
   publishedRevision: 1,
   aiLabel: "Gemini test",
+  connectionSource: "direct_api",
   aiReady: true,
   aiBusy: false,
   selectedKeyId: "019a0000-0000-7000-8000-000000000006",
@@ -620,6 +631,7 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.clearAllMocks();
   listeners.clear();
+  planListeners.clear();
   popup.options = null;
 });
 
@@ -1646,5 +1658,348 @@ it("announces quality phases and call count during tailoring", async () => {
         details: {},
       },
     }),
+  );
+});
+
+it("shows Codex controls and locks them while labeling progress in passes", async () => {
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "application_context")
+      return reply({
+        ...context,
+        connectionSource: "chatgpt_plan",
+        aiBusy: true,
+        aiLabel: "Using Codex · GPT-6.1 Sol",
+      });
+    if (name === "load_chatgpt_plan")
+      return reply({ ...codexStatus(), operationActive: true });
+    if (name.startsWith("load_application_")) return reply(null);
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host } = await mount();
+  expect(host.querySelector(".application-provider-label")?.textContent).toBe(
+    "Codex",
+  );
+  expect(
+    host.querySelector<HTMLSelectElement>('[aria-label="Codex model"]')
+      ?.disabled,
+  ).toBe(true);
+  expect(host.querySelector('[aria-label="AI model"]')).toBeNull();
+  await act(async () =>
+    listeners.get("ort:tailoring-progress")?.({
+      payload: {
+        phase: "Checking sources and editing",
+        call: 2,
+        maximum: 4,
+        connectionSource: "chatgpt_plan",
+        unit: "pass",
+      },
+    }),
+  );
+  expect(host.textContent).toContain("pass 2 of 4");
+});
+
+function codexStatus(): Wire.PlanStatus {
+  return {
+    settings: {
+      cleanupRequired: false,
+      connectionId: context.selectedKeyId,
+      enabled: true,
+      model: "gpt-6.1-sol",
+      reasoning: "high",
+      reserveEnabled: true,
+      reservePercent: 25,
+    },
+    revision: 3,
+    connected: true,
+    accountPlan: "plus",
+    loginPending: false,
+    operationActive: false,
+    runtimeVersion: "0.162.0",
+    errorCode: null,
+    models: [
+      {
+        id: "gpt-6.1-sol",
+        name: "GPT-6.1 Sol",
+        supported: true,
+        explanation: null,
+        reasoningEfforts: ["medium", "high"],
+      },
+      {
+        id: "gpt-6-luna",
+        name: "GPT-6 Luna",
+        supported: true,
+        explanation: null,
+        reasoningEfforts: ["low", "medium"],
+      },
+      {
+        id: "gpt-5.6-terra",
+        name: "GPT-5.6 Terra",
+        supported: false,
+        explanation: "Unavailable",
+        reasoningEfforts: [],
+      },
+    ],
+    quota: {
+      fetchedAtUnixMs: Date.now(),
+      windows: [
+        {
+          limitId: "codex",
+          name: "Codex primary",
+          window: "primary",
+          remainingPercent: 0,
+          windowDurationMinutes: 300,
+          resetsAt: null,
+        },
+        {
+          limitId: "codex",
+          name: "Codex secondary",
+          window: "secondary",
+          remainingPercent: 76.5,
+          windowDurationMinutes: 10080,
+          resetsAt: null,
+        },
+      ],
+    },
+  };
+}
+
+function mockCodex(read: () => Wire.PlanStatus) {
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "application_context")
+      return reply({
+        ...context,
+        connectionSource: "chatgpt_plan",
+        model: read().settings.model,
+      });
+    if (name === "load_chatgpt_plan") return reply(read());
+    if (name.startsWith("load_application_")) return reply(null);
+    throw new Error(`Unexpected command: ${name}`);
+  });
+}
+
+it("hides previously known usage after a failed Codex quota refresh", async () => {
+  let status = codexStatus();
+  mockCodex(() => status);
+  const { host } = await mount();
+  expect(host.textContent).toContain("76.5% remaining");
+  status = { ...status, quota: null, errorCode: "PLAN_QUOTA_UNAVAILABLE" };
+  await act(async () =>
+    planListeners.get("ort:ai-model-changed")?.({ payload: null }),
+  );
+  expect(
+    host.querySelector('[aria-label="Account-wide remaining usage"]'),
+  ).toBeNull();
+  expect(host.textContent).not.toContain("76.5% remaining");
+  expect(
+    host.querySelector<HTMLSelectElement>('[aria-label="Codex model"]')?.value,
+  ).toBe("gpt-6.1-sol");
+  expect(host.querySelector('[aria-label="AI model"]')).toBeNull();
+});
+
+it("changes Codex model and reasoning in the overlay while preserving reserve settings", async () => {
+  let status = codexStatus();
+  mockCodex(() => status);
+  const original = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (name, args) => {
+    if (name === "save_chatgpt_plan") {
+      const request = (args as { request: Wire.SavePlanRequest }).request;
+      status = {
+        ...status,
+        revision: status.revision! + 1,
+        settings: {
+          ...status.settings,
+          model: request.model ?? null,
+          reasoning: request.reasoning,
+        },
+      };
+      return reply(status);
+    }
+    return original(name, args);
+  });
+  const { host } = await mount();
+  const model = host.querySelector<HTMLSelectElement>(
+    '[aria-label="Codex model"]',
+  )!;
+  const reasoning = host.querySelector<HTMLSelectElement>(
+    '[aria-label="Codex reasoning"]',
+  )!;
+  expect(model.value).toBe("gpt-6.1-sol");
+  expect(
+    [...model.options].find((option) => option.value === "gpt-5.6-terra")
+      ?.disabled,
+  ).toBe(true);
+  await act(async () => {
+    model.value = "gpt-6-luna";
+    model.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(invoke).toHaveBeenCalledWith("save_chatgpt_plan", {
+    request: {
+      expectedRevision: 3,
+      enabled: true,
+      model: "gpt-6-luna",
+      reasoning: "low",
+      reserveEnabled: true,
+      reservePercent: 25,
+    },
+  });
+  expect(model.value).toBe("gpt-6-luna");
+  expect(reasoning.value).toBe("low");
+  expect(
+    [...reasoning.options].find((option) => option.value === "high")?.disabled,
+  ).toBe(true);
+  await act(async () => {
+    reasoning.value = "medium";
+    reasoning.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(invoke).toHaveBeenLastCalledWith("save_chatgpt_plan", {
+    request: {
+      expectedRevision: 4,
+      enabled: true,
+      model: "gpt-6-luna",
+      reasoning: "medium",
+      reserveEnabled: true,
+      reservePercent: 25,
+    },
+  });
+  expect(reasoning.value).toBe("medium");
+  expect(host.querySelector('[aria-label="AI model"]')).toBeNull();
+});
+
+it("refreshes Codex choices and usage on shared setting and operation events", async () => {
+  let status = codexStatus();
+  mockCodex(() => status);
+  const { host } = await mount();
+  expect(host.textContent).toContain("0% remaining");
+  expect(host.textContent).toContain("76.5% remaining");
+  expect(host.textContent).toContain("5 hours");
+  expect(host.textContent).toContain("7 days");
+  status = {
+    ...status,
+    revision: 4,
+    settings: { ...status.settings, model: "gpt-6-luna", reasoning: "medium" },
+    quota: null,
+  };
+  await act(async () =>
+    planListeners.get("ort:ai-model-changed")?.({ payload: null }),
+  );
+  const model = host.querySelector<HTMLSelectElement>(
+    '[aria-label="Codex model"]',
+  )!;
+  expect(model.value).toBe("gpt-6-luna");
+  expect(
+    host.querySelector('[aria-label="Account-wide remaining usage"]'),
+  ).toBeNull();
+  await act(async () =>
+    planListeners.get("ort:ai-operation-state")?.({ payload: true }),
+  );
+  expect(model.disabled).toBe(true);
+  await act(async () =>
+    planListeners.get("ort:ai-operation-state")?.({ payload: false }),
+  );
+  expect(model.disabled).toBe(false);
+  expect(invoke).toHaveBeenCalledWith("load_chatgpt_plan", {
+    request: { refreshUsage: true },
+  });
+});
+
+it("keeps the Codex selection and shows the error when a settings save fails", async () => {
+  const status = codexStatus();
+  mockCodex(() => status);
+  const original = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (name, args) =>
+    name === "save_chatgpt_plan"
+      ? {
+          ok: false,
+          error: {
+            code: "REVISION_CONFLICT",
+            messageKey: "errors.chatgptPlan",
+            retryable: true,
+            details: {},
+          },
+        }
+      : original(name, args),
+  );
+  const { host } = await mount();
+  const model = host.querySelector<HTMLSelectElement>(
+    '[aria-label="Codex model"]',
+  )!;
+  await act(async () => {
+    model.value = "gpt-6-luna";
+    model.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(model.value).toBe("gpt-6.1-sol");
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    "These settings changed elsewhere",
+  );
+});
+
+it("keeps Codex in the overlay while signed out and replaces model controls with the AI disabled message", async () => {
+  const signedOut = {
+    ...codexStatus(),
+    connected: false,
+    accountPlan: null,
+    quota: null,
+  };
+  vi.mocked(invoke).mockImplementation(async (name) => {
+    if (name === "application_capture_status") return reply(idleCapture);
+    if (name === "application_context")
+      return reply({
+        ...context,
+        connectionSource: "chatgpt_plan",
+        aiReady: false,
+        selectedKeyReady: false,
+        selectedKeyId: null,
+        modelOptions: [],
+        aiLabel: "Check Codex in the main app",
+      });
+    if (name === "load_chatgpt_plan") return reply(signedOut);
+    if (name.startsWith("load_application_")) return reply(null);
+    throw new Error(`Unexpected command: ${name}`);
+  });
+  const { host } = await mount();
+  expect(host.querySelector(".application-provider-label")?.textContent).toBe(
+    "Codex",
+  );
+  expect(host.querySelector('[aria-label="AI model"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Codex model"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Codex reasoning"]')).toBeNull();
+  expect(host.textContent).toContain(
+    "AI is disabled until an account is connected.",
+  );
+  expect(
+    host.querySelector('[aria-label="Account-wide remaining usage"]'),
+  ).toBeNull();
+  expect(
+    vi.mocked(invoke).mock.calls.some(([name]) => name === "set_ai_key_model"),
+  ).toBe(false);
+});
+
+it("replaces controls after sign-out and restores them when an account connects", async () => {
+  let status = codexStatus();
+  mockCodex(() => status);
+  const { host } = await mount();
+  expect(host.querySelector('[aria-label="Codex model"]')).not.toBeNull();
+  status = { ...status, connected: false, accountPlan: null };
+  await act(async () =>
+    planListeners.get("ort:ai-model-changed")?.({ payload: null }),
+  );
+  expect(host.querySelector('[aria-label="Codex model"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Codex reasoning"]')).toBeNull();
+  expect(
+    host.querySelector('[aria-label="Account-wide remaining usage"]'),
+  ).toBeNull();
+  expect(host.textContent).toContain(
+    "AI is disabled until an account is connected.",
+  );
+  status = { ...status, connected: true };
+  await act(async () =>
+    planListeners.get("ort:ai-model-changed")?.({ payload: null }),
+  );
+  expect(host.querySelector('[aria-label="Codex model"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Codex reasoning"]')).not.toBeNull();
+  expect(host.textContent).not.toContain(
+    "AI is disabled until an account is connected.",
   );
 });

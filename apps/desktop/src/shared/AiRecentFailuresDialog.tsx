@@ -89,7 +89,11 @@ export function AiRecentFailuresDialog({
                         {aiFailureName(failure.details?.code, failure.category)}
                       </strong>
                       <span>
-                        {failure.requestedModel} · call {failure.callNumber}
+                        {failure.requestedModel} ·{" "}
+                        {failure.connectionSource === "chatgpt_plan"
+                          ? "pass"
+                          : "call"}{" "}
+                        {failure.callNumber}
                       </span>
                       <time
                         dateTime={new Date(
@@ -110,6 +114,10 @@ export function AiRecentFailuresDialog({
                     <AiFailureDetailsContent
                       details={{
                         diagnostic: failure.details,
+                        connectionSource: failure.connectionSource,
+                        reasoning: failure.reasoning,
+                        monetaryCostTracking: failure.monetaryCostTracking,
+                        reportedRetries: failure.reportedRetries,
                         category: failure.category,
                         provider: failure.provider,
                         model: failure.requestedModel,

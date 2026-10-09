@@ -56,6 +56,8 @@ const emptyMonitoring = {
     logicalOperations: 0,
     totalTokens: 0,
     byCredentialId: {},
+    connectionSources: {},
+    planAttempts: 0,
     attempts: 0,
     usage: {
       inputTokens: 0,
@@ -144,6 +146,30 @@ beforeEach(async () => {
   native.invoke.mockReset();
   native.modelListeners.clear();
   native.invoke.mockImplementation((command: string) => {
+    if (command === "load_chatgpt_plan")
+      return Promise.resolve({
+        ok: true,
+        value: {
+          settings: {
+            enabled: false,
+            cleanupRequired: false,
+            connectionId: null,
+            model: null,
+            reasoning: "medium",
+            reserveEnabled: true,
+            reservePercent: 20,
+          },
+          revision: null,
+          connected: false,
+          accountPlan: null,
+          loginPending: false,
+          operationActive: false,
+          runtimeVersion: null,
+          errorCode: null,
+          models: [],
+          quota: null,
+        },
+      });
     if (command === "load_ai_catalog") return Promise.resolve(catalog);
     if (command === "load_ai_connection") return Promise.resolve(connection);
     if (command === "load_ai_monitoring")
@@ -327,6 +353,8 @@ it("shows persisted failure diagnostics in Data, including older failure categor
             ...emptyMonitoring.value,
             attempts: 2,
             logicalOperations: 1,
+            connectionSources: {},
+            planAttempts: 0,
             recentFailures: [
               {
                 operationId: "op-1",
@@ -335,6 +363,10 @@ it("shows persisted failure diagnostics in Data, including older failure categor
                 requestedModel: "gemini-3.5-flash-lite",
                 effectiveModel: null,
                 operationType: "tailor_resume",
+                connectionSource: "direct_api",
+                reasoning: null,
+                monetaryCostTracking: "estimated",
+                reportedRetries: 0,
                 callNumber: 2,
                 startedAtUnixMs: Date.now() - 5000,
                 durationMs: 3500,
@@ -357,6 +389,10 @@ it("shows persisted failure diagnostics in Data, including older failure categor
                 requestedModel: "gemini-3.5-flash-lite",
                 effectiveModel: null,
                 operationType: "tailor_resume",
+                connectionSource: "direct_api",
+                reasoning: null,
+                monetaryCostTracking: "estimated",
+                reportedRetries: 0,
                 callNumber: 1,
                 startedAtUnixMs: Date.now() - 10000,
                 durationMs: 2000,
@@ -752,15 +788,13 @@ it("places metric and timeframe controls on the chart and settings below it", as
   expect(settings.textContent).toContain("Clear activity");
   expect(settings.textContent).toContain("Activity retention");
   expect(document.querySelector(".ai-data-heading")?.textContent).toContain(
-    "All keys · General activity · Every provider and model",
+    "All AI activity · General activity · Every provider and model",
   );
   await clickAccessible("Choose view");
   const picker = document.querySelector('[aria-label="Choose activity view"]')!;
   expect(picker.textContent).toContain("OpenAI");
   expect(picker.textContent).toContain("fixture-model");
-  const allKeys = picker.querySelector(
-    '[aria-label="View activity for all keys"]',
-  )!;
+  const allKeys = picker.querySelector('[aria-label="View all AI activity"]')!;
   expect(allKeys.querySelector(".ai-data-key-option-logo")).toBeNull();
   const openAiKey = picker.querySelector(
     '[aria-label="View activity for OpenAI key"]',
@@ -1182,7 +1216,11 @@ async function clickAccessible(label: string) {
 }
 async function chooseDataView(label: string) {
   await clickAccessible("Choose view");
-  await clickAccessible(`View activity for ${label}`);
+  await clickAccessible(
+    label === "all keys"
+      ? "View all AI activity"
+      : `View activity for ${label}`,
+  );
 }
 async function choose(label: string, value: string) {
   const select = [...document.querySelectorAll("select")].find((element) =>
@@ -1205,7 +1243,7 @@ function returnRegistry(value: typeof connection.value) {
     return previous(command, args);
   });
 }
-it("moves a key into the Active key bucket and returns the previous key to All keys", async () => {
+it("moves a key into the Active key bucket and returns the previous key to All AI activity", async () => {
   expect(document.querySelector(".ai-primary")?.textContent).toContain(
     "OpenAI key",
   );
@@ -1238,7 +1276,7 @@ it("moves a key into the Active key bucket and returns the previous key to All k
   expect(document.querySelectorAll(".ai-key-row--active")).toHaveLength(1);
 });
 
-it("moves the active key back to All keys and leaves no active key", async () => {
+it("moves the active key back to All AI activity and leaves no active key", async () => {
   returnRegistry({ ...connection.value, primaryCredentialId: null });
   await act(async () => {
     document
@@ -1316,7 +1354,7 @@ it("uses a vertically bounded drag to replace the active key", async () => {
   });
 });
 
-it("keeps All keys sorted by creation date", async () => {
+it("keeps All AI activity sorted by creation date", async () => {
   const previous = native.invoke.getMockImplementation()!;
   const unsorted = {
     ...connection.value,
@@ -1424,7 +1462,7 @@ it("rejects invalid inline limits without writing or changing the meter", async 
   ).toBe(0);
 });
 
-it("pausing the active key leaves no active key; unpausing keeps it in All keys", async () => {
+it("pausing the active key leaves no active key; unpausing keeps it in All AI activity", async () => {
   returnRegistry({
     ...connection.value,
     primaryCredentialId: null,
@@ -1915,13 +1953,13 @@ it("chooses export and clear months independently from the graph", async () => {
     }),
   );
   await click("Choose activity…");
-  await clickAccessible("Select all keys");
+  await clickAccessible("Select all AI activity");
   await clickAccessible("Select OpenAI key");
   await click("Continue");
   expect(
     document.querySelector('[aria-labelledby="ai-data-action-title"]')
       ?.textContent,
-  ).toContain("All keys");
+  ).toContain("All AI activity");
   await clickAccessible("Select September 2026");
   await click("Clear 1 month");
   expect(native.invoke).toHaveBeenCalledWith(
@@ -1983,7 +2021,7 @@ it("permanently deletes data only for removed keys after explicit confirmation",
   await click("Continue");
   expect(document.body.textContent).toContain("This cannot be undone");
   expect(document.body.textContent).toContain(
-    "removed from the All keys data display",
+    "removed from the All AI activity data display",
   );
   expect(document.body.textContent).toContain(
     "spending totals on My Keys will not change",
@@ -1993,7 +2031,7 @@ it("permanently deletes data only for removed keys after explicit confirmation",
     request: { credentialIds: ["019a0000-0000-7000-8000-000000000004"] },
   });
   expect(document.body.textContent).toContain(
-    "All keys data was updated; My Keys spending totals were not changed",
+    "All AI activity data was updated; My Keys spending totals were not changed",
   );
   await clickAccessible("Choose view");
   expect(
@@ -2109,5 +2147,141 @@ it("restarts only the expanded key cap while preserving lifetime spend and Data"
     native.invoke.mock.calls.some(
       ([command]) => command === "clear_ai_monitoring",
     ),
+  ).toBe(false);
+});
+
+it("groups retained plan connections without inventing removed API keys and defaults the plan view to Tokens", async () => {
+  const previous = native.invoke.getMockImplementation()!;
+  const first = "019a0000-0000-7000-8000-000000000050";
+  const second = "019a0000-0000-7000-8000-000000000051";
+  native.invoke.mockImplementation((command: string, args?: any) => {
+    if (command === "load_ai_monitoring")
+      return Promise.resolve({
+        ok: true,
+        value: {
+          ...emptyMonitoring.value,
+          logicalOperations: 2,
+          attempts: 4,
+          planAttempts: 4,
+          totalTokens: 130,
+          usage: {
+            ...emptyMonitoring.value.usage,
+            inputTokens: 100,
+            outputTokens: 30,
+          },
+          costByCurrencyMicros: { USD: 0 },
+          byCredentialId: { [first]: 2, [second]: 2 },
+          connectionSources: {
+            [first]: "chatgpt_plan",
+            [second]: "chatgpt_plan",
+          },
+        },
+      });
+    return previous(command, args);
+  });
+  await act(async () =>
+    root.render(<AiWorkspace key="plan-history" blocked={false} />),
+  );
+  await click("Data");
+  expect(document.body.textContent).toContain("All AI activity");
+  expect(document.body.textContent).toContain(
+    "Codex monetary cost is not tracked",
+  );
+  expect(document.body.textContent).not.toContain("Removed key");
+  await act(async () =>
+    document
+      .querySelector<HTMLButtonElement>('[aria-label="Choose view"]')!
+      .click(),
+  );
+  await act(async () =>
+    document
+      .querySelector<HTMLButtonElement>(
+        '[aria-label="View activity for Codex"]',
+      )!
+      .click(),
+  );
+  expect(document.body.textContent).toContain("Reported tokens");
+  expect(document.body.textContent).toContain("4 passes");
+  expect(
+    [...document.querySelectorAll("button")]
+      .find((button) => button.textContent === "Tokens")
+      ?.getAttribute("aria-pressed"),
+  ).toBe("true");
+  expect(
+    native.invoke.mock.calls
+      .filter(([command]) => command === "load_ai_monitoring")
+      .at(-1)?.[1],
+  ).toEqual(
+    expect.objectContaining({
+      credentialId: null,
+      connectionSource: "chatgpt_plan",
+    }),
+  );
+});
+
+it("locks all My Keys controls while Codex is enabled and signed out, then restores the saved active key", async () => {
+  const original = native.invoke.getMockImplementation()!;
+  let enabled = true;
+  native.invoke.mockImplementation((command: string, args?: unknown) =>
+    command === "load_chatgpt_plan"
+      ? Promise.resolve({
+          ok: true,
+          value: {
+            settings: {
+              enabled,
+              cleanupRequired: false,
+              connectionId: null,
+              model: null,
+              reasoning: "medium",
+              reserveEnabled: true,
+              reservePercent: 20,
+            },
+            revision: 2,
+            connected: false,
+            accountPlan: null,
+            loginPending: false,
+            operationActive: false,
+            runtimeVersion: null,
+            models: [],
+            quota: null,
+            errorCode: null,
+          },
+        })
+      : original(command, args),
+  );
+  await act(async () => native.modelListeners.forEach((wake) => wake()));
+  const controls =
+    document.querySelector<HTMLFieldSetElement>(".ai-keys-controls")!;
+  expect(controls.disabled).toBe(true);
+  expect(controls.hasAttribute("inert")).toBe(true);
+  expect(controls.classList.contains("ai-keys-controls--disabled")).toBe(true);
+  expect(document.body.textContent).toContain(
+    "Codex must be disabled to use API keys.",
+  );
+  expect(
+    [...controls.querySelectorAll("button,input,select")].every((control) =>
+      control.matches(":disabled"),
+    ),
+  ).toBe(true);
+  expect(
+    document.querySelector(".ai-key-row--active")?.getAttribute("data-key-id"),
+  ).toBe(connection.value.primaryCredentialId);
+  expect(
+    document
+      .querySelector(".ai-key-row--active")
+      ?.classList.contains("ai-key-row--paused"),
+  ).toBe(false);
+  enabled = false;
+  await act(async () => native.modelListeners.forEach((wake) => wake()));
+  expect(controls.disabled).toBe(false);
+  expect(controls.hasAttribute("inert")).toBe(false);
+  expect(document.body.textContent).not.toContain(
+    "Codex must be disabled to use API keys.",
+  );
+  expect(
+    document.querySelector(".ai-key-row--active")?.getAttribute("data-key-id"),
+  ).toBe(connection.value.primaryCredentialId);
+  expect(
+    native.invoke.mock.calls.some(([name]) => name === "change_ai_key"),
   ).toBe(false);
 });

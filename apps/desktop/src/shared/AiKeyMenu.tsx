@@ -5,12 +5,14 @@ import type { SavedKey } from "./AiWorkspace";
 export function AiKeyMenu({
   saved,
   blocked,
+  testDisabled = false,
   onTest,
   onPause,
   onRemove,
 }: {
   saved: SavedKey;
   blocked: boolean;
+  testDisabled?: boolean;
   onTest: () => void;
   onPause: () => void;
   onRemove: () => void;
@@ -107,7 +109,7 @@ export function AiKeyMenu({
             type="button"
             role="menuitem"
             aria-label={`Test ${label}`}
-            disabled={saved.cleanupRequired}
+            disabled={saved.cleanupRequired || testDisabled}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => act(onTest)}
           >

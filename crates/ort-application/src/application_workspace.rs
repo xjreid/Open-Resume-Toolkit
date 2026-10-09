@@ -238,6 +238,7 @@ QUALITY PHASES
 qualityPhase=draft: return a complete selective candidate.
 qualityPhase=review: independently check every previousCandidate line against the published source; correct unsupported claims, weak relevance, redundancy and verbosity. Return a complete improved candidate, not just comments. Validate every source reference yourself: a citation is not proof of a claim.
 qualityPhase=correction: repeat that source/editorial audit and fix validationFeedback, including measured PDF overflow. Every phase returns the same complete contract. reviewIssues lists remaining blocking factual/editorial issues that you cannot resolve; return [] only after the audit passes. Never hide a known issue to obtain a passing status.
+qualityPhase=final_revision: this is the fourth and final call. Revise the complete candidate as well as possible using all validationFeedback and the published evidence. Resolve as many issues as possible and target one page without changing formatting. Return your best complete candidate even if issues remain; the app will use this revision without another quality gate. Report remaining reviewIssues honestly.
 
 Keep exactly one page through selection and tightening. Fonts, margins, spacing, layout and bullet glyphs are fixed by the app. Audit factual support, relevance, distinct value and concision before returning JSON only.";
 
@@ -248,6 +249,7 @@ Apply the same selective, truthful one-page standard as initial tailoring. Ident
 Rank content by direct role relevance, with no automatic Education-first preference. Prefer reverse chronology within employment unless a strong relevance reason supports another order. Preserve exact names, titles, dates, metrics and links. Never infer new qualifications, transfer accomplishments between employers/projects, or use the job description as evidence. Write concise, specific bullets, preferably one sentence and no more than two rendered lines where practical; keep meaningful technical evidence and omit filler and redundancy.
 
 For qualityPhase=review, independently audit the complete previousCandidate against publishedResume for factual support, relevance, distinct value and concision; return a complete improved candidate. For qualityPhase=correction, repeat that audit and resolve validationFeedback and measured page overflow. reviewIssues lists unresolved blocking problems; an empty list must reflect an actual audit. Preserve fonts, margins, spacing, layout and glyphs. Use selection and tightening to fit exactly one page.
+For qualityPhase=final_revision, this is the fourth and final call: revise the complete candidate as well as possible using validationFeedback and the published evidence. Resolve as many issues as possible, preserve unrelated reviewed edits, and return your best complete candidate even if issues remain. The app will use this revision without another quality gate; report remaining reviewIssues honestly.
 
 Set roleInfo=null to preserve reviewedRoleInfo unless the correction explicitly requests a job-details change. Return only complete JSON.";
 

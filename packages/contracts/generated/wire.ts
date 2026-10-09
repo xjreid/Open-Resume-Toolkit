@@ -13,12 +13,16 @@ export type AiAttemptFailure = {
   attemptId: string;
   callNumber: number;
   category: string | null;
+  connectionSource: ConnectionSource;
   details: AiFailureDetails | null;
   durationMs: number | null;
   effectiveModel: string | null;
+  monetaryCostTracking: MonetaryCostTracking;
   operationId: string;
   operationType: string;
   provider: string;
+  reasoning: ReasoningEffort | null;
+  reportedRetries: number;
   requestedModel: string;
   startedAtUnixMs: number;
   usage: Usage | null;
@@ -79,11 +83,13 @@ export type AiMonitoringSummary = {
   byPreset: Record<string, number>;
   byProvider: Record<string, number>;
   byStatus: Record<string, number>;
+  connectionSources: Record<string, string>;
   costByCurrencyMicros: Record<string, number>;
   currency: string | null;
   estimatedCostMicros: number;
   logicalOperations: number;
   partial: boolean;
+  planAttempts: number;
   recentFailures: Array<AiAttemptFailure>;
   timeBuckets: Array<AiMonitoringBucket>;
   totalTokens: number;
@@ -126,6 +132,7 @@ export type ApplicationContext = {
   aiLabel: string;
   aiReady: boolean;
   browserConnected: boolean;
+  connectionSource: ConnectionSource;
   model: string | null;
   modelOptions: Array<ApplicationModelOption>;
   profileId: string;
@@ -245,6 +252,7 @@ export type CloseStatusRequest = {
   requestId: string;
 };
 export type CloseStatusResponse = { pendingAttempt: string | null };
+export type ConnectionSource = "direct_api" | "chatgpt_plan";
 export type ConnectionStatus = { available: boolean; connected: boolean };
 export type ContactDetails = {
   email: string;
@@ -414,8 +422,18 @@ export type ImportTextTarget =
   | { index: number; kind: "proposed" }
   | { id: string; kind: "existing" }
   | { heading: string; kind: "new" };
+export type InstallPhase =
+  | "idle"
+  | "downloading"
+  | "verifying"
+  | "awaiting_approval"
+  | "checking"
+  | "complete"
+  | "cancelled"
+  | "failed";
 export type Link = { id?: string; label: string; order?: number; url: string };
 export type ListKind = "skills" | "coursework";
+export type LoadPlanRequest = { refreshUsage?: boolean };
 export type LoadResumeRequest = {
   contractVersion: number;
   payload: EmptyPayload;
@@ -429,6 +447,7 @@ export type MapImportReviewRequest = {
 };
 export type MaterialKind = "resume" | "cover_letter";
 export type MaterialPdf = { base64: string; filename: string };
+export type MonetaryCostTracking = "estimated" | "not_tracked";
 export type NamedField = {
   id: string;
   isSkill: boolean;
@@ -518,6 +537,34 @@ export type PdfTicketRequest = {
   payload: PdfTicketPayload;
   requestId: string;
 };
+export type PlanModel = {
+  explanation: string | null;
+  id: string;
+  name: string;
+  reasoningEfforts: Array<ReasoningEffort>;
+  supported: boolean;
+};
+export type PlanSettings = {
+  cleanupRequired: boolean;
+  connectionId: string | null;
+  enabled: boolean;
+  model: string | null;
+  reasoning: ReasoningEffort;
+  reserveEnabled: boolean;
+  reservePercent: number;
+};
+export type PlanStatus = {
+  accountPlan: string | null;
+  connected: boolean;
+  errorCode: string | null;
+  loginPending: boolean;
+  models: Array<PlanModel>;
+  operationActive: boolean;
+  quota: QuotaSnapshot | null;
+  revision: number | null;
+  runtimeVersion: string | null;
+  settings: PlanSettings;
+};
 export type PortablePdfArchivePayload = { archiveId: string };
 export type PortablePdfArchiveRequest = {
   contractVersion: number;
@@ -593,6 +640,19 @@ export type QualificationAlert = {
   target: string;
   validationVersion: number;
 };
+export type QuotaSnapshot = {
+  fetchedAtUnixMs: number;
+  windows: Array<QuotaWindow>;
+};
+export type QuotaWindow = {
+  limitId: string;
+  name: string;
+  remainingPercent: number;
+  resetsAt: number | null;
+  window: string;
+  windowDurationMinutes: number | null;
+};
+export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
 export type RenameAiKeyRequest = { credentialId: string; name: string };
 export type ResolveClosePayload = { attempt: string; decision: CloseDecision };
 export type ResolveCloseRequest = {
@@ -655,7 +715,14 @@ export type RollbackSafetyCopyResponse = {
   currentProfileRetained: boolean;
   restartRequired: boolean;
 };
+export type RuntimeInstallStatus = {
+  downloadedBytes: number;
+  errorCode: string | null;
+  phase: InstallPhase;
+  totalBytes: number;
+};
 export type RuntimeProfile = "development";
+export type RuntimeReadiness = { errorCode: string | null; ready: boolean };
 export type SafetyCopyActionPayload = { confirmation: string };
 export type SaveAiCapRequest = {
   credentialId: string;
@@ -663,6 +730,14 @@ export type SaveAiCapRequest = {
   limitMicros: number;
   period: AiPeriod;
   timeZone: string;
+};
+export type SavePlanRequest = {
+  enabled: boolean;
+  expectedRevision?: number | null;
+  model?: string | null;
+  reasoning: ReasoningEffort;
+  reserveEnabled: boolean;
+  reservePercent: number;
 };
 export type SaveResumePayload = {
   document: ResumeDocument;
@@ -679,6 +754,7 @@ export type SavedAiKey = {
   credentialId: string;
   model: string;
   name?: string | null;
+  pauseReason?: string | null;
   paused: boolean;
   provider: CredentialProvider;
   removed: boolean;
@@ -833,10 +909,16 @@ export type DesktopCommands = {
     args: Record<string, never>;
     value: boolean;
   };
+  cancel_chatgpt_login: { args: Record<string, never>; value: PlanStatus };
+  cancel_codex_runtime_install: {
+    args: Record<string, never>;
+    value: RuntimeInstallStatus;
+  };
   change_ai_key: {
     args: { request: ChangeAiKeyRequest };
     value: AiKeyRegistry;
   };
+  check_codex_runtime: { args: Record<string, never>; value: RuntimeReadiness };
   clear_ai_monitoring: {
     args: {
       credentialIds?: Array<string> | null;
@@ -849,6 +931,7 @@ export type DesktopCommands = {
     args: { request: CloseStatusRequest };
     value: CloseStatusResponse;
   };
+  connect_chatgpt_plan: { args: Record<string, never>; value: PlanStatus };
   connect_development_browser: { args: Record<string, never>; value: boolean };
   delete_removed_ai_key_data: {
     args: { request: DeleteRemovedKeyDataRequest };
@@ -864,6 +947,7 @@ export type DesktopCommands = {
   };
   disable_ai_cap: { args: { request: AiCapActionRequest }; value: boolean };
   disable_ai_general_cap: { args: Record<string, never>; value: boolean };
+  disconnect_chatgpt_plan: { args: Record<string, never>; value: PlanStatus };
   disconnect_development_browser: {
     args: Record<string, never>;
     value: boolean;
@@ -911,6 +995,10 @@ export type DesktopCommands = {
   get_tracker_entry: { args: { id: string }; value: SavedTrackerEntry };
   health: { args: { request: HealthRequest }; value: HealthResponse };
   hide_application_popup: { args: Record<string, never>; value: boolean };
+  install_codex_runtime: {
+    args: Record<string, never>;
+    value: RuntimeInstallStatus;
+  };
   list_tracker_entries: {
     args: {
       limit?: number | null;
@@ -937,6 +1025,7 @@ export type DesktopCommands = {
   load_ai_monitoring: {
     args: {
       bucketSize: string;
+      connectionSource?: ConnectionSource | null;
       credentialId?: string | null;
       fromUnixMs: number;
       timeZone: string;
@@ -961,6 +1050,11 @@ export type DesktopCommands = {
     args: { request: BackupRecoveryStatusRequest };
     value: BackupRecoveryStatusResponse;
   };
+  load_chatgpt_plan: { args: { request: LoadPlanRequest }; value: PlanStatus };
+  load_codex_runtime_install: {
+    args: Record<string, never>;
+    value: RuntimeInstallStatus;
+  };
   load_resume: {
     args: { request: LoadResumeRequest };
     value: ResumeWorkspaceResponse;
@@ -968,6 +1062,10 @@ export type DesktopCommands = {
   load_storage_usage: {
     args: { request: StorageUsageRequest };
     value: StorageUsageResponse;
+  };
+  open_chatgpt_plan_runtime_guidance: {
+    args: Record<string, never>;
+    value: boolean;
   };
   open_tracker_link: { args: { target: string }; value: boolean };
   prepare_application_exports: {
@@ -1057,6 +1155,7 @@ export type DesktopCommands = {
     };
     value: SavedWorkspace;
   };
+  save_chatgpt_plan: { args: { request: SavePlanRequest }; value: PlanStatus };
   save_resume: {
     args: { request: SaveResumeRequest };
     value: VersionedResumeResponse;
@@ -1085,6 +1184,7 @@ export type DesktopCommands = {
     args: { jobDescription: string; jobUrl: string; style: DocumentStyle };
     value: SavedWorkspace;
   };
+  stop_chatgpt_plan: { args: Record<string, never>; value: boolean };
   test_ai_connection: {
     args: {
       credentialId: string;

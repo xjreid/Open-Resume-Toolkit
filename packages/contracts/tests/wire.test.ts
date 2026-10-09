@@ -41,3 +41,25 @@ it("rejects malformed UUIDs and inherited property names", () => {
     }),
   ).toBe(false);
 });
+
+it("rejects unknown installer states, invalid progress and incomplete status", () => {
+  const valid = fixtures.load_codex_runtime_install;
+  for (const value of [
+    { ...valid, phase: "executing_arbitrary_command" },
+    { ...valid, downloadedBytes: -1 },
+    { ...valid, totalBytes: "98089521" },
+    { phase: "complete" },
+  ]) {
+    expect(isDesktopValue("load_codex_runtime_install", value)).toBe(false);
+  }
+});
+
+it("requires a complete, typed offline runtime readiness result", () => {
+  expect(
+    isDesktopValue("check_codex_runtime", { ready: true, errorCode: null }),
+  ).toBe(true);
+  expect(
+    isDesktopValue("check_codex_runtime", { ready: "true", errorCode: null }),
+  ).toBe(false);
+  expect(isDesktopValue("check_codex_runtime", { ready: true })).toBe(false);
+});

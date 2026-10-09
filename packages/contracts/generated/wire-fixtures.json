@@ -1,10 +1,14 @@
 {
+  "check_codex_runtime": {
+    "errorCode": "PLAN_RUNTIME_MISSING",
+    "ready": false
+  },
   "export_portable_backup": {
     "byteCount": 1000,
     "cleanupPending": false,
     "durabilityUnconfirmed": false,
     "formatMajor": 1,
-    "formatMinor": 7,
+    "formatMinor": 8,
     "status": "exported"
   },
   "get_tracker_entry": {
@@ -49,11 +53,13 @@
     "byPreset": {},
     "byProvider": {},
     "byStatus": {},
+    "connectionSources": {},
     "costByCurrencyMicros": {},
     "currency": null,
     "estimatedCostMicros": 0,
     "logicalOperations": 0,
     "partial": false,
+    "planAttempts": 0,
     "recentFailures": [],
     "timeBuckets": [],
     "totalTokens": 0,
@@ -104,16 +110,22 @@
       "style": "technical"
     }
   },
+  "load_codex_runtime_install": {
+    "downloadedBytes": 0,
+    "errorCode": null,
+    "phase": "idle",
+    "totalBytes": 98089521
+  },
   "validate_portable_backup": {
     "aiAttempts": 20001,
     "aiOperations": 10001,
     "appVersion": "0.0.0-dev",
     "byteCount": 1000,
     "createdAt": "2026-10-06T12:00:00Z",
-    "databaseSchema": 5,
+    "databaseSchema": 7,
     "documentSchema": 2,
     "formatMajor": 1,
-    "formatMinor": 7,
+    "formatMinor": 8,
     "masterDrafts": 1,
     "publishedResumes": 101,
     "renderManifests": 0,

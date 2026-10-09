@@ -1,3 +1,4 @@
+import { planErrorMessage } from "./chatgpt-plan-presentation";
 import "./styles/ai-failure-details.css";
 
 function record(value: unknown): Record<string, unknown> {
@@ -42,10 +43,22 @@ export function AiFailureDetailsContent({
     ["Serving model", text(details.effectiveModel)],
     ["Operation", text(details.operationType)],
     [
-      "Call",
+      details.connectionSource === "chatgpt_plan" ? "Pass" : "Call",
       call == null
         ? null
         : `${call}${maximum == null ? "" : ` of ${maximum}`}${maximum === 4 ? ` · ${call === 1 ? "draft" : call === 2 ? "source and editorial review" : "correction"}` : ""}`,
+    ],
+    [
+      "Connection",
+      details.connectionSource === "chatgpt_plan" ? "Codex" : null,
+    ],
+    ["Reasoning", text(details.reasoning)],
+    ["Reported internal retries", number(details.reportedRetries)],
+    [
+      "Monetary cost",
+      details.monetaryCostTracking === "not_tracked"
+        ? "$0 · not tracked"
+        : null,
     ],
     ["HTTP status", number(diagnostic.httpStatus)],
     ["Finish reason", text(diagnostic.finishReason)],
@@ -104,7 +117,18 @@ export function aiFailureReason(
   code: string | undefined,
   category: string | null,
 ) {
+  if (code?.startsWith("PLAN_")) return planErrorMessage(code);
   const reasons: Record<string, string> = {
+    PLAN_AUTH_REQUIRED: "ChatGPT sign-in required",
+    PLAN_RESERVE_REJECTED: "Plan reserve reached",
+    PLAN_QUOTA_UNAVAILABLE: "Plan quota unavailable",
+    PLAN_QUOTA_INVALID: "Invalid plan quota",
+    PLAN_MODEL_UNAVAILABLE: "Plan model unavailable",
+    PLAN_PROVIDER_REJECTED: "Codex request rejected",
+    PLAN_RUNTIME_UNAVAILABLE: "Codex stopped",
+    PLAN_REQUEST_TIMEOUT: "Codex pass timed out",
+    PLAN_CONTAINMENT_VIOLATION: "Codex tool activity blocked",
+    PLAN_PROTOCOL_INVALID: "Incompatible Codex response",
     AI_PROVIDER_SERVICE_UNAVAILABLE:
       "Provider unavailable or overloaded (HTTP 503). Wait before retrying or choose another model.",
     AI_PROVIDER_TEMPORARY:
@@ -166,6 +190,16 @@ export function aiFailureName(
   category: string | null,
 ) {
   const names: Record<string, string> = {
+    PLAN_AUTH_REQUIRED: "ChatGPT sign-in required",
+    PLAN_RESERVE_REJECTED: "Plan reserve reached",
+    PLAN_QUOTA_UNAVAILABLE: "Plan quota unavailable",
+    PLAN_QUOTA_INVALID: "Invalid plan quota",
+    PLAN_MODEL_UNAVAILABLE: "Plan model unavailable",
+    PLAN_PROVIDER_REJECTED: "Codex request rejected",
+    PLAN_RUNTIME_UNAVAILABLE: "Codex stopped",
+    PLAN_REQUEST_TIMEOUT: "Codex pass timed out",
+    PLAN_CONTAINMENT_VIOLATION: "Codex tool activity blocked",
+    PLAN_PROTOCOL_INVALID: "Incompatible Codex response",
     AI_PROVIDER_SERVICE_UNAVAILABLE: "Provider unavailable",
     AI_PROVIDER_TEMPORARY: "Provider server error",
     AI_PROVIDER_UNAVAILABLE: "Connection interrupted",
