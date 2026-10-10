@@ -32,7 +32,7 @@ fn session_retirement_interrupts_stalled_writes_for_disconnect_and_shutdown() {
         std::thread::sleep(Duration::from_millis(20));
         let start = Instant::now();
         if shutdown {
-            manager.stop();
+            manager.shutdown();
         } else {
             manager.disconnect(profile);
         }
@@ -303,11 +303,63 @@ fn a_queued_status_check_rechecks_permission_after_disable_and_cannot_restart() 
 }
 
 #[test]
-fn app_shutdown_destroys_sign_in_without_changing_the_enabled_preference() {
+fn app_shutdown_destroys_sign_in_and_permanently_blocks_restart() {
     let (manager, profile, settings) = signed_in("success");
-    manager.stop();
+    manager.shutdown();
+    manager.shutdown();
     let status = manager.status(profile, settings, None, false);
     assert!(status.settings.enabled);
     assert!(!status.connected);
     assert!(status.runtime_version.is_none());
+    assert_eq!(
+        manager.with_session(
+            profile,
+            Instant::now() + Duration::from_secs(1),
+            SessionAccess {
+                cancel: &|| false,
+                skip_busy: false,
+                permit: &|| Ok(()),
+            },
+            |_| panic!("server restarted after app shutdown"),
+            |_| -> Result<(), &'static str> { panic!("server reused after app shutdown") },
+        ),
+        Err("AI_CANCELLED"),
+    );
+}
+
+#[test]
+fn shutdown_blocks_a_poll_that_already_passed_permission() {
+    let manager = Arc::new(PlanRuntime::default());
+    let worker = Arc::clone(&manager);
+    let (entered, ready) = std::sync::mpsc::channel();
+    let (resume, released) = std::sync::mpsc::channel();
+    let poll = std::thread::spawn(move || {
+        worker.with_session(
+            Uuid::now_v7(),
+            Instant::now() + Duration::from_secs(2),
+            SessionAccess {
+                cancel: &|| false,
+                skip_busy: false,
+                permit: &|| {
+                    entered.send(()).unwrap();
+                    released.recv_timeout(Duration::from_secs(1)).unwrap();
+                    Ok(())
+                },
+            },
+            |_| panic!("queued poll restarted the server during shutdown"),
+            |_| -> Result<(), &'static str> { panic!("queued poll reused the server") },
+        )
+    });
+    ready.recv_timeout(Duration::from_secs(1)).unwrap();
+    let retiring = Arc::clone(&manager);
+    let shutdown = std::thread::spawn(move || retiring.shutdown());
+    let deadline = Instant::now() + Duration::from_secs(1);
+    while !manager.shutting_down.load(Ordering::Acquire) {
+        assert!(Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    resume.send(()).unwrap();
+    assert_eq!(poll.join().unwrap(), Err("AI_CANCELLED"));
+    shutdown.join().unwrap();
+    assert!(manager.interrupted());
 }

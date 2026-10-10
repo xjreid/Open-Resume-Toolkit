@@ -777,6 +777,9 @@
         "browserConnected": {
           "type": "boolean"
         },
+        "codexConnected": {
+          "type": "boolean"
+        },
         "connectionSource": {
           "$ref": "#/$defs/ConnectionSource"
         },
@@ -803,6 +806,16 @@
             "null"
           ]
         },
+        "reasoning": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReasoningEffort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "selectedKeyId": {
           "format": "uuid",
           "type": [
@@ -821,9 +834,11 @@
         "aiLabel",
         "aiReady",
         "aiBusy",
+        "codexConnected",
         "selectedKeyReady",
         "selectedKeyId",
         "model",
+        "reasoning",
         "modelOptions",
         "browserConnected"
       ],

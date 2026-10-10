@@ -732,6 +732,35 @@ fn codex_permission_locks_all_keys_without_pausing_and_disabling_restores_primar
 }
 
 #[test]
+fn reopening_with_codex_stopped_restores_primary_without_changing_api_keys() {
+    let (_temp, store, vault) = fixture();
+    let id = add(&store, &vault, "openai").keys[0].credential_id;
+    let paused = add(&store, &vault, "anthropic").keys[1].credential_id;
+    action(&store, &vault, id, AiKeyAction::SelectPrimary);
+    action(&store, &vault, paused, AiKeyAction::Pause);
+    let keys = serde_json::to_value(load_registry(&store).unwrap().0).unwrap();
+    let secrets = vault.secrets.lock().unwrap().clone();
+    crate::chatgpt_plan::persist_selection(
+        &store,
+        None,
+        &ort_ai::plan::PlanSettings {
+            enabled: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    crate::chatgpt_plan::reset_server_on_launch(&store).unwrap();
+    let connection = request_connection(&store, None).unwrap();
+    assert_eq!(connection.mode, "direct_api");
+    assert_eq!(connection.credential_id, Some(id));
+    assert_eq!(
+        serde_json::to_value(load_registry(&store).unwrap().0).unwrap(),
+        keys
+    );
+    assert_eq!(*vault.secrets.lock().unwrap(), secrets);
+}
+
+#[test]
 fn old_codex_key_pauses_migrate_without_changing_manual_pauses_or_primary() {
     let (_temp, store, vault) = fixture();
     let id = add(&store, &vault, "openai").keys[0].credential_id;

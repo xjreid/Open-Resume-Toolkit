@@ -2,6 +2,37 @@ import { expect, it } from "vitest";
 import fixtures from "../generated/wire-fixtures.json";
 import { isDesktopValue } from "../generated/wire-decoder";
 import type { DesktopCommands } from "../generated/wire";
+
+it("decodes overlay reasoning as a supported level or null", () => {
+  const context = {
+    aiBusy: false,
+    aiLabel: "Using Codex",
+    aiReady: true,
+    codexConnected: true,
+    browserConnected: false,
+    connectionSource: "chatgpt_plan",
+    model: "gpt-5.6-sol",
+    modelOptions: [],
+    profileId: "01992187-74f7-7000-8000-000000000001",
+    publishedRevision: 1,
+    reasoning: "high",
+    selectedKeyId: null,
+    selectedKeyReady: true,
+  };
+  expect(isDesktopValue("application_context", context)).toBe(true);
+  expect(
+    isDesktopValue("application_context", { ...context, reasoning: null }),
+  ).toBe(true);
+  expect(
+    isDesktopValue("application_context", { ...context, reasoning: "unknown" }),
+  ).toBe(false);
+  expect(
+    isDesktopValue("application_context", {
+      ...context,
+      codexConnected: "true",
+    }),
+  ).toBe(false);
+});
 for (const [command, value] of Object.entries(fixtures)) {
   it(`decodes the Rust-produced ${command} response`, () => {
     expect(isDesktopValue(command as keyof DesktopCommands, value)).toBe(true);

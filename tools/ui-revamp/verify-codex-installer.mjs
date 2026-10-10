@@ -31,11 +31,20 @@ try {
     await page.setViewportSize(viewport);
     await page.goto("http://127.0.0.1:1420/preview/ai.html?disabled=1");
     await page.getByRole("button", { name: "Codex", exact: true }).click();
-    const enable = page.getByRole("checkbox", { name: /Enable Codex/ });
+    const start = page.getByRole("button", {
+      name: "Start Codex server",
+      exact: true,
+    });
     await page.waitForFunction(
-      () => !document.querySelector(".plan-enable input")?.disabled,
+      () =>
+        !document.querySelector(".plan-server-actions button:last-child")
+          ?.disabled,
     );
-    if (await enable.isChecked())
+    if (
+      await page
+        .getByRole("button", { name: "Stop Codex server", exact: true })
+        .count()
+    )
       throw Error("Readiness must not enable Codex");
     if (
       (await page.getByText("Runtime installation details").count()) ||
@@ -44,7 +53,7 @@ try {
         .count())
     )
       throw Error("Verified installations must hide all setup guidance");
-    await enable.focus();
+    await start.focus();
     await page.screenshot({
       path: `.impeccable/review/readiness-ready-${viewport.width}.png`,
     });
@@ -57,7 +66,7 @@ try {
       exact: true,
     });
     await button.waitFor();
-    if (await enable.isEnabled())
+    if (await start.count())
       throw Error("Unverified runtimes must not enable Codex");
     await button.scrollIntoViewIfNeeded();
     await button.focus();

@@ -30,7 +30,7 @@ async function capture(page, options) {
         await page.evaluate(() =>
           [
             ...document.querySelectorAll(
-              ".application-provider-label, .application-reasoning label",
+              ".application-brand-title, .application-provider-label",
             ),
           ].map((element) => {
             const style = getComputedStyle(element);
@@ -227,19 +227,28 @@ await context.addInitScript(
           return ok({ available: true, connected: true });
         if (name === "application_context")
           return ok({
-            connectionSource: parameters.has("api-key")
-              ? "direct_api"
-              : "chatgpt_plan",
+            connectionSource:
+              parameters.has("api-key") || !plan.settings.enabled
+                ? "direct_api"
+                : "chatgpt_plan",
             profileId: "019a0000-0000-7000-8000-000000000001",
             publishedRevision: 1,
             aiLabel: "Using Codex · GPT-6.1 Sol",
-            aiReady: parameters.has("api-key") || plan.connected,
+            aiReady:
+              parameters.has("api-key") ||
+              (plan.settings.enabled && plan.connected),
+            codexConnected: !parameters.has("api-key") && plan.connected,
             aiBusy: parameters.has("busy"),
             selectedKeyReady: parameters.has("api-key") || plan.connected,
             selectedKeyId: "019a0000-0000-7000-8000-000000000050",
             model: parameters.has("api-key")
               ? "gpt-6-sol"
-              : plan.settings.model,
+              : plan.settings.enabled
+                ? plan.settings.model
+                : null,
+            reasoning: parameters.has("api-key")
+              ? null
+              : plan.settings.reasoning,
             modelOptions: [{ model: "gpt-6-sol" }, { model: "gpt-6.1-sol" }],
             browserConnected: false,
           });
@@ -318,7 +327,11 @@ try {
       .scrollIntoViewIfNeeded();
     await capture(page, { path: `${out}/plan-bottom-${viewport.width}.png` });
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    if (!(await page.getByLabel("Enable Codex").isChecked()))
+    if (
+      !(await page
+        .getByRole("button", { name: "Stop Codex server", exact: true })
+        .count())
+    )
       throw new Error("Sign out changed the enabled preference");
     await page.getByRole("button", { name: "My Keys", exact: true }).click();
     // Fresh registry is loaded when activation status changes.
@@ -350,15 +363,21 @@ try {
   await page.goto("http://127.0.0.1:1420/preview/ai.html?disconnected=1");
   await page.getByRole("button", { name: "Codex", exact: true }).click();
   await page
-    .getByRole("button", { name: "Connect ChatGPT account", exact: true })
+    .getByRole("button", { name: "Sign in to ChatGPT", exact: true })
     .waitFor();
   await capture(page, { path: `${out}/plan-disconnected.png` });
-  if (!(await page.getByLabel("Enable Codex", { exact: false }).isChecked()))
+  if (
+    !(await page
+      .getByRole("button", { name: "Stop Codex server", exact: true })
+      .count())
+  )
     throw new Error("Enabled preference disappeared after sign-out");
-  await page.getByLabel("Enable Codex", { exact: false }).uncheck();
+  await page
+    .getByRole("button", { name: "Stop Codex server", exact: true })
+    .click();
   if (
     await page
-      .getByRole("button", { name: "Connect ChatGPT account", exact: true })
+      .getByRole("button", { name: "Sign in to ChatGPT", exact: true })
       .count()
   )
     throw new Error("Account controls must be hidden while Codex is disabled");
@@ -368,28 +387,31 @@ try {
   await capture(page, { path: `${out}/codex-disabled-keys.png` });
   await page.setViewportSize({ width: 360, height: 760 });
   await page.goto("http://127.0.0.1:1420/overlay.html");
-  await page.getByLabel("Codex model").waitFor();
-  await page.getByText("64.5% remaining", { exact: true }).waitFor();
+  await page
+    .locator(".application-key-status")
+    .getByText("Ready", { exact: true })
+    .waitFor();
   await capture(page, { path: `${out}/codex-controls-overlay.png` });
-  await page.getByLabel("Codex model").selectOption("gpt-6-luna");
-  await page.getByLabel("Codex reasoning").selectOption("medium");
-  if ((await page.getByLabel("Codex model").inputValue()) !== "gpt-6-luna")
-    throw new Error("Codex model was not saved");
+  if (await page.locator(".application-header select").count())
+    throw new Error("Overlay provider settings belong in the main app");
   await page.goto("http://127.0.0.1:1420/overlay.html?unknown-usage=1");
-  await page.getByLabel("Codex model").waitFor();
+  await page
+    .locator(".application-key-status")
+    .getByText("Ready", { exact: true })
+    .waitFor();
   await capture(page, { path: `${out}/codex-controls-overlay-unknown.png` });
   if (await page.getByLabel("Account-wide remaining usage").count())
     throw new Error("Unknown usage must be omitted");
   await page.goto("http://127.0.0.1:1420/overlay.html?busy=1");
-  await page.getByLabel("Codex model").waitFor();
+  await page.getByRole("button", { name: "Stop", exact: true }).waitFor();
   await capture(page, { path: `${out}/codex-controls-overlay-busy.png` });
-  if (await page.getByLabel("Codex model").isEnabled())
-    throw new Error("Busy model control must be locked");
+  if (await page.locator(".application-header select").count())
+    throw new Error("Working overlay must not expose provider settings");
   await page.goto("http://127.0.0.1:1420/overlay.html?disconnected=1");
-  await page.getByText("Codex", { exact: true }).waitFor();
-  await page
-    .getByText("AI is disabled until an account is connected.", { exact: true })
-    .waitFor();
+  await page.getByText("No model connected", { exact: true }).waitFor();
+  await page.getByText("Sign in to use Codex", { exact: true }).waitFor();
+  if (await page.locator("footer .application-provider-label").count())
+    throw new Error("Signed-out Codex must not be shown as connected");
   if (
     (await page.getByLabel("Codex model").count()) ||
     (await page.getByLabel("Codex reasoning").count())
@@ -400,6 +422,9 @@ try {
   if (await page.getByLabel("AI model").count())
     throw new Error("Signed-out Codex cannot expose API models");
   await capture(page, { path: `${out}/codex-controls-overlay-signed-out.png` });
+  await page.goto("http://127.0.0.1:1420/overlay.html?disabled=1");
+  await page.getByText("No model connected", { exact: true }).waitFor();
+  await page.getByText("Connect API key or Codex", { exact: true }).waitFor();
   await page.goto("http://127.0.0.1:1420/overlay.html?api-key=1");
   await page.getByText("API key", { exact: true }).waitFor();
   await capture(page, { path: `${out}/codex-controls-overlay-api.png` });

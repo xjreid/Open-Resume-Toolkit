@@ -4,24 +4,28 @@ The application workspace opens as a fixed 360 × 760 logical-pixel rail at the
 left edge of the monitor work area, vertically centered. Its height is clamped
 on smaller displays. Drag the header to move it within the monitor work area;
 the rail cannot be resized.
-The header shows request activity and a red Stop text control while a request
-is running. The native red window control requests an app quit and shows the
+The compact header keeps the logo beside a one-line Open Resume Toolkit title
+and request activity. A red Stop text control
+appears beside the activity while a request is running. A fixed bottom footer
+shows browser connection status on the left and the provider, model, and
+applicable reasoning on the right. AI readiness stays in the header.
+The native red window control requests an app quit and shows the
 existing confirmation for unsaved work. Opening the overlay leaves the main
 window visible; the native yellow control minimizes only the overlay.
 
 ## Provider controls
 
-The fixed top banner identifies the active connection as **API key** or **Codex**.
-API key connections show the active key's model selector. Connected Codex accounts show
-model and reasoning selectors using the qualified runtime's available options;
-unavailable options remain disabled. Selecting a model preserves the current
-reasoning when supported, otherwise selects the first supported level. Changes
-are saved through the same settings boundary as the main app and broadcast to
-both windows immediately. Controls are locked during AI work and settings saves.
-
-When Codex reports account-wide remaining usage, the banner shows each reported
-window and remaining percentage, including zero. Unknown usage is omitted. Usage
-refreshes on opening the overlay, every 30 seconds, and after AI work finishes.
+The fixed footer summarizes a usable provider and model, for example
+**API key: Gemini 3.5 Flash** or **Codex: GPT-5.6 Sol · High**. Reasoning appears
+only for a selected Codex model. Long summaries wrap within the footer.
+When AI is unavailable, the footer shows **No model connected** and the header
+shows **Connect API key or Codex**. Enabled Codex without a signed-in account
+instead shows **Sign in to use Codex** in the header.
+Model and reasoning changes are made in the main app. The overlay has no
+provider settings controls and uses the current settings for AI work.
+Connection changes in the main app refresh the overlay's status immediately.
+Codex usage is not displayed in the overlay; account-wide usage remains
+available in the main app.
 
 ## Capture and tailor
 
@@ -89,8 +93,8 @@ found role details and today's date. The pencil opens editable tracker details;
 the red X confirms discarding the application without a tracker entry.
 
 Codex enablement is the exclusive provider choice even while signed out. The
-banner keeps showing Codex, with “AI is disabled until an account is connected.”
-instead of model/reasoning controls. Remaining usage and API key selectors are
-also hidden while signed out. Controls return when the account connects.
+footer shows “No model connected”, with “Sign in to use Codex” in the header.
+The status returns to
+Ready when the account connects and AI is available.
 Sign out keeps this choice; disabling Codex
 restores the selected API key automatically without unpausing it.

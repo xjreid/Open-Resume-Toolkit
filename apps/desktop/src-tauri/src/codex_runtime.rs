@@ -262,6 +262,11 @@ impl Drop for Session {
     }
 }
 impl Session {
+    #[cfg(all(test, unix))]
+    pub(crate) fn process_id(&self) -> u32 {
+        self.child.id()
+    }
+
     pub(crate) fn attach_interrupt(&mut self, interrupt: Arc<AtomicBool>) {
         self.interrupt = interrupt;
     }
@@ -968,6 +973,17 @@ pub(crate) fn test_session(mode: &str) -> Session {
         &|| false,
     )
     .unwrap()
+}
+
+#[cfg(all(test, unix))]
+pub(crate) fn test_process_is_running(pid: u32) -> bool {
+    Command::new("/bin/kill")
+        .args(["-0", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("inspect synthetic server process")
+        .success()
 }
 
 #[cfg(test)]

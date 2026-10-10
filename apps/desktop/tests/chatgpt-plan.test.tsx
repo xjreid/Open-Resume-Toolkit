@@ -57,7 +57,7 @@ beforeEach(() => {
     settings: {
       cleanupRequired: false,
       connectionId: "019a0000-0000-7000-8000-000000000001",
-      enabled: false,
+      enabled: true,
       model: "gpt-6.1-sol",
       reasoning: "medium",
       reserveEnabled: true,
@@ -112,6 +112,13 @@ beforeEach(() => {
       status = { ...status, runtimeVersion: "0.162.0", errorCode: null };
       return { ok: true, value: installation };
     }
+    if (
+      command === "load_chatgpt_plan" &&
+      status.settings.enabled &&
+      !status.settings.cleanupRequired &&
+      readiness.ready
+    )
+      status = { ...status, runtimeVersion: "0.162.0" };
     if (command === "save_chatgpt_plan") {
       status = {
         ...status,
@@ -126,6 +133,16 @@ beforeEach(() => {
         },
       };
     }
+    if (command === "save_chatgpt_plan" && !args.request.enabled)
+      status = {
+        ...status,
+        connected: false,
+        accountPlan: null,
+        runtimeVersion: null,
+        loginPending: false,
+        quota: null,
+        settings: { ...status.settings, connectionId: null },
+      };
     if (command === "connect_chatgpt_plan")
       status = { ...status, loginPending: true };
     if (command === "cancel_chatgpt_login")
@@ -172,19 +189,22 @@ async function click(text: string) {
 }
 
 it("checks installation while disabled and hides all setup for a verified, stopped runtime", async () => {
+  status.settings.enabled = false;
   status.connected = false;
   status.settings.connectionId = null;
   status.runtimeVersion = null;
   await render();
   expect(native.invoke).toHaveBeenCalledWith("check_codex_runtime");
   expect(
-    document.querySelector<HTMLInputElement>(".plan-enable input")!.disabled,
+    document.querySelector<HTMLButtonElement>(
+      ".plan-server-actions button:last-child",
+    )!.disabled,
   ).toBe(false);
   expect(
     document.querySelector('[aria-label="Codex runtime installation"]'),
   ).toBeNull();
   expect(document.body.textContent).not.toMatch(
-    /Runtime installation details|official runtime download|Connect ChatGPT account|Refresh connection/,
+    /Runtime installation details|official runtime download|Sign in to ChatGPT|Refresh connection/,
   );
   expect(native.invoke.mock.calls.map(([command]) => command)).not.toEqual(
     expect.arrayContaining([
@@ -196,6 +216,7 @@ it("checks installation while disabled and hides all setup for a verified, stopp
 });
 
 it("prompts for installation while disabled, without relying on a session error", async () => {
+  status.settings.enabled = false;
   status.connected = false;
   status.settings.connectionId = null;
   status.runtimeVersion = null;
@@ -203,8 +224,8 @@ it("prompts for installation while disabled, without relying on a session error"
   await render();
   expect(document.body.textContent).toContain("Install Codex runtime");
   expect(
-    document.querySelector<HTMLInputElement>(".plan-enable input")!.disabled,
-  ).toBe(true);
+    document.querySelector(".plan-server-actions button:last-child"),
+  ).toBeNull();
   expect(native.invoke).not.toHaveBeenCalledWith("install_codex_runtime");
 });
 
@@ -216,8 +237,9 @@ it.each(["PLAN_RUNTIME_UNTRUSTED", "PLAN_RUNTIME_INCOMPATIBLE"])(
     readiness = { ready: false, errorCode };
     await render();
     expect(document.body.textContent).toContain("Install Codex runtime");
-    const toggle =
-      document.querySelector<HTMLInputElement>(".plan-enable input")!;
+    const toggle = document.querySelector<HTMLButtonElement>(
+      ".plan-server-actions button:last-child",
+    )!;
     expect(toggle.disabled).toBe(false);
     await act(async () => toggle.click());
     expect(status.settings.enabled).toBe(false);
@@ -226,6 +248,10 @@ it.each(["PLAN_RUNTIME_UNTRUSTED", "PLAN_RUNTIME_INCOMPATIBLE"])(
 );
 
 it("waits for verification before allowing enable and never flashes an installer", async () => {
+  status.settings.enabled = false;
+  status.connected = false;
+  status.settings.connectionId = null;
+  status.runtimeVersion = null;
   status.connected = false;
   let finish!: (value: unknown) => void;
   const implementation = native.invoke.getMockImplementation()!;
@@ -237,8 +263,9 @@ it("waits for verification before allowing enable and never flashes an installer
       : implementation(command, args),
   );
   await render();
-  const toggle =
-    document.querySelector<HTMLInputElement>(".plan-enable input")!;
+  const toggle = document.querySelector<HTMLButtonElement>(
+    ".plan-server-actions button:last-child",
+  )!;
   expect(toggle.disabled).toBe(true);
   expect(document.body.textContent).toContain("Checking Codex installation");
   expect(document.body.textContent).not.toContain("Install Codex runtime");
@@ -248,6 +275,10 @@ it("waits for verification before allowing enable and never flashes an installer
 });
 
 it("recovers from an unavailable installation check without assuming the runtime is missing", async () => {
+  status.settings.enabled = false;
+  status.connected = false;
+  status.settings.connectionId = null;
+  status.runtimeVersion = null;
   status.connected = false;
   const implementation = native.invoke.getMockImplementation()!;
   native.invoke.mockImplementation((command, args) => {
@@ -262,7 +293,9 @@ it("recovers from an unavailable installation check without assuming the runtime
   native.invoke.mockImplementation(implementation);
   await click("Check installation");
   expect(
-    document.querySelector<HTMLInputElement>(".plan-enable input")!.disabled,
+    document.querySelector<HTMLButtonElement>(
+      ".plan-server-actions button:last-child",
+    )!.disabled,
   ).toBe(false);
   expect(document.body.textContent).not.toContain(
     "installation could not be checked",
@@ -270,6 +303,10 @@ it("recovers from an unavailable installation check without assuming the runtime
 });
 
 it("rechecks on focus and ignores a late earlier installation result", async () => {
+  status.settings.enabled = false;
+  status.connected = false;
+  status.settings.connectionId = null;
+  status.runtimeVersion = null;
   status.connected = false;
   const checks: ((value: unknown) => void)[] = [];
   const implementation = native.invoke.getMockImplementation()!;
@@ -290,7 +327,9 @@ it("rechecks on focus and ignores a late earlier installation result", async () 
   );
   expect(document.body.textContent).not.toContain("Install Codex runtime");
   expect(
-    document.querySelector<HTMLInputElement>(".plan-enable input")!.disabled,
+    document.querySelector<HTMLButtonElement>(
+      ".plan-server-actions button:last-child",
+    )!.disabled,
   ).toBe(false);
 });
 
@@ -319,10 +358,15 @@ it("shows all six exact models and disables unavailable choices and efforts", as
   );
 });
 it("saves explicit activation with the frozen model, reasoning and reserve revision", async () => {
+  status.settings.enabled = false;
+  status.connected = false;
+  status.settings.connectionId = null;
+  status.runtimeVersion = null;
   await render();
-  const toggle =
-    document.querySelector<HTMLInputElement>(".plan-enable input")!;
-  expect(toggle.checked).toBe(false);
+  const toggle = document.querySelector<HTMLButtonElement>(
+    ".plan-server-actions button:last-child",
+  )!;
+  expect(document.body.textContent!.includes("Stop Codex server")).toBe(false);
   await act(async () => toggle.click());
   expect(native.invoke).toHaveBeenCalledWith("save_chatgpt_plan", {
     request: {
@@ -334,7 +378,7 @@ it("saves explicit activation with the frozen model, reasoning and reserve revis
       reservePercent: 20,
     },
   });
-  expect(toggle.checked).toBe(true);
+  expect(document.body.textContent!.includes("Stop Codex server")).toBe(true);
 });
 it("locks model and reserve controls during operations while keeping Stop and Sign out usable", async () => {
   status.operationActive = true;
@@ -349,7 +393,7 @@ it("locks model and reserve controls during operations while keeping Stop and Si
       '[aria-label="Usage reserve percentage"]',
     )!.disabled,
   ).toBe(true);
-  await click("Stop");
+  await click("Stop AI work");
   expect(native.invoke).toHaveBeenCalledWith("stop_chatgpt_plan");
   await click("Sign out");
   expect(native.invoke).toHaveBeenCalledWith("disconnect_chatgpt_plan");
@@ -363,7 +407,7 @@ it("supports cancellable browser login and explains an unavailable runtime", asy
   expect(document.body.textContent).toContain(
     "without saving it to Keychain or a credential file",
   );
-  await click("Connect ChatGPT account");
+  await click("Sign in to ChatGPT");
   expect(document.body.textContent).toContain("Waiting for browser sign-in");
   await click("Cancel sign-in");
   expect(native.invoke).toHaveBeenCalledWith("cancel_chatgpt_login");
@@ -378,18 +422,13 @@ it("explains the session lifetime while connected and preserves preferences afte
   status.settings.enabled = true;
   await render();
   expect(document.body.textContent).toContain(
-    "Your Enable Codex preference stays saved",
-  );
-  expect(document.body.textContent).toContain(
     "Your model, reserve settings, and activity history stay saved",
   );
   await click("Sign out");
   expect(status.settings.model).toBe("gpt-6-sol");
   expect(status.settings.reservePercent).toBe(35);
   expect(status.settings.enabled).toBe(true);
-  expect(
-    document.querySelector<HTMLInputElement>(".plan-enable input")!.checked,
-  ).toBe(true);
+  expect(document.body.textContent).toContain("Stop Codex server");
   expect(document.body.textContent).toContain("Sign-in stays in memory only");
 });
 
@@ -403,7 +442,7 @@ it("explains an authentication transport failure and allows a fresh sign-in", as
     "could not reach OpenAI’s authentication service",
   );
   expect(document.body.textContent).not.toContain("Sign-in was declined");
-  await click("Connect ChatGPT account");
+  await click("Sign in to ChatGPT");
   expect(native.invoke).toHaveBeenCalledWith("connect_chatgpt_plan");
   expect(
     native.invoke.mock.calls.some(([name]) => String(name).includes("ai_key")),
@@ -421,7 +460,11 @@ it("lets an expired connection disable plan usage without invoking a key command
     "Disable Codex to use API keys",
   );
   await act(async () =>
-    document.querySelector<HTMLInputElement>(".plan-enable input")!.click(),
+    document
+      .querySelector<HTMLButtonElement>(
+        ".plan-server-actions button:last-child",
+      )!
+      .click(),
   );
   expect(status.settings.enabled).toBe(false);
   expect(
@@ -429,6 +472,10 @@ it("lets an expired connection disable plan usage without invoking a key command
   ).toBe(false);
 });
 it("allows enabling independently of model availability but blocks sign-in until credential cleanup", async () => {
+  status.settings.enabled = false;
+  status.connected = false;
+  status.settings.connectionId = null;
+  status.runtimeVersion = null;
   status.settings.model = null;
   status.models.forEach((m) => {
     m.supported = false;
@@ -436,7 +483,9 @@ it("allows enabling independently of model availability but blocks sign-in until
   });
   await render();
   expect(
-    document.querySelector<HTMLInputElement>(".plan-enable input")!.disabled,
+    document.querySelector<HTMLButtonElement>(
+      ".plan-server-actions button:last-child",
+    )!.disabled,
   ).toBe(false);
   await act(async () => root.unmount());
   root = createRoot(document.getElementById("root")!);
@@ -446,13 +495,14 @@ it("allows enabling independently of model availability but blocks sign-in until
   await render();
   expect(
     [...document.querySelectorAll("button")].find(
-      (b) => b.textContent === "Connect ChatGPT account",
-    )!.disabled,
-  ).toBe(true);
+      (b) => b.textContent === "Sign in to ChatGPT",
+    ),
+  ).toBeUndefined();
   expect(document.body.textContent).toContain("Retry sign-out");
 });
 
 it("offers an opt-in verified runtime install without connecting or enabling a plan", async () => {
+  status.settings.enabled = false;
   status.connected = false;
   status.settings.connectionId = null;
   status.runtimeVersion = null;
@@ -472,7 +522,9 @@ it("offers an opt-in verified runtime install without connecting or enabling a p
     "Runtime installation details",
   );
   expect(
-    document.querySelector<HTMLInputElement>(".plan-enable input")!.disabled,
+    document.querySelector<HTMLButtonElement>(
+      ".plan-server-actions button:last-child",
+    )!.disabled,
   ).toBe(false);
 });
 
@@ -593,13 +645,14 @@ it("keeps controls responsive during a slow quota refresh and ignores its stale 
       : implementation(command, args),
   );
   await render();
-  const toggle =
-    document.querySelector<HTMLInputElement>(".plan-enable input")!;
+  const toggle = document.querySelector<HTMLInputElement>(
+    ".plan-reserve-toggle input",
+  )!;
   expect(toggle.disabled).toBe(false);
   await act(async () => toggle.click());
-  expect(toggle.checked).toBe(true);
+  expect(toggle.checked).toBe(false);
   await act(async () => finish({ ok: true, value: old }));
-  expect(toggle.checked).toBe(true);
+  expect(toggle.checked).toBe(false);
   expect(
     native.invoke.mock.calls.filter(([name]) => name === "load_chatgpt_plan"),
   ).toHaveLength(1);
@@ -632,8 +685,9 @@ it("coalesces polls and blocks background refreshes during a settings mutation",
   expect(
     native.invoke.mock.calls.filter(([name]) => name === "load_chatgpt_plan"),
   ).toHaveLength(initialLoads + 1);
-  const toggle =
-    document.querySelector<HTMLInputElement>(".plan-enable input")!;
+  const toggle = document.querySelector<HTMLInputElement>(
+    ".plan-reserve-toggle input",
+  )!;
   await act(async () => toggle.click());
   await act(async () =>
     finishPoll({ ok: true, value: structuredClone(status) }),
@@ -651,11 +705,11 @@ it("coalesces polls and blocks background refreshes during a settings mutation",
       value: {
         ...status,
         revision: 2,
-        settings: { ...status.settings, enabled: true },
+        settings: { ...status.settings, reserveEnabled: false },
       },
     }),
   );
-  expect(toggle.checked).toBe(true);
+  expect(toggle.checked).toBe(false);
 });
 
 it("does not publish a late disconnect response after the page unmounts", async () => {
@@ -759,48 +813,110 @@ it("reloads a shared setting change arriving during a slow usage poll without pu
   ).toBe("high");
 });
 
-it("always shows Enable Codex before sign-in and allows enabling without a model", async () => {
+it("shows Start Codex server before sign-in and starts independently of model selection", async () => {
+  status.settings.enabled = false;
+  status.connected = false;
+  status.settings.connectionId = null;
+  status.runtimeVersion = null;
   status.connected = false;
   status.settings.connectionId = null;
   status.settings.model = null;
   status.runtimeVersion = null;
   await render();
-  const toggle =
-    document.querySelector<HTMLInputElement>(".plan-enable input")!;
+  const toggle = document.querySelector<HTMLButtonElement>(
+    ".plan-server-actions button:last-child",
+  )!;
   expect(toggle.disabled).toBe(false);
-  expect(document.body.textContent).not.toContain("Connect ChatGPT account");
+  expect(document.body.textContent).not.toContain("Sign in to ChatGPT");
   await act(async () => toggle.click());
   expect(status.settings.enabled).toBe(true);
   const connect = [...document.querySelectorAll("button")].find(
-    (b) => b.textContent === "Connect ChatGPT account",
+    (b) => b.textContent === "Sign in to ChatGPT",
   )!;
   expect(connect.disabled).toBe(false);
   expect(native.invoke).not.toHaveBeenCalledWith("connect_chatgpt_plan");
 });
 
-it("keeps an enabled preference checked on a signed-out app relaunch", async () => {
+it("starts a previously enabled server on a signed-out app relaunch", async () => {
   status.connected = false;
   status.settings.connectionId = null;
   status.settings.enabled = true;
   status.runtimeVersion = null;
   await render();
-  expect(
-    document.querySelector<HTMLInputElement>(".plan-enable input")!.checked,
-  ).toBe(true);
-  await click("Connect ChatGPT account");
+  expect(status.settings.enabled).toBe(true);
+  await click("Sign in to ChatGPT");
   expect(status.settings.enabled).toBe(true);
 });
 
-it("allows disabling Codex during an active operation", async () => {
+it("allows stopping the Codex server during an active operation", async () => {
   status.settings.enabled = true;
   status.operationActive = true;
   await render();
-  const toggle =
-    document.querySelector<HTMLInputElement>(".plan-enable input")!;
+  const toggle = document.querySelector<HTMLButtonElement>(
+    ".plan-server-actions button:last-child",
+  )!;
   expect(toggle.disabled).toBe(false);
   await act(async () => toggle.click());
   expect(status.settings.enabled).toBe(false);
   expect(native.invoke).toHaveBeenCalledWith("save_chatgpt_plan", {
     request: expect.objectContaining({ enabled: false }),
   });
+});
+
+it("keeps one connection refresh at the top and refreshes both installation and account usage", async () => {
+  await render();
+  const refreshes = [...document.querySelectorAll("button")].filter(
+    (button) => button.textContent?.trim() === "Refresh connection",
+  );
+  expect(refreshes).toHaveLength(1);
+  expect(refreshes[0].closest(".plan-server-actions")).not.toBeNull();
+  expect(document.querySelector(".plan-status-strip")?.textContent).toMatch(
+    /Codex serverRunning.*ChatGPT accountSigned in/,
+  );
+  native.invoke.mockClear();
+  await click("Refresh connection");
+  expect(native.invoke).toHaveBeenCalledWith("check_codex_runtime");
+  expect(native.invoke).toHaveBeenCalledWith("load_chatgpt_plan", {
+    request: { refreshUsage: true },
+  });
+});
+
+it("stops a signed-in server, clears account controls, and hides connection refresh", async () => {
+  await render();
+  await click("Stop Codex server");
+  expect(status.connected).toBe(false);
+  expect(status.runtimeVersion).toBeNull();
+  expect(status.settings.connectionId).toBeNull();
+  expect(document.querySelector(".plan-status-strip")?.textContent).toMatch(
+    /Codex serverStopped.*ChatGPT accountSigned out/,
+  );
+  expect(document.querySelector('[aria-label="Codex model"]')).toBeNull();
+  expect(
+    document.querySelector('[aria-label="Usage reserve percentage"]'),
+  ).toBeNull();
+  expect(document.body.textContent).not.toContain("Refresh connection");
+  expect(document.body.textContent).toContain("Start Codex server");
+});
+
+it("waits for a live server before showing sign-in and leaves recovery controls available on startup failure", async () => {
+  status.connected = false;
+  status.settings.connectionId = null;
+  status.runtimeVersion = null;
+  status.errorCode = "PLAN_RUNTIME_UNAVAILABLE";
+  const original = native.invoke.getMockImplementation()!;
+  native.invoke.mockImplementation((command, args) =>
+    command === "load_chatgpt_plan"
+      ? Promise.resolve({ ok: true, value: status })
+      : original(command, args),
+  );
+  await render();
+  expect(document.body.textContent).toContain("Unavailable");
+  expect(
+    [...document.querySelectorAll("button")].some(
+      (button) => button.textContent === "Sign in to ChatGPT",
+    ),
+  ).toBe(false);
+  expect(document.body.textContent).toContain("Refresh connection");
+  await click("Stop Codex server");
+  expect(status.settings.enabled).toBe(false);
 });

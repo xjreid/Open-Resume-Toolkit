@@ -124,7 +124,8 @@ export function CodexRuntimeInstaller({
     awaiting_approval:
       "Approve installation in the macOS prompt, or cancel there. The protected copy is verified before it replaces the runtime.",
     checking: "Verifying the protected installation…",
-    complete: "Codex runtime installed and verified. You can enable Codex.",
+    complete:
+      "Codex runtime installed and verified. You can start the Codex server.",
     cancelled: "Installation cancelled. You can try again when ready.",
     failed: state?.errorCode
       ? planErrorMessage(state.errorCode)
@@ -141,11 +142,10 @@ export function CodexRuntimeInstaller({
           <p className="ai-help">
             Optional download: Codex 0.162.0 for Apple Silicon, about 94 MB.
             macOS will ask for administrator approval to install it. This does
-            not connect an account or enable Codex.
+            not start the server or sign you in.
           </p>
           <button
             type="button"
-            className="button--secondary"
             disabled={blocked || !state}
             onClick={() => void install()}
           >

@@ -103,12 +103,14 @@ fn resolve_close_on_main(
     if let Err(code) = resolve_close_decision(
         &state,
         &exports,
+        &app.state::<chatgpt_plan::PlanRuntime>(),
         &request.payload.attempt,
         request.payload.decision,
     ) {
         return CommandResponse::failure(code, "errors.closeUnavailable", true);
     }
     if quitting {
+        app.state::<ai_request::AiRequestGate>().cancel_overlay();
         overlay_position::remember(app);
     }
     #[cfg(target_os = "macos")]
@@ -126,6 +128,7 @@ fn resolve_close_on_main(
 fn resolve_close_decision(
     guard: &CloseGuard,
     operations: &text_export::ExportState,
+    runtime: &chatgpt_plan::PlanRuntime,
     attempt: &str,
     decision: CloseDecision,
 ) -> Result<(), &'static str> {
@@ -138,6 +141,12 @@ fn resolve_close_decision(
             operations.undo_quit_seal();
         }
         return Err(code);
+    }
+    if quitting {
+        // AppKit may terminate inside replyToApplicationShouldTerminate:
+        // without delivering Tauri's Exit event. Destroy and reap the server
+        // before either native reply or app.exit can approve process exit.
+        runtime.shutdown();
     }
     Ok(())
 }
@@ -391,7 +400,9 @@ fn initialize_storage(app: &AppHandle) -> DesktopStorage {
                 .duration_since(std::time::UNIX_EPOCH)
                 .ok()
                 .and_then(|duration| i64::try_from(duration.as_millis()).ok());
-            if now.is_some_and(|now| store.recover_ai_attempts(now).is_ok()) {
+            if now.is_some_and(|now| store.recover_ai_attempts(now).is_ok())
+                && chatgpt_plan::reset_server_on_launch(&store).is_ok()
+            {
                 DesktopStorage::Ready(store)
             } else {
                 DesktopStorage::Unavailable
@@ -839,7 +850,7 @@ pub fn run() {
             }
             RunEvent::Exit => {
                 app.state::<ai_request::AiRequestGate>().cancel_overlay();
-                app.state::<chatgpt_plan::PlanRuntime>().stop();
+                app.state::<chatgpt_plan::PlanRuntime>().shutdown();
                 app.state::<browser_bridge::BrowserBridgeState>()
                     .disconnect();
                 let _ = app.state::<DesktopState>().reviews.clear();
@@ -852,10 +863,50 @@ pub fn run() {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    #[test]
+    fn approved_quit_reaps_codex_before_returning_and_cancel_keeps_it_running() {
+        use std::time::{Duration, Instant};
+        let runtime = chatgpt_plan::PlanRuntime::default();
+        let profile = uuid::Uuid::now_v7();
+        let pid = runtime
+            .with_session(
+                profile,
+                Instant::now() + Duration::from_secs(2),
+                plan_runtime::SessionAccess {
+                    cancel: &|| false,
+                    skip_busy: false,
+                    permit: &|| Ok(()),
+                },
+                |_| Ok(codex_runtime::test_session("success")),
+                |session| Ok(session.process_id()),
+            )
+            .unwrap()
+            .unwrap();
+        assert!(codex_runtime::test_process_is_running(pid));
+        let guard = CloseGuard::default();
+        let operations = text_export::ExportState::default();
+        for decision in [CloseDecision::Cancel, CloseDecision::Quit] {
+            guard.request().unwrap();
+            let attempt = guard.status("main").unwrap().pending_attempt.unwrap();
+            assert_eq!(
+                resolve_close_decision(&guard, &operations, &runtime, "stale", decision),
+                Err("STALE_CLOSE_ATTEMPT"),
+            );
+            assert!(codex_runtime::test_process_is_running(pid));
+            resolve_close_decision(&guard, &operations, &runtime, &attempt, decision).unwrap();
+            assert_eq!(
+                codex_runtime::test_process_is_running(pid),
+                decision == CloseDecision::Cancel,
+            );
+        }
+    }
+
     #[test]
     fn quit_decision_waits_for_operations_and_stale_decisions_do_not_seal() {
         let guard = CloseGuard::default();
         let operations = text_export::ExportState::default();
+        let runtime = chatgpt_plan::PlanRuntime::default();
         guard.request().expect("request");
         let attempt = guard
             .status("main")
@@ -864,7 +915,7 @@ mod tests {
             .expect("attempt");
         let lease = operations.begin().expect("operation");
         assert_eq!(
-            resolve_close_decision(&guard, &operations, &attempt, CloseDecision::Quit),
+            resolve_close_decision(&guard, &operations, &runtime, &attempt, CloseDecision::Quit),
             Err("EXPORT_BUSY")
         );
         assert!(!guard.approved());
@@ -878,7 +929,7 @@ mod tests {
         );
         drop(lease);
         assert_eq!(
-            resolve_close_decision(&guard, &operations, "stale", CloseDecision::Quit),
+            resolve_close_decision(&guard, &operations, &runtime, "stale", CloseDecision::Quit),
             Err("STALE_CLOSE_ATTEMPT")
         );
         drop(
@@ -886,12 +937,13 @@ mod tests {
                 .begin()
                 .expect("stale decision released its seal"),
         );
-        resolve_close_decision(&guard, &operations, &attempt, CloseDecision::Quit)
+        resolve_close_decision(&guard, &operations, &runtime, &attempt, CloseDecision::Quit)
             .expect("approve");
         assert!(guard.approved());
         assert!(operations.begin().is_none());
         assert!(
-            resolve_close_decision(&guard, &operations, &attempt, CloseDecision::Quit).is_err()
+            resolve_close_decision(&guard, &operations, &runtime, &attempt, CloseDecision::Quit)
+                .is_err()
         );
         assert!(
             operations.begin().is_none(),
@@ -903,6 +955,7 @@ mod tests {
     fn cancel_can_resolve_while_an_operation_remains_active() {
         let guard = CloseGuard::default();
         let operations = text_export::ExportState::default();
+        let runtime = chatgpt_plan::PlanRuntime::default();
         guard.request().expect("request");
         let attempt = guard
             .status("main")
@@ -910,8 +963,14 @@ mod tests {
             .pending_attempt
             .expect("attempt");
         let lease = operations.begin().expect("operation");
-        resolve_close_decision(&guard, &operations, &attempt, CloseDecision::Cancel)
-            .expect("cancel");
+        resolve_close_decision(
+            &guard,
+            &operations,
+            &runtime,
+            &attempt,
+            CloseDecision::Cancel,
+        )
+        .expect("cancel");
         assert!(!guard.approved());
         assert!(
             guard

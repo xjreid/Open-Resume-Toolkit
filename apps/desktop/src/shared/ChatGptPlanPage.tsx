@@ -1,20 +1,11 @@
-import { useEffect, useState } from "react";
-import { useChatGptPlan } from "./use-chatgpt-plan";
+import { useState } from "react";
 import type * as Wire from "@ort/contracts/wire";
-import { invokeDesktop as invoke } from "./desktop-client";
-import "./styles/chatgpt-plan.css";
-
-import {
-  planErrorMessage,
-  REASONING_EFFORT_LABELS,
-} from "./chatgpt-plan-presentation";
+import { useChatGptPlan } from "./use-chatgpt-plan";
+import { planErrorMessage } from "./chatgpt-plan-presentation";
+import { CodexAccountSettings } from "./CodexAccountSettings";
 import { CodexRuntimeSetup } from "./CodexRuntimeSetup";
 import { useCodexRuntimeReadiness } from "./use-codex-runtime-readiness";
-
-const efforts = Object.entries(REASONING_EFFORT_LABELS) as [
-  Wire.ReasoningEffort,
-  string,
-][];
+import "./styles/chatgpt-plan.css";
 
 export function ChatGptPlanPage({
   visible,
@@ -30,15 +21,17 @@ export function ChatGptPlanPage({
   const { working, refreshing, notice, refresh, act, save, setNotice } =
     useChatGptPlan(visible, status, onStatus);
   const [installing, setInstalling] = useState(false);
-  const runtime = useCodexRuntimeReadiness(visible);
-  const [reserve, setReserve] = useState("20");
-  useEffect(
-    () => setReserve(String(status?.settings.reservePercent ?? 20)),
-    [status?.settings.reservePercent],
+  const [serverAction, setServerAction] = useState<"start" | "stop" | null>(
+    null,
   );
-  const locked = blocked || working || installing || !!status?.operationActive;
+  const runtime = useCodexRuntimeReadiness(visible);
   const settings = status?.settings;
-  const model = status?.models.find((model) => model.id === settings?.model);
+  const enabled = settings?.enabled ?? false;
+  const running =
+    enabled && !!status?.runtimeVersion && !settings?.cleanupRequired;
+  const connected = running && !!status?.connected;
+  const locked = blocked || working || installing || !!status?.operationActive;
+  const installationNeeded = runtime.readiness?.ready === false;
   const error =
     notice ||
     (status?.errorCode &&
@@ -50,374 +43,227 @@ export function ChatGptPlanPage({
     ].includes(status.errorCode)
       ? planErrorMessage(status.errorCode)
       : "");
+
+  async function changeServer() {
+    const starting = !enabled;
+    setServerAction(starting ? "start" : "stop");
+    try {
+      await save({ enabled: starting });
+      // Saving permission does not launch the native runtime. Loading status
+      // starts it and reports the session before offering account sign-in.
+      if (starting) await refresh(true);
+    } finally {
+      setServerAction(null);
+    }
+  }
+  function refreshConnection() {
+    setNotice("");
+    void runtime.refresh();
+    void refresh(true);
+  }
+  async function signOut() {
+    await act("disconnect");
+    // Sign-out retires the account's runtime session. Reopen the enabled
+    // server with no authorization so another browser sign-in is available.
+    await refresh(true);
+  }
+  const serverLabel = !status
+    ? "Checking…"
+    : serverAction === "stop"
+      ? "Stopping…"
+      : serverAction === "start" || (enabled && !running && refreshing)
+        ? "Starting…"
+        : running
+          ? "Running"
+          : enabled
+            ? "Unavailable"
+            : installationNeeded
+              ? runtime.readiness?.errorCode === "PLAN_RUNTIME_MISSING"
+                ? "Not installed"
+                : "Not ready"
+              : "Stopped";
+
   return (
     <div
       className="ai-page-panels chatgpt-plan-page"
       hidden={!visible}
       aria-label="Codex settings"
     >
-      <section className="ai-panel" aria-labelledby="chatgpt-plan-title">
-        <div className="ai-panel-heading">
+      <section
+        className="ai-panel plan-server"
+        aria-labelledby="chatgpt-plan-title"
+      >
+        <div className="plan-server-heading">
           <div>
             <h3 id="chatgpt-plan-title">Codex</h3>
             <p className="ai-help">
-              Connect your ChatGPT account through Codex for resume tailoring
-              and other AI work.
+              Use your ChatGPT account for AI work in ORT.
             </p>
           </div>
-        </div>
-        <label className="plan-enable">
-          <input
-            type="checkbox"
-            checked={settings?.enabled ?? false}
-            disabled={
-              blocked ||
-              working ||
-              installing ||
-              !settings ||
-              (!settings.enabled &&
-                (!!status?.operationActive ||
-                  runtime.checking ||
-                  !runtime.readiness?.ready))
-            }
-            onChange={(event) => void save({ enabled: event.target.checked })}
-          />
-          <span>
-            <strong>Enable Codex</strong>
-            <small>
-              Allow the Codex runtime to run and use Codex for all AI work.
-              Disable it to sign out, stop the runtime, and use API keys.
-            </small>
-          </span>
-        </label>
-        {settings?.enabled && (
-          <p className="ai-help">
-            Your Enable Codex preference stays saved. Sign-in stays in memory
-            only, so sign in again after quitting ORT, switching profiles, or a
-            Codex session restart. Your model, reserve settings, and activity
-            history stay saved.
-          </p>
-        )}
-        {error && (
-          <p className="notice" role="alert">
-            {error}
-          </p>
-        )}
-        <CodexRuntimeSetup
-          visible={visible}
-          blocked={
-            blocked ||
-            working ||
-            installing ||
-            !!status?.operationActive ||
-            !!status?.loginPending
-          }
-          readiness={runtime.readiness}
-          checking={runtime.checking}
-          error={runtime.error}
-          onCheck={() => void runtime.refresh()}
-          onInstalled={() => {
-            void runtime.refresh();
-            void refresh(true);
-          }}
-          onBusy={setInstalling}
-        />
-        {!status ? (
-          <p role="status">Loading Codex settings…</p>
-        ) : (
-          <>
-            {status.connected ? (
-              <>
-                <div className="plan-account">
-                  <span
-                    className={`application-dot${settings!.enabled ? " application-dot--ready" : ""}`}
-                  />
-                  <strong>ChatGPT account connected</strong>
-                  <span>
-                    {status.accountPlan
-                      ? `${status.accountPlan} plan`
-                      : "Authorization checked before each pass"}
-                  </span>
-                </div>
-                <div className="plan-model-controls">
-                  <label>
-                    Model
-                    <select
-                      aria-label="Codex model"
-                      value={settings!.model ?? ""}
-                      disabled={locked}
-                      onChange={(event) => {
-                        const next = status.models.find(
-                          (model) => model.id === event.target.value,
-                        )!;
-                        void save({
-                          model: next.id,
-                          reasoning: next.reasoningEfforts.includes(
-                            settings!.reasoning,
-                          )
-                            ? settings!.reasoning
-                            : next.reasoningEfforts[0],
-                        });
-                      }}
-                    >
-                      <option value="" disabled>
-                        Choose a supported model
-                      </option>
-                      {status.models.map((model) => (
-                        <option
-                          key={model.id}
-                          value={model.id}
-                          disabled={!model.supported}
-                        >
-                          {model.name}
-                          {model.supported ? "" : " — Unavailable"}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Reasoning
-                    <select
-                      aria-label="Codex reasoning"
-                      value={settings!.reasoning}
-                      disabled={locked || !model?.supported}
-                      onChange={(event) =>
-                        void save({
-                          reasoning: event.target.value as Wire.ReasoningEffort,
-                        })
-                      }
-                    >
-                      {efforts.map(([value, label]) => (
-                        <option
-                          value={value}
-                          key={value}
-                          disabled={!model?.reasoningEfforts.includes(value)}
-                        >
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <p className="ai-help">
-                  {model?.explanation ??
-                    "Unavailable choices are not offered by the installed runtime. Account access is checked when a request runs."}{" "}
-                  Your resume, job description, and instructions are sent to
-                  OpenAI under your account’s plan and privacy terms.
-                </p>
-                {status.operationActive && (
-                  <div className="plan-operation" role="status">
-                    <span>
-                      AI work is in progress. Model and reserve controls are
-                      locked.
-                    </span>
-                    <button
-                      type="button"
-                      className="button--secondary"
-                      onClick={() => void invoke("stop_chatgpt_plan")}
-                    >
-                      Stop
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : settings!.enabled || settings!.cleanupRequired ? (
-              <div className="plan-connect">
-                <p className="ai-help">
-                  {settings!.enabled
-                    ? "Sign in securely in your system browser."
-                    : "Enable Codex above to connect your ChatGPT account."}{" "}
-                  Codex keeps this ORT session’s authorization in memory without
-                  saving it to Keychain or a credential file.
-                </p>
-                {status.loginPending ? (
-                  <div className="plan-operation" role="status">
-                    <span>Waiting for browser sign-in…</span>
-                    <button
-                      type="button"
-                      className="button--secondary"
-                      disabled={working}
-                      onClick={() => void act("cancel")}
-                    >
-                      Cancel sign-in
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={
-                      locked ||
+          <div className="plan-server-actions">
+            {enabled && (
+              <button
+                type="button"
+                className="button--secondary"
+                disabled={locked || refreshing || runtime.checking}
+                onClick={refreshConnection}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 17.9 17" />
+                </svg>
+                {refreshing || runtime.checking
+                  ? "Refreshing…"
+                  : "Refresh connection"}
+              </button>
+            )}
+            {(enabled || !installationNeeded) && (
+              <button
+                type="button"
+                className={enabled ? "button--danger" : undefined}
+                disabled={
+                  blocked ||
+                  working ||
+                  installing ||
+                  !!serverAction ||
+                  !settings ||
+                  (!enabled &&
+                    (!!status?.operationActive ||
                       runtime.checking ||
                       !runtime.readiness?.ready ||
-                      !settings!.enabled ||
-                      status.errorCode === "PLAN_RUNTIME_UNAVAILABLE" ||
-                      status.errorCode === "PLAN_PLATFORM_UNSUPPORTED" ||
-                      settings!.cleanupRequired
-                    }
-                    onClick={() => void act("connect")}
-                  >
-                    Connect ChatGPT account
-                  </button>
-                )}
-              </div>
-            ) : null}
-            {settings!.enabled && (
-              <div className="plan-runtime">
-                <button
-                  type="button"
-                  className="button--quiet"
-                  disabled={
-                    working ||
-                    installing ||
-                    refreshing ||
-                    runtime.checking ||
-                    status.operationActive
-                  }
-                  onClick={() => {
-                    void runtime.refresh();
-                    void refresh(true);
-                  }}
-                >
-                  Refresh connection
-                </button>
-              </div>
+                      settings.cleanupRequired))
+                }
+                onClick={() => void changeServer()}
+              >
+                {serverAction === "stop"
+                  ? "Stopping server…"
+                  : serverAction === "start"
+                    ? "Starting server…"
+                    : enabled
+                      ? "Stop Codex server"
+                      : "Start Codex server"}
+              </button>
             )}
-            {status.connected && (
-              <>
-                <div className="plan-section-heading">
-                  <h4>Account-wide remaining usage</h4>
-                  <button
-                    type="button"
-                    className="button--secondary"
-                    disabled={locked || refreshing}
-                    onClick={() => void refresh(true)}
-                  >
-                    Refresh usage
-                  </button>
-                </div>
-                {status.quota ? (
-                  <ul className="plan-quota-list">
-                    {status.quota.windows.map((window) => (
-                      <li key={`${window.limitId}-${window.window}`}>
-                        <div>
-                          <strong>
-                            {window.name}
-                            {window.windowDurationMinutes
-                              ? ` · ${window.windowDurationMinutes >= 60 ? `${window.windowDurationMinutes / 60} hours` : `${window.windowDurationMinutes} minutes`}`
-                              : ""}
-                          </strong>
-                          <small>
-                            {window.resetsAt
-                              ? `Resets ${new Date(window.resetsAt * 1000).toLocaleString()}`
-                              : "Reset time not supplied"}
-                          </small>
-                        </div>
-                        <span>
-                          {window.remainingPercent.toLocaleString(undefined, {
-                            maximumFractionDigits: 1,
-                          })}
-                          % remaining
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="ai-help">
-                    Remaining usage is unavailable.{" "}
-                    {settings!.reserveEnabled
-                      ? "The enabled reserve blocks new passes until Codex reports valid quota."
-                      : "Your reserve is disabled."}
-                  </p>
-                )}
-                <p className="ai-help">
-                  This includes usage from other apps. ORT’s token activity is
-                  shown separately in Data. Usage refreshes every 30 seconds
-                  while this page is visible.
-                </p>
-                <div className="plan-reserve">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={settings!.reserveEnabled}
-                      disabled={locked}
-                      onChange={(event) =>
-                        void save({ reserveEnabled: event.target.checked })
-                      }
-                    />
-                    <strong>Keep a usage reserve</strong>
-                  </label>
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      const value = Number(reserve);
-                      if (
-                        !Number.isInteger(value) ||
-                        value < 1 ||
-                        value > 100
-                      ) {
-                        setNotice(planErrorMessage("PLAN_SETTINGS_INVALID"));
-                        return;
-                      }
-                      void save({ reservePercent: value });
-                    }}
-                  >
-                    <label>
-                      Minimum remaining
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        step="1"
-                        inputMode="numeric"
-                        aria-label="Usage reserve percentage"
-                        value={reserve}
-                        disabled={locked || !settings!.reserveEnabled}
-                        onChange={(event) => setReserve(event.target.value)}
-                      />
-                    </label>
-                    <span>%</span>
-                    <button
-                      type="submit"
-                      className="button--secondary"
-                      disabled={
-                        locked ||
-                        !settings!.reserveEnabled ||
-                        reserve === String(settings!.reservePercent)
-                      }
-                    >
-                      Save reserve
-                    </button>
-                  </form>
-                </div>
-                <p className="ai-help">
-                  A fresh quota check runs before every pass. At exactly{" "}
-                  {settings!.reservePercent}% remaining, dispatch is allowed.
-                  The reserve controls new dispatches; ongoing requests and
-                  usage elsewhere can cross it.
-                </p>
-              </>
-            )}
-            {(status.connected ||
-              settings?.connectionId ||
-              status.errorCode === "PLAN_CREDENTIAL_CLEANUP_REQUIRED") && (
-              <div className="plan-disconnect">
-                <p className="ai-help">
-                  Signing out stops current Codex work and ends this account
-                  session. Codex stays enabled; sign in again to resume AI work.
-                </p>
-                <button
-                  type="button"
-                  className="button--secondary"
-                  disabled={blocked || working}
-                  onClick={() => void act("disconnect")}
-                >
-                  {settings!.cleanupRequired ? "Retry sign-out" : "Sign out"}
-                </button>
-              </div>
-            )}
-          </>
-        )}
+          </div>
+        </div>
+        <dl className="plan-status-strip" aria-live="polite">
+          <div>
+            <dt>Codex server</dt>
+            <dd>
+              <span
+                className={`plan-status-dot${running ? " plan-status-dot--ready" : ""}`}
+              />
+              {serverLabel}
+              {running && <small>v{status!.runtimeVersion}</small>}
+            </dd>
+          </div>
+          <div>
+            <dt>ChatGPT account</dt>
+            <dd>
+              <span
+                className={`plan-status-dot${connected ? " plan-status-dot--ready" : ""}`}
+              />
+              {!status
+                ? "Checking…"
+                : connected
+                  ? "Signed in"
+                  : status.loginPending && running
+                    ? "Signing in…"
+                    : "Signed out"}
+            </dd>
+          </div>
+        </dl>
+        <p className="ai-help plan-server-note">
+          {enabled
+            ? "Stopping the server ends Codex work and signs you out. Your model, reserve settings, and activity history stay saved."
+            : "Start the local Codex server, then sign in to ChatGPT. Codex handles AI work while the server is enabled; stop it to use API keys."}
+        </p>
       </section>
+      {error && (
+        <p className="notice plan-notice" role="alert">
+          {error}
+        </p>
+      )}
+      <CodexRuntimeSetup
+        visible={visible}
+        blocked={
+          blocked ||
+          working ||
+          installing ||
+          !!status?.operationActive ||
+          !!status?.loginPending
+        }
+        readiness={runtime.readiness}
+        checking={runtime.checking}
+        error={runtime.error}
+        showCheck={!enabled}
+        onCheck={refreshConnection}
+        onInstalled={refreshConnection}
+        onBusy={setInstalling}
+      />
+      {connected && status ? (
+        <CodexAccountSettings
+          status={status}
+          locked={locked}
+          signOutDisabled={blocked || working || installing}
+          onSave={save}
+          onSignOut={() => void signOut()}
+          onNotice={setNotice}
+        />
+      ) : running ? (
+        <section
+          className="ai-panel plan-connect"
+          aria-labelledby="plan-sign-in-title"
+        >
+          <h3 id="plan-sign-in-title">Sign in to ChatGPT</h3>
+          <p className="plan-body">
+            Connect your account to choose a model and use your ChatGPT plan for
+            resume tailoring and other AI work.
+          </p>
+          {status?.loginPending ? (
+            <div className="plan-operation" role="status">
+              <span>Waiting for browser sign-in…</span>
+              <button
+                type="button"
+                className="button--secondary"
+                disabled={working}
+                onClick={() => void act("cancel")}
+              >
+                Cancel sign-in
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={locked || runtime.checking || !runtime.readiness?.ready}
+              onClick={() => void act("connect")}
+            >
+              Sign in to ChatGPT
+            </button>
+          )}
+          <p className="ai-help plan-session-note">
+            Sign in securely in your system browser. Sign-in stays in memory
+            only, without saving it to Keychain or a credential file. Sign in
+            again after quitting ORT, switching profiles, or restarting the
+            server.
+          </p>
+        </section>
+      ) : null}
+      {settings?.cleanupRequired && (
+        <div className="plan-operation plan-cleanup">
+          <p className="ai-help">
+            Clear the previous session before starting the server or signing in
+            again.
+          </p>
+          <button
+            type="button"
+            className="button--secondary"
+            disabled={blocked || working}
+            onClick={() => void signOut()}
+          >
+            Retry sign-out
+          </button>
+        </div>
+      )}
     </div>
   );
 }

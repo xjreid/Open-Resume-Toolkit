@@ -274,14 +274,9 @@
   font-family: Hanken, sans-serif;
 }
 .application-shell .application-header {
-  padding: 36px 16px 14px;
-  gap: 10px;
+  padding: 36px 16px 12px;
+  gap: 12px;
   border-bottom-color: var(--line);
-}
-.application-shell .application-connection select {
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 600;
 }
 .application-shell .application-key-status,
 .application-shell .application-intro,
@@ -290,7 +285,7 @@
 }
 .application-shell .application-browser.is-connected,
 .application-shell .application-browser.is-connected span {
-  color: #457873;
+  color: var(--success);
 }
 .application-shell .application-content {
   padding: 20px;

@@ -24,6 +24,19 @@ The application is local-first: resume content, settings, AI accounting,
 guardrails, diagnostics, and render receipts remain local unless the user
 explicitly exports or invokes an external AI provider.
 
+## Closing the app
+
+Closing the main window or overlay, choosing Quit, and native macOS Quit all
+use the existing save and confirmation flow. Once quit is approved, ORT stops
+and reaps its Codex server before allowing the app to terminate. Pending status
+checks cannot restart that server during shutdown. Cancelling quit leaves it
+running.
+
+Codex starts stopped when the app reopens and waits for **Start Codex server**.
+The selected model, reasoning, reserve settings, and activity history stay
+saved. Any previously selected API key becomes available again; its saved key
+and pause state are preserved.
+
 External PDF, DOCX, JSON, text, and portable-backup files are not part of the
 active encrypted profile. Ordinary exports are unencrypted. Portable backups
 are encrypted with the user-provided passphrase.

@@ -45,10 +45,11 @@ pub(crate) struct PlanRuntime {
     session: Mutex<Option<(Uuid, Session)>>,
     view: Mutex<Option<(Uuid, SessionView)>>,
     interrupt: Arc<AtomicBool>,
+    shutting_down: AtomicBool,
 }
 impl PlanRuntime {
     pub(crate) fn interrupted(&self) -> bool {
-        self.interrupt.load(Ordering::Acquire)
+        self.interrupt.load(Ordering::Acquire) || self.shutting_down.load(Ordering::Acquire)
     }
     pub(crate) fn login_pending(&self) -> bool {
         self.view
@@ -159,7 +160,7 @@ impl PlanRuntime {
             skip_busy,
         } = access;
         let mut current = loop {
-            if cancel() {
+            if cancel() || self.shutting_down.load(Ordering::Acquire) {
                 return Err("AI_CANCELLED");
             }
             if Instant::now() >= end {
@@ -180,6 +181,13 @@ impl PlanRuntime {
             return Err(code);
         }
         self.interrupt.store(false, Ordering::Release);
+        // An approved quit permanently retires this manager. In particular, a
+        // poll already queued before shutdown must not restart the process or
+        // clear the cancellation signal while native termination is pending.
+        if self.shutting_down.load(Ordering::Acquire) {
+            self.interrupt.store(true, Ordering::Release);
+            return Err("AI_CANCELLED");
+        }
         if current.as_ref().is_none_or(|(id, _)| *id != profile) {
             self.publish(profile, None);
             *current = None;
@@ -201,6 +209,11 @@ impl PlanRuntime {
         }
         self.publish(profile, current.as_ref().map(|(_, s)| s));
         result.map(Some)
+    }
+
+    pub(crate) fn shutdown(&self) {
+        self.shutting_down.store(true, Ordering::Release);
+        self.stop();
     }
 
     pub(crate) fn stop(&self) {

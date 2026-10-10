@@ -1,11 +1,13 @@
-import { planErrorMessage } from "./chatgpt-plan-presentation";
+import {
+  planErrorMessage,
+  REASONING_EFFORT_LABELS,
+} from "./chatgpt-plan-presentation";
 import { SaveCoordinator } from "./save-coordinator";
 import {
   desktopCommand as command,
   DesktopCommandError,
 } from "./desktop-client";
 import { AiFailureDetailsView } from "./AiFailureDetailsView";
-import { ApplicationCodexControls } from "./ApplicationCodexControls";
 import type * as Wire from "@ort/contracts/wire";
 import { emitTo } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -34,6 +36,25 @@ type Alert = Wire.QualificationAlert;
 type Workspace = Wire.ApplicationWorkspace;
 type Saved = Wire.SavedWorkspace;
 type FinishMode = "edit" | "discard" | null;
+
+function overlayModelLabel(model: string, usesCodex: boolean): string {
+  if (usesCodex) {
+    return model
+      .replace(/^gpt-/i, "GPT-")
+      .replace(
+        /-(sol|luna|terra)$/i,
+        (_, family: string) =>
+          ` ${family.charAt(0).toUpperCase()}${family.slice(1).toLowerCase()}`,
+      );
+  }
+  if (/^(gemini|claude)-/i.test(model)) {
+    return model
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+  return model;
+}
 
 function qualificationPoint(alert: Alert): string {
   const text = (alert.target?.trim() || alert.requirement)
@@ -342,6 +363,12 @@ export function ApplicationOverlay() {
   savedRef.current = saved;
   draftRef.current = draft;
   const aiWorking = working || !!context?.aiBusy;
+  const usesCodex = context?.connectionSource === "chatgpt_plan";
+  const aiConnectionPending = !context;
+  const aiConnected =
+    !!context?.aiReady &&
+    !!context.model &&
+    (!usesCodex || context.codexConnected);
   const materialKind: MaterialKind =
     tab === "cover" ? "cover_letter" : "resume";
   const exportKey = saved ? `${saved.revision}:${materialKind}` : "";
@@ -1083,70 +1110,27 @@ export function ApplicationOverlay() {
           <img src={logo} alt="Open Resume Toolkit" width="30" height="30" />
         </div>
         <div className="application-connection">
-          <strong className="application-provider-label">
-            {context?.connectionSource === "chatgpt_plan" ? "Codex" : "API key"}
+          <strong className="application-brand-title">
+            Open Resume Toolkit
           </strong>
-          {context?.connectionSource === "chatgpt_plan" ? (
-            <ApplicationCodexControls
-              key={context.profileId}
-              disabled={busy || aiWorking || closePending}
-              onNotice={setNotice}
-            />
-          ) : (
-            <select
-              aria-label="AI model"
-              title={context?.aiLabel}
-              value={context?.model ?? ""}
-              disabled={
-                !context?.selectedKeyId || busy || aiWorking || closePending
-              }
-              onChange={(event) =>
-                void run(async () => {
-                  await command("set_ai_key_model", {
-                    request: {
-                      credentialId: context!.selectedKeyId!,
-                      model: event.target.value,
-                    },
-                  });
-                  setContext(await command("application_context"));
-                })
-              }
-            >
-              {!context?.model && (
-                <option value="">{context?.aiLabel ?? "Checking AI…"}</option>
-              )}
-              {context?.model &&
-                !context.modelOptions.some(
-                  (item) => item.model === context.model,
-                ) && (
-                  <option value={context.model} disabled>
-                    {context.model}
-                  </option>
-                )}
-              {(context?.modelOptions ?? []).map((item) => (
-                <option
-                  key={item.model}
-                  value={item.model}
-                  disabled={!item.model}
-                >
-                  {item.model}
-                </option>
-              ))}
-            </select>
-          )}
           <div className="application-key-status" role="status">
             <span
-              className={`application-dot${aiWorking ? " application-dot--working" : context?.aiReady ? " application-dot--ready" : ""}`}
+              aria-hidden="true"
+              className={`application-dot${aiWorking ? " application-dot--working" : aiConnected ? " application-dot--ready" : ""}`}
             />
-            {aiWorking
-              ? tailoringProgress
-                ? `${tailoringProgress.phase} · ${context?.connectionSource === "chatgpt_plan" ? "pass" : "call"} ${tailoringProgress.call} of ${tailoringProgress.maximum}${tailoringProgress.pageCount == null ? "" : tailoringProgress.pageCount === 1 ? " · PDF: 1 page" : ` · PDF: ${tailoringProgress.pageCount} pages; target 1`}`
-                : "Working"
-              : context?.aiReady
-                ? "Ready"
-                : context?.connectionSource === "chatgpt_plan"
-                  ? "Check Codex connection in the main app"
-                  : "Select an API key in the main app"}
+            <span className="application-activity-text">
+              {aiWorking
+                ? tailoringProgress
+                  ? `${tailoringProgress.phase} · ${usesCodex ? "pass" : "call"} ${tailoringProgress.call} of ${tailoringProgress.maximum}${tailoringProgress.pageCount == null ? "" : tailoringProgress.pageCount === 1 ? " · PDF: 1 page" : ` · PDF: ${tailoringProgress.pageCount} pages; target 1`}`
+                  : "Working"
+                : aiConnectionPending
+                  ? "Checking AI…"
+                  : aiConnected
+                    ? "Ready"
+                    : usesCodex && !context?.codexConnected
+                      ? "Sign in to use Codex"
+                      : "Connect API key or Codex"}
+            </span>
             {aiWorking && (
               <button
                 type="button"
@@ -1161,18 +1145,6 @@ export function ApplicationOverlay() {
               </button>
             )}
           </div>
-        </div>
-        <div
-          className={`application-browser${context?.browserConnected ? " is-connected" : ""}`}
-          role="status"
-          title={
-            context?.browserConnected
-              ? "Browser connected"
-              : "Browser disconnected"
-          }
-        >
-          <OverlayIcon name="browser" />
-          <span>{context?.browserConnected ? "Connected" : "Offline"}</span>
         </div>
       </header>
       <div className="application-content">
@@ -1233,7 +1205,7 @@ export function ApplicationOverlay() {
                     pendingCapture?.capture.payload.target === "job" ||
                     !jobReady ||
                     !context?.publishedRevision ||
-                    !context?.aiReady ||
+                    !aiConnected ||
                     aiWorking
                   }
                   onClick={() =>
@@ -1490,7 +1462,7 @@ export function ApplicationOverlay() {
                         disabled={
                           dirty ||
                           aiWorking ||
-                          !context?.aiReady ||
+                          !aiConnected ||
                           !instruction.trim()
                         }
                       >
@@ -1517,7 +1489,7 @@ export function ApplicationOverlay() {
                     <button
                       type="button"
                       onClick={generateCover}
-                      disabled={dirty || aiWorking || !context?.aiReady}
+                      disabled={dirty || aiWorking || !aiConnected}
                     >
                       {draft.coverLetter
                         ? "Refine cover letter"
@@ -1571,7 +1543,7 @@ export function ApplicationOverlay() {
                       disabled={
                         dirty ||
                         aiWorking ||
-                        !context?.aiReady ||
+                        !aiConnected ||
                         !question.trim() ||
                         (draft.answer
                           ? !answerInstruction.trim()
@@ -1659,6 +1631,44 @@ export function ApplicationOverlay() {
           )}
         </fieldset>
       </div>
+      <footer className="application-footer" aria-label="Connection status">
+        <div className="application-footer-connections">
+          <div
+            className={`application-browser${context?.browserConnected ? " is-connected" : ""}`}
+            role="status"
+          >
+            <OverlayIcon name="browser" />
+            <span>
+              {!context
+                ? "Browser checking…"
+                : context.browserConnected
+                  ? "Browser connected"
+                  : "Browser offline"}
+            </span>
+          </div>
+          <div
+            className="application-ai-connection"
+            role="status"
+            aria-label="AI provider"
+          >
+            {aiConnectionPending ? (
+              "Checking provider…"
+            ) : aiConnected && context?.model ? (
+              <span>
+                <strong className="application-provider-label">
+                  {usesCodex ? "Codex" : "API key"}
+                </strong>
+                {`: ${overlayModelLabel(context.model, usesCodex)}`}
+                {usesCodex && context.model && context.reasoning
+                  ? ` · ${REASONING_EFFORT_LABELS[context.reasoning]}`
+                  : ""}
+              </span>
+            ) : (
+              "No model connected"
+            )}
+          </div>
+        </div>
+      </footer>
       {pendingCapture?.capture.payload.target === "job" &&
         (jobCaptureError || saved) &&
         !busy && (

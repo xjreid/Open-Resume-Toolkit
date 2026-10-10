@@ -72,8 +72,10 @@ const context = {
   connectionSource: "direct_api",
   aiReady: true,
   aiBusy: false,
+  codexConnected: false,
   selectedKeyId: "019a0000-0000-7000-8000-000000000006",
   model: "test",
+  reasoning: null as Wire.ReasoningEffort | null,
   modelOptions: [{ model: "small" }, { model: "test" }],
   browserConnected: false,
 };
@@ -664,7 +666,7 @@ it("clamps header dragging before moving the native window", async () => {
   expect(position).toMatchObject({ x: 640, y: 100 });
 });
 
-it("refreshes its selected model when the main app changes it", async () => {
+it("refreshes AI readiness when the main app changes its settings without exposing model controls", async () => {
   let current = context;
   vi.mocked(invoke).mockImplementation(async (name) => {
     if (name === "application_capture_status") return reply(idleCapture);
@@ -673,16 +675,71 @@ it("refreshes its selected model when the main app changes it", async () => {
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host } = await mount();
-  current = { ...context, model: "small" };
+  current = { ...context, model: "small", aiReady: false };
   await act(async () =>
     listeners.get("ort:ai-model-changed")?.({ payload: null }),
   );
-  expect(
-    host.querySelector<HTMLSelectElement>('[aria-label="AI model"]')?.value,
-  ).toBe("small");
+  expect(host.querySelector("header select")).toBeNull();
+  expect(host.querySelector("header")?.textContent).toContain(
+    "Connect API key or Codex",
+  );
+  expect(host.querySelector("footer")?.textContent).toContain(
+    "No model connected",
+  );
 });
 
-it("keeps an unavailable selected model visible without implying a replacement", async () => {
+it.each([true, false])(
+  "keeps API and browser connections in the footer and updates their active state (%s)",
+  async (active) => {
+    let current = { ...context, aiReady: active, browserConnected: active };
+    vi.mocked(invoke).mockImplementation(async (name) => {
+      if (name === "application_capture_status") return reply(idleCapture);
+      if (name === "application_context") return reply(current);
+      if (name.startsWith("load_application_")) return reply(null);
+      throw new Error(`Unexpected command: ${name}`);
+    });
+    const { host } = await mount();
+    const header = host.querySelector("header")!;
+    const footer = host.querySelector("footer")!;
+    expect(header.querySelector(".application-brand-title")?.textContent).toBe(
+      "Open Resume Toolkit",
+    );
+    expect(header.querySelector("img")?.getAttribute("width")).toBe("30");
+    expect(header.querySelector("select")).toBeNull();
+    expect(header.querySelector('[aria-label="Codex reasoning"]')).toBeNull();
+    expect(header.querySelector(".application-browser")).toBeNull();
+    expect(footer.textContent).toContain(
+      active ? "API key: test" : "No model connected",
+    );
+    expect(footer.textContent).not.toMatch(/AI (in)?active/);
+    expect(header.querySelector(".application-key-status")?.textContent).toBe(
+      active ? "Ready" : "Connect API key or Codex",
+    );
+    expect(footer.textContent).toContain(
+      active ? "Browser connected" : "Browser offline",
+    );
+    current = {
+      ...current,
+      model: "gemini-3.5-flash",
+      aiReady: !active,
+      browserConnected: !active,
+    };
+    await act(async () =>
+      listeners.get("ort:ai-model-changed")?.({ payload: null }),
+    );
+    expect(footer.textContent).toContain(
+      active ? "No model connected" : "API key: Gemini 3.5 Flash",
+    );
+    expect(header.querySelector(".application-key-status")?.textContent).toBe(
+      active ? "Connect API key or Codex" : "Ready",
+    );
+    expect(footer.textContent).toContain(
+      active ? "Browser offline" : "Browser connected",
+    );
+  },
+);
+
+it("shows inactive AI for an unavailable model without choosing a replacement", async () => {
   vi.mocked(invoke).mockImplementation(async (name) => {
     if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context")
@@ -696,19 +753,87 @@ it("keeps an unavailable selected model visible without implying a replacement",
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host } = await mount();
-  const selector = host.querySelector<HTMLSelectElement>(
-    '[aria-label="AI model"]',
-  )!;
-  expect(selector.value).toBe("previous-model");
-  expect(selector.selectedOptions[0].disabled).toBe(true);
-  expect(
-    [...selector.options].map((option) => option.textContent?.trim()),
-  ).toEqual(["previous-model", "small", "test"]);
+  expect(host.querySelector("header select")).toBeNull();
+  expect(host.querySelector("footer")?.textContent).toContain(
+    "No model connected",
+  );
+  expect(host.querySelector("header")?.textContent).toContain(
+    "Connect API key or Codex",
+  );
   expect(invoke).not.toHaveBeenCalledWith(
     "set_ai_key_model",
     expect.anything(),
   );
 });
+
+it.each([
+  {
+    state: "Codex disabled with no selected API key",
+    connectionSource: "direct_api",
+    selectedKeyId: null,
+    model: null,
+    aiReady: false,
+    codexConnected: false,
+    guidance: "Connect API key or Codex",
+  },
+  {
+    state: "a paused API key with a saved model",
+    connectionSource: "direct_api",
+    selectedKeyId: context.selectedKeyId,
+    model: context.model,
+    aiReady: false,
+    codexConnected: false,
+    guidance: "Connect API key or Codex",
+  },
+  {
+    state: "Codex enabled without a signed-in account",
+    connectionSource: "chatgpt_plan",
+    selectedKeyId: null,
+    model: "gpt-5.6-sol",
+    aiReady: false,
+    codexConnected: false,
+    guidance: "Sign in to use Codex",
+  },
+  {
+    state: "Codex reporting a busy-ready state without an account",
+    connectionSource: "chatgpt_plan",
+    selectedKeyId: context.selectedKeyId,
+    model: "gpt-5.6-sol",
+    aiReady: true,
+    codexConnected: false,
+    guidance: "Sign in to use Codex",
+  },
+  {
+    state: "signed-in Codex without a model",
+    connectionSource: "chatgpt_plan",
+    selectedKeyId: context.selectedKeyId,
+    model: null,
+    aiReady: false,
+    codexConnected: true,
+    guidance: "Connect API key or Codex",
+  },
+] as const)(
+  "shows connection guidance for $state",
+  async ({ state: _state, guidance, ...connection }) => {
+    vi.mocked(invoke).mockImplementation(async (name) => {
+      if (name === "application_capture_status") return reply(idleCapture);
+      if (name === "application_context")
+        return reply({ ...context, ...connection });
+      if (name.startsWith("load_application_")) return reply(null);
+      throw new Error(`Unexpected command: ${name}`);
+    });
+    const { host, button } = await mount();
+    expect(host.querySelector(".application-key-status")?.textContent).toBe(
+      guidance,
+    );
+    expect(host.querySelector('[aria-label="AI provider"]')?.textContent).toBe(
+      "No model connected",
+    );
+    expect(host.querySelector(".application-provider-label")).toBeNull();
+    expect(host.querySelector(".application-dot--ready")).toBeNull();
+    expect(button("Tailor").disabled).toBe(true);
+  },
+);
 
 it("keeps Answers available without a question capture button", async () => {
   vi.mocked(invoke).mockImplementation(async (name) => {
@@ -1325,7 +1450,7 @@ it("places Finish Application directly below the header when no role was found",
   expect(host.textContent).not.toContain("Your next opportunity");
 });
 
-it("requires an active key even when a job exists and routes connected capture + models", async () => {
+it("requires active AI for tailoring while keeping connected browser capture available", async () => {
   let activeContext = {
     ...context,
     aiReady: false,
@@ -1354,20 +1479,13 @@ it("requires an active key even when a job exists and routes connected capture +
   });
   activeContext = { ...context, browserConnected: true };
   await act(async () => window.dispatchEvent(new Event("focus")));
-  const selector = host.querySelector<HTMLSelectElement>(
-    '[aria-label="AI model"]',
-  )!;
-  expect(selector.options[0].text).toBe("small");
-  await act(async () => {
-    selector.value = "small";
-    selector.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  expect(invoke).toHaveBeenCalledWith("set_ai_key_model", {
-    request: {
-      credentialId: "019a0000-0000-7000-8000-000000000006",
-      model: "small",
-    },
-  });
+  expect(host.querySelector("header select")).toBeNull();
+  expect(host.querySelector("footer")?.textContent).toContain("API key: test");
+  expect(button("Tailor").disabled).toBe(false);
+  expect(invoke).not.toHaveBeenCalledWith(
+    "set_ai_key_model",
+    expect.anything(),
+  );
 });
 
 it("autosaves without losing newer typing and only exports the latest prepared revision", async () => {
@@ -1661,18 +1779,17 @@ it("announces quality phases and call count during tailoring", async () => {
   );
 });
 
-it("shows Codex controls and locks them while labeling progress in passes", async () => {
+it("keeps Codex activity and Stop in the header while labeling progress in passes", async () => {
   vi.mocked(invoke).mockImplementation(async (name) => {
     if (name === "application_capture_status") return reply(idleCapture);
     if (name === "application_context")
       return reply({
         ...context,
         connectionSource: "chatgpt_plan",
+        codexConnected: true,
         aiBusy: true,
         aiLabel: "Using Codex · GPT-6.1 Sol",
       });
-    if (name === "load_chatgpt_plan")
-      return reply({ ...codexStatus(), operationActive: true });
     if (name.startsWith("load_application_")) return reply(null);
     throw new Error(`Unexpected command: ${name}`);
   });
@@ -1680,10 +1797,10 @@ it("shows Codex controls and locks them while labeling progress in passes", asyn
   expect(host.querySelector(".application-provider-label")?.textContent).toBe(
     "Codex",
   );
-  expect(
-    host.querySelector<HTMLSelectElement>('[aria-label="Codex model"]')
-      ?.disabled,
-  ).toBe(true);
+  expect(host.querySelector("header select")).toBeNull();
+  expect(host.querySelector("header .application-stop")?.textContent).toBe(
+    "Stop",
+  );
   expect(host.querySelector('[aria-label="AI model"]')).toBeNull();
   await act(async () =>
     listeners.get("ort:tailoring-progress")?.({
@@ -1699,307 +1816,144 @@ it("shows Codex controls and locks them while labeling progress in passes", asyn
   expect(host.textContent).toContain("pass 2 of 4");
 });
 
-function codexStatus(): Wire.PlanStatus {
-  return {
-    settings: {
-      cleanupRequired: false,
-      connectionId: context.selectedKeyId,
-      enabled: true,
-      model: "gpt-6.1-sol",
-      reasoning: "high",
-      reserveEnabled: true,
-      reservePercent: 25,
-    },
-    revision: 3,
-    connected: true,
-    accountPlan: "plus",
-    loginPending: false,
-    operationActive: false,
-    runtimeVersion: "0.162.0",
-    errorCode: null,
-    models: [
-      {
-        id: "gpt-6.1-sol",
-        name: "GPT-6.1 Sol",
-        supported: true,
-        explanation: null,
-        reasoningEfforts: ["medium", "high"],
-      },
-      {
-        id: "gpt-6-luna",
-        name: "GPT-6 Luna",
-        supported: true,
-        explanation: null,
-        reasoningEfforts: ["low", "medium"],
-      },
-      {
-        id: "gpt-5.6-terra",
-        name: "GPT-5.6 Terra",
-        supported: false,
-        explanation: "Unavailable",
-        reasoningEfforts: [],
-      },
-    ],
-    quota: {
-      fetchedAtUnixMs: Date.now(),
-      windows: [
-        {
-          limitId: "codex",
-          name: "Codex primary",
-          window: "primary",
-          remainingPercent: 0,
-          windowDurationMinutes: 300,
-          resetsAt: null,
-        },
-        {
-          limitId: "codex",
-          name: "Codex secondary",
-          window: "secondary",
-          remainingPercent: 76.5,
-          windowDurationMinutes: 10080,
-          resetsAt: null,
-        },
-      ],
-    },
-  };
-}
+it.each(["direct_api", "chatgpt_plan"] as const)(
+  "leaves all %s provider settings in the main app",
+  async (connectionSource) => {
+    vi.mocked(invoke).mockImplementation(async (name) => {
+      if (name === "application_capture_status") return reply(idleCapture);
+      if (name === "application_context")
+        return reply({
+          ...context,
+          connectionSource,
+          codexConnected: connectionSource === "chatgpt_plan",
+        });
+      if (name.startsWith("load_application_")) return reply(null);
+      throw new Error(`Unexpected command: ${name}`);
+    });
+    const { host } = await mount();
+    expect(host.querySelector("header select")).toBeNull();
+    expect(host.querySelector("header")?.textContent).toBe(
+      "Open Resume ToolkitReady",
+    );
+    expect(
+      host.querySelector("footer .application-provider-label")?.textContent,
+    ).toBe(connectionSource === "chatgpt_plan" ? "Codex" : "API key");
+    expect(
+      host.querySelector('[aria-label="Account-wide remaining usage"]'),
+    ).toBeNull();
+    expect(
+      vi
+        .mocked(invoke)
+        .mock.calls.some(([name]) =>
+          [
+            "load_chatgpt_plan",
+            "save_chatgpt_plan",
+            "set_ai_key_model",
+          ].includes(name),
+        ),
+    ).toBe(false);
+  },
+);
 
-function mockCodex(read: () => Wire.PlanStatus) {
-  vi.mocked(invoke).mockImplementation(async (name) => {
-    if (name === "application_capture_status") return reply(idleCapture);
-    if (name === "application_context")
-      return reply({
-        ...context,
-        connectionSource: "chatgpt_plan",
-        model: read().settings.model,
-      });
-    if (name === "load_chatgpt_plan") return reply(read());
-    if (name.startsWith("load_application_")) return reply(null);
-    throw new Error(`Unexpected command: ${name}`);
-  });
-}
-
-it("hides previously known usage after a failed Codex quota refresh", async () => {
-  let status = codexStatus();
-  mockCodex(() => status);
-  const { host } = await mount();
-  expect(host.textContent).toContain("76.5% remaining");
-  status = { ...status, quota: null, errorCode: "PLAN_QUOTA_UNAVAILABLE" };
-  await act(async () =>
-    planListeners.get("ort:ai-model-changed")?.({ payload: null }),
-  );
-  expect(
-    host.querySelector('[aria-label="Account-wide remaining usage"]'),
-  ).toBeNull();
-  expect(host.textContent).not.toContain("76.5% remaining");
-  expect(
-    host.querySelector<HTMLSelectElement>('[aria-label="Codex model"]')?.value,
-  ).toBe("gpt-6.1-sol");
-  expect(host.querySelector('[aria-label="AI model"]')).toBeNull();
-});
-
-it("changes Codex model and reasoning in the overlay while preserving reserve settings", async () => {
-  let status = codexStatus();
-  mockCodex(() => status);
-  const original = vi.mocked(invoke).getMockImplementation()!;
-  vi.mocked(invoke).mockImplementation(async (name, args) => {
-    if (name === "save_chatgpt_plan") {
-      const request = (args as { request: Wire.SavePlanRequest }).request;
-      status = {
-        ...status,
-        revision: status.revision! + 1,
-        settings: {
-          ...status.settings,
-          model: request.model ?? null,
-          reasoning: request.reasoning,
-        },
-      };
-      return reply(status);
-    }
-    return original(name, args);
-  });
-  const { host } = await mount();
-  const model = host.querySelector<HTMLSelectElement>(
-    '[aria-label="Codex model"]',
-  )!;
-  const reasoning = host.querySelector<HTMLSelectElement>(
-    '[aria-label="Codex reasoning"]',
-  )!;
-  expect(model.value).toBe("gpt-6.1-sol");
-  expect(
-    [...model.options].find((option) => option.value === "gpt-5.6-terra")
-      ?.disabled,
-  ).toBe(true);
-  await act(async () => {
-    model.value = "gpt-6-luna";
-    model.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  expect(invoke).toHaveBeenCalledWith("save_chatgpt_plan", {
-    request: {
-      expectedRevision: 3,
-      enabled: true,
-      model: "gpt-6-luna",
-      reasoning: "low",
-      reserveEnabled: true,
-      reservePercent: 25,
-    },
-  });
-  expect(model.value).toBe("gpt-6-luna");
-  expect(reasoning.value).toBe("low");
-  expect(
-    [...reasoning.options].find((option) => option.value === "high")?.disabled,
-  ).toBe(true);
-  await act(async () => {
-    reasoning.value = "medium";
-    reasoning.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  expect(invoke).toHaveBeenLastCalledWith("save_chatgpt_plan", {
-    request: {
-      expectedRevision: 4,
-      enabled: true,
-      model: "gpt-6-luna",
-      reasoning: "medium",
-      reserveEnabled: true,
-      reservePercent: 25,
-    },
-  });
-  expect(reasoning.value).toBe("medium");
-  expect(host.querySelector('[aria-label="AI model"]')).toBeNull();
-});
-
-it("refreshes Codex choices and usage on shared setting and operation events", async () => {
-  let status = codexStatus();
-  mockCodex(() => status);
-  const { host } = await mount();
-  expect(host.textContent).toContain("0% remaining");
-  expect(host.textContent).toContain("76.5% remaining");
-  expect(host.textContent).toContain("5 hours");
-  expect(host.textContent).toContain("7 days");
-  status = {
-    ...status,
-    revision: 4,
-    settings: { ...status.settings, model: "gpt-6-luna", reasoning: "medium" },
-    quota: null,
-  };
-  await act(async () =>
-    planListeners.get("ort:ai-model-changed")?.({ payload: null }),
-  );
-  const model = host.querySelector<HTMLSelectElement>(
-    '[aria-label="Codex model"]',
-  )!;
-  expect(model.value).toBe("gpt-6-luna");
-  expect(
-    host.querySelector('[aria-label="Account-wide remaining usage"]'),
-  ).toBeNull();
-  await act(async () =>
-    planListeners.get("ort:ai-operation-state")?.({ payload: true }),
-  );
-  expect(model.disabled).toBe(true);
-  await act(async () =>
-    planListeners.get("ort:ai-operation-state")?.({ payload: false }),
-  );
-  expect(model.disabled).toBe(false);
-  expect(invoke).toHaveBeenCalledWith("load_chatgpt_plan", {
-    request: { refreshUsage: true },
-  });
-});
-
-it("keeps the Codex selection and shows the error when a settings save fails", async () => {
-  const status = codexStatus();
-  mockCodex(() => status);
-  const original = vi.mocked(invoke).getMockImplementation()!;
-  vi.mocked(invoke).mockImplementation(async (name, args) =>
-    name === "save_chatgpt_plan"
-      ? {
-          ok: false,
-          error: {
-            code: "REVISION_CONFLICT",
-            messageKey: "errors.chatgptPlan",
-            retryable: true,
-            details: {},
-          },
-        }
-      : original(name, args),
-  );
-  const { host } = await mount();
-  const model = host.querySelector<HTMLSelectElement>(
-    '[aria-label="Codex model"]',
-  )!;
-  await act(async () => {
-    model.value = "gpt-6-luna";
-    model.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  expect(model.value).toBe("gpt-6.1-sol");
-  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
-    "These settings changed elsewhere",
-  );
-});
-
-it("keeps Codex in the overlay while signed out and replaces model controls with the AI disabled message", async () => {
-  const signedOut = {
-    ...codexStatus(),
-    connected: false,
-    accountPlan: null,
-    quota: null,
+it("refreshes Codex readiness, model, and reasoning after changes in the main app", async () => {
+  let current: Wire.ApplicationContext = {
+    ...context,
+    connectionSource: "chatgpt_plan",
+    codexConnected: true,
+    model: "gpt-5.6-sol",
+    reasoning: "high",
   };
   vi.mocked(invoke).mockImplementation(async (name) => {
     if (name === "application_capture_status") return reply(idleCapture);
-    if (name === "application_context")
-      return reply({
-        ...context,
-        connectionSource: "chatgpt_plan",
-        aiReady: false,
-        selectedKeyReady: false,
-        selectedKeyId: null,
-        modelOptions: [],
-        aiLabel: "Check Codex in the main app",
-      });
-    if (name === "load_chatgpt_plan") return reply(signedOut);
+    if (name === "application_context") return reply(current);
     if (name.startsWith("load_application_")) return reply(null);
     throw new Error(`Unexpected command: ${name}`);
   });
   const { host } = await mount();
-  expect(host.querySelector(".application-provider-label")?.textContent).toBe(
-    "Codex",
+  expect(host.querySelector("header")?.textContent).toContain("Ready");
+  expect(host.querySelector("footer")?.textContent).toContain(
+    "Codex: GPT-5.6 Sol · High",
   );
-  expect(host.querySelector('[aria-label="AI model"]')).toBeNull();
-  expect(host.querySelector('[aria-label="Codex model"]')).toBeNull();
-  expect(host.querySelector('[aria-label="Codex reasoning"]')).toBeNull();
-  expect(host.textContent).toContain(
-    "AI is disabled until an account is connected.",
+  current = { ...current, aiReady: false, codexConnected: false };
+  await act(async () =>
+    listeners.get("ort:ai-model-changed")?.({ payload: null }),
+  );
+  expect(host.querySelector("header")?.textContent).toContain(
+    "Sign in to use Codex",
+  );
+  expect(host.querySelector("footer")?.textContent).toContain(
+    "No model connected",
   );
   expect(
-    host.querySelector('[aria-label="Account-wide remaining usage"]'),
-  ).toBeNull();
-  expect(
-    vi.mocked(invoke).mock.calls.some(([name]) => name === "set_ai_key_model"),
-  ).toBe(false);
+    host.querySelector("footer .application-provider-label")?.textContent,
+  ).toBeUndefined();
+  current = {
+    ...current,
+    aiReady: true,
+    codexConnected: true,
+    model: "gpt-6.1-sol",
+    reasoning: "xhigh",
+  };
+  await act(async () =>
+    listeners.get("ort:ai-model-changed")?.({ payload: null }),
+  );
+  expect(host.querySelector("header")?.textContent).toContain("Ready");
+  expect(host.querySelector("footer")?.textContent).toContain(
+    "Codex: GPT-6.1 Sol · Extra high",
+  );
+  expect(host.querySelector("header select")).toBeNull();
 });
 
-it("replaces controls after sign-out and restores them when an account connects", async () => {
-  let status = codexStatus();
-  mockCodex(() => status);
-  const { host } = await mount();
-  expect(host.querySelector('[aria-label="Codex model"]')).not.toBeNull();
-  status = { ...status, connected: false, accountPlan: null };
-  await act(async () =>
-    planListeners.get("ort:ai-model-changed")?.({ payload: null }),
-  );
-  expect(host.querySelector('[aria-label="Codex model"]')).toBeNull();
-  expect(host.querySelector('[aria-label="Codex reasoning"]')).toBeNull();
-  expect(
-    host.querySelector('[aria-label="Account-wide remaining usage"]'),
-  ).toBeNull();
-  expect(host.textContent).toContain(
-    "AI is disabled until an account is connected.",
-  );
-  status = { ...status, connected: true };
-  await act(async () =>
-    planListeners.get("ort:ai-model-changed")?.({ payload: null }),
-  );
-  expect(host.querySelector('[aria-label="Codex model"]')).not.toBeNull();
-  expect(host.querySelector('[aria-label="Codex reasoning"]')).not.toBeNull();
-  expect(host.textContent).not.toContain(
-    "AI is disabled until an account is connected.",
-  );
-});
+it.each([
+  {
+    connectionSource: "direct_api",
+    model: "gemini-3.5-flash",
+    reasoning: "high",
+    summary: "API key: Gemini 3.5 Flash",
+  },
+  {
+    connectionSource: "chatgpt_plan",
+    model: "gpt-5.6-sol",
+    reasoning: "high",
+    summary: "Codex: GPT-5.6 Sol · High",
+  },
+  {
+    connectionSource: "chatgpt_plan",
+    model: "gpt-6-luna",
+    reasoning: null,
+    summary: "Codex: GPT-6 Luna",
+  },
+  {
+    connectionSource: "chatgpt_plan",
+    model: null,
+    reasoning: "high",
+    summary: "No model connected",
+  },
+] as const)(
+  "summarizes the selected provider as $summary",
+  async ({ connectionSource, model, reasoning, summary }) => {
+    vi.mocked(invoke).mockImplementation(async (name) => {
+      if (name === "application_capture_status") return reply(idleCapture);
+      if (name === "application_context")
+        return reply({
+          ...context,
+          connectionSource,
+          codexConnected: connectionSource === "chatgpt_plan",
+          model,
+          reasoning,
+        });
+      if (name.startsWith("load_application_")) return reply(null);
+      throw new Error(`Unexpected command: ${name}`);
+    });
+    const { host } = await mount();
+    expect(host.querySelector('[aria-label="AI provider"]')?.textContent).toBe(
+      summary,
+    );
+    expect(
+      host
+        .querySelector(".application-footer-connections")
+        ?.lastElementChild?.getAttribute("aria-label"),
+    ).toBe("AI provider");
+    expect(host.querySelector("header select")).toBeNull();
+  },
+);

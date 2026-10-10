@@ -29,6 +29,10 @@ the native request. Only a main-thread reply to an outstanding request can
 approve termination; missing, repeated and worker-thread replies cannot. The
 desktop independently validates its main-window, single-use close attempt and
 atomically excludes new file/render operations before approving.
+Before replying with approval, the desktop shuts down and reaps its Codex
+server and prevents queued status checks from restarting it. Native AppKit
+termination can bypass Tauri's final exit callback, so that callback is only
+a fallback for cleanup.
 
 This is not recovery for Force Quit, a crash or power loss. Neither a timeout nor
 a missing renderer response approves a quit. Real logout/shutdown and installed

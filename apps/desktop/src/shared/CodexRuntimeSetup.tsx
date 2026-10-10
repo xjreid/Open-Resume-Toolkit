@@ -9,6 +9,7 @@ export function CodexRuntimeSetup({
   readiness,
   checking,
   error,
+  showCheck,
   onCheck,
   onInstalled,
   onBusy,
@@ -18,6 +19,7 @@ export function CodexRuntimeSetup({
   readiness: RuntimeReadiness | null;
   checking: boolean;
   error: string;
+  showCheck: boolean;
   onCheck: () => void;
   onInstalled: () => void;
   onBusy: (busy: boolean) => void;
@@ -25,26 +27,44 @@ export function CodexRuntimeSetup({
   const needed = readiness?.ready === false;
   const supported = readiness?.errorCode !== "PLAN_PLATFORM_UNSUPPORTED";
   return (
-    <>
+    <section
+      className="ai-panel plan-setup"
+      hidden={!!readiness?.ready && !error}
+      aria-labelledby="plan-setup-title"
+    >
+      <div className="plan-runtime">
+        <h3 id="plan-setup-title">
+          {needed && supported
+            ? "Install the Codex runtime"
+            : "Codex installation"}
+        </h3>
+        {showCheck && (
+          <button
+            type="button"
+            className="button--secondary"
+            disabled={blocked || checking}
+            onClick={onCheck}
+          >
+            {checking ? "Checking installation…" : "Check installation"}
+          </button>
+        )}
+      </div>
       {!readiness && checking && (
         <p className="ai-help" role="status">
           Checking Codex installation…
         </p>
       )}
       {(error || needed) && (
-        <div className="plan-runtime">
-          <p className="ai-help" role="alert">
-            {error || planErrorMessage(readiness!.errorCode!)}
-          </p>
-          <button
-            type="button"
-            className="button--quiet"
-            disabled={blocked || checking}
-            onClick={onCheck}
-          >
-            Check installation
-          </button>
-        </div>
+        <p
+          className="ai-help"
+          role={
+            error || readiness?.errorCode !== "PLAN_RUNTIME_MISSING"
+              ? "alert"
+              : "status"
+          }
+        >
+          {error || planErrorMessage(readiness!.errorCode!)}
+        </p>
       )}
       <CodexRuntimeInstaller
         visible={visible}
@@ -80,6 +100,6 @@ export function CodexRuntimeSetup({
           </button>
         </details>
       )}
-    </>
+    </section>
   );
 }

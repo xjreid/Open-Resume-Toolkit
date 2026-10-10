@@ -52,6 +52,18 @@ pub(crate) fn load_settings(
     }
     Ok((settings, Some(saved.revision)))
 }
+
+/// Server enablement belongs to one app run. Preserve model and quota policy,
+/// but never resume a previous run's server permission or account identity.
+pub(crate) fn reset_server_on_launch(store: &EncryptedStore) -> Result<(), StorageError> {
+    let (mut settings, revision) = load_settings(store)?;
+    if !settings.enabled && settings.connection_id.is_none() {
+        return Ok(());
+    }
+    settings.enabled = false;
+    settings.connection_id = None;
+    persist_selection(store, revision, &settings)
+}
 pub(crate) fn auth_root(window: &WebviewWindow, profile: Uuid) -> Result<PathBuf, &'static str> {
     let root = window
         .app_handle()
@@ -626,6 +638,54 @@ pub fn open_chatgpt_plan_runtime_guidance(window: WebviewWindow) -> CommandRespo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reopening_starts_stopped_and_preserves_model_reserve_and_cleanup_policy() {
+        for cleanup_required in [false, true] {
+            let temp = tempfile::tempdir().unwrap();
+            let vault = ort_vault::testing::MemoryDatabaseKeyVault::new();
+            let store = EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+            let previous = PlanSettings {
+                enabled: true,
+                connection_id: Some(Uuid::now_v7()),
+                model: Some("gpt-6-sol".into()),
+                reasoning: ReasoningEffort::High,
+                reserve_enabled: false,
+                reserve_percent: 35,
+                cleanup_required,
+            };
+            persist_selection(&store, None, &previous).unwrap();
+            drop(store);
+            let reopened = EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+            reset_server_on_launch(&reopened).unwrap();
+            let (settings, revision) = load_settings(&reopened).unwrap();
+            assert_eq!(
+                settings,
+                PlanSettings {
+                    enabled: false,
+                    connection_id: None,
+                    ..previous
+                },
+            );
+            assert_eq!(settings.runtime_permission(), Err("PLAN_DISABLED"));
+            reset_server_on_launch(&reopened).unwrap();
+            assert_eq!(load_settings(&reopened).unwrap().1, revision);
+        }
+    }
+
+    #[test]
+    fn opening_without_codex_settings_does_not_create_a_record() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = EncryptedStore::open_or_initialize(
+            temp.path(),
+            "test",
+            &ort_vault::testing::MemoryDatabaseKeyVault::new(),
+        )
+        .unwrap();
+        reset_server_on_launch(&store).unwrap();
+        assert_eq!(load_settings(&store).unwrap().1, None);
+    }
+
     #[test]
     fn overlay_can_only_change_model_and_reasoning_for_enabled_codex() {
         let mut settings = PlanSettings {

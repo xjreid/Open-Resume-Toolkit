@@ -322,9 +322,11 @@ pub struct ApplicationContext {
     pub ai_label: String,
     pub ai_ready: bool,
     pub ai_busy: bool,
+    pub codex_connected: bool,
     pub selected_key_ready: bool,
     pub selected_key_id: Option<uuid::Uuid>,
     pub model: Option<String>,
+    pub reasoning: Option<ort_ai::plan::ReasoningEffort>,
     pub model_options: Vec<ApplicationModelOption>,
     pub browser_connected: bool,
 }
@@ -356,6 +358,18 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
         let published_revision = store.load_latest_published()?.map(|item| item.revision);
         let connection = crate::ai_keys::request_connection(store, None)?;
         let using_plan = connection.mode == "chatgpt_plan";
+        let plan = if using_plan {
+            Some(crate::chatgpt_plan::load_settings(store)?.0)
+        } else {
+            None
+        };
+        let reasoning = plan.as_ref().map(|settings| settings.reasoning);
+        let codex_connected = plan.as_ref().is_some_and(|settings| {
+            !settings.cleanup_required
+                && window
+                    .state::<crate::chatgpt_plan::PlanRuntime>()
+                    .is_connected(store.manifest().profile_id, settings.connection_id)
+        });
         let ai_ready = connection.mode == "direct_api" || using_plan;
         let provider_name = connection
             .provider
@@ -384,11 +398,9 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
             .is_some_and(|model| model_options.iter().any(|option| &option.model == model));
         let ai_busy = window.state::<ai_request::AiRequestGate>().is_busy();
         let ai_ready = ai_ready
+            && selected_model.is_some()
             && if using_plan {
-                ai_busy
-                    || window
-                        .state::<crate::chatgpt_plan::PlanRuntime>()
-                        .is_connected(store.manifest().profile_id, connection.credential_id)
+                ai_busy || codex_connected
             } else {
                 model_available
             };
@@ -417,9 +429,11 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
             ai_label,
             ai_ready,
             ai_busy,
+            codex_connected,
             selected_key_ready: ai_ready,
             selected_key_id: connection.credential_id,
             model: connection.model,
+            reasoning,
             model_options,
             browser_connected,
         })

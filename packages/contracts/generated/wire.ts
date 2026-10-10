@@ -132,11 +132,13 @@ export type ApplicationContext = {
   aiLabel: string;
   aiReady: boolean;
   browserConnected: boolean;
+  codexConnected: boolean;
   connectionSource: ConnectionSource;
   model: string | null;
   modelOptions: Array<ApplicationModelOption>;
   profileId: string;
   publishedRevision: number | null;
+  reasoning: ReasoningEffort | null;
   selectedKeyId: string | null;
   selectedKeyReady: boolean;
 };
