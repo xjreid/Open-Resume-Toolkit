@@ -22,10 +22,15 @@
           "type": "null"
         }
       ]
+    },
+    "profileId": {
+      "type": "string",
+      "format": "uuid"
     }
   },
   "additionalProperties": false,
   "required": [
+    "profileId",
     "draft",
     "latestPublished"
   ],

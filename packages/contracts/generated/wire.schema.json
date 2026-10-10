@@ -171,7 +171,7 @@
           "type": "string"
         },
         "period": {
-          "$ref": "#/$defs/AiPeriod"
+          "$ref": "#/$defs/AiGuardrailPeriod"
         }
       },
       "required": [
@@ -205,7 +205,7 @@
           "type": "integer"
         },
         "period": {
-          "$ref": "#/$defs/AiPeriod"
+          "$ref": "#/$defs/AiGuardrailPeriod"
         },
         "periodEndUnixMs": {
           "format": "int64",
@@ -339,6 +339,15 @@
       ],
       "title": "AiGeneralSettings",
       "type": "object"
+    },
+    "AiGuardrailPeriod": {
+      "enum": [
+        "week",
+        "month",
+        "year",
+        "all_time"
+      ],
+      "type": "string"
     },
     "AiKeyAction": {
       "enum": [
@@ -605,15 +614,6 @@
       ],
       "title": "AiMonitoringSummary",
       "type": "object"
-    },
-    "AiPeriod": {
-      "enum": [
-        "week",
-        "month",
-        "year",
-        "all_time"
-      ],
-      "type": "string"
     },
     "AiProgress": {
       "properties": {
@@ -2537,6 +2537,27 @@
         }
       ]
     },
+    "ImportedAiGuardrails": {
+      "$defs": {},
+      "properties": {
+        "policies": {
+          "items": {
+            "$ref": "#/$defs/PortableAiGuardrailV1"
+          },
+          "type": "array"
+        },
+        "profileId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profileId",
+        "policies"
+      ],
+      "title": "ImportedAiGuardrails",
+      "type": "object"
+    },
     "InstallPhase": {
       "enum": [
         "idle",
@@ -3303,6 +3324,85 @@
       "title": "PlanStatus",
       "type": "object"
     },
+    "PortableAiGuardrailV1": {
+      "$defs": {},
+      "additionalProperties": false,
+      "description": "Restored policies are historical configuration until explicitly rebound.",
+      "properties": {
+        "activatedAtUnixMs": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "countedMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "credentialId": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "limitMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "period": {
+          "$ref": "#/$defs/AiGuardrailPeriod"
+        },
+        "periodEndUnixMs": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "periodStartUnixMs": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "reservedMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "unresolvedMicros": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "credentialId",
+        "period",
+        "currency",
+        "timeZone",
+        "limitMicros",
+        "activatedAtUnixMs",
+        "periodStartUnixMs",
+        "periodEndUnixMs",
+        "countedMicros",
+        "reservedMicros",
+        "unresolvedMicros",
+        "revision"
+      ],
+      "title": "PortableAiGuardrailV1",
+      "type": "object"
+    },
     "PortablePdfArchivePayload": {
       "additionalProperties": false,
       "properties": {
@@ -3590,6 +3690,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "expectedProfileId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "payload": {
           "$ref": "#/$defs/PublishResumePayload"
         },
@@ -3598,6 +3702,7 @@
         }
       },
       "required": [
+        "expectedProfileId",
         "contractVersion",
         "requestId",
         "payload"
@@ -4102,9 +4207,14 @@
               "type": "null"
             }
           ]
+        },
+        "profileId": {
+          "format": "uuid",
+          "type": "string"
         }
       },
       "required": [
+        "profileId",
         "draft",
         "latestPublished"
       ],
@@ -4266,7 +4376,7 @@
           "type": "integer"
         },
         "period": {
-          "$ref": "#/$defs/AiPeriod"
+          "$ref": "#/$defs/AiGuardrailPeriod"
         },
         "timeZone": {
           "type": "string"
@@ -4352,6 +4462,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "expectedProfileId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "payload": {
           "$ref": "#/$defs/SaveResumePayload"
         },
@@ -4360,6 +4474,7 @@
         }
       },
       "required": [
+        "expectedProfileId",
         "contractVersion",
         "requestId",
         "payload"
@@ -5159,6 +5274,35 @@
       },
       "value": {
         "$ref": "#/$defs/SavedStageOneDraft"
+      }
+    },
+    "bind_imported_ai_guardrail": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "type": "string"
+          },
+          "credentialId": {
+            "type": "string"
+          },
+          "expectedProfileId": {
+            "type": "string"
+          },
+          "importId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedProfileId",
+          "importId",
+          "credentialId",
+          "confirmation"
+        ],
+        "type": "object"
+      },
+      "value": {
+        "type": "boolean"
       }
     },
     "browser_connection_status": {
@@ -5965,6 +6109,17 @@
       },
       "value": {
         "$ref": "#/$defs/RuntimeInstallStatus"
+      }
+    },
+    "load_imported_ai_guardrails": {
+      "args": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "value": {
+        "$ref": "#/$defs/ImportedAiGuardrails"
       }
     },
     "load_resume": {

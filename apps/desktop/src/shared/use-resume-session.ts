@@ -58,7 +58,7 @@ export function useResumeSession({
     importWorking ? { ...editor, status: "exporting" } : editor,
     trackerDirty || importActive,
   );
-  const { document } = editor;
+  const { document, profileId } = editor;
   const revision = editor.saved?.revision ?? null;
   const dirty = isDirty(editor);
   const busy = editor.status !== "idle" || importActive;
@@ -92,6 +92,7 @@ export function useResumeSession({
       dispatch({ type: "failed", code: workspace.error.code });
       return;
     }
+    ioBusy.current = false;
     dispatch({
       type: "loaded",
       workspace: workspace.value,
@@ -108,6 +109,7 @@ export function useResumeSession({
   const save = useCallback(async () => {
     if (
       !document ||
+      !profileId ||
       busy ||
       ioBusy.current ||
       !dirty ||
@@ -119,7 +121,9 @@ export function useResumeSession({
     const submittedEpoch = editor.editEpoch;
     dispatch({ type: "saving" });
     const normalized = normalizeDocument(document);
-    const result = await saveResume(revision, normalized);
+    const generation = loadGeneration.current;
+    const result = await saveResume(profileId, revision, normalized);
+    if (generation !== loadGeneration.current) return;
     if (result.ok) {
       dispatch({ type: "saved", value: result.value, submittedEpoch });
     } else {
@@ -134,6 +138,7 @@ export function useResumeSession({
     mustReload,
     editor.editEpoch,
     revision,
+    profileId,
   ]);
 
   useEffect(() => {
@@ -161,11 +166,20 @@ export function useResumeSession({
   ]);
 
   async function publish() {
-    if (revision === null || dirty || busy || ioBusy.current || mustReload)
+    if (
+      !profileId ||
+      revision === null ||
+      dirty ||
+      busy ||
+      ioBusy.current ||
+      mustReload
+    )
       return;
     ioBusy.current = true;
     dispatch({ type: "publishing" });
-    const result = await publishResume(revision);
+    const generation = loadGeneration.current;
+    const result = await publishResume(profileId, revision);
+    if (generation !== loadGeneration.current) return;
     if (result.ok) {
       dispatch({ type: "published", value: result.value.published });
     } else {
@@ -176,11 +190,17 @@ export function useResumeSession({
 
   async function selectedVersionForExport(source: ExportSource) {
     if (source === "published_snapshot") return editor.published;
-    if (!document) return null;
+    if (!document || !profileId) return null;
     if (!dirty) return editor.saved;
     const submittedEpoch = editor.editEpoch;
     dispatch({ type: "saving" });
-    const result = await saveResume(revision, normalizeDocument(document));
+    const generation = loadGeneration.current;
+    const result = await saveResume(
+      profileId,
+      revision,
+      normalizeDocument(document),
+    );
+    if (generation !== loadGeneration.current) return null;
     if (!result.ok) {
       dispatch({ type: "failed", code: result.error.code });
       return null;

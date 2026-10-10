@@ -95,6 +95,7 @@ fn command_signatures(root: &Path) -> Result<BTreeMap<String, Value>, Box<dyn st
         "ai_request",
         "application_materials",
         "application_exports",
+        "application_edits",
         "tracker",
         "browser_bridge",
         "backup_export",

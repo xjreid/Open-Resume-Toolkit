@@ -1,6 +1,7 @@
 //! One retirement boundary for every profile-scoped native cache and webview.
 use tauri::{Emitter, Manager};
 pub(crate) fn retire(app: &tauri::AppHandle) {
+    crate::background_work::clear_render_cache();
     app.state::<crate::ai_request::AiRequestGate>()
         .cancel_overlay();
     app.state::<crate::chatgpt_plan::PlanRuntime>().stop();

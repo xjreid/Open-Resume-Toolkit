@@ -20,8 +20,10 @@ pub use wire_contracts::{desktop_wire_fixtures, desktop_wire_schemas};
 mod ai_keys;
 mod ai_request;
 mod ai_settings;
+mod application_edits;
 mod application_exports;
 mod application_materials;
+mod background_work;
 mod backup_export;
 mod browser_bridge;
 mod chatgpt_plan;
@@ -258,8 +260,9 @@ fn load_resume(
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };
     }
-    let (draft, latest_published) = match state.with_store(|store| {
+    let (profile_id, draft, latest_published) = match state.with_store(|store| {
         Ok((
+            store.manifest().profile_id,
             store.load_draft()?.map(versioned_response),
             store.load_latest_published()?.map(versioned_response),
         ))
@@ -269,6 +272,7 @@ fn load_resume(
     };
 
     CommandResponse::success(ResumeWorkspaceResponse {
+        profile_id,
         draft,
         latest_published,
     })
@@ -320,9 +324,12 @@ fn save_resume(
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };
     }
-    let saved = state.with_store(|store| match request.payload.expected_revision {
-        Some(revision) => store.save_draft(revision, &request.payload.document),
-        None => store.create_draft(&request.payload.document),
+    let saved = state.with_store(|store| {
+        store.save_resume_for_profile(
+            request.expected_profile_id,
+            request.payload.expected_revision,
+            &request.payload.document,
+        )
     });
     match saved {
         Ok(value) => CommandResponse::success(versioned_response(value)),
@@ -344,7 +351,9 @@ fn publish_resume(
         return CommandResponse::Failure { ok: false, error };
     }
     let draft_revision = request.payload.expected_draft_revision;
-    match state.with_store(|store| store.publish_draft(draft_revision)) {
+    match state.with_store(|store| {
+        store.publish_resume_for_profile(request.expected_profile_id, draft_revision)
+    }) {
         Ok(published) => CommandResponse::success(PublishResumeResponse {
             draft_revision,
             published: versioned_response(published),
@@ -457,6 +466,7 @@ fn toggle_application_overlay(window: WebviewWindow) -> CommandResponse<bool> {
             );
         }
         let _ = window.emit("ort:overlay-visibility", false);
+        let _ = overlay.emit("ort:overlay-visibility", false);
         return CommandResponse::success(false);
     }
     if overlay_position::restore(&overlay).is_err() {
@@ -470,6 +480,7 @@ fn toggle_application_overlay(window: WebviewWindow) -> CommandResponse<bool> {
         return CommandResponse::failure("OVERLAY_UNAVAILABLE", "errors.overlayUnavailable", true);
     }
     let _ = window.emit("ort:overlay-visibility", true);
+    let _ = overlay.emit("ort:overlay-visibility", true);
     CommandResponse::success(true)
 }
 
@@ -710,7 +721,7 @@ pub fn run() {
             application_materials::generate_application_cover_letter,
             application_materials::generate_application_answer,
             application_materials::refine_application_answer,
-            application_materials::save_application_workspace,
+            application_edits::save_application_workspace,
             application_materials::finish_application,
             application_exports::preview_application_pdf,
             application_exports::prepare_application_exports,
@@ -730,6 +741,8 @@ pub fn run() {
             ai_settings::load_ai_retention,
             ai_settings::save_ai_retention,
             ai_settings::load_ai_caps,
+            ai_settings::load_imported_ai_guardrails,
+            ai_settings::bind_imported_ai_guardrail,
             ai_settings::load_ai_key_settings,
             ai_settings::load_ai_general_settings,
             ai_settings::save_ai_cap,

@@ -325,10 +325,12 @@ pub struct PreparedApplicationExport {
 
 pub(crate) fn render_application_exports(
     state: &DesktopState,
+    expected_profile_id: uuid::Uuid,
     expected_revision: i64,
     kind: MaterialKind,
 ) -> Result<PreparedApplicationExports, StorageError> {
     let (profile_id, document, style) = state.with_store(|store| {
+        ort_application::application_workspace::ensure_profile(store, expected_profile_id)?;
         let current = load(store)?.ok_or(StorageError::NotFound)?;
         if current.revision != expected_revision {
             return Err(StorageError::RevisionConflict);
@@ -343,7 +345,7 @@ pub(crate) fn render_application_exports(
             current.workspace.style,
         ))
     })?;
-    let pdf = ort_render::render_pdf_with_style(&document, style)
+    let pdf = crate::background_work::render_pdf(profile_id, &document, style)
         .map_err(|_| StorageError::InvalidData)?;
     let docx = render_docx_with_style(&document, style).map_err(|_| StorageError::InvalidData)?;
     Ok(PreparedApplicationExports {
@@ -357,7 +359,7 @@ pub(crate) fn render_application_exports(
 }
 
 #[tauri::command]
-pub fn prepare_application_exports(
+pub async fn prepare_application_exports(
     window: WebviewWindow,
     expected_revision: i64,
     kind: MaterialKind,
@@ -365,10 +367,32 @@ pub fn prepare_application_exports(
     if window.label() != "overlay" {
         return window_not_authorized();
     }
-    let profile_id = match window
+    let expected_profile_id = match window
         .state::<DesktopState>()
         .with_store(|store| Ok(store.manifest().profile_id))
     {
+        Ok(profile) => profile,
+        Err(problem) => return storage_failure(&problem),
+    };
+    crate::background_work::run(move || {
+        prepare_application_exports_blocking(window, expected_revision, kind, expected_profile_id)
+    })
+    .await
+}
+
+fn prepare_application_exports_blocking(
+    window: WebviewWindow,
+    expected_revision: i64,
+    kind: MaterialKind,
+    expected_profile_id: uuid::Uuid,
+) -> CommandResponse<PreparedApplicationExport> {
+    if window.label() != "overlay" {
+        return window_not_authorized();
+    }
+    let profile_id = match window.state::<DesktopState>().with_store(|store| {
+        ort_application::application_workspace::ensure_profile(store, expected_profile_id)?;
+        Ok(store.manifest().profile_id)
+    }) {
         Ok(profile) => profile,
         Err(problem) => return storage_failure(&problem),
     };
@@ -407,6 +431,7 @@ pub fn prepare_application_exports(
     }
     let prepared = match render_application_exports(
         &window.state::<DesktopState>(),
+        expected_profile_id,
         expected_revision,
         kind,
     ) {

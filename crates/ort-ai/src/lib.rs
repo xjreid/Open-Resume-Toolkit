@@ -25,14 +25,20 @@ pub const BUILTIN_CATALOG_BYTES: &[u8] = include_bytes!("../../../packages/catal
 /// # Errors
 /// Uses the same trust and freshness checks as a downloaded content-only update.
 pub fn builtin_catalog(now: &str, previous_id: Option<&str>) -> Result<Catalog, AiError> {
-    Catalog::verify(
-        BUILTIN_CATALOG_BYTES,
-        BUILTIN_CATALOG_SIGNATURE,
-        &BUILTIN_CATALOG_PUBLIC_KEY,
-        now,
-        env!("CARGO_PKG_VERSION"),
-        previous_id,
-    )
+    static VERIFIED: std::sync::OnceLock<Result<Catalog, AiError>> = std::sync::OnceLock::new();
+    let catalog = VERIFIED
+        .get_or_init(|| {
+            // Verify immutable bytes once; freshness and rollback remain per request.
+            Catalog::authenticate(
+                BUILTIN_CATALOG_BYTES,
+                BUILTIN_CATALOG_SIGNATURE,
+                &BUILTIN_CATALOG_PUBLIC_KEY,
+            )
+        })
+        .as_ref()
+        .map_err(|_| AiError::InvalidCatalog)?;
+    catalog.validate_at(now, env!("CARGO_PKG_VERSION"), previous_id)?;
+    Ok(catalog.clone())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
@@ -194,6 +200,15 @@ impl Catalog {
         app_version: &str,
         previous_id: Option<&str>,
     ) -> Result<Self, AiError> {
+        let catalog = Self::authenticate(bytes, signature_base64, public_key)?;
+        catalog.validate_at(now, app_version, previous_id)?;
+        Ok(catalog)
+    }
+    fn authenticate(
+        bytes: &[u8],
+        signature_base64: &str,
+        public_key: &[u8; 32],
+    ) -> Result<Self, AiError> {
         let raw = base64::engine::general_purpose::STANDARD
             .decode(signature_base64)
             .map_err(|_| AiError::InvalidCatalog)?;
@@ -202,7 +217,15 @@ impl Catalog {
             .map_err(|_| AiError::InvalidCatalog)?
             .verify(bytes, &signature)
             .map_err(|_| AiError::InvalidCatalog)?;
-        let catalog: Self = serde_json::from_slice(bytes).map_err(|_| AiError::InvalidCatalog)?;
+        serde_json::from_slice(bytes).map_err(|_| AiError::InvalidCatalog)
+    }
+    fn validate_at(
+        &self,
+        now: &str,
+        app_version: &str,
+        previous_id: Option<&str>,
+    ) -> Result<(), AiError> {
+        let catalog = self;
         if catalog.format_version != 1
             || catalog.entries.is_empty()
             || catalog.catalog_id.is_empty()
@@ -239,7 +262,7 @@ impl Catalog {
                 return Err(AiError::InvalidCatalog);
             }
         }
-        Ok(catalog)
+        Ok(())
     }
     /// # Errors
     /// Returns `UnsupportedModel`; selection never silently falls back.

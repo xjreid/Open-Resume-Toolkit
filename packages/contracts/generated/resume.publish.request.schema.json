@@ -9,6 +9,10 @@
       "maximum": 65535,
       "minimum": 0
     },
+    "expectedProfileId": {
+      "type": "string",
+      "format": "uuid"
+    },
     "payload": {
       "$ref": "#/$defs/PublishResumePayload"
     },
@@ -18,6 +22,7 @@
   },
   "additionalProperties": false,
   "required": [
+    "expectedProfileId",
     "contractVersion",
     "requestId",
     "payload"

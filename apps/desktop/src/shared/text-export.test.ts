@@ -100,7 +100,11 @@ describe("export and editor lifecycle isolation", () => {
     const loaded = editorReducer(initialEditorState, {
       type: "loaded",
       empty: document,
-      workspace: { draft: { revision: 2, document }, latestPublished: null },
+      workspace: {
+        profileId: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086",
+        draft: { revision: 2, document },
+        latestPublished: null,
+      },
     });
     for (const notice of [
       "Exported",

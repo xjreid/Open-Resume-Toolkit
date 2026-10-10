@@ -14,118 +14,10 @@ use crate::{EncryptedStore, StorageError};
 /// Reserved policy identity for the profile-wide AI spending guardrail.
 pub const AI_GENERAL_CAP_CREDENTIAL_ID: Uuid = Uuid::from_u128(0);
 
-// Durable, content-free lifetime totals use encrypted settings and survive retention and cap resets.
-fn lifetime_cost(
-    connection: &rusqlite::Connection,
-    profile: &str,
-    credential: &str,
-    currency: &str,
-) -> Result<i64, StorageError> {
-    lifetime_counter(connection, profile, credential, currency, false)
-}
-fn all_lifetime_counter(
-    connection: &rusqlite::Connection,
-    profile: &str,
-    currency: &str,
-    unknown: bool,
-) -> Result<i64, StorageError> {
-    let namespace = if unknown {
-        "ai.lifetime_unknown.v1"
-    } else {
-        "ai.lifetime.v1"
-    };
-    let suffix = format!(".{currency}");
-    let prefix = format!("{namespace}.");
-    let mut statement = connection.prepare(
-        "SELECT DISTINCT credential_id FROM ai_attempts WHERE profile_id = ?1 AND currency = ?4
-         UNION SELECT substr(setting_key, length(?2) + 1, length(setting_key) - length(?2) - length(?3))
-         FROM settings WHERE profile_id = ?1 AND substr(setting_key, 1, length(?2)) = ?2 AND substr(setting_key, -length(?3)) = ?3",
-    ).map_err(|_| StorageError::Unavailable)?;
-    let credentials = statement
-        .query_map(params![profile, prefix, suffix, currency], |row| {
-            row.get::<_, String>(0)
-        })
-        .map_err(|_| StorageError::Unavailable)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| StorageError::Unavailable)?;
-    credentials
-        .into_iter()
-        .try_fold(0_i64, |total, credential| {
-            total
-                .checked_add(lifetime_counter(
-                    connection,
-                    profile,
-                    &credential,
-                    currency,
-                    unknown,
-                )?)
-                .ok_or(StorageError::InvalidData)
-        })
-}
-fn lifetime_counter(
-    connection: &rusqlite::Connection,
-    profile: &str,
-    credential: &str,
-    currency: &str,
-    unknown: bool,
-) -> Result<i64, StorageError> {
-    let namespace = if unknown {
-        "ai.lifetime_unknown.v1"
-    } else {
-        "ai.lifetime.v1"
-    };
-    let bytes: Option<Vec<u8>> = connection
-        .query_row(
-            "SELECT value_json FROM settings WHERE profile_id = ?1 AND setting_key = ?2",
-            params![profile, format!("{namespace}.{credential}.{currency}")],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(|_| StorageError::Unavailable)?;
-    if let Some(bytes) = bytes {
-        let total: u64 = serde_json::from_slice(&bytes).map_err(|_| StorageError::InvalidData)?;
-        return i64::try_from(total).map_err(|_| StorageError::InvalidData);
-    }
-    let sql = if unknown {
-        "SELECT COALESCE(SUM(reserved_cost_micros), 0) FROM ai_attempts WHERE profile_id = ?1 AND credential_id = ?2 AND currency = ?3 AND estimate_completeness != 'complete' AND connection_source = 'direct_api' AND status NOT IN ('reserved', 'dispatching', 'streaming')"
-    } else {
-        "SELECT COALESCE(SUM(settled_cost_micros), 0) FROM ai_attempts WHERE profile_id = ?1 AND credential_id = ?2 AND currency = ?3"
-    };
-    connection
-        .query_row(sql, params![profile, credential, currency], |row| {
-            row.get(0)
-        })
-        .map_err(|_| StorageError::Unavailable)
-}
-fn record_lifetime_counter(
-    connection: &rusqlite::Connection,
-    profile: &str,
-    credential: &str,
-    currency: &str,
-    amount: i64,
-    unknown: bool,
-) -> Result<(), StorageError> {
-    let total = lifetime_counter(connection, profile, credential, currency, unknown)?
-        .checked_add(amount)
-        .ok_or(StorageError::InvalidData)?;
-    let namespace = if unknown {
-        "ai.lifetime_unknown.v1"
-    } else {
-        "ai.lifetime.v1"
-    };
-    connection.execute("INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) VALUES (?1, ?2, 1, ?3, CURRENT_TIMESTAMP) ON CONFLICT (profile_id, setting_key) DO UPDATE SET value_json = excluded.value_json, revision = settings.revision + 1, updated_at = excluded.updated_at", params![profile, format!("{namespace}.{credential}.{currency}"), serde_json::to_vec(&total).map_err(|_| StorageError::InvalidData)?]).map_err(|_| StorageError::Unavailable)?;
-    Ok(())
-}
-fn preserve_lifetime_totals(
-    connection: &rusqlite::Connection,
-    profile: &str,
-) -> Result<(), StorageError> {
-    connection.execute("INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) SELECT profile_id, 'ai.lifetime.v1.' || credential_id || '.' || currency, 1, CAST(CAST(SUM(settled_cost_micros) AS TEXT) AS BLOB), CURRENT_TIMESTAMP FROM ai_attempts WHERE profile_id = ?1 AND settled_cost_micros IS NOT NULL GROUP BY profile_id, credential_id, currency ON CONFLICT (profile_id, setting_key) DO NOTHING", [profile]).map_err(|_| StorageError::Unavailable)?;
-    connection.execute("INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) SELECT profile_id, 'ai.lifetime_unknown.v1.' || credential_id || '.' || currency, 1, CAST(CAST(SUM(reserved_cost_micros) AS TEXT) AS BLOB), CURRENT_TIMESTAMP FROM ai_attempts WHERE profile_id = ?1 AND estimate_completeness != 'complete' AND connection_source = 'direct_api' AND status NOT IN ('reserved', 'dispatching', 'streaming') GROUP BY profile_id, credential_id, currency ON CONFLICT (profile_id, setting_key) DO NOTHING", [profile]).map_err(|_| StorageError::Unavailable)?;
-    connection.execute("INSERT INTO settings (profile_id, setting_key, revision, value_json, updated_at) SELECT DISTINCT profile_id, 'ai.lifetime_partial.v1.' || credential_id, 1, CAST('true' AS BLOB), CURRENT_TIMESTAMP FROM ai_attempts WHERE profile_id = ?1 AND estimate_completeness != 'complete' AND connection_source = 'direct_api' AND status NOT IN ('reserved', 'dispatching', 'streaming') ON CONFLICT (profile_id, setting_key) DO NOTHING", [profile]).map_err(|_| StorageError::Unavailable)?;
-    Ok(())
-}
-
+use crate::ai_ledger::{
+    all_lifetime_counter, lifetime_cost, lifetime_counter, preserve_lifetime_totals,
+    record_lifetime_counter,
+};
 #[derive(Clone, Debug)]
 pub struct AiAttemptPreflight {
     pub operation_id: Uuid,
@@ -159,34 +51,7 @@ pub struct AiCapPolicy {
     pub expected_revision: Option<u64>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum AiPeriod {
-    Week,
-    Month,
-    Year,
-    AllTime,
-}
-impl AiPeriod {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::Week => "week",
-            Self::Month => "month",
-            Self::Year => "year",
-            Self::AllTime => "all_time",
-        }
-    }
-
-    fn from_db(value: &str) -> Option<Self> {
-        match value {
-            "week" => Some(Self::Week),
-            "month" => Some(Self::Month),
-            "year" => Some(Self::Year),
-            "all_time" => Some(Self::AllTime),
-            _ => None,
-        }
-    }
-}
+pub use ort_backup::AiGuardrailPeriod as AiPeriod;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -841,6 +706,14 @@ impl EncryptedStore {
         } else if policy.expected_revision.is_some() {
             return Err(StorageError::RevisionConflict);
         }
+        if is_new {
+            let count:i64 = connection.query_row("SELECT (SELECT COUNT(*) FROM ai_guardrail_policies WHERE profile_id=?1) + (SELECT COUNT(*) FROM ai_imported_guardrails WHERE profile_id=?1)", [&profile], |row|row.get(0)).map_err(|_|StorageError::Unavailable)?;
+            if usize::try_from(count).map_err(|_| StorageError::InvalidData)?
+                >= ort_backup::MAX_AI_ACCOUNTING_RECORDS
+            {
+                return Err(StorageError::InvalidData);
+            }
+        }
         connection.execute(
             "INSERT INTO ai_guardrail_policies (profile_id, credential_id, period, currency, time_zone, limit_micros, activated_at_unix_ms, period_start_unix_ms, period_end_unix_ms, counted_micros, reserved_micros, unresolved_micros, revision)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, 0, 0, 1)
@@ -968,6 +841,16 @@ impl EncryptedStore {
             return Err(StorageError::RevisionConflict);
         }
         if reasoning.is_none() {
+            let future: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM ai_guardrail_policies WHERE profile_id=?1 AND credential_id IN (?2,?3) AND (activated_at_unix_ms > ?4 OR period_start_unix_ms > ?4))", params![profile,preflight.credential_id.to_string(),AI_GENERAL_CAP_CREDENTIAL_ID.to_string(),preflight.started_at_unix_ms], |row| row.get(0)).map_err(|_|StorageError::Unavailable)?;
+            if future {
+                return Err(StorageError::InvalidData);
+            }
+            crate::ai_ledger::ensure_counter(
+                &tx,
+                &profile,
+                &preflight.credential_id.to_string(),
+                &preflight.currency,
+            )?;
             let expired = {
                 let mut statement = tx.prepare("SELECT credential_id, period, time_zone FROM ai_guardrail_policies
                 WHERE profile_id = ?1 AND period_end_unix_ms IS NOT NULL AND period_end_unix_ms <= ?2")
@@ -1263,9 +1146,7 @@ impl EncryptedStore {
         {
             return Err(StorageError::InvalidData);
         }
-        if !matches!(status.as_str(), "dispatching" | "streaming")
-            || result.ended_at_unix_ms < started
-        {
+        if !matches!(status.as_str(), "dispatching" | "streaming") {
             return Err(StorageError::RevisionConflict);
         }
         if result.keep_operation_active && result.status == AiTerminalStatus::Succeeded {
@@ -1277,6 +1158,7 @@ impl EncryptedStore {
                 return Err(StorageError::InvalidData);
             }
         }
+        let ended = result.ended_at_unix_ms.max(started);
         let usage_json = result
             .usage
             .map(|usage| serde_json::to_vec(&usage))
@@ -1314,7 +1196,7 @@ impl EncryptedStore {
             "UPDATE ai_attempts SET status = ?1, ended_at_unix_ms = ?2, effective_model = ?3,
              usage_json = ?4, usage_complete = ?5, settled_cost_micros = ?6,
              estimate_completeness = ?7, error_category = ?8 WHERE attempt_id = ?9 AND profile_id = ?10",
-            params![result.status.as_str(), result.ended_at_unix_ms, result.effective_model, usage_json,
+            params![result.status.as_str(), ended, result.effective_model, usage_json,
                     i64::from(complete), actual, if complete {"complete"} else {"partial"}, result.error_category,
                     result.attempt_id.to_string(), profile],
         ).map_err(|_| StorageError::Unavailable)?;
@@ -1342,7 +1224,7 @@ impl EncryptedStore {
              WHERE operation_id = ?4 AND profile_id = ?5 AND status = 'active'",
                 params![
                     result.status.as_str(),
-                    result.ended_at_unix_ms,
+                    ended,
                     i64::from(result.status == AiTerminalStatus::Cancelled),
                     operation,
                     profile
@@ -1548,9 +1430,7 @@ impl EncryptedStore {
                     a.preset_version, o.operation_type, a.credential_id,
                     a.attempt_id, a.ended_at_unix_ms, a.error_category,
                     a.error_details_json, a.requested_model, a.effective_model,
-                    (SELECT COUNT(*) FROM ai_attempts previous WHERE previous.operation_id = a.operation_id
-                    AND (previous.started_at_unix_ms < a.started_at_unix_ms OR
-                    (previous.started_at_unix_ms = a.started_at_unix_ms AND previous.attempt_id <= a.attempt_id))), a.connection_source, a.reasoning, a.monetary_cost_tracking, a.reported_retries
+                    1 AS call_number, a.connection_source, a.reasoning, a.monetary_cost_tracking, a.reported_retries
              FROM ai_attempts a JOIN ai_operations o ON o.operation_id = a.operation_id
              WHERE a.profile_id = ?1 AND a.started_at_unix_ms >= ?2
              AND a.started_at_unix_ms < ?3",
@@ -1780,6 +1660,27 @@ impl EncryptedStore {
             summary.partial = true;
         }
         summary.time_buckets = buckets.into_values().collect();
+        // Ordinals inspect only the ten failures retained for display. This also
+        // bounds work for imported operations containing many failed attempts.
+        let ordinal_sql = "SELECT COUNT(*) FROM ai_attempts previous
+            WHERE previous.operation_id=?1 AND (previous.started_at_unix_ms < ?2 OR
+            (previous.started_at_unix_ms=?2 AND previous.attempt_id<=?3))";
+        let mut ordinal = connection
+            .prepare(ordinal_sql)
+            .map_err(|_| StorageError::Unavailable)?;
+        for failure in &mut summary.recent_failures {
+            let count: i64 = ordinal
+                .query_row(
+                    params![
+                        failure.operation_id,
+                        failure.started_at_unix_ms,
+                        failure.attempt_id
+                    ],
+                    |row| row.get(0),
+                )
+                .map_err(|_| StorageError::Unavailable)?;
+            failure.call_number = u64::try_from(count).map_err(|_| StorageError::InvalidData)?;
+        }
         summary.recent_failures.reverse();
         Ok(summary)
     }
@@ -2020,7 +1921,7 @@ impl EncryptedStore {
             .execute(
                 "UPDATE ai_guardrail_policies SET counted_micros = 0,
             reserved_micros = 0, unresolved_micros = 0,
-            activated_at_unix_ms = ?1, period_start_unix_ms = ?1,
+            activated_at_unix_ms = MAX(activated_at_unix_ms, period_start_unix_ms, ?1), period_start_unix_ms = MAX(activated_at_unix_ms, period_start_unix_ms, ?1),
             period_end_unix_ms = NULL, revision = revision + 1
             WHERE profile_id = ?2 AND credential_id = ?3 AND period = ?4",
                 params![
@@ -2035,111 +1936,6 @@ impl EncryptedStore {
             return Err(StorageError::NotFound);
         }
         tx.commit().map_err(|_| StorageError::Unavailable)
-    }
-
-    /// Lifetime estimated spend by currency, independent of cap baselines and activity retention.
-    /// # Errors
-    /// Rejects unavailable storage or corrupt totals.
-    pub fn ai_lifetime_spend(
-        &self,
-        credential_id: Uuid,
-    ) -> Result<BTreeMap<String, u64>, StorageError> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| StorageError::Unavailable)?;
-        let profile = self.manifest.profile_id.to_string();
-        let credential = credential_id.to_string();
-        let prefix = format!("ai.lifetime.v1.{credential}.");
-        let mut statement = connection.prepare("SELECT DISTINCT currency FROM ai_attempts WHERE profile_id = ?1 AND credential_id = ?2 UNION SELECT substr(setting_key, length(?3) + 1) FROM settings WHERE profile_id = ?1 AND substr(setting_key, 1, length(?3)) = ?3").map_err(|_| StorageError::Unavailable)?;
-        let currencies = statement
-            .query_map(params![profile, credential, prefix], |row| {
-                row.get::<_, String>(0)
-            })
-            .map_err(|_| StorageError::Unavailable)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| StorageError::Unavailable)?;
-        currencies
-            .into_iter()
-            .map(|currency| {
-                let total = lifetime_cost(&connection, &profile, &credential, &currency)?;
-                Ok((
-                    currency,
-                    u64::try_from(total).map_err(|_| StorageError::InvalidData)?,
-                ))
-            })
-            .collect()
-    }
-
-    /// Profile-wide lifetime estimated spend by currency across every credential.
-    /// # Errors
-    /// Rejects unavailable storage, corrupt counters, or arithmetic overflow.
-    pub fn ai_lifetime_spend_all(&self) -> Result<BTreeMap<String, u64>, StorageError> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| StorageError::Unavailable)?;
-        let profile = self.manifest.profile_id.to_string();
-        let prefix = "ai.lifetime.v1.";
-        let mut statement = connection.prepare(
-            "SELECT DISTINCT currency FROM ai_attempts WHERE profile_id = ?1 UNION SELECT substr(setting_key, length(setting_key) - 2) FROM settings WHERE profile_id = ?1 AND substr(setting_key, 1, length(?2)) = ?2",
-        ).map_err(|_| StorageError::Unavailable)?;
-        let currencies = statement
-            .query_map(params![profile, prefix], |row| row.get::<_, String>(0))
-            .map_err(|_| StorageError::Unavailable)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| StorageError::Unavailable)?;
-        currencies
-            .into_iter()
-            .map(|currency| {
-                let total = all_lifetime_counter(&connection, &profile, &currency, false)?;
-                Ok((
-                    currency,
-                    u64::try_from(total).map_err(|_| StorageError::InvalidData)?,
-                ))
-            })
-            .collect()
-    }
-
-    /// Whether any credential has retained partially priced lifetime activity.
-    /// # Errors
-    /// Rejects unavailable storage or corrupt retained metadata.
-    pub fn ai_lifetime_spend_all_is_partial(&self) -> Result<bool, StorageError> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| StorageError::Unavailable)?;
-        let profile = self.manifest.profile_id.to_string();
-        let count: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM settings WHERE profile_id = ?1 AND substr(setting_key, 1, length('ai.lifetime_partial.v1.')) = 'ai.lifetime_partial.v1.' AND value_json = CAST('true' AS BLOB)",
-            [&profile], |row| row.get(0)).map_err(|_| StorageError::Unavailable)?;
-        if count != 0 {
-            return Ok(true);
-        }
-        let attempts: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1 AND estimate_completeness != 'complete' AND connection_source = 'direct_api' AND status NOT IN ('reserved', 'dispatching', 'streaming')",
-            [&profile], |row| row.get(0)).map_err(|_| StorageError::Unavailable)?;
-        Ok(attempts != 0)
-    }
-
-    /// Whether some historical spend could not be estimated; retained after activity clearing.
-    /// # Errors
-    /// Rejects unavailable storage or corrupt metadata.
-    pub fn ai_lifetime_spend_is_partial(&self, credential_id: Uuid) -> Result<bool, StorageError> {
-        if let Some(saved) =
-            self.load_setting(&format!("ai.lifetime_partial.v1.{credential_id}"))?
-        {
-            if saved.value != serde_json::Value::Bool(true) {
-                return Err(StorageError::InvalidData);
-            }
-            return Ok(true);
-        }
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| StorageError::Unavailable)?;
-        let count: i64 = connection.query_row("SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1 AND credential_id = ?2 AND estimate_completeness != 'complete' AND connection_source = 'direct_api' AND status NOT IN ('reserved', 'dispatching', 'streaming')", params![self.manifest.profile_id.to_string(), credential_id.to_string()], |row| row.get(0)).map_err(|_| StorageError::Unavailable)?;
-        Ok(count != 0)
     }
 }
 
@@ -2469,17 +2265,13 @@ mod tests {
             })
             .unwrap();
         assert_eq!(store.ai_lifetime_spend(id).unwrap()["USD"], 60);
-        // Emulate a pre-upgrade profile: lifetime falls back to retained attempts,
-        // then activity clearing must preserve that total before deleting them.
-        store
-            .connection
-            .lock()
-            .unwrap()
-            .execute(
-                "DELETE FROM settings WHERE setting_key LIKE 'ai.lifetime.v1.%'",
-                [],
-            )
-            .unwrap();
+        // Migration derives a typed baseline from retained pre-upgrade attempts.
+        {
+            let db = store.connection.lock().unwrap();
+            db.execute("DELETE FROM ai_lifetime_totals", []).unwrap();
+            crate::ai_ledger::preserve_lifetime_totals(&db, &store.manifest.profile_id.to_string())
+                .unwrap();
+        }
         assert_eq!(store.ai_lifetime_spend(id).unwrap()["USD"], 60);
         assert_eq!(
             store.ai_lifetime_spend(Uuid::from_u128(43)).unwrap().len(),
@@ -2669,7 +2461,8 @@ mod tests {
         store
             .reset_ai_cap(AI_GENERAL_CAP_CREDENTIAL_ID, AiPeriod::AllTime, 2_500)
             .unwrap();
-        let second = preflight(50);
+        let mut second = preflight(50);
+        second.started_at_unix_ms = 2_600;
         store.reserve_ai_attempt(&second).unwrap();
         store
             .cancel_reserved_ai_attempt(second.attempt_id, 3_000)

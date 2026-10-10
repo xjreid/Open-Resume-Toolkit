@@ -28,14 +28,17 @@ export type AiAttemptFailure = {
   usage: Usage | null;
   usageComplete: boolean;
 };
-export type AiCapActionRequest = { credentialId: string; period: AiPeriod };
+export type AiCapActionRequest = {
+  credentialId: string;
+  period: AiGuardrailPeriod;
+};
 export type AiCapPolicySummary = {
   activatedAtUnixMs: number;
   countedMicros: number;
   credentialId: string;
   currency: string;
   limitMicros: number;
-  period: AiPeriod;
+  period: AiGuardrailPeriod;
   periodEndUnixMs: number | null;
   periodStartUnixMs: number;
   reservedMicros: number;
@@ -56,6 +59,7 @@ export type AiGeneralSettings = {
   lifetimeSpendByCurrencyMicros: Record<string, number>;
   lifetimeSpendPartial: boolean;
 };
+export type AiGuardrailPeriod = "week" | "month" | "year" | "all_time";
 export type AiKeyAction = "select_primary" | "pause" | "unpause" | "remove";
 export type AiKeyRegistry = {
   keys: Array<SavedAiKey>;
@@ -97,7 +101,6 @@ export type AiMonitoringSummary = {
   unresolvedReservedMicros: number;
   usage: Usage;
 };
-export type AiPeriod = "week" | "month" | "year" | "all_time";
 export type AiProgress = { kind: string; text: string };
 export type AiRetentionSummary = { policy: string; removedOperations: number };
 export type AiTestPreview = {
@@ -424,6 +427,10 @@ export type ImportTextTarget =
   | { index: number; kind: "proposed" }
   | { id: string; kind: "existing" }
   | { heading: string; kind: "new" };
+export type ImportedAiGuardrails = {
+  policies: Array<PortableAiGuardrailV1>;
+  profileId: string;
+};
 export type InstallPhase =
   | "idle"
   | "downloading"
@@ -567,6 +574,21 @@ export type PlanStatus = {
   runtimeVersion: string | null;
   settings: PlanSettings;
 };
+export type PortableAiGuardrailV1 = {
+  activatedAtUnixMs: number;
+  countedMicros: number;
+  credentialId: string;
+  currency: string;
+  id: string;
+  limitMicros: number;
+  period: AiGuardrailPeriod;
+  periodEndUnixMs: number | null;
+  periodStartUnixMs: number;
+  reservedMicros: number;
+  revision: number;
+  timeZone: string;
+  unresolvedMicros: number;
+};
 export type PortablePdfArchivePayload = { archiveId: string };
 export type PortablePdfArchiveRequest = {
   contractVersion: number;
@@ -621,6 +643,7 @@ export type Provider = "open_ai" | "anthropic" | "gemini";
 export type PublishResumePayload = { expectedDraftRevision: number };
 export type PublishResumeRequest = {
   contractVersion: number;
+  expectedProfileId: string;
   payload: PublishResumePayload;
   requestId: string;
 };
@@ -706,6 +729,7 @@ export type ResumeSection = {
 export type ResumeWorkspaceResponse = {
   draft: VersionedResumeResponse | null;
   latestPublished: VersionedResumeResponse | null;
+  profileId: string;
 };
 export type RoleInfo = { company: string; location: string; title: string };
 export type RollbackSafetyCopyRequest = {
@@ -730,7 +754,7 @@ export type SaveAiCapRequest = {
   credentialId: string;
   expectedRevision?: number | null;
   limitMicros: number;
-  period: AiPeriod;
+  period: AiGuardrailPeriod;
   timeZone: string;
 };
 export type SavePlanRequest = {
@@ -747,6 +771,7 @@ export type SaveResumePayload = {
 };
 export type SaveResumeRequest = {
   contractVersion: number;
+  expectedProfileId: string;
   payload: SaveResumePayload;
   requestId: string;
 };
@@ -897,6 +922,15 @@ export type DesktopCommands = {
   apply_application_job_capture: {
     args: { expectedRevision?: number | null; requestId: string };
     value: SavedStageOneDraft;
+  };
+  bind_imported_ai_guardrail: {
+    args: {
+      confirmation: string;
+      credentialId: string;
+      expectedProfileId: string;
+      importId: string;
+    };
+    value: boolean;
   };
   browser_connection_status: {
     args: Record<string, never>;
@@ -1056,6 +1090,10 @@ export type DesktopCommands = {
   load_codex_runtime_install: {
     args: Record<string, never>;
     value: RuntimeInstallStatus;
+  };
+  load_imported_ai_guardrails: {
+    args: Record<string, never>;
+    value: ImportedAiGuardrails;
   };
   load_resume: {
     args: { request: LoadResumeRequest };

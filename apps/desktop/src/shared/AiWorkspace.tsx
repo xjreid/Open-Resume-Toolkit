@@ -1,3 +1,4 @@
+import { ImportedAiCaps } from "./ImportedAiCaps";
 import { Channel } from "@tauri-apps/api/core";
 import { invokeDesktop as invoke } from "./desktop-client";
 import type * as Wire from "@ort/contracts/wire";
@@ -1312,6 +1313,12 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                 </div>
               )}
             </section>
+            <ImportedAiCaps
+              keys={registry?.keys ?? []}
+              blocked={blocked || working || keysLocked}
+              refreshRevision={monitoringRevision}
+              onChanged={() => setMonitoringRevision((value) => value + 1)}
+            />
             <AiGeneralSpending
               blocked={blocked || working || keysLocked}
               refreshRevision={monitoringRevision}

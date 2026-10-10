@@ -18,6 +18,7 @@ pub struct EmptyPayload {}
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SaveResumeRequest {
+    pub expected_profile_id: uuid::Uuid,
     pub contract_version: u16,
     pub request_id: String,
     pub payload: SaveResumePayload,
@@ -33,6 +34,7 @@ pub struct SaveResumePayload {
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PublishResumeRequest {
+    pub expected_profile_id: uuid::Uuid,
     pub contract_version: u16,
     pub request_id: String,
     pub payload: PublishResumePayload,
@@ -54,6 +56,7 @@ pub struct VersionedResumeResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResumeWorkspaceResponse {
+    pub profile_id: uuid::Uuid,
     pub draft: Option<VersionedResumeResponse>,
     pub latest_published: Option<VersionedResumeResponse>,
 }
@@ -119,6 +122,7 @@ mod tests {
     #[test]
     fn save_rejects_negative_revision_before_storage() {
         let request = SaveResumeRequest {
+            expected_profile_id: uuid::Uuid::now_v7(),
             contract_version: CONTRACT_VERSION,
             request_id: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086".to_owned(),
             payload: SaveResumePayload {

@@ -27,11 +27,13 @@ use rusqlite::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 use zeroize::Zeroize;
 
 pub mod ai_activity;
+pub mod ai_ledger;
+mod migrations;
+mod resume_scoped;
 pub mod tracker;
 
 const DATABASE_FILENAME: &str = "profile.db";
@@ -45,7 +47,9 @@ const RESTORE_SAFETY_DIRECTORY: &str = ".ort-restore-safety";
 const SAFETY_DELETE_DIRECTORY: &str = ".ort-safety-delete-pending";
 const DELETE_ALL_MARKER_FILENAME: &str = ".ort-delete-all-pending.json";
 const DATABASE_FORMAT_VERSION: u16 = 1;
-const SCHEMA_VERSION: i64 = 7;
+use migrations::{
+    MIGRATION_V1_SQL, SCHEMA_VERSION, migrate_schema, migration_v1_checksum, verify_schema,
+};
 const MAX_RENDER_MANIFESTS: i64 = 100;
 const MAX_JAVASCRIPT_DATE_MS: u64 = 8_640_000_000_000_000;
 const MAX_MANIFEST_BYTES: u64 = 16 * 1_024;
@@ -57,150 +61,6 @@ fn setting_size_limit(key: &str) -> usize {
     ort_domain::application_record_size_limit(key).unwrap_or(MAX_SETTING_BYTES)
 }
 const AI_CONNECTION_SETTING_KEY: &str = "ai.connection.v1";
-const MIGRATION_V1_SQL: &str = "CREATE TABLE schema_migrations (
-         version INTEGER PRIMARY KEY,
-         checksum_sha256 TEXT NOT NULL,
-         minimum_app_version TEXT NOT NULL,
-         estimated_disk_bytes INTEGER NOT NULL CHECK (estimated_disk_bytes >= 0),
-         requires_safety_copy INTEGER NOT NULL CHECK (requires_safety_copy IN (0, 1)),
-         applied_at TEXT NOT NULL
-     ) STRICT;
-     CREATE TABLE app_metadata (
-         metadata_key TEXT PRIMARY KEY,
-         metadata_value TEXT NOT NULL
-     ) STRICT;
-     CREATE TABLE profiles (
-         profile_id TEXT PRIMARY KEY,
-         revision INTEGER NOT NULL CHECK (revision >= 1),
-         created_at TEXT NOT NULL,
-         updated_at TEXT NOT NULL
-     ) STRICT;
-     CREATE TABLE resume_drafts (
-         profile_id TEXT PRIMARY KEY REFERENCES profiles(profile_id) ON DELETE CASCADE,
-         revision INTEGER NOT NULL CHECK (revision >= 1),
-         schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
-         document_json BLOB NOT NULL,
-         created_at TEXT NOT NULL,
-         updated_at TEXT NOT NULL
-     ) STRICT;
-     CREATE TABLE published_resumes (
-         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-         published_revision INTEGER NOT NULL CHECK (published_revision >= 1),
-         draft_revision INTEGER NOT NULL CHECK (draft_revision >= 1),
-         schema_version INTEGER NOT NULL CHECK (schema_version >= 1),
-         document_json BLOB NOT NULL,
-         published_at TEXT NOT NULL,
-         PRIMARY KEY (profile_id, published_revision)
-     ) STRICT;
-     CREATE TABLE settings (
-         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-         setting_key TEXT NOT NULL,
-         revision INTEGER NOT NULL CHECK (revision >= 1),
-         value_json BLOB NOT NULL,
-         updated_at TEXT NOT NULL,
-         PRIMARY KEY (profile_id, setting_key)
-     ) STRICT;
-     CREATE TABLE diagnostic_events (
-         event_id TEXT PRIMARY KEY,
-         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-         event_code TEXT NOT NULL,
-         severity TEXT NOT NULL CHECK (severity IN ('info', 'warning', 'error')),
-         safe_context_json BLOB NOT NULL,
-         created_at TEXT NOT NULL
-     ) STRICT;";
-const MIGRATION_V2_SQL: &str = "CREATE TABLE render_manifests (
-         manifest_id TEXT PRIMARY KEY,
-         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-         source TEXT NOT NULL CHECK (source IN ('saved_draft', 'published_snapshot')),
-         source_revision INTEGER NOT NULL CHECK (source_revision >= 1),
-         generated_at_unix_ms INTEGER NOT NULL CHECK (generated_at_unix_ms >= 1),
-         last_generated_at_unix_ms INTEGER NOT NULL CHECK (last_generated_at_unix_ms >= generated_at_unix_ms),
-         render_count INTEGER NOT NULL CHECK (render_count >= 1),
-         document_sha256 TEXT NOT NULL,
-         document_schema_version INTEGER NOT NULL CHECK (document_schema_version >= 1),
-         pdf_sha256 TEXT NOT NULL,
-         renderer_version TEXT NOT NULL,
-         template_id TEXT NOT NULL,
-         template_sha256 TEXT NOT NULL,
-         font_bundle_id TEXT NOT NULL,
-         font_bundle_sha256 TEXT NOT NULL,
-         page_count INTEGER NOT NULL CHECK (page_count >= 1),
-         byte_count INTEGER NOT NULL CHECK (byte_count >= 1),
-         UNIQUE (profile_id, source, source_revision, pdf_sha256)
-     ) STRICT;
-     CREATE INDEX render_manifests_recent
-         ON render_manifests (profile_id, last_generated_at_unix_ms DESC, manifest_id DESC);";
-const MIGRATION_V3_SQL: &str = "CREATE TABLE ai_operations (
-         operation_id TEXT PRIMARY KEY,
-         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-         operation_type TEXT NOT NULL CHECK (operation_type IN ('tailor_resume', 'refine_resume', 'cover_letter', 'answer_question', 'import_mapping', 'credential_test')),
-         started_at_unix_ms INTEGER NOT NULL CHECK (started_at_unix_ms >= 1),
-         ended_at_unix_ms INTEGER CHECK (ended_at_unix_ms IS NULL OR ended_at_unix_ms >= started_at_unix_ms),
-         status TEXT NOT NULL CHECK (status IN ('active', 'succeeded', 'failed', 'cancelled', 'outcome_unknown')),
-         cancelled INTEGER NOT NULL CHECK (cancelled IN (0, 1))
-     ) STRICT;
-     CREATE UNIQUE INDEX ai_one_active_operation
-         ON ai_operations (profile_id) WHERE status = 'active';
-     CREATE TABLE ai_attempts (
-         attempt_id TEXT PRIMARY KEY,
-         operation_id TEXT NOT NULL REFERENCES ai_operations(operation_id) ON DELETE CASCADE,
-         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-         provider TEXT NOT NULL CHECK (provider IN ('openai', 'anthropic', 'gemini')),
-         credential_id TEXT NOT NULL,
-         requested_model TEXT NOT NULL,
-         effective_model TEXT,
-         preset_version TEXT NOT NULL,
-         catalog_id TEXT NOT NULL,
-         started_at_unix_ms INTEGER NOT NULL CHECK (started_at_unix_ms >= 1),
-         ended_at_unix_ms INTEGER CHECK (ended_at_unix_ms IS NULL OR ended_at_unix_ms >= started_at_unix_ms),
-         status TEXT NOT NULL CHECK (status IN ('reserved', 'dispatching', 'streaming', 'succeeded', 'failed', 'cancelled', 'outcome_unknown')),
-         retry_of TEXT REFERENCES ai_attempts(attempt_id),
-         usage_json BLOB,
-         usage_complete INTEGER NOT NULL CHECK (usage_complete IN (0, 1)),
-         estimated_input_tokens INTEGER NOT NULL CHECK (estimated_input_tokens >= 0),
-         reserved_cost_micros INTEGER NOT NULL CHECK (reserved_cost_micros >= 0),
-         settled_cost_micros INTEGER CHECK (settled_cost_micros IS NULL OR settled_cost_micros >= 0),
-         currency TEXT NOT NULL CHECK (length(currency) = 3),
-         estimate_completeness TEXT NOT NULL CHECK (estimate_completeness IN ('complete', 'partial', 'unavailable')),
-         error_category TEXT CHECK (error_category IS NULL OR error_category IN ('authentication', 'rate_limit', 'transient', 'safety', 'invalid_output', 'timeout', 'cancelled', 'provider'))
-     ) STRICT;
-     CREATE INDEX ai_attempts_monitoring
-         ON ai_attempts (profile_id, started_at_unix_ms, provider, status);
-     CREATE TABLE ai_guardrail_policies (
-         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-         credential_id TEXT NOT NULL,
-         period TEXT NOT NULL CHECK (period IN ('week', 'month', 'year', 'all_time')),
-         currency TEXT NOT NULL CHECK (length(currency) = 3),
-         time_zone TEXT NOT NULL,
-         limit_micros INTEGER NOT NULL CHECK (limit_micros > 0),
-         activated_at_unix_ms INTEGER NOT NULL CHECK (activated_at_unix_ms >= 1),
-         period_start_unix_ms INTEGER NOT NULL CHECK (period_start_unix_ms >= 1),
-         period_end_unix_ms INTEGER CHECK (period_end_unix_ms IS NULL OR period_end_unix_ms > period_start_unix_ms),
-         counted_micros INTEGER NOT NULL CHECK (counted_micros >= 0),
-         reserved_micros INTEGER NOT NULL CHECK (reserved_micros >= 0),
-         unresolved_micros INTEGER NOT NULL CHECK (unresolved_micros >= 0),
-         revision INTEGER NOT NULL CHECK (revision >= 1),
-         PRIMARY KEY (profile_id, credential_id, period)
-     ) STRICT;";
-const MIGRATION_V4_SQL: &str =
-    "ALTER TABLE ai_attempts ADD COLUMN catalog_effective_from TEXT NOT NULL DEFAULT 'unavailable';
-     ALTER TABLE ai_attempts ADD COLUMN pricing_components_json BLOB NOT NULL DEFAULT X'5B5D';";
-const MIGRATION_V5_SQL: &str = "CREATE TABLE tracker_entries (
-         entry_id TEXT PRIMARY KEY,
-         profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
-         revision INTEGER NOT NULL CHECK (revision >= 1),
-         entry_json BLOB NOT NULL,
-         created_at TEXT NOT NULL,
-         updated_at TEXT NOT NULL
-     ) STRICT;
-     CREATE INDEX tracker_entries_profile ON tracker_entries (profile_id, updated_at DESC);";
-
-const MIGRATION_V6_SQL: &str = "ALTER TABLE ai_attempts ADD COLUMN error_details_json BLOB;";
-const MIGRATION_V7_SQL: &str = "ALTER TABLE ai_attempts ADD COLUMN connection_source TEXT NOT NULL DEFAULT 'direct_api' CHECK(connection_source IN ('direct_api','chatgpt_plan'));
-ALTER TABLE ai_attempts ADD COLUMN reasoning TEXT CHECK(reasoning IN ('low','medium','high','xhigh'));
-ALTER TABLE ai_attempts ADD COLUMN monetary_cost_tracking TEXT NOT NULL DEFAULT 'estimated' CHECK(monetary_cost_tracking IN ('estimated','not_tracked'));
-ALTER TABLE ai_attempts ADD COLUMN reported_retries INTEGER NOT NULL DEFAULT 0 CHECK(reported_retries >= 0);";
-
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum StorageError {
     #[error("the storage location is unsafe")]
@@ -973,6 +833,22 @@ impl EncryptedStore {
             .transpose()
     }
 
+    /// Reads only the publication revision for inexpensive context refreshes.
+    /// # Errors
+    /// Returns an error when storage is unavailable.
+    pub fn latest_published_revision(&self) -> Result<Option<i64>, StorageError> {
+        let db = self
+            .connection
+            .lock()
+            .map_err(|_| StorageError::Unavailable)?;
+        db.query_row(
+            "SELECT MAX(published_revision) FROM published_resumes WHERE profile_id=?1",
+            [self.manifest.profile_id.to_string()],
+            |row| row.get(0),
+        )
+        .map_err(|_| StorageError::Unavailable)
+    }
+
     /// Loads one exact immutable published revision. Unlike the editor-facing
     /// latest snapshot query, this is intended for retained render replay and
     /// never substitutes a newer publication.
@@ -1583,7 +1459,10 @@ impl EncryptedStore {
                  (SELECT COUNT(*) FROM tracker_entries WHERE profile_id = ?1) + \
                  (SELECT COUNT(*) FROM render_manifests WHERE profile_id = ?1) + \
                  (SELECT COUNT(*) FROM ai_operations WHERE profile_id = ?1) + \
-                 (SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1)",
+                 (SELECT COUNT(*) FROM ai_attempts WHERE profile_id = ?1) + \
+                 (SELECT COUNT(*) FROM ai_lifetime_totals WHERE profile_id = ?1) + \
+                 (SELECT COUNT(*) FROM ai_guardrail_policies WHERE profile_id = ?1) + \
+                 (SELECT COUNT(*) FROM ai_imported_guardrails WHERE profile_id = ?1)",
                 [self.manifest.profile_id.to_string()],
                 |row| row.get(0),
             )
@@ -1671,6 +1550,12 @@ impl EncryptedStore {
             &self.manifest.profile_id.to_string(),
             &backup.profile.ai_operations,
             &backup.profile.ai_attempts,
+        )?;
+        ai_ledger::restore_accounting(
+            &transaction,
+            &self.manifest.profile_id.to_string(),
+            &backup.profile.ai_lifetime_totals,
+            &backup.profile.ai_guardrail_policies,
         )?;
         transaction
             .commit()
@@ -2048,6 +1933,10 @@ impl EncryptedStore {
         };
         let ai_attempts =
             read_portable_ai_attempts(&transaction, &self.manifest.profile_id.to_string())?;
+        let ai_lifetime_totals =
+            ai_ledger::read_totals(&transaction, &self.manifest.profile_id.to_string())?;
+        let ai_guardrail_policies =
+            ai_ledger::read_policies(&transaction, &self.manifest.profile_id.to_string())?;
         transaction
             .commit()
             .map_err(|_| StorageError::Unavailable)?;
@@ -2059,6 +1948,8 @@ impl EncryptedStore {
             render_manifests,
             ai_operations,
             ai_attempts,
+            ai_lifetime_totals,
+            ai_guardrail_policies,
         })
     }
 
@@ -3476,160 +3367,6 @@ fn initialize_schema(
     result
 }
 
-fn migrate_schema(connection: &Connection) -> Result<(), StorageError> {
-    let migrations = load_migration_receipts(connection)?;
-    let mut latest = migrations
-        .last()
-        .map(|(version, _)| *version)
-        .ok_or(StorageError::IntegrityFailure)?;
-    if latest > SCHEMA_VERSION {
-        return Err(StorageError::NewerSchema);
-    }
-    verify_migration_receipts(&migrations)?;
-    if latest == 1 {
-        apply_migration(connection, 2, MIGRATION_V2_SQL, &migration_v2_checksum())?;
-        latest = 2;
-    }
-    if latest == 2 {
-        apply_migration(connection, 3, MIGRATION_V3_SQL, &migration_v3_checksum())?;
-        latest = 3;
-    }
-    if latest == 3 {
-        apply_migration(connection, 4, MIGRATION_V4_SQL, &migration_v4_checksum())?;
-        latest = 4;
-    }
-    if latest == 4 {
-        apply_migration(connection, 5, MIGRATION_V5_SQL, &migration_v5_checksum())?;
-        latest = 5;
-    }
-    if latest == 5 {
-        apply_migration(connection, 6, MIGRATION_V6_SQL, &migration_v6_checksum())?;
-        latest = 6;
-    }
-    if latest == 6 {
-        apply_migration(connection, 7, MIGRATION_V7_SQL, &migration_v7_checksum())?;
-        latest = 7;
-    }
-    if latest == SCHEMA_VERSION {
-        Ok(())
-    } else {
-        Err(StorageError::IntegrityFailure)
-    }
-}
-
-fn apply_migration(
-    connection: &Connection,
-    version: i64,
-    sql: &str,
-    checksum: &str,
-) -> Result<(), StorageError> {
-    connection
-        .execute_batch("BEGIN IMMEDIATE")
-        .map_err(|_| StorageError::Unavailable)?;
-    let result = (|| {
-        connection
-            .execute_batch(sql)
-            .map_err(|_| StorageError::Unavailable)?;
-        connection.execute(
-            "INSERT INTO schema_migrations (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, requires_safety_copy, applied_at) VALUES (?1, ?2, ?3, 0, 0, ?4)",
-            params![version, checksum, "0.0.0-dev", now_string()],
-        ).map_err(|_| StorageError::Unavailable)?;
-        #[cfg(all(test, target_os = "macos"))]
-        if version == 2 {
-            native_qualification::crash_checkpoint("migration-before-commit");
-        }
-        connection
-            .execute_batch("COMMIT")
-            .map_err(|_| StorageError::Unavailable)?;
-        #[cfg(all(test, target_os = "macos"))]
-        if version == 2 {
-            native_qualification::crash_checkpoint("migration-after-commit");
-        }
-        Ok(())
-    })();
-    if result.is_err() {
-        let _ = connection.execute_batch("ROLLBACK");
-    }
-    result
-}
-
-fn verify_schema(connection: &Connection) -> Result<(), StorageError> {
-    let migrations = load_migration_receipts(connection)?;
-    let latest = migrations
-        .last()
-        .map(|(version, _)| *version)
-        .ok_or(StorageError::IntegrityFailure)?;
-    if latest > SCHEMA_VERSION {
-        return Err(StorageError::NewerSchema);
-    }
-    if latest != SCHEMA_VERSION {
-        return Err(StorageError::IntegrityFailure);
-    }
-    verify_migration_receipts(&migrations)?;
-    verify_integrity(connection)
-}
-
-fn load_migration_receipts(connection: &Connection) -> Result<Vec<(i64, String)>, StorageError> {
-    let mut statement = connection
-        .prepare("SELECT version, checksum_sha256 FROM schema_migrations ORDER BY version")
-        .map_err(|_| StorageError::IntegrityFailure)?;
-    statement
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-        .map_err(|_| StorageError::IntegrityFailure)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| StorageError::IntegrityFailure)
-}
-
-fn verify_migration_receipts(migrations: &[(i64, String)]) -> Result<(), StorageError> {
-    let expected = [
-        (1, migration_v1_checksum()),
-        (2, migration_v2_checksum()),
-        (3, migration_v3_checksum()),
-        (4, migration_v4_checksum()),
-        (5, migration_v5_checksum()),
-        (6, migration_v6_checksum()),
-        (7, migration_v7_checksum()),
-    ];
-    if migrations.len() > expected.len()
-        || migrations.iter().zip(expected).any(
-            |((version, checksum), (expected_version, expected_checksum))| {
-                *version != expected_version || *checksum != expected_checksum
-            },
-        )
-    {
-        return Err(StorageError::IntegrityFailure);
-    }
-    Ok(())
-}
-
-fn migration_v1_checksum() -> String {
-    hex::encode(Sha256::digest(MIGRATION_V1_SQL.as_bytes()))
-}
-
-fn migration_v2_checksum() -> String {
-    hex::encode(Sha256::digest(MIGRATION_V2_SQL.as_bytes()))
-}
-
-fn migration_v3_checksum() -> String {
-    hex::encode(Sha256::digest(MIGRATION_V3_SQL.as_bytes()))
-}
-
-fn migration_v4_checksum() -> String {
-    hex::encode(Sha256::digest(MIGRATION_V4_SQL.as_bytes()))
-}
-
-fn migration_v5_checksum() -> String {
-    hex::encode(Sha256::digest(MIGRATION_V5_SQL.as_bytes()))
-}
-
-fn migration_v6_checksum() -> String {
-    hex::encode(Sha256::digest(MIGRATION_V6_SQL.as_bytes()))
-}
-
-fn migration_v7_checksum() -> String {
-    hex::encode(Sha256::digest(MIGRATION_V7_SQL.as_bytes()))
-}
-
 fn verify_integrity(connection: &Connection) -> Result<(), StorageError> {
     let mut cipher_statement = connection
         .prepare("PRAGMA cipher_integrity_check")
@@ -3924,7 +3661,7 @@ mod tests {
         let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("initialize encrypted store");
         let empty = store.storage_usage().expect("empty usage");
-        assert_eq!(empty.database_schema, 7);
+        assert_eq!(empty.database_schema, 8);
         assert_eq!(empty.drafts, 0);
         assert_eq!(empty.published_snapshots, 0);
         assert_eq!(empty.settings, 0);
@@ -4127,7 +3864,7 @@ mod tests {
                     "INSERT INTO schema_migrations \
                      (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
                       requires_safety_copy, applied_at) \
-                     VALUES (8, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
+                     VALUES (9, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
                     [super::now_string()],
                 )
                 .expect("seed newer schema marker");
@@ -4185,7 +3922,9 @@ mod tests {
             let connection = store.connection.lock().expect("lock test connection");
             connection
                 .execute_batch(
-                    "DROP TABLE tracker_entries;
+                    "DROP TABLE ai_lifetime_totals;
+                     DROP TABLE ai_imported_guardrails;
+                     DROP TABLE tracker_entries;
                      DROP TABLE ai_guardrail_policies;
                      DROP TABLE ai_attempts;
                      DROP TABLE ai_operations;
@@ -4209,7 +3948,7 @@ mod tests {
 
         let upgraded = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("upgrade schema v1 profile");
-        assert_eq!(upgraded.manifest().schema_version, 7);
+        assert_eq!(upgraded.manifest().schema_version, 8);
         assert_eq!(
             upgraded
                 .load_draft()
@@ -4227,7 +3966,7 @@ mod tests {
             .expect("query migration versions")
             .collect::<Result<_, _>>()
             .expect("collect migration versions");
-        assert_eq!(versions, vec![1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(versions, vec![1, 2, 3, 4, 5, 6, 7, 8]);
     }
 
     #[test]

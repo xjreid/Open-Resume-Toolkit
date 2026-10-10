@@ -21,7 +21,12 @@ use zeroize::{Zeroize, Zeroizing};
 
 const MAGIC: &[u8; 4] = b"ORTB";
 const FORMAT_MAJOR: u16 = 1;
-pub const FORMAT_MINOR: u16 = 8;
+mod ai_accounting;
+pub use ai_accounting::{
+    AiGuardrailPeriod, MAX_AI_ACCOUNTING_RECORDS, PortableAiGuardrailV1, PortableAiLifetimeV1,
+};
+
+pub const FORMAT_MINOR: u16 = 9;
 const DATABASE_SCHEMA_V1_0: u16 = 1;
 const DATABASE_SCHEMA_V1_1: u16 = 2;
 const DATABASE_SCHEMA_V1_2: u16 = 3;
@@ -29,6 +34,7 @@ const DATABASE_SCHEMA_V1_3: u16 = 4;
 const DATABASE_SCHEMA_V1_4: u16 = 5;
 const DATABASE_SCHEMA_V1_5: u16 = 6;
 const DATABASE_SCHEMA_V1_8: u16 = 7;
+const DATABASE_SCHEMA_V1_9: u16 = 8;
 const KDF_ARGON2ID: u8 = 1;
 const HEADER_LEN: usize = 76;
 const SALT_LEN: usize = 16;
@@ -214,6 +220,10 @@ pub struct PortableProfileV1 {
     pub ai_operations: Vec<PortableAiOperationV1>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ai_attempts: Vec<PortableAiAttemptV1>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ai_lifetime_totals: Vec<PortableAiLifetimeV1>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ai_guardrail_policies: Vec<PortableAiGuardrailV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -230,6 +240,10 @@ pub struct BackupInventoryV1 {
     pub ai_operations: u32,
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub ai_attempts: u32,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub ai_lifetime_totals: u32,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub ai_guardrail_policies: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -320,7 +334,7 @@ fn create_backup_with_entropy(
         salt,
         nonce,
         format_minor,
-        DATABASE_SCHEMA_V1_8,
+        DATABASE_SCHEMA_V1_9,
     )
 }
 
@@ -344,13 +358,20 @@ fn create_backup_with_entropy_for_format(
         || (format_minor == 4 && database_schema == DATABASE_SCHEMA_V1_3)
         || (matches!(format_minor, 5 | 6) && database_schema == DATABASE_SCHEMA_V1_4)
         || (format_minor == 7 && database_schema == DATABASE_SCHEMA_V1_5)
-        || (format_minor == 8 && database_schema == DATABASE_SCHEMA_V1_8);
+        || (format_minor == 8 && database_schema == DATABASE_SCHEMA_V1_8)
+        || (format_minor == 9 && database_schema == DATABASE_SCHEMA_V1_9);
     let supported_writer = supported_writer
         && (format_minor >= 5 || request.profile.tracker_entries.is_empty())
         && ((format_minor <= 1 && document_schema == 1)
             || (format_minor == 2 && document_schema == 2)
             || (format_minor >= 3 && matches!(document_schema, 1 | 2)));
     if !supported_writer {
+        return Err(BackupError::InvalidContent);
+    }
+    if format_minor < 9
+        && (!request.profile.ai_lifetime_totals.is_empty()
+            || !request.profile.ai_guardrail_policies.is_empty())
+    {
         return Err(BackupError::InvalidContent);
     }
     if format_minor < 8
@@ -617,6 +638,12 @@ fn validate_payload(
     payload: &PortableBackupV1,
     header: &BackupHeaderInfo,
 ) -> Result<(), BackupError> {
+    if header.format_minor < 9
+        && (!payload.profile.ai_lifetime_totals.is_empty()
+            || !payload.profile.ai_guardrail_policies.is_empty())
+    {
+        return Err(BackupError::InvalidBackup);
+    }
     if header.format_minor < 8
         && payload.profile.ai_attempts.iter().any(|a| {
             a.connection_source != "direct_api"
@@ -644,6 +671,7 @@ fn validate_payload(
         5 | 6 => DATABASE_SCHEMA_V1_4,
         7 => DATABASE_SCHEMA_V1_5,
         8 => DATABASE_SCHEMA_V1_8,
+        9 => DATABASE_SCHEMA_V1_9,
         _ => return Err(BackupError::InvalidBackup),
     };
     if payload.manifest.format_major != FORMAT_MAJOR
@@ -758,6 +786,10 @@ fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
     }
     validate_render_manifests(&profile.render_manifests)?;
     validate_ai_activity(&profile.ai_operations, &profile.ai_attempts)?;
+    ai_accounting::validate_accounting(
+        &profile.ai_lifetime_totals,
+        &profile.ai_guardrail_policies,
+    )?;
     let serialized = serde_json::to_vec(profile).map_err(|_| BackupError::InvalidContent)?;
     if serialized.len() > MAX_PAYLOAD_BYTES {
         return Err(BackupError::InvalidContent);
@@ -1039,6 +1071,10 @@ fn inventory_for(profile: &PortableProfileV1) -> Result<BackupInventoryV1, Backu
             .map_err(|_| BackupError::InvalidContent)?,
         ai_attempts: u32::try_from(profile.ai_attempts.len())
             .map_err(|_| BackupError::InvalidContent)?,
+        ai_lifetime_totals: u32::try_from(profile.ai_lifetime_totals.len())
+            .map_err(|_| BackupError::InvalidContent)?,
+        ai_guardrail_policies: u32::try_from(profile.ai_guardrail_policies.len())
+            .map_err(|_| BackupError::InvalidContent)?,
     })
 }
 
@@ -1220,8 +1256,8 @@ mod tests {
             create_backup_with_entropy(&passphrase, request, [0x11; 16], [0x22; 24]).unwrap();
         let header = inspect_backup(&bytes).unwrap();
         let mut payload = restore_backup(&bytes, &passphrase).unwrap();
-        assert_eq!(header.format_minor, 8);
-        assert_eq!(payload.manifest.database_schema, 7);
+        assert_eq!(header.format_minor, 9);
+        assert_eq!(payload.manifest.database_schema, 8);
         assert_eq!(payload.manifest.document_schema, 2);
         payload.manifest.document_schema = 1;
         assert_eq!(
@@ -1239,12 +1275,37 @@ mod tests {
         let digest = hex::encode(Sha256::digest(&backup));
         assert_eq!(
             digest,
-            "06b0048880e68b58fc0d52d4ee701d446d1c13cf8fb51afc450c9ab33ccb1605"
+            "41fdeea304c3b00de67968489fd7021af0c36cf7d480ee7fedd6de42e9bfd5b0"
         );
         let restored = restore_backup(&backup, &passphrase).expect("restore vector");
         assert_eq!(
             restored.profile.master_draft.expect("draft").document.title,
             MARKER
+        );
+    }
+
+    #[test]
+    fn previous_v1_8_vector_remains_readable() {
+        let passphrase = BackupPassphrase::new("vector passphrase".into()).unwrap();
+        let bytes = create_backup_with_entropy_for_format(
+            &passphrase,
+            sample_request(),
+            [0x11; 16],
+            [0x22; 24],
+            8,
+            super::DATABASE_SCHEMA_V1_8,
+        )
+        .unwrap();
+        assert_eq!(
+            hex::encode(Sha256::digest(&bytes)),
+            "06b0048880e68b58fc0d52d4ee701d446d1c13cf8fb51afc450c9ab33ccb1605"
+        );
+        assert_eq!(
+            restore_backup(&bytes, &passphrase)
+                .unwrap()
+                .manifest
+                .format_minor,
+            8
         );
     }
 
@@ -1344,6 +1405,8 @@ mod tests {
                 }],
                 ai_operations: Vec::new(),
                 ai_attempts: Vec::new(),
+                ai_lifetime_totals: Vec::new(),
+                ai_guardrail_policies: Vec::new(),
             },
         }
     }

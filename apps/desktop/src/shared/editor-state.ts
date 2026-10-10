@@ -6,6 +6,7 @@ import type {
 import { normalizeDocument } from "./resume-editor";
 
 export interface EditorState {
+  profileId: string | null;
   document: ResumeDocument | null;
   saved: VersionedResume | null;
   published: VersionedResume | null;
@@ -26,6 +27,7 @@ export interface EditorState {
 }
 
 export const initialEditorState: EditorState = {
+  profileId: null,
   document: null,
   saved: null,
   published: null,
@@ -40,7 +42,11 @@ export const initialEditorState: EditorState = {
 
 type EditorAction =
   | { type: "loading" }
-  | { type: "loaded"; workspace: ResumeWorkspace; empty: ResumeDocument }
+  | {
+      type: "loaded";
+      workspace: ResumeWorkspace;
+      empty: ResumeDocument;
+    }
   | { type: "edit"; update: (document: ResumeDocument) => ResumeDocument }
   | { type: "undo" }
   | { type: "redo" }
@@ -85,6 +91,7 @@ export function editorReducer(
       return {
         ...initialEditorState,
         status: "idle",
+        profileId: action.workspace.profileId,
         document: action.workspace.draft?.document ?? action.empty,
         saved: action.workspace.draft,
         published: action.workspace.latestPublished,

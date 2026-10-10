@@ -233,8 +233,15 @@ fn prepared_pdf_and_docx_follow_the_saved_content_and_style() {
         storage: Mutex::new(crate::DesktopStorage::Ready(store)),
         reviews: Arc::new(crate::import_review::ReviewState::default()),
     };
-    let original =
-        render_application_exports(&state, first.revision, MaterialKind::Resume).unwrap();
+    let original = render_application_exports(
+        &state,
+        state
+            .with_store(|store| Ok(store.manifest().profile_id))
+            .unwrap(),
+        first.revision,
+        MaterialKind::Resume,
+    )
+    .unwrap();
     assert!(original.pdf.starts_with(b"%PDF-"));
     assert!(original.docx.starts_with(b"PK\x03\x04"));
     current.resume.contact.full_name = "Alex Morgan".into();
@@ -243,15 +250,36 @@ fn prepared_pdf_and_docx_follow_the_saved_content_and_style() {
         .with_store(|store| save(store, Some(first.revision), &current))
         .unwrap();
     assert!(matches!(
-        render_application_exports(&state, first.revision, MaterialKind::Resume),
+        render_application_exports(
+            &state,
+            state
+                .with_store(|store| Ok(store.manifest().profile_id))
+                .unwrap(),
+            first.revision,
+            MaterialKind::Resume
+        ),
         Err(StorageError::RevisionConflict)
     ));
-    let updated =
-        render_application_exports(&state, edited.revision, MaterialKind::Resume).unwrap();
+    let updated = render_application_exports(
+        &state,
+        state
+            .with_store(|store| Ok(store.manifest().profile_id))
+            .unwrap(),
+        edited.revision,
+        MaterialKind::Resume,
+    )
+    .unwrap();
     assert_ne!(original.pdf, updated.pdf);
     assert_ne!(original.docx, updated.docx);
-    let cover =
-        render_application_exports(&state, edited.revision, MaterialKind::CoverLetter).unwrap();
+    let cover = render_application_exports(
+        &state,
+        state
+            .with_store(|store| Ok(store.manifest().profile_id))
+            .unwrap(),
+        edited.revision,
+        MaterialKind::CoverLetter,
+    )
+    .unwrap();
     assert!(cover.pdf.starts_with(b"%PDF-"));
     assert!(cover.docx.starts_with(b"PK\x03\x04"));
 }
@@ -296,8 +324,15 @@ fn cover_pdf_preview_matches_download_and_rejects_stale_revisions() {
             .unwrap()
             .is_none()
     );
-    let prepared =
-        render_application_exports(&state, saved.revision, MaterialKind::CoverLetter).unwrap();
+    let prepared = render_application_exports(
+        &state,
+        state
+            .with_store(|store| Ok(store.manifest().profile_id))
+            .unwrap(),
+        saved.revision,
+        MaterialKind::CoverLetter,
+    )
+    .unwrap();
     let receipt = prepared.receipt.clone();
     assert!(exports.replace(prepared));
     let preview =
@@ -343,8 +378,15 @@ fn cover_pdf_preview_matches_download_and_rejects_stale_revisions() {
         .unwrap()
         .is_none()
     );
-    let edited =
-        render_application_exports(&state, updated.revision, MaterialKind::CoverLetter).unwrap();
+    let edited = render_application_exports(
+        &state,
+        state
+            .with_store(|store| Ok(store.manifest().profile_id))
+            .unwrap(),
+        updated.revision,
+        MaterialKind::CoverLetter,
+    )
+    .unwrap();
     assert!(exports.replace(edited));
     let edited_preview = prepared_application_pdf(
         &state,
@@ -374,7 +416,7 @@ fn cover_letter_pdf_accepts_v2_contact_schema() {
     assert_eq!(document.schema_version, 2);
     assert!(document.sections[0].entries[0].dates.is_some());
     document.validate(DocumentLimits::default()).unwrap();
-    preflight_pdf(&workspace, MaterialKind::CoverLetter).unwrap();
+    preflight_pdf(uuid::Uuid::now_v7(), &workspace, MaterialKind::CoverLetter).unwrap();
 }
 
 #[test]
@@ -386,7 +428,7 @@ fn pdf_preflight_rejects_a_valid_resume_with_an_unsupported_glyph() {
         .validate(DocumentLimits::default())
         .unwrap();
     assert_eq!(
-        preflight_pdf(&workspace, MaterialKind::Resume),
+        preflight_pdf(uuid::Uuid::now_v7(), &workspace, MaterialKind::Resume),
         Err("PDF_UNAVAILABLE")
     );
 }
@@ -459,8 +501,16 @@ fn profile_replacement_rejects_same_revision_cache_hits_with_real_artifacts() {
         reviews: Arc::default(),
     };
     let exports = ApplicationExportState::default();
-    let old_render =
-        render_application_exports(&state, old.revision, MaterialKind::Resume).unwrap();
+    let old_render = render_application_exports(
+        &state,
+        state
+            .with_store(|store| Ok(store.manifest().profile_id))
+            .unwrap(),
+        old.revision,
+        MaterialKind::Resume,
+    )
+    .unwrap();
+    let old_profile = old_render.profile_id;
     let old_bytes = old_render.pdf.clone();
     assert!(exports.replace(old_render));
     let fresh =
@@ -473,13 +523,24 @@ fn profile_replacement_rejects_same_revision_cache_hits_with_real_artifacts() {
     state
         .replace_storage(crate::DesktopStorage::Ready(fresh))
         .unwrap();
+    assert!(matches!(
+        render_application_exports(&state, old_profile, new.revision, MaterialKind::Resume),
+        Err(StorageError::RevisionConflict)
+    ));
     assert!(
         prepared_application_pdf(&state, &exports, new.revision, MaterialKind::Resume)
             .unwrap()
             .is_none()
     );
-    let new_render =
-        render_application_exports(&state, new.revision, MaterialKind::Resume).unwrap();
+    let new_render = render_application_exports(
+        &state,
+        state
+            .with_store(|store| Ok(store.manifest().profile_id))
+            .unwrap(),
+        new.revision,
+        MaterialKind::Resume,
+    )
+    .unwrap();
     assert_ne!(new_render.pdf, old_bytes);
     let new_bytes = new_render.pdf.clone();
     assert!(exports.replace(new_render));

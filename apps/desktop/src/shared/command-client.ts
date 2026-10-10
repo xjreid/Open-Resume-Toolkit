@@ -258,14 +258,15 @@ export async function deleteSafetyCopy(
 }
 
 export async function saveResume(
+  expectedProfileId: string,
   expectedRevision: number | null,
   document: ResumeDocument,
 ): Promise<VersionedResumeCommandResponse> {
   try {
-    const request: SaveResumeRequest = requestEnvelope({
-      expectedRevision,
-      document,
-    });
+    const request: SaveResumeRequest = {
+      ...requestEnvelope({ expectedRevision, document }),
+      expectedProfileId,
+    };
     const response: unknown = await invoke("save_resume", { request });
     return isVersionedResumeCommandResponse(response)
       ? response
@@ -276,12 +277,14 @@ export async function saveResume(
 }
 
 export async function publishResume(
+  expectedProfileId: string,
   expectedDraftRevision: number,
 ): Promise<PublishResumeCommandResponse> {
   try {
-    const request: PublishResumeRequest = requestEnvelope({
-      expectedDraftRevision,
-    });
+    const request: PublishResumeRequest = {
+      ...requestEnvelope({ expectedDraftRevision }),
+      expectedProfileId,
+    };
     const response: unknown = await invoke("publish_resume", { request });
     return isPublishResumeCommandResponse(response)
       ? response

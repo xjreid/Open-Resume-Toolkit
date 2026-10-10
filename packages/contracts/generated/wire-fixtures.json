@@ -8,7 +8,7 @@
     "cleanupPending": false,
     "durabilityUnconfirmed": false,
     "formatMajor": 1,
-    "formatMinor": 8,
+    "formatMinor": 9,
     "status": "exported"
   },
   "get_tracker_entry": {
@@ -122,10 +122,10 @@
     "appVersion": "0.0.0-dev",
     "byteCount": 1000,
     "createdAt": "2026-10-06T12:00:00Z",
-    "databaseSchema": 7,
+    "databaseSchema": 8,
     "documentSchema": 2,
     "formatMajor": 1,
-    "formatMinor": 8,
+    "formatMinor": 9,
     "masterDrafts": 1,
     "publishedResumes": 101,
     "renderManifests": 0,

@@ -42,6 +42,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
   getCurrentWebviewWindow: () => ({
+    isVisible: async () => true,
     listen: (name: string, handler: (event: { payload: unknown }) => void) => {
       listeners.set(name, handler);
       return Promise.resolve(() => listeners.delete(name));

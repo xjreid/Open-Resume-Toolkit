@@ -78,7 +78,8 @@ export function isCommandResponse<T>(
 function isResumeWorkspace(value: unknown): value is ResumeWorkspace {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ["draft", "latestPublished"]) &&
+    hasExactKeys(value, ["profileId", "draft", "latestPublished"]) &&
+    typeof value.profileId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value.profileId) &&
     (value.draft === null || isVersionedResume(value.draft)) &&
     (value.latestPublished === null || isVersionedResume(value.latestPublished))
   );

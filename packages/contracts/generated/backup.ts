@@ -4,7 +4,7 @@ import type * as Wire from "./wire";
 import { CONTRACT_VERSION } from "./health";
 import { isCommandResponse, type CommandResponse } from "./resume";
 
-export const BACKUP_FORMAT_MINOR = 8;
+export const BACKUP_FORMAT_MINOR = 9;
 export const MAX_BACKUP_BYTES = 67109008;
 export const MAX_BACKUP_PASSPHRASE_BYTES = 1024;
 export const RESTORE_CONFIRMATION_PHRASE = "REPLACE SAVED PROFILE";
@@ -95,19 +95,21 @@ export function isValidateBackupCommandResponse(
       typeof record.appVersion !== "string" ||
       !/^[A-Za-z0-9._+\-]{1,64}$/.test(record.appVersion) ||
       record.databaseSchema !==
-        (record.formatMinor === 8
-          ? 7
-          : record.formatMinor === 7
-            ? 6
-            : record.formatMinor === 0
-              ? 1
-              : record.formatMinor === 3
-                ? 3
-                : record.formatMinor === 4
-                  ? 4
-                  : (record.formatMinor as number) >= 5
-                    ? 5
-                    : 2) ||
+        (record.formatMinor === 9
+          ? 8
+          : record.formatMinor === 8
+            ? 7
+            : record.formatMinor === 7
+              ? 6
+              : record.formatMinor === 0
+                ? 1
+                : record.formatMinor === 3
+                  ? 3
+                  : record.formatMinor === 4
+                    ? 4
+                    : (record.formatMinor as number) >= 5
+                      ? 5
+                      : 2) ||
       ((record.formatMinor as number) <= 1
         ? record.documentSchema !== 1
         : record.formatMinor === 2

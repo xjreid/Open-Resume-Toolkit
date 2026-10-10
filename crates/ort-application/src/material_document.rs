@@ -16,14 +16,23 @@ pub fn document_for(
         MaterialKind::CoverLetter => {
             let text = cover_letter.ok_or(StorageError::NotFound)?;
             let mut document = ResumeDocument::empty("Cover letter");
+            // Stable derived identities let preflight and export share the exact document.
+            let id = |slot: u128| {
+                EntityId::parse(
+                    &uuid::Uuid::from_u128(resume.document_id.as_uuid().as_u128() ^ slot)
+                        .to_string(),
+                )
+                .map_err(|_| StorageError::InvalidData)
+            };
+            document.document_id = id(1)?;
             document.schema_version = resume.schema_version;
             document.contact = resume.contact.clone();
             document.sections = vec![ResumeSection {
-                id: EntityId::new(),
+                id: id(2)?,
                 order: 0,
                 heading: "Cover letter".into(),
                 entries: vec![ResumeEntry {
-                    id: EntityId::new(),
+                    id: id(3)?,
                     order: 0,
                     heading: String::new(),
                     subheading: String::new(),
@@ -31,7 +40,7 @@ pub fn document_for(
                     dates: (document.schema_version == 2).then(Vec::new),
                     location: String::new(),
                     fields: vec![NamedField {
-                        id: EntityId::new(),
+                        id: id(4)?,
                         order: 0,
                         label: ort_domain::PARAGRAPH_FIELD_LABEL.into(),
                         value: text.to_owned(),

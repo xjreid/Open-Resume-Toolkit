@@ -1,20 +1,21 @@
 //! The overlay's temporary, encrypted application workspace. Every command is
 //! scoped to the overlay; only user edits may change validated generated text.
 #![allow(clippy::needless_pass_by_value, clippy::manual_let_else)]
-use crate::application_exports::ApplicationExportState;
+use crate::background_work::preflight_pdf;
 use ort_ai::materials::{self, MAX_JOB_CHARS, MAX_QUESTION_CHARS};
 use ort_ai::{OperationType, Provider};
 use ort_application::application_workspace::{
     ANSWER_SYSTEM, COVER_SYSTEM, REFINE_ANSWER_SYSTEM, REFINE_SYSTEM, TAILOR_SYSTEM,
     ensure_profile, load, load_stage_one, merge_refinement_alerts, resume_system, save,
-    save_reviewed, save_stage_one, validate_stage_one, validate_workspace,
+    save_stage_one, validate_stage_one, validate_workspace,
 };
-use ort_application::material_document::preflight_pdf;
 use ort_application::tailoring::{
     MAX_TAILORING_CALLS, TailoringRun, TailoringStep, change_summary,
 };
 use ort_domain::MaterialKind;
-use ort_domain::{CommandResponse, DocumentStyle, ResumeDocument};
+#[cfg(test)]
+use ort_domain::ResumeDocument;
+use ort_domain::{CommandResponse, DocumentStyle};
 use ort_storage::StorageError;
 use serde::Serialize;
 use serde_json::json;
@@ -355,7 +356,7 @@ pub fn application_context(window: WebviewWindow) -> CommandResponse<Application
         .state::<crate::browser_bridge::BrowserBridgeState>()
         .connected();
     match window.state::<DesktopState>().with_store(|store| {
-        let published_revision = store.load_latest_published()?.map(|item| item.revision);
+        let published_revision = store.latest_published_revision()?;
         let connection = crate::ai_keys::request_connection(store, None)?;
         let using_plan = connection.mode == "chatgpt_plan";
         let plan = if using_plan {
@@ -756,9 +757,9 @@ pub async fn generate_application_cover_letter(
         let source = store
             .load_published_revision(saved.workspace.published_revision)?
             .ok_or(StorageError::NotFound)?;
-        Ok((saved.workspace, source))
+        Ok((store.manifest().profile_id, saved.workspace, source))
     });
-    let (mut workspace, source) = match prepared {
+    let (expected_profile_id, mut workspace, source) = match prepared {
         Ok(value) => value,
         Err(problem) => return storage_failure(&problem),
     };
@@ -778,13 +779,20 @@ pub async fn generate_application_cover_letter(
         Ok(text) => Some(text),
         Err(failure) => return material_error(&window, failure, None),
     };
-    if let Err(code) = preflight_pdf(&workspace, MaterialKind::CoverLetter) {
-        return error(code);
-    }
-    match state.with_store(|store| save(store, Some(expected_revision), &workspace)) {
-        Ok(saved) => CommandResponse::success(saved),
-        Err(problem) => storage_failure(&problem),
-    }
+    crate::background_work::run(move || {
+        if let Err(code) = preflight_pdf(expected_profile_id, &workspace, MaterialKind::CoverLetter)
+        {
+            return error(code);
+        }
+        match window.state::<DesktopState>().with_store(|store| {
+            ensure_profile(store, expected_profile_id)?;
+            save(store, Some(expected_revision), &workspace)
+        }) {
+            Ok(saved) => CommandResponse::success(saved),
+            Err(problem) => storage_failure(&problem),
+        }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -896,72 +904,6 @@ pub async fn refine_application_answer(
         Ok(saved) => CommandResponse::success(saved),
         Err(problem) => storage_failure(&problem),
     }
-}
-
-#[tauri::command]
-pub fn save_application_workspace(
-    window: WebviewWindow,
-    expected_profile_id: uuid::Uuid,
-    expected_revision: i64,
-    workspace: ApplicationWorkspace,
-) -> CommandResponse<SavedWorkspace> {
-    if window.label() != "overlay" {
-        return window_not_authorized();
-    }
-    let state = window.state::<DesktopState>();
-    let prior = match state.with_store(|store| {
-        ensure_profile(store, expected_profile_id)?;
-        load(store)?.ok_or(StorageError::NotFound)
-    }) {
-        Ok(prior) => prior,
-        Err(problem) => return storage_failure(&problem),
-    };
-    if prior.revision != expected_revision {
-        return storage_failure(&StorageError::RevisionConflict);
-    }
-    let resume_pdf_unchanged = workspace.style == prior.workspace.style
-        && printable_resume_unchanged(&prior.workspace.resume, &workspace.resume);
-    if !resume_pdf_unchanged && let Err(code) = preflight_pdf(&workspace, MaterialKind::Resume) {
-        return error(code);
-    }
-    if (workspace.cover_letter != prior.workspace.cover_letter
-        || workspace.resume.contact != prior.workspace.resume.contact
-        || workspace.style != prior.workspace.style)
-        && workspace.cover_letter.is_some()
-        && let Err(code) = preflight_pdf(&workspace, MaterialKind::CoverLetter)
-    {
-        return error(code);
-    }
-    match state.with_store(|store| {
-        ensure_profile(store, expected_profile_id)?;
-        save_reviewed(store, expected_revision, &workspace)
-    }) {
-        Ok(saved) => {
-            if resume_pdf_unchanged {
-                window.state::<ApplicationExportState>().promote_unchanged(
-                    expected_profile_id,
-                    prior.revision,
-                    saved.revision,
-                    MaterialKind::Resume,
-                );
-            }
-            CommandResponse::success(saved)
-        }
-        Err(problem) => storage_failure(&problem),
-    }
-}
-
-// Empty sections are useful while editing but contribute nothing to either
-// exported format. Adding one should not force a PDF rerender or invalidate an
-// already prepared download of the same printable content.
-fn printable_resume_unchanged(before: &ResumeDocument, after: &ResumeDocument) -> bool {
-    let mut before = before.clone();
-    let mut after = after.clone();
-    before
-        .sections
-        .retain(|section| !section.entries.is_empty());
-    after.sections.retain(|section| !section.entries.is_empty());
-    before == after
 }
 
 #[tauri::command]

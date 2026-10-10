@@ -283,11 +283,11 @@ fn new_item_in_v2_resume_requires_an_empty_dates_array() {
         links: vec![],
     });
     assert_eq!(
-        preflight_pdf(&workspace, MaterialKind::Resume),
+        preflight_pdf(uuid::Uuid::now_v7(), &workspace, MaterialKind::Resume),
         Err("RESUME_INVALID")
     );
     workspace.resume.sections[0].entries[0].dates = Some(vec![]);
-    preflight_pdf(&workspace, MaterialKind::Resume).unwrap();
+    preflight_pdf(uuid::Uuid::now_v7(), &workspace, MaterialKind::Resume).unwrap();
     let temp = TempDir::new().unwrap();
     let store = ort_storage::EncryptedStore::open_or_initialize(
         temp.path(),
@@ -300,7 +300,15 @@ fn new_item_in_v2_resume_requires_an_empty_dates_array() {
         storage: Mutex::new(crate::DesktopStorage::Ready(store)),
         reviews: Arc::new(crate::import_review::ReviewState::default()),
     };
-    let exports = render_application_exports(&state, saved.revision, MaterialKind::Resume).unwrap();
+    let exports = render_application_exports(
+        &state,
+        state
+            .with_store(|store| Ok(store.manifest().profile_id))
+            .unwrap(),
+        saved.revision,
+        MaterialKind::Resume,
+    )
+    .unwrap();
     assert!(exports.pdf.starts_with(b"%PDF-"));
     assert!(exports.docx.starts_with(b"PK\x03\x04"));
 }
@@ -347,7 +355,7 @@ fn reviewed_generation_edit_and_pdf_render_journey() {
     let mut workspace = workspace();
     workspace.resume = generated.resume;
     workspace.change_points = generated.change_points;
-    preflight_pdf(&workspace, MaterialKind::Resume).unwrap();
+    preflight_pdf(uuid::Uuid::now_v7(), &workspace, MaterialKind::Resume).unwrap();
     let saved = save(&store, None, &workspace).unwrap();
     workspace.resume.sections[0].entries[0].bullets[0].text = "Built reliable Rust services".into();
     save(&store, Some(saved.revision), &workspace).unwrap();
@@ -477,7 +485,12 @@ fn body_only_draft_with_plan_and_read_only_headers_preflights_and_renders() {
     );
     assert_eq!(serialized["workspace"]["alerts"][0]["jobExcerpt"], "Python");
     assert_eq!(serialized["workspace"]["alerts"][0]["target"], "Python");
-    preflight_pdf(&generated_workspace, MaterialKind::Resume).unwrap();
+    preflight_pdf(
+        uuid::Uuid::now_v7(),
+        &generated_workspace,
+        MaterialKind::Resume,
+    )
+    .unwrap();
     let pdf = ort_render::render_pdf_with_style(
         &document_for(
             &generated_workspace.resume,

@@ -350,7 +350,7 @@ pub fn open_tracker_link(window: WebviewWindow, target: String) -> CommandRespon
 }
 
 #[tauri::command]
-pub fn preview_tracker_pdf(
+pub async fn preview_tracker_pdf(
     window: WebviewWindow,
     id: String,
     expected_revision: i64,
@@ -359,7 +359,31 @@ pub fn preview_tracker_pdf(
     if window.label() != "main" {
         return window_not_authorized();
     }
+    let expected_profile_id = match window
+        .state::<DesktopState>()
+        .with_store(|store| Ok(store.manifest().profile_id))
+    {
+        Ok(profile) => profile,
+        Err(problem) => return storage_failure(&problem),
+    };
+    crate::background_work::run(move || {
+        preview_tracker_pdf_blocking(window, id, expected_revision, kind, expected_profile_id)
+    })
+    .await
+}
+
+fn preview_tracker_pdf_blocking(
+    window: WebviewWindow,
+    id: String,
+    expected_revision: i64,
+    kind: ort_domain::MaterialKind,
+    expected_profile_id: uuid::Uuid,
+) -> CommandResponse<application_exports::MaterialPdf> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
     let prepared = window.state::<DesktopState>().with_store(|store| {
+        ort_application::application_workspace::ensure_profile(store, expected_profile_id)?;
         let record = store.tracker_get(&id)?.ok_or(StorageError::NotFound)?;
         if record.revision != expected_revision {
             return Err(StorageError::RevisionConflict);
@@ -388,15 +412,29 @@ pub fn preview_tracker_pdf(
         Ok(value) => value,
         Err(error) => return tracker_failure(&error),
     };
-    match ort_render::render_pdf_with_style(&document, style) {
-        Ok(pdf) => CommandResponse::success(application_exports::MaterialPdf {
-            base64: STANDARD.encode(&pdf.bytes),
-            filename: match kind {
-                ort_domain::MaterialKind::Resume => "tailored-resume.pdf",
-                ort_domain::MaterialKind::CoverLetter => "cover-letter.pdf",
+    match crate::background_work::render_pdf(expected_profile_id, &document, style) {
+        Ok(pdf) => {
+            if let Err(problem) = window.state::<DesktopState>().with_store(|store| {
+                ort_application::application_workspace::ensure_profile(store, expected_profile_id)?;
+                if store
+                    .tracker_get(&id)?
+                    .is_none_or(|entry| entry.revision != expected_revision)
+                {
+                    return Err(StorageError::RevisionConflict);
+                }
+                Ok(())
+            }) {
+                return tracker_failure(&problem);
             }
-            .into(),
-        }),
+            CommandResponse::success(application_exports::MaterialPdf {
+                base64: STANDARD.encode(&pdf.bytes),
+                filename: match kind {
+                    ort_domain::MaterialKind::Resume => "tailored-resume.pdf",
+                    ort_domain::MaterialKind::CoverLetter => "cover-letter.pdf",
+                }
+                .into(),
+            })
+        }
         Err(_) => CommandResponse::failure("PDF_UNAVAILABLE", "errors.pdfUnavailable", true),
     }
 }

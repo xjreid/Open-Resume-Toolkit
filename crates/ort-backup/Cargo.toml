@@ -13,6 +13,7 @@ getrandom.workspace = true
 hex.workspace = true
 jiff.workspace = true
 ort-domain = { path = "../ort-domain" }
+schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

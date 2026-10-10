@@ -166,9 +166,9 @@ fn schema_upgrade_retains_publications_and_round_trips_mixed_versions_through_ba
     let backup = store
         .create_portable_backup(&passphrase, "0.0.0-test")
         .unwrap();
-    assert_eq!(ort_backup::inspect_backup(&backup).unwrap().format_minor, 8);
+    assert_eq!(ort_backup::inspect_backup(&backup).unwrap().format_minor, 9);
     let decoded = ort_backup::restore_backup(&backup, &passphrase).unwrap();
-    assert_eq!(decoded.manifest.database_schema, 7);
+    assert_eq!(decoded.manifest.database_schema, 8);
     assert_eq!(decoded.manifest.document_schema, 2);
     assert_eq!(decoded.profile.master_draft.unwrap().document, upgraded);
     drop(store);

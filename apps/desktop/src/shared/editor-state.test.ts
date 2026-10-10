@@ -12,7 +12,11 @@ function loaded() {
   return editorReducer(initialEditorState, {
     type: "loaded",
     empty: document,
-    workspace: { draft: { revision: 2, document }, latestPublished: null },
+    workspace: {
+      profileId: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086",
+      draft: { revision: 2, document },
+      latestPublished: null,
+    },
   });
 }
 
@@ -67,7 +71,11 @@ describe("editor persistence state", () => {
     state = editorReducer(state, {
       type: "loaded",
       empty: createResumeDocument(),
-      workspace: { draft: null, latestPublished: null },
+      workspace: {
+        profileId: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086",
+        draft: null,
+        latestPublished: null,
+      },
     });
     expect(isDirty(state)).toBe(true);
   });

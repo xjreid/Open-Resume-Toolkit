@@ -17,11 +17,7 @@ pub fn ensure_profile(
     store: &ort_storage::EncryptedStore,
     expected: uuid::Uuid,
 ) -> Result<(), StorageError> {
-    if store.manifest().profile_id == expected {
-        Ok(())
-    } else {
-        Err(StorageError::RevisionConflict)
-    }
+    store.ensure_profile(expected)
 }
 
 /// User edits may change reviewed content, but cannot replace generation provenance.

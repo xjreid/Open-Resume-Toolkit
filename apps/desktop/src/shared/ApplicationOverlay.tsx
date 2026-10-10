@@ -1,3 +1,4 @@
+import { useApplicationContext } from "./use-application-context";
 import {
   planErrorMessage,
   REASONING_EFFORT_LABELS,
@@ -456,15 +457,10 @@ export function ApplicationOverlay() {
 
   useEffect(() => {
     void Promise.all([
-      command("application_context"),
       command("load_application_workspace"),
       command("load_application_stage_one"),
-      command("load_application_capture"),
-      command("application_capture_status"),
     ])
-      .then(([nextContext, current, stageOne, capture, mode]) => {
-        setCaptureMode(mode ?? idleCapture);
-        setContext(nextContext);
+      .then(([current, stageOne]) => {
         savedRef.current = current;
         draftRef.current = current?.workspace ?? null;
         setSaved(current);
@@ -478,47 +474,17 @@ export function ApplicationOverlay() {
           setStyle(stageOne.draft.style);
         }
         setStageOneReady(true);
-        setPendingCapture(capture);
       })
       .catch((error: unknown) => setNotice(message(error)));
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    const refreshContext = () => {
-      const epoch = ++captureRefreshEpoch.current;
-      void Promise.all([
-        command("load_application_capture"),
-        command("application_context"),
-        command("application_capture_status"),
-      ])
-        .then(([capture, nextContext, mode]) => {
-          if (active && epoch === captureRefreshEpoch.current) {
-            setPendingCapture(capture);
-            setContext(nextContext);
-            setCaptureMode(mode ?? idleCapture);
-          }
-        })
-        .catch((error: unknown) => {
-          if (active && epoch === captureRefreshEpoch.current)
-            setNotice(message(error));
-        });
-    };
-    window.addEventListener("focus", refreshContext);
-    const timer = window.setInterval(refreshContext, 500);
-    const overlayWindow = getCurrentWebviewWindow();
-    const subscriptions = Promise.all([
-      overlayWindow.listen("ort:browser-capture", refreshContext),
-      overlayWindow.listen("ort:capture-mode", refreshContext),
-      overlayWindow.listen("ort:ai-model-changed", refreshContext),
-    ]).catch(() => []);
-    return () => {
-      active = false;
-      window.removeEventListener("focus", refreshContext);
-      window.clearInterval(timer);
-      void subscriptions.then((unlisten) => unlisten.forEach((stop) => stop()));
-    };
-  }, []);
+  useApplicationContext({
+    epoch: captureRefreshEpoch,
+    setContext,
+    setCapture: setPendingCapture,
+    setMode: setCaptureMode,
+    onError: (error) => setNotice(message(error)),
+  });
 
   async function flushStageOne(): Promise<void> {
     await stageOneCoordinator.current?.flush();

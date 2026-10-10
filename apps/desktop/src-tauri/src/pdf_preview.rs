@@ -1192,6 +1192,8 @@ mod tests {
             ],
             ai_operations: Vec::new(),
             ai_attempts: Vec::new(),
+            ai_lifetime_totals: Vec::new(),
+            ai_guardrail_policies: Vec::new(),
         };
         let created = Instant::now();
         let archive = build_portable_archive(&profile, created, 10_000).unwrap();
@@ -1275,6 +1277,8 @@ mod tests {
             render_manifests: vec![manifest.clone()],
             ai_operations: Vec::new(),
             ai_attempts: Vec::new(),
+            ai_lifetime_totals: Vec::new(),
+            ai_guardrail_policies: Vec::new(),
         };
         let passphrase = BackupPassphrase::new("synthetic archive phrase".into()).unwrap();
         let bytes = ort_backup::create_backup(
@@ -1341,6 +1345,8 @@ mod tests {
                 render_manifests,
                 ai_operations: Vec::new(),
                 ai_attempts: Vec::new(),
+                ai_lifetime_totals: Vec::new(),
+                ai_guardrail_policies: Vec::new(),
             },
             Instant::now(),
             10_000,

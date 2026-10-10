@@ -59,6 +59,9 @@ pub fn desktop_wire_schemas() -> std::collections::BTreeMap<String, serde_json::
     register!("AiKeySettings", ai_settings::AiKeySettings);
     register!("AiRetentionSummary", ai_settings::AiRetentionSummary);
     register!("SaveAiCapRequest", ai_settings::SaveAiCapRequest);
+    register!("ImportedAiGuardrails", ai_settings::ImportedAiGuardrails);
+    register!("PortableAiGuardrailV1", ort_backup::PortableAiGuardrailV1);
+    register!("AiGuardrailPeriod", ort_backup::AiGuardrailPeriod);
     register!(
         "ApplicationExportFormat",
         application_exports::ApplicationExportFormat
@@ -253,7 +256,7 @@ pub fn desktop_wire_fixtures() -> std::collections::BTreeMap<String, serde_json:
                 format_major: 1,
                 format_minor: ort_backup::FORMAT_MINOR,
                 app_version: "0.0.0-dev".into(),
-                database_schema: 7,
+                database_schema: 8,
                 document_schema: 2,
                 created_at: "2026-10-06T12:00:00Z".into(),
                 master_drafts: 1,

@@ -713,9 +713,17 @@ function ResumeEditor() {
             onBusyChange={setImportActive}
             onOperationChange={setImportWorking}
             onSaved={(saved) => {
+              if (!editor.profileId) {
+                void loadWorkspace();
+                return;
+              }
               dispatch({
                 type: "loaded",
-                workspace: { draft: saved, latestPublished: editor.published },
+                workspace: {
+                  profileId: editor.profileId,
+                  draft: saved,
+                  latestPublished: editor.published,
+                },
                 empty: saved.document,
               });
               setDestination("resume");

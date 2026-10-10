@@ -635,11 +635,37 @@ pub fn reset_ai_cap(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn load_ai_monitoring(
+    window: WebviewWindow,
+    from_unix_ms: i64,
+    to_unix_ms: i64,
+    time_zone: String,
+    bucket_size: String,
+    credential_id: Option<Uuid>,
+    connection_source: Option<ort_ai::plan::ConnectionSource>,
+) -> CommandResponse<AiMonitoringSummary> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    crate::background_work::run(move || {
+        load_ai_monitoring_blocking(
+            window,
+            from_unix_ms,
+            to_unix_ms,
+            time_zone,
+            bucket_size,
+            credential_id,
+            connection_source,
+        )
+    })
+    .await
+}
+
 #[allow(clippy::needless_pass_by_value)]
 #[allow(clippy::too_many_arguments)]
-pub fn load_ai_monitoring(
+fn load_ai_monitoring_blocking(
     window: WebviewWindow,
-    state: State<'_, DesktopState>,
     from_unix_ms: i64,
     to_unix_ms: i64,
     time_zone: String,
@@ -658,7 +684,7 @@ pub fn load_ai_monitoring(
         "month" => AiBucketSize::Month,
         _ => return CommandResponse::failure("AI_PERIOD_INVALID", "errors.aiPeriodInvalid", false),
     };
-    match state.with_store(|store| {
+    match window.state::<DesktopState>().with_store(|store| {
         let sources = store.ai_connection_sources()?;
         let ids: Vec<Uuid> = sources
             .iter()
@@ -675,30 +701,22 @@ pub fn load_ai_monitoring(
             })
             .filter_map(|(id, _)| Uuid::parse_str(id).ok())
             .collect();
-        let mut summary = if connection_source.is_some() && ids.is_empty() {
-            AiMonitoringSummary::default()
-        } else {
-            store.ai_monitoring_summary_for_keys(
-                from_unix_ms,
-                to_unix_ms,
-                &time_zone,
-                bucket_size,
-                if connection_source.is_some() {
-                    Some(ids.as_slice())
-                } else {
-                    None
-                },
-            )?
-        };
-        if connection_source.is_none() && credential_id.is_some() {
-            summary = store.ai_monitoring_summary_for_key(
-                from_unix_ms,
-                to_unix_ms,
-                &time_zone,
-                bucket_size,
-                credential_id,
-            )?;
-        }
+        let mut summary =
+            if (connection_source.is_some() || credential_id.is_some()) && ids.is_empty() {
+                AiMonitoringSummary::default()
+            } else {
+                store.ai_monitoring_summary_for_keys(
+                    from_unix_ms,
+                    to_unix_ms,
+                    &time_zone,
+                    bucket_size,
+                    if connection_source.is_some() || credential_id.is_some() {
+                        Some(ids.as_slice())
+                    } else {
+                        None
+                    },
+                )?
+            };
         summary.connection_sources = sources;
         Ok(summary)
     }) {
@@ -850,5 +868,77 @@ pub fn load_ai_catalog(window: WebviewWindow) -> CommandResponse<ort_ai::Catalog
             "errors.aiCatalogUnavailable",
             false,
         ),
+    }
+}
+
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedAiGuardrails {
+    profile_id: Uuid,
+    policies: Vec<ort_backup::PortableAiGuardrailV1>,
+}
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn load_imported_ai_guardrails(
+    window: WebviewWindow,
+    state: State<'_, DesktopState>,
+) -> CommandResponse<ImportedAiGuardrails> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    match state.with_store(|store| {
+        Ok(ImportedAiGuardrails {
+            profile_id: store.manifest().profile_id,
+            policies: store.imported_ai_guardrails()?,
+        })
+    }) {
+        Ok(value) => CommandResponse::success(value),
+        Err(problem) => crate::storage_failure(&problem),
+    }
+}
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn bind_imported_ai_guardrail(
+    window: WebviewWindow,
+    state: State<'_, DesktopState>,
+    expected_profile_id: Uuid,
+    import_id: Uuid,
+    credential_id: Uuid,
+    confirmation: String,
+) -> CommandResponse<bool> {
+    if window.label() != "main" {
+        return window_not_authorized();
+    }
+    if confirmation != "RESTORE LIFETIME CAP" {
+        return CommandResponse::failure("AI_CAP_INVALID", "errors.aiCapInvalid", false);
+    }
+    let Some(now) = now_unix_ms() else {
+        return storage_unavailable();
+    };
+    match state.with_store(|store| {
+        ort_application::application_workspace::ensure_profile(store, expected_profile_id)?;
+        if credential_id != AI_GENERAL_CAP_CREDENTIAL_ID {
+            cap_context(store, credential_id)?;
+        }
+        let policy = store
+            .imported_ai_guardrails()?
+            .into_iter()
+            .find(|policy| policy.id == import_id.to_string())
+            .ok_or(ort_storage::StorageError::NotFound)?;
+        // Every current direct-provider catalog uses USD. Refuse incompatible archives.
+        let catalog = ort_ai::builtin_catalog(&jiff::Timestamp::now().to_string(), None)
+            .map_err(|_| ort_storage::StorageError::InvalidData)?;
+        if !catalog
+            .entries
+            .iter()
+            .any(|entry| entry.currency == policy.currency)
+        {
+            return Err(ort_storage::StorageError::InvalidData);
+        }
+        store.bind_imported_ai_guardrail(import_id, credential_id, now)?;
+        Ok(true)
+    }) {
+        Ok(value) => CommandResponse::success(value),
+        Err(problem) => crate::storage_failure(&problem),
     }
 }

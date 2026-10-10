@@ -26,7 +26,11 @@ describe("resume command response validation", () => {
     expect(
       isResumeWorkspaceCommandResponse({
         ok: true,
-        value: { draft: versioned, latestPublished: null },
+        value: {
+          profileId: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086",
+          draft: versioned,
+          latestPublished: null,
+        },
       }),
     ).toBe(true);
     expect(
@@ -44,7 +48,12 @@ describe("resume command response validation", () => {
     expect(
       isResumeWorkspaceCommandResponse({
         ok: true,
-        value: { draft: null, latestPublished: null, secret: "unexpected" },
+        value: {
+          profileId: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086",
+          draft: null,
+          latestPublished: null,
+          secret: "unexpected",
+        },
       }),
     ).toBe(false);
     expect(

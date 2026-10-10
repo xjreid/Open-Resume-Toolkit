@@ -202,6 +202,7 @@ beforeEach(() => {
         return {
           ok: true,
           value: {
+            profileId: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086",
             draft: { revision: 1, document },
             latestPublished: null,
           },
@@ -281,7 +282,14 @@ describe("M2 live editor accessibility", () => {
     native.invoke.mockImplementation(
       async (command: string, ...args: unknown[]) => {
         if (command === "load_resume")
-          return { ok: true, value: { draft: null, latestPublished: null } };
+          return {
+            ok: true,
+            value: {
+              profileId: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086",
+              draft: null,
+              latestPublished: null,
+            },
+          };
         if (command === "validate_portable_backup")
           return { ok: true, value: { status: "cancelled" } };
         if (command === "restore_portable_backup")
@@ -383,7 +391,14 @@ describe("M2 live editor accessibility", () => {
     native.invoke.mockImplementation(
       async (command: string, ...args: unknown[]) =>
         command === "load_resume"
-          ? { ok: true, value: { draft: null, latestPublished: null } }
+          ? {
+              ok: true,
+              value: {
+                profileId: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086",
+                draft: null,
+                latestPublished: null,
+              },
+            }
           : original(command, ...args),
     );
     const container = await render(<App surface="main" />);
@@ -444,7 +459,14 @@ describe("M2 live editor accessibility", () => {
         native.invoke.mockImplementation(
           async (command: string, ...args: unknown[]) =>
             command === "load_resume"
-              ? { ok: true, value: { draft: null, latestPublished: null } }
+              ? {
+                  ok: true,
+                  value: {
+                    profileId: "018f8b1b-50ad-7b4a-8f7d-38fd63e44086",
+                    draft: null,
+                    latestPublished: null,
+                  },
+                }
               : original(command, ...args),
         );
       }
