@@ -2,13 +2,18 @@
 
 ## My Keys layout
 
-The AI workspace has two tabs: **My Keys** and **Data**. My Keys contains:
+The AI workspace has three pages: **My Keys**, **Codex**, and **Data**. My Keys contains:
 
 1. an API keys panel with an **Active key** bucket and an **All keys** bucket;
 2. a separate **General spending** panel for the shared all-key limit.
 
 Only one key can be active. A saved, unpaused key in All keys is available but
 is not used for ordinary AI requests until it is moved into Active key.
+
+While the Codex server is started, My Keys is disabled as an AI provider choice;
+its keys and selected primary remain saved. Stop server restores the selected
+key without changing manual pauses. Every app launch starts Codex stopped.
+See the [Codex runtime guide](../ai/codex-plan-runtime.md).
 
 ## Adding a key
 

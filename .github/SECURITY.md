@@ -2,13 +2,18 @@
 
 ## Current support status
 
-Open Resume Toolkit is currently a planning workspace and has not published a
-stable application release. There are no supported binary versions yet.
+Open Resume Toolkit has a working macOS Apple Silicon development application,
+Chrome development bridge, and optional verified Codex integration. It has not
+completed production stable-release qualification; there is no supported stable
+binary version table yet. Windows and Intel Mac CI builds are portability checks,
+not platform-support claims.
 
-Security reports about repository configuration, planned architecture,
-release infrastructure, dependency choices, or future implementation are still
-welcome. Supported-version information will be added here before the first
-public binary release.
+Reports about implemented storage, credentials, import helpers, AI/runtime
+containment, IPC, backup/recovery, packaging, dependencies, or repository
+configuration are welcome. Include the source commit and build identity when
+available. See the [current implementation map](../docs/development/current-state.md)
+for availability and limitations. Supported-version information must be updated
+before a public supported binary release.
 
 ## Reporting a vulnerability
 

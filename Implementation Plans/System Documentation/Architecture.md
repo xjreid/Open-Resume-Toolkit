@@ -2,12 +2,12 @@
 
 ## Status and authority
 
-- Status: approved baseline for implementation
+- Status: implemented development architecture with planned release/platform adapters
 - Owner: core maintainers
 - First milestone: M0 architecture skeleton through M7 release hardening
 - Product authority: all files in `../../Product Plans/`, especially `Product_Scope_and_Principles.md`, `Local_Data_and_Document_Model.md`, `Product_States_and_Operations.md`, and `Security_Privacy_and_Open_Source.md`
 
-This document defines how the approved local-first desktop product will be assembled. It does not define visual styling.
+This document records the architecture and remaining release design. The [implementation map](../../docs/development/current-state.md) identifies working adapters and open qualification. It does not define visual styling.
 
 ## Architectural goals
 
@@ -48,9 +48,15 @@ The public GitHub repository is the primary home for project information, docume
 
 The Tauri process owns all authoritative state and privileged operations. Bundled web UI code can request typed commands but cannot directly access the filesystem, database, network, shell, credential vault, native-messaging registration, or updater.
 
-Long-running work runs as cancellable Rust tasks behind an operation coordinator. Rendering and trusted CPU-heavy work may use a bounded internal worker pool. Untrusted PDF/DOCX parsing never runs in the desktop process: one disposable `ort-document-worker` process handles one staged input inside a platform sandbox and returns only a bounded versioned extraction record. A process-wide single-instance lock routes secondary launch intents to the existing process.
+Long-running work runs as cancellable Rust tasks behind an operation coordinator. Rendering and trusted CPU-heavy work may use a bounded internal worker pool. Untrusted PDF/DOCX parsing never runs in the desktop process: the packaged, identity-pinned `ort-parser-helper` runs constrained metered-Wasm guests and returns a bounded extraction record. ADR 0012 supersedes the older native-worker/XPC design. A stable OS profile lock is acquired before recovery and retained for the process lifetime. Secondary launches refuse profile access; intent forwarding/activation is not implemented. Tracker reads use the bounded background-work facility and a canonical search projection.
 
 ### Hostile document worker
+
+The following native-worker description is the legacy design. The active macOS
+import path is the pinned helper/metered-Wasm architecture in
+[ADR 0012](../../docs/adr/0012-metered-wasm-document-parsers.md), with explicit
+review before save. The legacy process must not be enabled as a parser fallback.
+
 
 `ort-document-worker` has no database, vault, provider, updater, browser, or native-IPC code dependency. The parent opens a validated staged input, launches the worker with an inherited handle or containment-verified path, and grants a single private output location. Platform policy denies all network, child processes, unrelated file reads/writes, application data, user documents, and secret stores. The parent enforces memory/CPU/wall-time/handle limits, validates the extraction result again, and kills the complete process tree after every outcome. A worker failure cannot commit canonical state.
 
@@ -60,11 +66,11 @@ There are two application windows: the main window and an always-on-top applicat
 
 ### Native host
 
-`ort-native-host` is a separate, small executable installed beside the desktop application. It accepts one native-messaging request, validates it, forwards it over protected local IPC, returns a bounded response, and exits. It does not open the database or hold content on disk.
+`ort-native-host` is a separate, small executable installed beside the desktop application. It validates bounded browser native-messaging frames and forwards requests over protected local IPC. The current Chrome development path keeps a native port for serialized heartbeat/capture commands until disconnect; it is not a one-request host. It does not open the database or hold content on disk.
 
 ### External Codex runtime
 
-Codex is not packaged in ORT. When enabled by the user, ORT launches a supported external executable as an app-server child using `stdio`, an isolated ORT-specific Codex home, a non-user-content working directory, and an allowlisted protocol surface. Direct API mode and Codex mode are mutually exclusive.
+Codex is not packaged in ORT. When enabled by the user, ORT launches a supported external executable as an app-server child using `stdio`, an isolated ORT-specific Codex home, a non-user-content working directory, and an allowlisted protocol surface. Direct API mode and Codex mode are mutually exclusive. The user starts/stops the server explicitly; launch resets server permission and memory-only sign-in.
 
 Codex support is a gated adapter, not a core dependency. Failure to locate, authenticate, update, or safely contain Codex disables only that connection mode.
 

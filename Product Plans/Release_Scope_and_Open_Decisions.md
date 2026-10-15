@@ -2,18 +2,29 @@
 
 ## Status key
 
-- **[IMPLEMENTATION]** — specified in the current technical plans; implementation and evidence are still required.
+- **[IMPLEMENTED]** — present in development code; qualification/acceptance limits are stated separately.
+- **[PARTIAL]** — working development behavior with specific remaining work.
+- **[IMPLEMENTATION]** — specified work still to implement.
 - **[VALIDATION]** — prove with implemented builds and representative tests before stable release.
 - **[RELEASE]** — operational, distribution, policy, or external requirement before broad public release.
 - **[LATER]** — intentionally outside the initial release; not a current commitment.
 
 This is the central register for implementation gates, unresolved validation/release work, and deferred work in the product plans. The detailed technical selections are authoritative only for implementation mechanics and are indexed in `../Implementation Plans/README.md`.
 
-## Current platform qualification scope (2026-09-04)
+## Current implementation status — October 15, 2026
 
-- The only active development, native-testing, and preview-qualification target for M0, M1, and M2 is **macOS on Apple Silicon (`arm64`)**. The exact minimum supported macOS release remains a later distribution decision.
+The [implementation map](../docs/development/current-state.md) distinguishes
+working features from planned distribution. M0–M4 have recorded development
+acceptance. M5 remains open for Edge/browser acceptance; optional M6 Codex is
+implemented in development without a full milestone sign-off. M7 production
+signing, notarization, final host/Store identities and release/update qualification
+remain planned. This documentation refresh does not grant milestone acceptance.
+
+## Current platform qualification scope
+
+- The only active development, native-testing, and preview-qualification target is **macOS on Apple Silicon (`arm64`)**. The exact minimum supported macOS release remains a later distribution decision.
 - A milestone described as complete during this phase means **complete for the macOS-arm64 development/preview scope**. It does not claim Windows, Intel Mac, universal-binary, or broad public-release qualification.
-- Windows and Intel Mac remain intended platform-expansion goals, but their native adapters, installers, signing, manual matrices, and release evidence are **[LATER]** work and do not block M0-M2 macOS-arm64 completion.
+- Windows and Intel Mac remain intended platform-expansion goals, but their native adapters, installers, signing, manual matrices, and release evidence are **[LATER]** work and do not add native support claims to macOS-arm64 development acceptance.
 - Shared contracts, data formats, domain behavior, and platform abstractions remain portable. Existing Windows and Intel-Mac CI jobs stay enabled as regression signals where practical; a green build is useful portability evidence, not native qualification or a support claim.
 - A feature remains disabled on every platform whose security gate has not passed. In particular, document import cannot be enabled merely because shared or CI tests pass.
 - During local development, a locally created self-signed Code Signing identity may be used to test stable code requirements and macOS Keychain access across rebuilds. It is not a Developer ID, is not suitable for distribution, and does not satisfy notarization or stable-release gates. Ad-hoc signing remains acceptable only for tests that do not require identity continuity.
@@ -37,13 +48,13 @@ unsigned test transport a silent production fallback.
 ## Initial release capabilities
 
 1. Free open-source macOS Apple Silicon desktop application with one local profile per operating-system user; Windows and Intel Mac are deferred platform expansions.
-2. One autosaved master-resume draft and one deliberately published master resume.
+2. One autosaved master draft and one current published master; earlier immutable publication revisions retained for replay/backup.
 3. Manual structured resume creation plus deterministic reviewed local import of text-bearing PDF/DOCX in No AI mode; a configured provider may optionally propose improved structure only after separate transmission confirmation.
 4. Three initial ATS-conscious resume style directions with local preview and rendering. The default Technical/Engineering style follows the supplied Jake's Resume reference as closely as compatible licensing permits and remains visually separate from ORT branding.
 5. Chrome and Edge deliberate capture through an installed native-messaging host.
 6. One locally recoverable overlay-owned application workspace with Stage 1 capture/review and Stage 2 Resume/Cover letter/Answers tabs; no more than three verified change-summary points; non-blocking Required Qualification Alerts; expanded structured editing with PDF preview; resume/cover-letter PDF drag and Download controls; prompted resume regeneration; and resettable question capture/answer drafting.
-7. Exactly one active AI mode: a user-supplied OpenAI, Anthropic, or Gemini API key; a user-authorized ChatGPT/Codex subscription connection; or No AI. Secrets use the OS credential vault and ORT funds no inference.
-8. Curated, adaptable Economy/Balanced/Quality model choices; aggregate local AI Monitoring with Week/Month/Year/All time token and direct-cost graphs/totals plus secondary breakdowns; optional direct-API weekly, monthly, yearly, and all-time estimated-spend caps; and optional Codex provider-quota thresholds.
+7. Exactly one active AI mode: a user-supplied OpenAI, Anthropic, or Gemini API key; a user-authorized ChatGPT/Codex subscription connection; or No AI. Direct keys use the OS vault; Codex authorization is memory-only. ORT funds no inference.
+8. Explicit tested catalog model IDs (legacy tier names are migration metadata); aggregate local AI Monitoring with Week/Month/Year/All time token and direct-cost graphs/totals plus secondary breakdowns; optional direct-API weekly, monthly, yearly, and all-time estimated-spend caps; and optional Codex provider-quota thresholds.
 9. Direct structured editing and local PDF, DOCX, and text export.
 10. Finish Application and a local tracker retaining selected resume, cover-letter, and answer JSON snapshots.
 11. Encrypted portable backup/restore and full structured data export.
@@ -61,29 +72,26 @@ unsigned test transport a silent production fallback.
 
 ## Implementation specifications and gates
 
-The current selections and module-level acceptance criteria are documented under `../Implementation Plans/`. Items remain marked **[IMPLEMENTATION]** until working code and the specified evidence exist; they are no longer unanswered architecture placeholders.
+The current selections and module-level acceptance criteria are documented under `../Implementation Plans/`. The statuses below describe development implementation. Release-time review, native qualification, and milestone acceptance remain separate.
 
-1. **[IMPLEMENTATION]** Implement the selected desktop framework on macOS arm64 while preserving explicit adapters for later Windows and Intel-Mac expansion.
-2. **[IMPLEMENTATION]** Define the versioned local schema, transaction model, migrations, crash recovery, exact content-at-rest encryption/key-vault design, macOS trusted-application/access-control behavior, and desktop/native-host secret-sharing proof. The specified Windows same-user boundary remains a later platform gate.
-3. **[IMPLEMENTATION]** Define encrypted `.ort-backup` format, RFC 9106 Argon2id writer profile and bounded reader policy, authenticated encryption, canonical header parsing, integrity, restore/merge behavior, and forgotten-passphrase limitations.
-4. **[IMPLEMENTATION]** Select local PDF/DOCX extraction and rendering libraries; implement mandatory per-import process isolation; and confirm licenses, font embedding, selectable text, links, tagging, deterministic layout, worker resource ceilings, crash behavior, and sandbox evidence.
-5. **[IMPLEMENTATION]** Implement direct adapters for OpenAI, Anthropic, and Gemini and freeze the tested Economy/Balanced/Quality presets from the dated baseline in `AI_and_Import.md`. Verify model-list access, exact identifiers, lifecycle status, structured output, token categories, official prices, and account availability immediately before each release.
-6. **[IMPLEMENTATION]** Define prompt/schema versioning, provider cancellation, streaming, timeouts, retries, local request recovery, error taxonomy, requested-versus-effective model handling, and explicit no-fallback behavior.
-   - Include a bounded Required Qualification Alert response schema in the existing tailoring operation; define mandatory-versus-preferred classification, supported resume mappings, resolvable evidence references, deterministic/local validation, dismissal state, and false-positive handling without a second provider call.
-7. **[IMPLEMENTATION]** Define the standardized provider-call accounting boundary, versioned AI activity schema, provider/model aggregation, raw-usage normalization, signed pricing-catalog format/channel/signing/rollback process, official-source verification and expiry rules, cost-estimate rules, export, retention, deletion, and interrupted-attempt recovery.
-8. **[IMPLEMENTATION]** Specify direct-API guardrail transactions: credential identities, period/time-zone semantics, preflight token counting and maximum reservations, price/currency handling, settlement, unknown outcomes, notifications, activity-deletion separation, cap changes, and all-time baseline resets.
-9. **[IMPLEMENTATION]** Specify the external Codex app-server integration: strict official-runtime identity/provenance verification with no arbitrary-executable override, supported minimum/maximum runtime and protocol versions, generated schemas and capability negotiation, app-managed `stdio` child-process launch/supervision/termination, ORT-specific config/auth root and keyring namespace, managed ChatGPT and device-code login, required client/service identification or registration, externally contained no-tool execution profile, experimental capabilities disabled, request/event allowlists, dynamic model intersection, thread-token/account-usage/quota normalization, bucket-threshold caps, orphan recovery, cleanup, safe disablement, and sign-out. The initial ORT package does not bundle or silently install/update Codex.
-10. **[IMPLEMENTATION]** Specify the native-messaging protocol, IPC authentication, per-user installation, desktop launch, version window, repair, and uninstall behavior.
-11. **[LATER]** Prove the preferred direct Windows installer, per-user native-host registration, repair, signed update handoff, and uninstall behavior; separately prove how fallback Microsoft Store MSIX first-run setup writes browser-visible registrations and keeps paths valid after updates.
-12. **[LATER]** Define the Windows GitHub packaging/signing path, reproducible source-to-binary CI, checksums, SBOM/provenance, public code-signing policy, release roles, and SignPath application readiness. Define the Microsoft Store MSIX contingency if SignPath is declined or unavailable.
-13. **[IMPLEMENTATION]** Select the unsigned macOS preview package format, checksum/provenance and authenticated update-notification design, Gatekeeper guidance, and native-messaging installation behavior. Developer ID signing/notarization and stable production qualification are required in M7; paid enrollment is not a pre-M7 development prerequisite.
-14. **[IMPLEMENTATION]** Define channel-specific update metadata, signature verification, release provenance, schema-safe update order, and recovery.
-15. **[IMPLEMENTATION]** Define safe local diagnostic bundles without centralized telemetry.
-16. **[IMPLEMENTATION]** Freeze protective limits for import size/pages, extracted text, native messages, document pages, collections, backups, provider requests, and exports.
-17. **[IMPLEMENTATION]** Implement a user-visible About/Legal view containing GPL, copyright, canonical-source attribution, third-party notices, trademark-policy links, build provenance, and official/preview status without exposing secrets or local identifiers.
-18. **[IMPLEMENTATION]** Implement the main-window/overlay capability split, Stage 1/Stage 2 state machine and tabs, expanded structured editors with PDF preview, safe Download and OS drag materialization/cleanup, required regeneration instruction, and aggregate Week/Month/Year/All time AI Monitoring queries.
-19. **[IMPLEMENTATION]** Record the Quiet Navy/Open Frame light-only tokens/assets and verify the Jake's Resume source/license or independent template implementation before shipping any related asset or template code.
-20. **[IMPLEMENTATION]** Implement deterministic No-AI import mapping into existing fields and versioned custom/simple sections, preserving all unrecognized text for explicit review without a network request.
+1. **[IMPLEMENTED]** Tauri/React/Rust desktop, generated contracts, and isolated macOS-arm64 development identity. Windows/Intel native qualification is **[LATER]**.
+2. **[IMPLEMENTED]** SQLCipher schema 9, OS-vault keys, forward migrations, process profile ownership, recovery, and retryable retirement of active/retained credentials. Production identity/vault qualification remains M7.
+3. **[IMPLEMENTED]** Authenticated `.ort-backup` 1.9, bounded collection/serialization, legacy readers/vectors, fresh-identity restart restore, safety rollback and deletion. Merge restore/automatic backup are not implemented.
+4. **[IMPLEMENTED]** Local PDF/DOCX/text output and reviewed macOS metered-Wasm import with packaged helper identity pins. OCR, other-platform importer qualification, and production packaging remain outside this development claim.
+5. **[IMPLEMENTED]** OpenAI/Anthropic/Gemini adapters and explicit model-ID selection from a signed catalog. **[RELEASE]** Reverify official model availability, features and prices before shipping; old research tables are not current guarantees.
+6. **[IMPLEMENTED]** Versioned structured generation/refinement, cancellation, bounded retry/recovery, factual validation, Required Qualification Alerts, and safe error categories. Live account-specific quality/availability remains separate.
+7. **[IMPLEMENTED]** Operation/attempt accounting, durable lifetime/guardrail records, Data graphs/export/clear, provenance and interrupted-attempt recovery. History clearing does not reset spending exposure.
+8. **[IMPLEMENTED]** Per-key/general spend-cap reservation/settlement and explicit restart/disable behavior. Current key controls use all-time caps; historical calendar policies and imported guardrails retain typed storage support.
+9. **[IMPLEMENTED]** Optional macOS-arm64 verified Codex runtime/installer, contained stdio, Start/Stop server, memory-only managed login, model/reasoning selection, usage/reserve checks and process cleanup. **[VALIDATION]** Remaining M6 live acceptance is not recorded; there is no credential-file/keyring fallback.
+10. **[PARTIAL]** Chrome 0.3.0 capture, exact origins, bounded authenticated development transport and setup/repair helpers are implemented. Edge remains capture-disabled. Remaining browser walkthrough and production identity/Store qualification stay open.
+11. **[LATER]** Windows installers, native-host registration, SignPath signing, and Microsoft Store fallback qualification.
+12. **[PARTIAL]** Local development app/helper and preview integrity packaging exist. **[RELEASE]** macOS Developer ID signing/notarization, release provenance/SBOM, final host identities, and final Store publication remain M7.
+13. **[IMPLEMENTATION]** Authenticated updater metadata, release/channel automation, installed update/repair/uninstall qualification, and safe diagnostic bundles. A checked-in CI workflow is not a production release pipeline.
+14. **[PARTIAL]** Protective parser/message/document/request/backup/export limits and focused regressions are implemented. Recheck limits with each changed adapter and production package.
+15. **[IMPLEMENTATION]** Complete production About/Legal/provenance and redistribution-notice verification for the actual shipped artifact.
+16. **[IMPLEMENTED]** Overlay Stage 1/Stage 2, structured editing/PDF preview, macOS temporary drag cleanup, atomic Finish, tracker snapshots and background paginated search. Cross-platform drag qualification remains deferred.
+17. **[IMPLEMENTED]** Open Folio light-only app direction and independent Technical/Professional/Modern document styles. Prior Quiet Navy/Precision Workbench plans are historical. **[RELEASE]** Final shipped asset/license review remains required.
+18. **[IMPLEMENTED]** Deterministic reviewed No-AI PDF/DOCX import without provider transmission. Optional AI mapping requires its separate explicit action and valid provider.
 
 ## Validation and release work
 

@@ -11,8 +11,16 @@
 | M3 | Complete | Direct AI foundation |
 | M4 | Complete | Tailoring, alerts and application materials |
 | M5 | In progress | Workspace, tracker and browser bridge |
-| M6 | Optional | External Codex integration |
+| M6 | Implemented in development; acceptance open | Optional external Codex integration |
 | M7 | Planned | Distribution and stable hardening |
+
+Status reviewed October 15, 2026 against the current source. M5 has working
+overlay/tracker and Chrome 0.3.0 development capture; Edge capture and remaining
+browser walkthrough/acceptance are still open. M6 has runtime verification,
+explicit installation, Start/Stop server, memory-only login, models/reasoning,
+usage/reserve checks, and supervised shutdown. Local automated/containment
+records do not constitute a new user milestone sign-off or account-specific
+live acceptance. See the [implementation map](../../docs/development/current-state.md).
 
 M0–M2 completion applies to macOS Apple Silicon development. See the
 [closure and accepted limitations](../../evidence/0.0.0-dev/m2-acceptance-closure.md).
@@ -63,7 +71,8 @@ this planning revision does not edit CI or remove working tests.
 
 ## M2.5 — usable desktop and resume designs
 
-**Deliver:** the approved Precision Workbench / Quiet Navy aesthetic throughout
+**Recorded original deliverable (M2.5 closed; Open Folio superseded its original
+visual direction on October 4):** the approved interface aesthetic throughout
 an organized app shell, navigation and dialogs; a document-centered, user-friendly
 resume builder with focused editing; coherent import/publish/preview/export flows;
 a clean Jake's Resume-style Technical template and equally professional Business
@@ -123,7 +132,7 @@ Confirm capture does not start AI automatically. No full browser/profile/OS matr
 ## M6 — optional external Codex
 
 **Deliver:** verified official-runtime discovery and supported-version negotiation;
-isolated ORT Codex home; managed sign-in/keyring; stdio adapter, cancellation and
+isolated ORT Codex home; managed memory-only sign-in; explicit Start/Stop server; stdio adapter, cancellation and
 lifecycle; account/rate-limit views and quota controls; containment and safe disablement.
 
 **Minimum checks:** one supported runtime's connect/request/cancel/sign-out smoke;

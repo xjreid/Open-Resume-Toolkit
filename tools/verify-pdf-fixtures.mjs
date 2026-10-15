@@ -306,7 +306,7 @@ for (const kind of kinds) {
     }
     if (expectedUrls.length) assert(structureRoles.has("Link"));
     console.log(
-      `${style}/${kind}: ${style === "plain" ? "exact golden" : "bundled style audit (golden/native qualification pending)"}, ${pdf.numPages} page(s), text/order, geometry, tags, safe links, no active content`,
+      `${style}/${kind}: ${style === "plain" ? "exact golden" : "independent style audit (corpus goldens checked separately)"}, ${pdf.numPages} page(s), text/order, geometry, tags, safe links, no active content`,
     );
   } finally {
     await task.destroy();

@@ -83,7 +83,10 @@ only the latest revision for each material and clears on Finish.
 
 Native file drag currently supports macOS; other platforms return an explicit
 unavailable error and can use Download. Drag files are private temporary files,
-retained through an active drag and cleared when finishing. Cover letters use
+retained through an active drag and cleared when finishing. Startup removes
+abandoned artifacts older than 24 hours while preserving live drags. Older
+artifacts without an ownership lease are removed only after a subsequent boot
+and validation of their owner, permissions, and expected contents. Cover letters use
 the same export controls and an editable text popup. Answers retain generation,
 editing, copying, and saved-answer collection. A generated answer can be refined
 with instructions and is retained once when Reset question, a new browser

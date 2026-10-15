@@ -4,14 +4,7 @@ import type {
   TrackerMetadata,
   SavedTrackerEntry,
 } from "@ort/contracts/wire";
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { PdfCanvas } from "./ApplicationViews";
 import {
   TrackerFields,
@@ -19,6 +12,7 @@ import {
   type TrackerEntry,
 } from "./TrackerFields";
 import { trackerLinkTarget } from "./tracker-link";
+import { TrackerSourceLink } from "./TrackerSourceLink";
 
 type RecordEntry = TrackerSummary;
 type ContentKind = "resume" | "cover_letter" | "answers";
@@ -45,78 +39,6 @@ function contentLabel(kind: ContentKind) {
   return "Approved answers";
 }
 
-function TrackerSourceLink({
-  source,
-  label,
-  onClick,
-  onEdit,
-}: {
-  source: string;
-  label: string;
-  onClick: (event: MouseEvent<HTMLAnchorElement>) => void;
-  onEdit: () => void;
-}) {
-  const container = useRef<HTMLDivElement>(null);
-  const link = useRef<HTMLAnchorElement>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [overflows, setOverflows] = useState(false);
-
-  useLayoutEffect(() => {
-    if (expanded) return;
-    const measure = () => {
-      if (container.current && link.current) {
-        // Compare with the whole cell, so a toggle does not itself cause overflow.
-        setOverflows(link.current.scrollWidth > container.current.clientWidth);
-      }
-    };
-    measure();
-    const observer =
-      typeof ResizeObserver === "undefined"
-        ? null
-        : new ResizeObserver(measure);
-    if (container.current) observer?.observe(container.current);
-    if (link.current) observer?.observe(link.current);
-    return () => observer?.disconnect();
-  }, [source, expanded]);
-
-  return (
-    <div
-      ref={container}
-      className={
-        "tracker-source" + (expanded ? " tracker-source--expanded" : "")
-      }
-    >
-      <a
-        ref={link}
-        className="tracker-source-link"
-        href={trackerLinkTarget(source) ?? "#"}
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Click to open; double-click to edit"
-        onClick={onClick}
-        onDoubleClick={(event) => {
-          event.preventDefault();
-          onEdit();
-        }}
-      >
-        {source}
-      </a>
-      {(overflows || expanded) && (
-        <button
-          type="button"
-          className="tracker-source-toggle"
-          aria-label={(expanded ? "Compress" : "Expand") + " link for " + label}
-          aria-expanded={expanded}
-          title={expanded ? "Compress link" : "Expand link"}
-          onClick={() => setExpanded((current) => !current)}
-        >
-          {expanded ? "Compress" : "Expand"}
-        </button>
-      )}
-    </div>
-  );
-}
-
 export function TrackerWorkspace({
   active,
   onDirtyChange,
@@ -136,6 +58,9 @@ export function TrackerWorkspace({
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("");
+  const [pageOffset, setPageOffset] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [loadingPage, setLoadingPage] = useState(false);
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
   const linkTimer = useRef<number | null>(null);
   const [notice, setNotice] = useState("");
@@ -163,36 +88,38 @@ export function TrackerWorkspace({
     if (!active || pendingCount > 0) return;
     let cancelled = false;
     const epoch = loadEpoch.current;
+    setLoadingPage(true);
     const load = async () => {
-      const loaded: RecordEntry[] = [];
-      for (let offset = 0; ; offset += 100) {
-        const page = await command("list_tracker_entries", {
-          offset,
+      try {
+        if (cancelled || epoch !== loadEpoch.current) return;
+        const loaded = await command("list_tracker_entries", {
+          offset: pageOffset,
           limit: 100,
           search,
           status: filter,
         });
-        loaded.push(...page);
-        if (page.length < 100) return loaded;
-      }
-    };
-    void load()
-      .then((loaded) => {
         if (cancelled || epoch !== loadEpoch.current || desired.current.size)
           return;
         committed.current = new Map(
           loaded.map((record) => [record.id, record]),
         );
         setEntries(loaded);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled)
+        setHasNextPage(loaded.length === 100);
+      } catch (error: unknown) {
+        if (!cancelled && epoch === loadEpoch.current)
           setNotice("Could not load tracker (" + String(error) + ").");
-      });
+      } finally {
+        if (!cancelled) setLoadingPage(false);
+      }
+    };
+    // Invalidate immediately on input; issue only the latest settled search.
+    const timer = search ? window.setTimeout(() => void load(), 250) : null;
+    if (timer === null) void load();
     return () => {
       cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
     };
-  }, [active, search, filter, pendingCount]);
+  }, [active, search, filter, pendingCount, pageOffset]);
 
   useEffect(() => {
     const dialog = createDialog.current;
@@ -568,7 +495,10 @@ export function TrackerWorkspace({
           Search
           <input
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPageOffset(0);
+            }}
             placeholder="Search all application columns"
           />
         </label>
@@ -576,7 +506,10 @@ export function TrackerWorkspace({
           Status
           <select
             value={filter}
-            onChange={(event) => setFilter(event.target.value)}
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPageOffset(0);
+            }}
           >
             <option value="">All statuses</option>
             {statuses.map(([value, label]) => (
@@ -849,6 +782,29 @@ export function TrackerWorkspace({
           <p className="tracker-table-empty">No matching applications.</p>
         )}
       </div>
+      <nav className="application-row" aria-label="Tracker pages">
+        <button
+          type="button"
+          className="button--secondary"
+          disabled={pageOffset === 0 || loadingPage || pendingCount > 0}
+          onClick={() => setPageOffset((offset) => Math.max(0, offset - 100))}
+        >
+          Previous page
+        </button>
+        <span role="status">
+          {loadingPage
+            ? "Loading applications…"
+            : `Page ${pageOffset / 100 + 1}`}
+        </span>
+        <button
+          type="button"
+          className="button--secondary"
+          disabled={!hasNextPage || loadingPage || pendingCount > 0}
+          onClick={() => setPageOffset((offset) => offset + 100)}
+        >
+          Next page
+        </button>
+      </nav>
       {pendingCount > 0 && !Object.keys(saveErrors).length && (
         <p role="status" className="tracker-save-status">
           Saving changes…

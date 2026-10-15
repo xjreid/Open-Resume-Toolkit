@@ -469,7 +469,7 @@ mod tests {
             .unwrap();
         {
             let db = store.connection.lock().unwrap();
-            db.execute_batch("DROP TABLE ai_lifetime_totals; DROP TABLE ai_imported_guardrails; DROP INDEX ai_attempts_operation_order; DELETE FROM schema_migrations WHERE version=8;").unwrap();
+            db.execute_batch("DROP VIEW tracker_projection; DROP TRIGGER tracker_search_insert; DROP TRIGGER tracker_search_update; DROP TABLE tracker_search; DROP TABLE ai_lifetime_totals; DROP TABLE ai_imported_guardrails; DROP INDEX ai_attempts_operation_order; DELETE FROM schema_migrations WHERE version>=8;").unwrap();
             crate::migrations::migrate_schema(&db).unwrap();
             crate::migrations::verify_schema(&db).unwrap();
             let plan=db.prepare("EXPLAIN QUERY PLAN SELECT COUNT(*) FROM ai_attempts previous WHERE previous.operation_id = 'fixture' AND previous.started_at_unix_ms <= 1").unwrap().query_map([],|r|r.get::<_,String>(3)).unwrap().collect::<Result<Vec<_>,_>>().unwrap();
@@ -504,7 +504,7 @@ mod tests {
             .save_setting(&key, None, &serde_json::json!("corrupt"))
             .unwrap();
         let db = store.connection.lock().unwrap();
-        db.execute_batch("DROP TABLE ai_lifetime_totals; DROP TABLE ai_imported_guardrails; DROP INDEX ai_attempts_operation_order; DELETE FROM schema_migrations WHERE version=8;").unwrap();
+        db.execute_batch("DROP VIEW tracker_projection; DROP TRIGGER tracker_search_insert; DROP TRIGGER tracker_search_update; DROP TABLE tracker_search; DROP TABLE ai_lifetime_totals; DROP TABLE ai_imported_guardrails; DROP INDEX ai_attempts_operation_order; DELETE FROM schema_migrations WHERE version>=8;").unwrap();
         assert_eq!(
             crate::migrations::migrate_schema(&db),
             Err(StorageError::InvalidData)

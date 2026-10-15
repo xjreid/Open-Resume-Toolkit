@@ -160,7 +160,7 @@ it("edits rows directly, autosaves, and keeps content read-only", async () => {
       setInput.call(search, "Birch");
       search.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(companies()).toEqual(["Birch Labs"]);
+    await vi.waitFor(() => expect(companies()).toEqual(["Birch Labs"]));
     await act(async () => {
       setInput.call(search, "");
       search.dispatchEvent(new Event("input", { bubbles: true }));
@@ -578,5 +578,71 @@ it("expands overflowing links independently without changing their full targets 
     host.remove();
     width.mockRestore();
     scrollWidth.mockRestore();
+  }
+});
+
+it("coalesces search and fetches another page only on request", async () => {
+  let finishInitial: ((value: unknown) => void) | undefined;
+  const initial = new Promise((resolve) => {
+    finishInitial = resolve;
+  });
+  const page = Array.from({ length: 100 }, (_, index) =>
+    summary({
+      id: "page-" + index,
+      revision: 1,
+      value: { ...emptyTrackerEntry(), company: "Synthetic " + index },
+    }),
+  );
+  vi.mocked(invoke).mockImplementation(async (name, args) => {
+    if (name !== "list_tracker_entries") throw new Error("Unexpected command");
+    const query = args as { search: string; offset: number };
+    if (!query.search) return initial;
+    return { ok: true, value: query.offset === 0 ? page : [] };
+  });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () =>
+      root.render(<TrackerWorkspace active onDirtyChange={() => {}} />),
+    );
+    const search = host.querySelector<HTMLInputElement>(
+      'input[placeholder="Search all application columns"]',
+    )!;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    for (const text of ["S", "Synthetic"]) {
+      await act(async () => {
+        setter.call(search, text);
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+    await act(async () => finishInitial?.({ ok: true, value: page }));
+    expect(vi.mocked(invoke)).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    expect(vi.mocked(invoke)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(invoke)).toHaveBeenLastCalledWith(
+      "list_tracker_entries",
+      expect.objectContaining({ search: "Synthetic", offset: 0 }),
+    );
+    const next = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "Next page",
+    )!;
+    await act(async () => next.click());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    expect(vi.mocked(invoke)).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(invoke)).toHaveBeenLastCalledWith(
+      "list_tracker_entries",
+      expect.objectContaining({ search: "Synthetic", offset: 100 }),
+    );
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
   }
 });

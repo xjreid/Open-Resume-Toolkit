@@ -40,7 +40,7 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 
 ### AI credential, cost, and quota abuse
 
-- API keys and Codex tokens use the OS credential store and never enter content records, activity rows, guardrail state, logs, backups, exports, extension messages, or diagnostics.
+- API keys use the OS credential store; Codex authorization stays only in the supervised process memory. Neither enters content records, activity rows, guardrail state, logs, backups, exports, extension messages, or diagnostics.
 - Direct keys receive random local identities; ORT does not persist key prefixes or hashes as identifiers.
 - Spending caps use atomic reservations and durable counters so concurrent dispatch, retry, crash recovery, activity deletion, clock changes, and migration cannot bypass them.
 - A configured hard cap fails closed when price, currency, usage, or reservation state cannot be evaluated. An unknown provider outcome is never treated as free.
@@ -48,7 +48,7 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 
 ### Codex app-server containment
 
-- ORT uses managed ChatGPT authentication in an ORT-specific configuration/authentication root and keyring namespace. It never asks for a password, scrapes cookies, imports a general-purpose Codex authentication file, or changes another Codex client's model, plugin, permission, or login configuration.
+- ORT uses managed ChatGPT authentication in an ORT-specific configuration root with ephemeral memory-only authorization. It has no credential-file or keyring fallback; Stop server, quit, and process replacement end authorization. It never asks for a password, scrapes cookies, imports a general-purpose Codex authentication file, or changes another Codex client's model, plugin, permission, or login configuration.
 - Each operation runs in an empty ORT-owned scratch directory under a process-level sandbox with restricted read-only filesystem access and provider-only network egress. ORT configures no dynamic tools, web, MCP, app, plugin, skill, or collaboration access, sets approval policy to never, and interrupts/fails on any command, file-change, tool, web, connector, or permission event.
 - The separately installed app-server executable and protocol are identity/version/capability checked before use; the supported version window is explicit, and unexpected model rerouting or tool activity fails the operation rather than broadening access.
 - The integration accepts only reviewed input and validated structured final output. Codex threads and scratch content follow bounded cleanup rules and do not become a second resume store.

@@ -37,6 +37,8 @@ mod codex_runtime;
 mod codex_session;
 mod codex_transport;
 mod data_deletion;
+#[cfg(target_os = "macos")]
+mod drag_artifacts;
 mod import_review;
 mod menu;
 mod overlay_position;
@@ -398,12 +400,17 @@ fn initialize_storage(app: &AppHandle) -> DesktopStorage {
     if !development_identity_allowed(&app.config().identifier) {
         return DesktopStorage::Unavailable;
     }
-    let Ok(app_data) = app.path().app_data_dir() else {
+    let Some(owner) = app.try_state::<ort_storage::ProfileLifecycle>() else {
         return DesktopStorage::Unavailable;
     };
-    let profile_root = app_data.join("profiles").join("default");
+    let profile_root = owner.root();
     let vault = OsDatabaseKeyVault::new();
-    match EncryptedStore::open_or_activate_pending_restore(&profile_root, "dev", &vault) {
+    match EncryptedStore::open_or_activate_pending_restore(
+        profile_root,
+        owner.channel(),
+        &vault,
+        &ort_vault::OsProviderCredentialVault::new(),
+    ) {
         Ok((store, _activated_restore)) => {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -664,6 +671,10 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            if development_identity_allowed(&app.config().identifier) {
+                let root = app.path().app_data_dir()?.join("profiles").join("default");
+                app.manage(ort_storage::ProfileLifecycle::acquire(&root, "dev")?);
+            }
             #[cfg(target_os = "macos")]
             {
                 application_exports::DragFiles::sweep_stale();

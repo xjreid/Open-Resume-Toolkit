@@ -6,8 +6,8 @@ identity and controls are separate from the exported document styles.
 
 - `AppShell.tsx` owns the shared brand, destination navigation, status slot, and
   persistent navigation rail. Add a destination to `WORKSPACE_DESTINATIONS` only when
-  its workspace is implemented. Future application, tracker, and monitoring
-  workspaces should use this shell rather than add tools to the resume editor.
+  its workspace is implemented. The implemented tracker and My Keys/Codex/Data workspaces use this shell rather
+  than add tools to the resume editor.
 - `App.tsx` composes the workspaces and resume workflow controls.
   `use-resume-session.ts` owns loading, editing, health, save/publish and export.
   `ResumeCanvas`, `PublishedResume` and editor controls are leaf modules shared
@@ -37,7 +37,8 @@ Canonical application models belong to `ort-domain`; typed encrypted workflow
 services and artifact-source projection belong to `ort-application`. Tauri
 commands retain authorization and native handles. Application artifact cache
 keys include the active profile UUID, revision and material kind. Tracker lists
-project bounded metadata pages; retained content is fetched by indexed ID only
+project bounded metadata pages through background work and a transactional search
+projection; the table coalesces search changes and loads 100 rows per page; retained content is fetched by indexed ID only
 when a detail view or point operation needs it.
 
 Contract generation requires the installed workspace Prettier binary for stable

@@ -21,7 +21,9 @@ use ort_backup::{
 use ort_domain::{
     DocumentLimits, ExportSource, MAX_PDF_BYTES, MAX_PDF_PAGES, PdfRenderReceipt, ResumeDocument,
 };
-use ort_vault::{DatabaseKey, DatabaseKeyVault, VaultError, VaultReference};
+use ort_vault::{
+    DatabaseKey, DatabaseKeyVault, ProviderCredentialVault, VaultError, VaultReference,
+};
 use rusqlite::{
     Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior, backup, params,
 };
@@ -32,7 +34,11 @@ use zeroize::Zeroize;
 
 pub mod ai_activity;
 pub mod ai_ledger;
+mod lifecycle;
 mod migrations;
+mod portable;
+mod retirement;
+pub use lifecycle::ProfileLifecycle;
 mod resume_scoped;
 pub mod tracker;
 
@@ -63,6 +69,8 @@ fn setting_size_limit(key: &str) -> usize {
 const AI_CONNECTION_SETTING_KEY: &str = "ai.connection.v1";
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum StorageError {
+    #[error("the profile is already owned by another process")]
+    ProfileInUse,
     #[error("the storage location is unsafe")]
     UnsafeLocation,
     #[error("storage initialization was interrupted")]
@@ -255,18 +263,19 @@ impl EncryptedStore {
     /// # Errors
     /// Returns a safe storage error for malformed recovery state or an
     /// unavailable/invalid encrypted profile.
-    pub fn open_or_activate_pending_restore(
+    pub fn open_or_activate_pending_restore<P: ProviderCredentialVault>(
         root: &Path,
         channel: &str,
         vault: &dyn DatabaseKeyVault,
+        provider_vault: &P,
     ) -> Result<(Self, bool), StorageError> {
         let Some(parent) = root.parent() else {
             return Err(StorageError::UnsafeLocation);
         };
         validate_active_profile_root(root)?;
         reject_directory_symlink(root)?;
-        recover_pending_all_data_deletion(root, channel, vault)?;
-        recover_pending_safety_deletion(parent, channel, vault)?;
+        recover_pending_all_data_deletion(root, channel, vault, provider_vault)?;
+        recover_pending_safety_deletion(parent, channel, vault, provider_vault)?;
         recover_initialization_marker(root, channel, vault)?;
         let marker = parent.join(RESTORE_MARKER_FILENAME);
         match fs::symlink_metadata(&marker) {
@@ -1406,28 +1415,6 @@ impl EncryptedStore {
             .transpose()
     }
 
-    /// Creates a password-protected portable backup containing canonical
-    /// records but no database key, vault reference, or diagnostics.
-    ///
-    /// # Errors
-    /// Returns an error when records are invalid or encryption is unavailable.
-    pub fn create_portable_backup(
-        &self,
-        passphrase: &BackupPassphrase,
-        app_version: &str,
-    ) -> Result<Vec<u8>, StorageError> {
-        let profile = self.read_portable_profile()?;
-        create_backup(
-            passphrase,
-            BackupExportRequestV1 {
-                app_version: app_version.to_owned(),
-                created_at: now_string(),
-                profile,
-            },
-        )
-        .map_err(|error| map_backup_write_error(&error))
-    }
-
     /// Restores a portable backup into an otherwise empty, newly encrypted
     /// profile. The destination retains its independently generated local
     /// database key and vault identity.
@@ -1697,10 +1684,11 @@ impl EncryptedStore {
     /// # Errors
     /// Refuses overlapping recovery state and fails closed on unsafe paths,
     /// integrity failures, or unavailable vault/filesystem operations.
-    pub fn delete_retained_safety_copy(
+    pub fn delete_retained_safety_copy<P: ProviderCredentialVault>(
         &self,
         channel: &str,
         vault: &dyn DatabaseKeyVault,
+        provider_vault: &P,
     ) -> Result<bool, StorageError> {
         let root = self
             .database_path
@@ -1715,7 +1703,7 @@ impl EncryptedStore {
             return Err(StorageError::RevisionConflict);
         }
         if known_optional_directory(&deleting)? {
-            recover_pending_safety_deletion(parent, channel, vault)?;
+            recover_pending_safety_deletion(parent, channel, vault, provider_vault)?;
         }
         if !known_optional_directory(&safety)? {
             return Ok(false);
@@ -1730,7 +1718,7 @@ impl EncryptedStore {
         sync_directory(parent)?;
         #[cfg(all(test, target_os = "macos"))]
         native_qualification::crash_checkpoint("safety-delete-renamed");
-        recover_pending_safety_deletion(parent, channel, vault)?;
+        recover_pending_safety_deletion(parent, channel, vault, provider_vault)?;
         Ok(true)
     }
 
@@ -1756,10 +1744,11 @@ impl EncryptedStore {
     /// # Errors
     /// Returns an error only before destructive intent is durably committed;
     /// later incomplete cleanup is returned as `CleanupPending`.
-    pub fn delete_all_local_data(
+    pub fn delete_all_local_data<P: ProviderCredentialVault>(
         root: &Path,
         channel: &str,
         vault: &dyn DatabaseKeyVault,
+        provider_vault: &P,
     ) -> Result<AllLocalDataDeletion, StorageError> {
         validate_channel(channel)?;
         validate_active_profile_root(root)?;
@@ -1777,180 +1766,11 @@ impl EncryptedStore {
             native_qualification::crash_checkpoint("delete-intent");
         }
         Ok(
-            match recover_pending_all_data_deletion(root, channel, vault) {
+            match recover_pending_all_data_deletion(root, channel, vault, provider_vault) {
                 Ok(()) => AllLocalDataDeletion::Deleted,
                 Err(_) => AllLocalDataDeletion::CleanupPending,
             },
         )
-    }
-
-    #[allow(clippy::too_many_lines)]
-    fn read_portable_profile(&self) -> Result<PortableProfileV1, StorageError> {
-        let mut connection = self
-            .connection
-            .lock()
-            .map_err(|_| StorageError::Unavailable)?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Deferred)
-            .map_err(|_| StorageError::Unavailable)?;
-        let master_draft = transaction
-            .query_row(
-                "SELECT revision, document_json FROM resume_drafts WHERE profile_id = ?1",
-                [self.manifest.profile_id.to_string()],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?)),
-            )
-            .optional()
-            .map_err(|_| StorageError::Unavailable)?
-            .map(|(revision, json)| {
-                Ok(PortableResumeRevisionV1 {
-                    revision,
-                    document: parse_document(&json)?,
-                })
-            })
-            .transpose()?;
-
-        let published_resumes = {
-            let mut statement = transaction
-                .prepare(
-                    "SELECT published_revision, draft_revision, document_json \
-                     FROM published_resumes WHERE profile_id = ?1 \
-                     ORDER BY published_revision",
-                )
-                .map_err(|_| StorageError::Unavailable)?;
-            statement
-                .query_map([self.manifest.profile_id.to_string()], |row| {
-                    Ok((
-                        row.get::<_, i64>(0)?,
-                        row.get::<_, i64>(1)?,
-                        row.get::<_, Vec<u8>>(2)?,
-                    ))
-                })
-                .map_err(|_| StorageError::Unavailable)?
-                .map(|row| {
-                    let (published_revision, draft_revision, json) =
-                        row.map_err(|_| StorageError::Unavailable)?;
-                    Ok(PortablePublishedResumeV1 {
-                        published_revision,
-                        draft_revision,
-                        document: parse_document(&json)?,
-                    })
-                })
-                .collect::<Result<Vec<_>, StorageError>>()?
-        };
-
-        let settings = {
-            let mut statement = transaction
-                .prepare(
-                    "SELECT setting_key, revision, value_json FROM settings \
-                     WHERE profile_id = ?1 ORDER BY setting_key",
-                )
-                .map_err(|_| StorageError::Unavailable)?;
-            statement
-                .query_map([self.manifest.profile_id.to_string()], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, i64>(1)?,
-                        row.get::<_, Vec<u8>>(2)?,
-                    ))
-                })
-                .map_err(|_| StorageError::Unavailable)?
-                .map(|row| {
-                    let (key, revision, json) = row.map_err(|_| StorageError::Unavailable)?;
-                    validate_setting_key(&key)?;
-                    let value =
-                        serde_json::from_slice(&json).map_err(|_| StorageError::InvalidData)?;
-                    Ok((key, PortableSettingV1 { revision, value }))
-                })
-                .collect::<Result<BTreeMap<_, _>, StorageError>>()?
-        };
-        let mut settings = settings;
-        settings.remove(AI_CONNECTION_SETTING_KEY);
-        settings.remove("ai.chatgpt_plan.v1");
-        let tracker_entries = {
-            let mut statement = transaction.prepare(
-                "SELECT entry_id, revision, entry_json FROM tracker_entries WHERE profile_id = ?1 ORDER BY entry_id",
-            ).map_err(|_| StorageError::Unavailable)?;
-            statement
-                .query_map([self.manifest.profile_id.to_string()], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, i64>(1)?,
-                        row.get::<_, Vec<u8>>(2)?,
-                    ))
-                })
-                .map_err(|_| StorageError::Unavailable)?
-                .map(|row| {
-                    let (id, revision, bytes) = row.map_err(|_| StorageError::Unavailable)?;
-                    let value =
-                        serde_json::from_slice(&bytes).map_err(|_| StorageError::InvalidData)?;
-                    Ok(PortableTrackerEntryV1 {
-                        id,
-                        revision,
-                        value,
-                    })
-                })
-                .collect::<Result<Vec<_>, StorageError>>()?
-        };
-        let render_manifests =
-            read_portable_render_manifests(&transaction, &self.manifest.profile_id.to_string())?;
-        let ai_operations = {
-            let mut statement = transaction
-                .prepare(
-                    "SELECT operation_id, operation_type, started_at_unix_ms, ended_at_unix_ms,
-                    status, cancelled FROM ai_operations WHERE profile_id = ?1
-                    ORDER BY started_at_unix_ms, operation_id",
-                )
-                .map_err(|_| StorageError::Unavailable)?;
-            statement
-                .query_map([self.manifest.profile_id.to_string()], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, i64>(2)?,
-                        row.get::<_, Option<i64>>(3)?,
-                        row.get::<_, String>(4)?,
-                        row.get::<_, i64>(5)?,
-                    ))
-                })
-                .map_err(|_| StorageError::Unavailable)?
-                .map(|row| {
-                    let (operation_id, operation_type, started, ended, status, cancelled) =
-                        row.map_err(|_| StorageError::Unavailable)?;
-                    Ok(PortableAiOperationV1 {
-                        operation_id,
-                        operation_type,
-                        started_at_unix_ms: u64::try_from(started)
-                            .map_err(|_| StorageError::InvalidData)?,
-                        ended_at_unix_ms: ended
-                            .map(u64::try_from)
-                            .transpose()
-                            .map_err(|_| StorageError::InvalidData)?,
-                        status,
-                        cancelled: cancelled == 1,
-                    })
-                })
-                .collect::<Result<Vec<_>, StorageError>>()?
-        };
-        let ai_attempts =
-            read_portable_ai_attempts(&transaction, &self.manifest.profile_id.to_string())?;
-        let ai_lifetime_totals =
-            ai_ledger::read_totals(&transaction, &self.manifest.profile_id.to_string())?;
-        let ai_guardrail_policies =
-            ai_ledger::read_policies(&transaction, &self.manifest.profile_id.to_string())?;
-        transaction
-            .commit()
-            .map_err(|_| StorageError::Unavailable)?;
-        Ok(PortableProfileV1 {
-            master_draft,
-            published_resumes,
-            settings,
-            tracker_entries,
-            render_manifests,
-            ai_operations,
-            ai_attempts,
-            ai_lifetime_totals,
-            ai_guardrail_policies,
-        })
     }
 
     /// Runs both `SQLCipher` authentication and SQLite structural checks.
@@ -2032,149 +1852,6 @@ fn known_file_bytes(path: &Path, required: bool) -> Result<u64, StorageError> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound && !required => Ok(0),
         Err(_) => Err(StorageError::Unavailable),
     }
-}
-
-#[allow(clippy::type_complexity, clippy::too_many_lines)]
-fn read_portable_ai_attempts(
-    transaction: &Transaction<'_>,
-    profile_id: &str,
-) -> Result<Vec<PortableAiAttemptV1>, StorageError> {
-    let mut statement = transaction
-        .prepare(
-            "SELECT attempt_id, operation_id, provider, credential_id, requested_model,
-            effective_model, preset_version, catalog_id, catalog_effective_from,
-            pricing_components_json, started_at_unix_ms, ended_at_unix_ms,
-            status, retry_of, usage_json, usage_complete, estimated_input_tokens,
-            reserved_cost_micros, settled_cost_micros, currency, estimate_completeness,
-            error_category, error_details_json, connection_source, reasoning, monetary_cost_tracking, reported_retries FROM ai_attempts WHERE profile_id = ?1
-            ORDER BY started_at_unix_ms, attempt_id",
-        )
-        .map_err(|_| StorageError::Unavailable)?;
-    statement
-        .query_map([profile_id], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, Option<String>>(5)?,
-                row.get::<_, String>(6)?,
-                row.get::<_, String>(7)?,
-                row.get::<_, String>(8)?,
-                row.get::<_, Vec<u8>>(9)?,
-                row.get::<_, i64>(10)?,
-                row.get::<_, Option<i64>>(11)?,
-                row.get::<_, String>(12)?,
-                row.get::<_, Option<String>>(13)?,
-                row.get::<_, Option<Vec<u8>>>(14)?,
-                row.get::<_, i64>(15)?,
-                row.get::<_, i64>(16)?,
-                row.get::<_, i64>(17)?,
-                row.get::<_, Option<i64>>(18)?,
-                row.get::<_, String>(19)?,
-                row.get::<_, String>(20)?,
-                row.get::<_, Option<String>>(21)?,
-                row.get::<_, Option<Vec<u8>>>(22)?,
-                row.get::<_, String>(23)?,
-                row.get::<_, Option<String>>(24)?,
-                row.get::<_, String>(25)?,
-                row.get::<_, u32>(26)?,
-            ))
-        })
-        .map_err(|_| StorageError::Unavailable)?
-        .map(|row| {
-            let (
-                attempt_id,
-                operation_id,
-                provider,
-                credential_id,
-                requested_model,
-                effective_model,
-                preset_version,
-                catalog_id,
-                catalog_effective_from,
-                pricing_components,
-                started,
-                ended,
-                status,
-                retry_of,
-                usage,
-                usage_complete,
-                estimated_input_tokens,
-                reserved_cost_micros,
-                settled_cost_micros,
-                currency,
-                estimate_completeness,
-                error_category,
-                error_details,
-                connection_source,
-                reasoning,
-                monetary_cost_tracking,
-                reported_retries,
-            ) = row.map_err(|_| StorageError::Unavailable)?;
-            let pricing_components =
-                serde_json::from_slice::<Vec<ort_ai::Price>>(&pricing_components)
-                    .map_err(|_| StorageError::InvalidData)?
-                    .into_iter()
-                    .map(|price| PortableAiPriceV1 {
-                        category: match price.category {
-                            ort_ai::PriceCategory::Input => "input",
-                            ort_ai::PriceCategory::CachedInput => "cached_input",
-                            ort_ai::PriceCategory::CacheWrite => "cache_write",
-                            ort_ai::PriceCategory::Output => "output",
-                            ort_ai::PriceCategory::Reasoning => "reasoning",
-                        }
-                        .into(),
-                        micros_per_million: price.micros_per_million,
-                    })
-                    .collect();
-            Ok(PortableAiAttemptV1 {
-                connection_source,
-                reasoning,
-                monetary_cost_tracking,
-                reported_retries,
-                attempt_id,
-                operation_id,
-                provider,
-                credential_id,
-                requested_model,
-                effective_model,
-                preset_version,
-                catalog_id,
-                catalog_effective_from,
-                pricing_components,
-                started_at_unix_ms: u64::try_from(started)
-                    .map_err(|_| StorageError::InvalidData)?,
-                ended_at_unix_ms: ended
-                    .map(u64::try_from)
-                    .transpose()
-                    .map_err(|_| StorageError::InvalidData)?,
-                status,
-                retry_of,
-                usage: usage
-                    .map(|bytes| serde_json::from_slice(&bytes))
-                    .transpose()
-                    .map_err(|_| StorageError::InvalidData)?,
-                usage_complete: usage_complete == 1,
-                estimated_input_tokens: u64::try_from(estimated_input_tokens)
-                    .map_err(|_| StorageError::InvalidData)?,
-                reserved_cost_micros: u64::try_from(reserved_cost_micros)
-                    .map_err(|_| StorageError::InvalidData)?,
-                settled_cost_micros: settled_cost_micros
-                    .map(u64::try_from)
-                    .transpose()
-                    .map_err(|_| StorageError::InvalidData)?,
-                currency,
-                estimate_completeness,
-                error_category,
-                error_details: error_details
-                    .map(|bytes| serde_json::from_slice(&bytes))
-                    .transpose()
-                    .map_err(|_| StorageError::InvalidData)?,
-            })
-        })
-        .collect()
 }
 
 fn restore_ai_activity(
@@ -2355,42 +2032,6 @@ fn restore_render_manifests(
             .map_err(|_| StorageError::Unavailable)?;
     }
     Ok(())
-}
-
-fn read_portable_render_manifests(
-    transaction: &Transaction<'_>,
-    profile_id: &str,
-) -> Result<Vec<PortableRenderManifestV1>, StorageError> {
-    let mut statement = transaction
-        .prepare(
-            "SELECT manifest_id, source, source_revision, generated_at_unix_ms, \
-             last_generated_at_unix_ms, render_count, document_sha256, \
-             document_schema_version, pdf_sha256, renderer_version, template_id, \
-             template_sha256, font_bundle_id, font_bundle_sha256, page_count, byte_count \
-             FROM render_manifests WHERE profile_id = ?1 \
-             ORDER BY last_generated_at_unix_ms DESC, manifest_id DESC \
-             LIMIT ?2",
-        )
-        .map_err(|_| StorageError::Unavailable)?;
-    statement
-        .query_map(
-            params![profile_id, MAX_RENDER_MANIFESTS + 1],
-            render_manifest_row,
-        )
-        .map_err(|_| StorageError::Unavailable)?
-        .map(|row| {
-            let stored = parse_render_manifest(row.map_err(|_| StorageError::Unavailable)?)?;
-            Ok(PortableRenderManifestV1 {
-                manifest_id: stored.manifest_id.to_string(),
-                source: stored.source,
-                source_revision: stored.source_revision,
-                generated_at_unix_ms: stored.generated_at_unix_ms,
-                last_generated_at_unix_ms: stored.last_generated_at_unix_ms,
-                render_count: stored.render_count,
-                receipt: stored.receipt,
-            })
-        })
-        .collect()
 }
 
 type RenderManifestRow = (
@@ -2946,10 +2587,11 @@ fn validate_all_data_deletion_targets(
     Ok(references)
 }
 
-fn recover_pending_all_data_deletion(
+fn recover_pending_all_data_deletion<P: ProviderCredentialVault>(
     root: &Path,
     channel: &str,
     vault: &dyn DatabaseKeyVault,
+    provider_vault: &P,
 ) -> Result<(), StorageError> {
     let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
     let marker = parent.join(DELETE_ALL_MARKER_FILENAME);
@@ -2958,6 +2600,18 @@ fn recover_pending_all_data_deletion(
     }
     validate_delete_all_marker(&marker)?;
     let references = validate_all_data_deletion_targets(root, channel, false)?;
+    // Inventory every still-readable profile before removing any database key.
+    for candidate in all_data_profile_roots(root)? {
+        if known_optional_file(&candidate.join(MANIFEST_FILENAME))? {
+            retirement::prepare(&candidate, channel, vault)?;
+        }
+    }
+    for candidate in all_data_profile_roots(root)? {
+        if known_optional_file(&candidate.join(MANIFEST_FILENAME))? {
+            let manifest = read_manifest(&candidate.join(MANIFEST_FILENAME), channel)?;
+            retirement::remove_credentials(&candidate, &manifest, provider_vault)?;
+        }
+    }
 
     // Resolve every reference before deleting any manifest. Missing credentials
     // are success so an interrupted deletion remains idempotent.
@@ -2981,10 +2635,11 @@ fn recover_pending_all_data_deletion(
     sync_directory(parent)
 }
 
-fn recover_pending_safety_deletion(
+fn recover_pending_safety_deletion<P: ProviderCredentialVault>(
     parent: &Path,
     channel: &str,
     vault: &dyn DatabaseKeyVault,
+    provider_vault: &P,
 ) -> Result<(), StorageError> {
     let deleting = parent.join(SAFETY_DELETE_DIRECTORY);
     if !known_optional_directory(&deleting)? {
@@ -2992,14 +2647,18 @@ fn recover_pending_safety_deletion(
     }
     let manifest_path = deleting.join(MANIFEST_FILENAME);
     if !known_optional_file(&manifest_path)? {
-        let mut entries = fs::read_dir(&deleting).map_err(|_| StorageError::Unavailable)?;
-        if entries.next().is_some() {
-            return Err(StorageError::IncompleteInitialization);
+        for entry in fs::read_dir(&deleting).map_err(|_| StorageError::Unavailable)? {
+            let name = entry.map_err(|_| StorageError::Unavailable)?.file_name();
+            if name != retirement::INVENTORY && name != retirement::INVENTORY_TMP {
+                return Err(StorageError::IncompleteInitialization);
+            }
         }
-        fs::remove_dir(&deleting).map_err(|_| StorageError::Unavailable)?;
+        cleanup_profile_directory(&deleting)?;
         return sync_directory(parent);
     }
     let manifest = read_manifest(&manifest_path, channel)?;
+    retirement::prepare(&deleting, channel, vault)?;
+    retirement::remove_credentials(&deleting, &manifest, provider_vault)?;
     let reference = manifest.vault_reference()?;
     vault
         .delete(&reference)
@@ -3013,13 +2672,17 @@ fn cleanup_profile_directory(root: &Path) -> Result<(), StorageError> {
     let database = root.join(DATABASE_FILENAME);
     remove_exact_database_files(&database)?;
     for name in [
-        MANIFEST_FILENAME,
         PREVIOUS_MANIFEST_FILENAME,
         MANIFEST_UPDATE_FILENAME,
         INITIALIZATION_MARKER_FILENAME,
     ] {
         remove_exact_optional_file(&root.join(name))?;
     }
+    // Manifest removal commits completion. Keep the durable inventory until then.
+    remove_exact_optional_file(&root.join(MANIFEST_FILENAME))?;
+    sync_directory(root)?;
+    remove_exact_optional_file(&root.join(retirement::INVENTORY))?;
+    remove_exact_optional_file(&root.join(retirement::INVENTORY_TMP))?;
     fs::remove_dir(root).map_err(|_| StorageError::Unavailable)
 }
 
@@ -3044,6 +2707,8 @@ fn validate_cleanup_profile_directory(root: &Path) -> Result<(), StorageError> {
                 | PREVIOUS_MANIFEST_FILENAME
                 | MANIFEST_UPDATE_FILENAME
                 | INITIALIZATION_MARKER_FILENAME
+                | retirement::INVENTORY
+                | retirement::INVENTORY_TMP
         ) {
             return Err(StorageError::UnsafeLocation);
         }
@@ -3661,7 +3326,7 @@ mod tests {
         let store = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("initialize encrypted store");
         let empty = store.storage_usage().expect("empty usage");
-        assert_eq!(empty.database_schema, 8);
+        assert_eq!(empty.database_schema, 9);
         assert_eq!(empty.drafts, 0);
         assert_eq!(empty.published_snapshots, 0);
         assert_eq!(empty.settings, 0);
@@ -3864,7 +3529,7 @@ mod tests {
                     "INSERT INTO schema_migrations \
                      (version, checksum_sha256, minimum_app_version, estimated_disk_bytes, \
                       requires_safety_copy, applied_at) \
-                     VALUES (9, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
+                     VALUES (10, 'synthetic-newer', '9.0.0', 0, 0, ?1)",
                     [super::now_string()],
                 )
                 .expect("seed newer schema marker");
@@ -3922,7 +3587,7 @@ mod tests {
             let connection = store.connection.lock().expect("lock test connection");
             connection
                 .execute_batch(
-                    "DROP TABLE ai_lifetime_totals;
+                    "DROP VIEW tracker_projection; DROP TRIGGER tracker_search_insert; DROP TRIGGER tracker_search_update; DROP TABLE tracker_search; DROP TABLE ai_lifetime_totals;
                      DROP TABLE ai_imported_guardrails;
                      DROP TABLE tracker_entries;
                      DROP TABLE ai_guardrail_policies;
@@ -3948,7 +3613,7 @@ mod tests {
 
         let upgraded = EncryptedStore::open_or_initialize(temporary.path(), "test", &vault)
             .expect("upgrade schema v1 profile");
-        assert_eq!(upgraded.manifest().schema_version, 8);
+        assert_eq!(upgraded.manifest().schema_version, 9);
         assert_eq!(
             upgraded
                 .load_draft()
@@ -3966,7 +3631,7 @@ mod tests {
             .expect("query migration versions")
             .collect::<Result<_, _>>()
             .expect("collect migration versions");
-        assert_eq!(versions, vec![1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(versions, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
     }
 
     #[test]
@@ -4744,9 +4409,13 @@ mod tests {
         assert!(temporary.path().join(RESTORE_STAGING_DIRECTORY).is_dir());
         drop(active);
 
-        let (restored, activated) =
-            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault)
-                .expect("activate replacement");
+        let (restored, activated) = EncryptedStore::open_or_activate_pending_restore(
+            &active_root,
+            "test",
+            &vault,
+            &ort_vault::testing::MemoryProviderCredentialVault::new(),
+        )
+        .expect("activate replacement");
         assert!(activated);
         assert_eq!(
             restored.load_draft().unwrap().unwrap().document.title,
@@ -4787,8 +4456,13 @@ mod tests {
         drop(staged);
         drop(active);
 
-        let (reopened, activated) =
-            EncryptedStore::open_or_activate_pending_restore(&root, "test", &vault).unwrap();
+        let (reopened, activated) = EncryptedStore::open_or_activate_pending_restore(
+            &root,
+            "test",
+            &vault,
+            &ort_vault::testing::MemoryProviderCredentialVault::new(),
+        )
+        .unwrap();
         assert!(!activated);
         assert!(!staging.exists());
         assert!(vault.load(&staged_reference).is_err());
@@ -4820,7 +4494,13 @@ mod tests {
         drop(safety_store);
         drop(active);
 
-        EncryptedStore::open_or_activate_pending_restore(&root, "test", &vault).unwrap();
+        EncryptedStore::open_or_activate_pending_restore(
+            &root,
+            "test",
+            &vault,
+            &ort_vault::testing::MemoryProviderCredentialVault::new(),
+        )
+        .unwrap();
         assert!(!staging.exists());
         assert!(vault.load(&safety_reference).is_ok());
         EncryptedStore::open_or_initialize(&safety, "test", &vault)
@@ -4860,9 +4540,13 @@ mod tests {
         cleanup_profile_directory(&staging).unwrap();
         vault.delete(&staged_reference).unwrap();
 
-        let (recovered, activated) =
-            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault)
-                .expect("rollback previous profile");
+        let (recovered, activated) = EncryptedStore::open_or_activate_pending_restore(
+            &active_root,
+            "test",
+            &vault,
+            &ort_vault::testing::MemoryProviderCredentialVault::new(),
+        )
+        .expect("rollback previous profile");
         assert!(!activated);
         assert_eq!(
             recovered.load_draft().unwrap().unwrap().document.title,
@@ -4884,13 +4568,25 @@ mod tests {
         let marker = temporary.path().join(RESTORE_MARKER_FILENAME);
         symlink(temporary.path().join("missing"), &marker).unwrap();
         assert_eq!(
-            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).err(),
+            EncryptedStore::open_or_activate_pending_restore(
+                &active_root,
+                "test",
+                &vault,
+                &ort_vault::testing::MemoryProviderCredentialVault::new()
+            )
+            .err(),
             Some(StorageError::UnsafeLocation)
         );
         fs::remove_file(&marker).unwrap();
         fs::write(&marker, vec![b'x'; 65]).unwrap();
         assert_eq!(
-            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).err(),
+            EncryptedStore::open_or_activate_pending_restore(
+                &active_root,
+                "test",
+                &vault,
+                &ort_vault::testing::MemoryProviderCredentialVault::new()
+            )
+            .err(),
             Some(StorageError::IncompleteInitialization)
         );
         assert!(active_root.is_dir());
@@ -4935,9 +4631,13 @@ mod tests {
         );
         drop(active);
 
-        let (rolled_back, activated) =
-            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault)
-                .expect("activate rollback");
+        let (rolled_back, activated) = EncryptedStore::open_or_activate_pending_restore(
+            &active_root,
+            "test",
+            &vault,
+            &ort_vault::testing::MemoryProviderCredentialVault::new(),
+        )
+        .expect("activate rollback");
         assert!(activated);
         assert_eq!(
             rolled_back.load_draft().unwrap().unwrap().document.title,
@@ -4978,7 +4678,11 @@ mod tests {
 
         assert!(
             active
-                .delete_retained_safety_copy("test", &vault)
+                .delete_retained_safety_copy(
+                    "test",
+                    &vault,
+                    &ort_vault::testing::MemoryProviderCredentialVault::new()
+                )
                 .expect("delete retained safety")
         );
         assert!(!safety_root.exists());
@@ -4988,7 +4692,15 @@ mod tests {
             active.load_draft().unwrap().unwrap().document.title,
             "Active profile"
         );
-        assert!(!active.delete_retained_safety_copy("test", &vault).unwrap());
+        assert!(
+            !active
+                .delete_retained_safety_copy(
+                    "test",
+                    &vault,
+                    &ort_vault::testing::MemoryProviderCredentialVault::new()
+                )
+                .unwrap()
+        );
     }
 
     #[test]
@@ -5008,9 +4720,13 @@ mod tests {
         fs::rename(&safety_root, &deleting).unwrap();
         drop(active);
 
-        let (reopened, activated) =
-            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault)
-                .expect("resume safety deletion before opening active");
+        let (reopened, activated) = EncryptedStore::open_or_activate_pending_restore(
+            &active_root,
+            "test",
+            &vault,
+            &ort_vault::testing::MemoryProviderCredentialVault::new(),
+        )
+        .expect("resume safety deletion before opening active");
         assert!(!activated);
         assert!(!deleting.exists());
         assert!(vault.load(&safety_reference).is_err());
@@ -5040,7 +4756,11 @@ mod tests {
             Err(StorageError::InvalidData)
         );
         assert_eq!(
-            active.delete_retained_safety_copy("test", &vault),
+            active.delete_retained_safety_copy(
+                "test",
+                &vault,
+                &ort_vault::testing::MemoryProviderCredentialVault::new()
+            ),
             Err(StorageError::InvalidData)
         );
         assert!(vault.load(&active_reference).is_ok());
@@ -5086,7 +4806,12 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            EncryptedStore::delete_all_local_data(&active_root, "test", &vault),
+            EncryptedStore::delete_all_local_data(
+                &active_root,
+                "test",
+                &vault,
+                &ort_vault::testing::MemoryProviderCredentialVault::new()
+            ),
             Ok(AllLocalDataDeletion::Deleted)
         );
         for path in [&active_root, &safety_root, &staged_root] {
@@ -5105,8 +4830,13 @@ mod tests {
             b"keep unrelated data"
         );
 
-        let (fresh, activated) =
-            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).unwrap();
+        let (fresh, activated) = EncryptedStore::open_or_activate_pending_restore(
+            &active_root,
+            "test",
+            &vault,
+            &ort_vault::testing::MemoryProviderCredentialVault::new(),
+        )
+        .unwrap();
         assert!(!activated);
         assert_ne!(fresh.manifest().install_id, old_install_id);
         assert!(fresh.load_draft().unwrap().is_none());
@@ -5132,7 +4862,12 @@ mod tests {
 
         vault.fail_delete.store(true, Ordering::Release);
         assert_eq!(
-            EncryptedStore::delete_all_local_data(&active_root, "test", &vault),
+            EncryptedStore::delete_all_local_data(
+                &active_root,
+                "test",
+                &vault,
+                &ort_vault::testing::MemoryProviderCredentialVault::new()
+            ),
             Ok(AllLocalDataDeletion::CleanupPending)
         );
         assert!(temporary.path().join(DELETE_ALL_MARKER_FILENAME).is_file());
@@ -5140,8 +4875,13 @@ mod tests {
         assert!(vault.load(&active_reference).is_ok());
 
         vault.fail_delete.store(false, Ordering::Release);
-        let (fresh, activated) =
-            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).unwrap();
+        let (fresh, activated) = EncryptedStore::open_or_activate_pending_restore(
+            &active_root,
+            "test",
+            &vault,
+            &ort_vault::testing::MemoryProviderCredentialVault::new(),
+        )
+        .unwrap();
         assert!(!activated);
         assert!(fresh.load_draft().unwrap().is_none());
         assert_eq!(
@@ -5185,12 +4925,19 @@ mod tests {
 
         // Model interruption after the complete key phase and the first exact
         // directory removal, before remaining profiles/markers are removed.
+        retirement::prepare(&active_root, "test", &vault).unwrap();
+        retirement::prepare(&safety_root, "test", &vault).unwrap();
         vault.delete(&active_reference).unwrap();
         vault.delete(&safety_reference).unwrap();
         cleanup_profile_directory(&active_root).unwrap();
 
-        let (fresh, activated) =
-            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).unwrap();
+        let (fresh, activated) = EncryptedStore::open_or_activate_pending_restore(
+            &active_root,
+            "test",
+            &vault,
+            &ort_vault::testing::MemoryProviderCredentialVault::new(),
+        )
+        .unwrap();
         assert!(!activated);
         assert!(fresh.load_draft().unwrap().is_none());
         assert!(!safety_root.exists());
@@ -5216,7 +4963,12 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            EncryptedStore::delete_all_local_data(&active_root, "test", &vault),
+            EncryptedStore::delete_all_local_data(
+                &active_root,
+                "test",
+                &vault,
+                &ort_vault::testing::MemoryProviderCredentialVault::new()
+            ),
             Err(StorageError::UnsafeLocation)
         );
         assert!(!temporary.path().join(DELETE_ALL_MARKER_FILENAME).exists());
@@ -5235,7 +4987,12 @@ mod tests {
         fs::write(active_root.join("unexpected.txt"), b"do not delete").unwrap();
 
         assert_eq!(
-            EncryptedStore::delete_all_local_data(&active_root, "test", &vault),
+            EncryptedStore::delete_all_local_data(
+                &active_root,
+                "test",
+                &vault,
+                &ort_vault::testing::MemoryProviderCredentialVault::new()
+            ),
             Err(StorageError::UnsafeLocation)
         );
         assert!(active_root.join("unexpected.txt").is_file());
@@ -5261,7 +5018,13 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            EncryptedStore::open_or_activate_pending_restore(&active_root, "test", &vault).err(),
+            EncryptedStore::open_or_activate_pending_restore(
+                &active_root,
+                "test",
+                &vault,
+                &ort_vault::testing::MemoryProviderCredentialVault::new()
+            )
+            .err(),
             Some(StorageError::IncompleteInitialization)
         );
         assert!(active_root.is_dir());
@@ -5286,7 +5049,13 @@ mod tests {
             StorageError::UnsafeLocation
         );
         assert_eq!(
-            EncryptedStore::open_or_activate_pending_restore(&linked, "test", &vault).err(),
+            EncryptedStore::open_or_activate_pending_restore(
+                &linked,
+                "test",
+                &vault,
+                &ort_vault::testing::MemoryProviderCredentialVault::new()
+            )
+            .err(),
             Some(StorageError::UnsafeLocation)
         );
     }

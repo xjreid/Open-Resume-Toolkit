@@ -14,7 +14,7 @@ ORT provides one familiar structured resume editor rather than requiring users t
 
 ### Draft and publish
 
-- Each local profile has exactly one autosaved master-resume draft and at most one published master-resume snapshot.
+- Each local profile has exactly one autosaved master-resume draft and one current published master; earlier immutable publication revisions remain stored for replay and backup.
 - All ordinary editor changes save locally to the draft.
 - Undo and redo are editing conveniences, not a permanent user-visible version history.
 - The user deliberately selects **Publish master resume** when the draft is ready for tailoring.
@@ -151,7 +151,13 @@ Initial statuses are Applied, Online Assessment, Interview, Accepted, Rejected, 
 
 Fields may remain blank when the user does not know them. Selecting Other permits a bounded custom status label without replacing the stable underlying status code.
 
-Users can create entries manually, edit tracking fields, replace retained materials deliberately, delete individual materials, delete an entry with confirmation, filter/search locally, and export tracking data as CSV. Opening a retained resume or cover letter renders its structured snapshot on demand. Opening an answer set shows ordered questions and answers with copy/export controls.
+The current tracker creates entries manually, edits metadata inline, deletes an
+entry after confirmation, searches/filters locally, and exports the visible page
+as CSV. It loads at most 100 rows per page through background native reads.
+Opening a retained resume or cover letter renders its structured snapshot on
+demand; retained materials are read-only. Answer sets show ordered questions and
+answers. Deliberate replacement or per-material deletion/export remains future
+workflow design, not an available current control.
 
 ## AI Monitoring
 
@@ -160,7 +166,7 @@ The desktop application provides an aggregate **AI Monitoring** view for underst
 - A period control switches between **Week**, **Month**, **Year**, and **All time**.
 - The primary content is a token-over-time graph, an estimated-cost-over-time graph for direct API use, and total tokens/estimated cost for the selected period. Week and month use daily buckets; year and all time use monthly buckets unless all-time density requires an adaptive bucket.
 - Secondary aggregate breakdowns may group activity by provider, requested/effective model or preset, operation type, or status. Logical operations and attempts remain separately labeled so retries do not look like new user operations.
-- Direct API setup selects OpenAI, Anthropic, or Gemini, adds/tests a key, chooses a tested Economy/Balanced/Quality model, reviews current pricing, and optionally sets spending caps. Codex setup uses managed ChatGPT sign-in, chooses a tested returned model, and optionally sets provider-quota thresholds.
+- Direct API setup in My Keys selects OpenAI, Anthropic, or Gemini, adds/tests saved keys, chooses an explicit tested model ID, and optionally sets per-key/general all-time spending caps. Codex setup verifies installation, explicitly starts the server, uses managed ChatGPT sign-in, and selects a supported model/reasoning effort and usage reserve. Data supplies activity graphs and exports.
 - Codex monitoring shows available ORT thread tokens and provider-reported account token/quota windows with clear provenance instead of inventing an API-equivalent dollar cost. Mixed-mode data never adds Codex activity to direct-API cost.
 - Missing or unpriced measurements are marked partial or unavailable rather than zero. Provider billing links remain available, and estimated cost is never represented as an invoice or complete account statement.
 - Ordinary CSV/JSON export contains the selected aggregate buckets and non-content breakdowns. Attempt-level records remain internal for accounting, guardrails, recovery, and an explicitly requested scrubbed diagnostic export; they are not a primary browsable call table.
@@ -170,19 +176,22 @@ AI Monitoring covers every remote provider call made through ORT. Direct-API tot
 
 ## Settings and local status
 
-The desktop settings/status area shows without exposing secrets:
+Current Settings provides profile inventory, backup/validation/restart restore,
+safety-copy recovery/deletion, and delete-all controls. My Keys/Codex own AI
+configuration; the overlay owns browser status. The broader release settings
+design below is not a list of available current controls:
 
 - Application version, installation/update channel, signing status where available, last update check, and Check for updates.
 - Local profile storage use, storage location explanation, schema version, and data export/deletion actions.
 - Backup destination, encryption status, last successful backup, restore, and backup test/reminder state.
-- Active AI mode; direct provider/credential identity/model preset and caps, or Codex account connection/model/quota caps; connection test, current pricing-catalog or quota-refresh status, link to AI Monitoring, and replace/remove/sign-out actions. API keys and Codex tokens are never displayed.
+- Active AI mode; direct provider/credential identity/model ID and caps, or Codex account connection/model/usage reserve; connection test, current pricing-catalog or quota-refresh status, link to AI Monitoring, and replace/remove/sign-out actions. API keys and Codex tokens are never displayed.
 - Chrome and Edge extension/native-host connection, component versions, compatibility, installation links, disconnect, and repair.
 - Links to documentation, GitHub Issues/Discussions, privacy information, the GPL license, copyright and canonical-source attribution, third-party notices, the trademark policy, build provenance and official/preview status, and private security reporting.
 
 ## Deletion and uninstall
 
 - Discarding an application workspace permanently removes its temporary local content after confirmation.
-- Deleting a retained material leaves the tracker entry and other materials intact.
+- Per-material deletion is planned; current tracker deletion removes the entry and its retained snapshots together.
 - Deleting a tracker entry removes its associated snapshots after confirmation.
 - Clearing an AI Monitoring date range removes only the corresponding content-free activity records; it does not delete generated materials, reset guardrails, or affect provider-side billing records.
 - The settings area provides an explicit **Delete all local ORT data** action with a clear backup reminder and destructive confirmation.

@@ -32,7 +32,7 @@ A starting profile changes suggested sections only and never restricts later con
 - A persistent status distinguishes **Draft saved**, **Saving**, **Save failed**, and **Published master resume**.
 - Undo and redo are available for current editing.
 - The user explicitly publishes the validated draft when ready.
-- Publishing replaces the previous published snapshot atomically and does not create another master resume.
+- Publishing atomically replaces the current published association and does not create another editable master resume. Earlier immutable publications remain stored for replay and backup.
 - If unpublished changes exist, tailoring continues to use the last published snapshot and says so clearly.
 - A save or publish failure never discards the last valid draft or published snapshot.
 

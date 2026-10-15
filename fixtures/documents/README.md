@@ -6,8 +6,8 @@ All future PDF, DOCX, and text fixtures must be synthetic, contain no personal d
 
 The M2 output-only corpus is defined in
 `crates/ort-documents/tests/support/mod.rs`. Its eight cases cover standard,
-sparse, supported multilingual, code-like literal, dense four-page, omitted
-optional data, multi-section/field/link ordering, and exact two-page output.
+sparse, supported multilingual, code-like literal, dense multipage, omitted
+optional data, multi-section/field/link ordering, and explicit pagination.
 Only built-in synthetic content is used; this is output verification, not an
 input parser or hostile-file corpus.
 
@@ -23,14 +23,16 @@ plain-text parity. Updating a fixture or generator requires explicit review of
 all affected digests plus semantic, accessibility, and rendered-page evidence;
 baselines are never accepted automatically.
 
-## Provisional style audits
+## Reviewed style regression audits
 
 `cargo run --locked -p ort-render --example style_fixtures -- NEW_DIRECTORY`
 generates the same eight synthetic cases for technical, professional and modern
 PDF/DOCX styles. Run `node tools/verify-pdf-fixtures.mjs
 NEW_DIRECTORY/technical/pdf technical` and `python3 tools/verify-docx-fixtures.py
 NEW_DIRECTORY/technical/docx technical`, then repeat for professional and modern.
-The optional style argument checks the selected bundled template and independent
-content/structure constraints. It does not claim a reviewed new golden baseline.
-Omitting the argument still enforces the original plain golden hashes. New style
-goldens require final layout review and native reader qualification.
+The style argument checks the selected bundled template and independent
+content/structure constraints. `python3 tools/check-style-output.py` runs all
+three styles with v1/v2 sources and verifies 48 reviewed PDF/DOCX/text pairs
+against `styles-v1.sha256.json`. Omitting a style argument still enforces the
+original Plain fixture hashes. Hashes never replace semantic or native-reader
+qualification; changing a golden requires review of the actual output.

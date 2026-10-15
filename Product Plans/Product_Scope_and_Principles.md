@@ -80,7 +80,7 @@ The software may be used internationally, but documentation must not imply that 
 - Employer/recruiter features, applicant ranking, or hiring decisions.
 - Universal ATS scoring or employment predictions.
 - Firefox, Safari, Linux, or mobile support at initial launch.
-- Windows and Intel-Mac release qualification during the current macOS-arm64 M0-M2 phase.
+- Windows and Intel-Mac release qualification during the active macOS-arm64 development scope.
 - OCR for scanned resumes, local-model bundles, job-board notifications, reminders, calendars, or direct job-board integrations at initial launch.
 
 ## Canonical terms

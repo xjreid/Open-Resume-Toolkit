@@ -1,8 +1,14 @@
 # M2.5 — Usable desktop and resume designs
 
+The original visual brief below is retained as the M2.5 plan. Open Folio replaced
+Quiet Navy/Precision Workbench on October 4, 2026; use the
+[current aesthetic](../../Aesthetic/README.md), [DESIGN.md](../../DESIGN.md), and
+[implementation map](../../docs/development/current-state.md) for current UI work.
+This file is not a new delivery gate.
+
 ## Goal and place in delivery
 
-**Next milestone, before M3.** Turn the implemented offline capabilities into a
+**Historical milestone, accepted September 13, 2026.** Turn the implemented offline capabilities into a
 coherent, usable resume application. M0–M2 remain technically accepted; that
 acceptance did not establish visual readiness. M2.5 owns the overall layout,
 interaction design, approved aesthetic and professional resume output.

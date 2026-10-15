@@ -2,16 +2,23 @@
 
 ## Status and requirements
 
-- Status: approved baseline for Direct API and document work; Codex remains behind the containment gate
+- Status: Direct API/document paths and macOS Codex development integration implemented; production/platform qualification remains gated
 - Owner: AI/document maintainers
 - Milestones: M2–M6
 - Product authority: `../../Product Plans/AI_and_Import.md`, `Core_Workflows.md`, `Resume_Editor_and_Schema.md`, `Product_States_and_Operations.md`, and `Configuration_Limits_and_Defaults.md`
 
 Non-goals: hosted ORT keys, a proxy service, training on user content, auto-applying to jobs, inventing credentials, executing page instructions, or bundling Codex.
 
+The [current implementation map](../../docs/development/current-state.md) and
+[Codex runtime guide](../../docs/ai/codex-plan-runtime.md) describe implemented
+boundaries. Codex uses explicit Start/Stop server and memory-only authentication;
+it starts stopped on every app launch. Native helper identity pins gate reviewed
+metered-Wasm import. Older process/keyring sketches below do not authorize
+persistent Codex login or a legacy native-parser fallback.
+
 ## Shared operation architecture
 
-All AI work goes through `OperationCoordinator` and a common `AiBackend` port. UI code cannot call a provider or Codex directly.
+All AI work goes through desktop-native `ai_request` orchestration, typed application/domain services, and durable storage accounting. Direct adapters live in `ort-ai`; Codex runtime/session/transport ownership lives in desktop-native modules. The `OperationCoordinator`/`AiBackend` names below are conceptual boundary sketches, not current source symbols. UI code cannot call a provider or Codex directly.
 
 ```rust
 trait AiBackend {
@@ -61,9 +68,9 @@ Each adapter owns:
 
 Adapter endpoints and API versions are pinned in code/config for each release and verified against official provider documentation during catalog review. Redirects to a different host are denied. Credentials are fetched from the vault immediately before dispatch and never returned to callers.
 
-## Model presets and signed catalog
+## Explicit models, legacy preset metadata, and signed catalog
 
-Economy, Balanced, and Quality are product presets resolved by a signed catalog, not aliases permanently compiled to one model. Catalog records include:
+The current UI stores one explicit tested model ID per key. Economy, Balanced, and Quality remain legacy catalog/migration metadata, rather than the visible key selector. The signed catalog defines compatibility and pricing. Catalog records include:
 
 - format version, catalog ID, issued/effective/expires timestamps;
 - provider and exact model ID;
@@ -171,13 +178,22 @@ After response:
 - missing/partial usage is marked explicitly and settles conservatively under cap rules;
 - currencies are never summed into one total without an exchange source approved in product policy.
 
-Weekly/monthly/yearly/all-time periods use the user's recorded IANA time zone and store resolved UTC boundaries. Policy changes are revisioned. Notifications are local and idempotent at threshold crossings.
+Current per-key/general UI caps are all-time. Historical/imported calendar
+policies retain the recorded IANA time zone and resolved UTC boundaries in typed
+storage; they are not a current new-policy UI choice. Policy changes are
+revisioned. Notifications are local and idempotent at threshold crossings.
 
 ## External Codex adapter
 
 Use the official Codex app-server protocol over `stdio`, beginning with initialize/capability negotiation and the minimum thread/turn/account methods needed for ORT. WebSocket transport is not used for the initial implementation.
 
 ### Discovery and verification
+
+The numbered sequence is the general release design. Current macOS discovery
+uses canonical root-owned locations and the exact digest in
+`apps/desktop/src-tauri/codex-compatibility.json`. Check installation, the explicit
+installer, and Start/Stop server are the available UI; PATH/manual executable
+selection is not exposed. See the [runtime guide](../../docs/ai/codex-plan-runtime.md).
 
 1. Check documented canonical platform install locations and package receipts. A sanitized PATH result or explicit user-selected path is only a locator candidate.
 2. Resolve the canonical file and parent chain; reject symlink/reparse substitution, a writable download/temp/project/app-data location, unexpected ownership, or parent permissions that permit replacement by a less-trusted principal.
@@ -188,8 +204,8 @@ Use the official Codex app-server protocol over `stdio`, beginning with initiali
 ### Isolated runtime
 
 - separate ORT `CODEX_HOME`/configuration directory with user-only permissions;
-- credentials configured for keyring storage;
-- managed ChatGPT/device-code sign-in only for this product mode;
+- managed authorization configured for ephemeral memory only; persistent keyring/file overrides fail closed;
+- managed ChatGPT browser sign-in for this mode; no API-key credential or inherited user auth;
 - empty ORT-owned working directory, no resume paths, minimal environment and inherited handles;
 - approvals disabled and no tool/file/command/browser capability exposed;
 - experimental app-server capabilities disabled; no dynamic tools, MCP, apps, skills, collaboration, filesystem, command, shell-command, process, or permission-profile APIs configured;
@@ -199,7 +215,7 @@ Requests contain only the minimized prompt data through app-server messages. Par
 
 Account/rate-limit information from app-server is normalized into timestamped snapshots with source method, runtime version, bucket identity, reset time, and freshness. Local token totals are never presented as provider account quota.
 
-Codex remains runtime-disabled until the process-level network/filesystem
+Codex is available in the qualified macOS-arm64 development adapter only after the process-level network/filesystem
 enforcement review and bounded negative checks in the threat model pass on the
 active platform. Later platforms keep it disabled until the same focused check
 is completed when they are introduced. Compatibility loss disables new Codex

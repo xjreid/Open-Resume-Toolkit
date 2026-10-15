@@ -2,7 +2,7 @@
 use crate::{StorageError, now_string, verify_integrity};
 use rusqlite::{Connection, params};
 use sha2::{Digest, Sha256};
-pub(super) const SCHEMA_VERSION: i64 = 8;
+pub(super) const SCHEMA_VERSION: i64 = 9;
 
 pub(super) const MIGRATION_V1_SQL: &str = "CREATE TABLE schema_migrations (
          version INTEGER PRIMARY KEY,
@@ -166,6 +166,9 @@ CREATE TABLE ai_imported_guardrails (
     PRIMARY KEY(profile_id, import_id)
 ) STRICT;";
 
+// Derived search data is rebuilt from canonical records and never exported.
+pub(super) const MIGRATION_V9_SQL: &str = include_str!("tracker_search.sql");
+
 const MIGRATIONS: &[&str] = &[
     MIGRATION_V1_SQL,
     MIGRATION_V2_SQL,
@@ -175,6 +178,7 @@ const MIGRATIONS: &[&str] = &[
     MIGRATION_V6_SQL,
     MIGRATION_V7_SQL,
     MIGRATION_V8_SQL,
+    MIGRATION_V9_SQL,
 ];
 fn checksum(sql: &str) -> String {
     hex::encode(Sha256::digest(sql.as_bytes()))

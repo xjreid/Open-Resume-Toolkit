@@ -2,7 +2,7 @@
 
 ## Status and requirements
 
-- Status: approved baseline; SignPath application and Store/native-host probes outstanding
+- Status: local development packaging implemented; production release/update pipeline and signing/Store qualification planned
 - Owner: release maintainer
 - Milestone: M7, with preview packaging earlier
 - Product authority: `../../Product Plans/Distribution_and_Updates.md`, `Security_Privacy_and_Open_Source.md`, `Quality_Accessibility_and_Verification.md`, and `Release_Scope_and_Open_Decisions.md`
@@ -12,7 +12,7 @@ Codex is not included in any ORT installer. Users who select Codex mode install 
 Cross-platform source ownership, build targets, environment identities, CI stages, desktop-before-extension deployment order, and the M0 handoff are centralized in `../System Documentation/Development_and_Deployment_Outline.md`. This plan remains authoritative for packaging, signing, update trust, publication, and rollback mechanics.
 
 Only macOS Apple Silicon is an active development and preview-qualification
-target through M2. Windows and Intel/universal Mac sections are retained as
+target. Windows and Intel/universal Mac sections are retained as
 future channel designs. They do not create present native-test obligations or
 support claims, and their artifacts must not be published as qualified previews.
 
@@ -112,7 +112,13 @@ Provider/model/pricing catalogs are content-only signed assets, independently ve
 
 Emergency catalog disablement can prevent selection of a broken/retired model, but cannot change user documents or silently switch connection mode.
 
-## GitHub Actions release design
+## Planned GitHub Actions release design
+
+Only `ci.yml` and `dependency-scan.yml` currently exist. The `preview.yml` and
+`release.yml` sections below specify future automation; they are not executable
+workflows. Current local app/helper builds are documented in
+[DEVELOPMENT.md](../../DEVELOPMENT.md) and the [implementation map](../../docs/development/current-state.md).
+
 
 Workflows are separated:
 

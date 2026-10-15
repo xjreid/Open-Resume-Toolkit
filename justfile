@@ -20,6 +20,7 @@ check:
 	cargo fmt --all --check
 	cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 	cargo test --workspace --all-targets --locked
+	node tools/check-dev-browser-bridge.mjs
 
 dev:
 	@node tools/assert-dev-profile.mjs
@@ -27,6 +28,9 @@ dev:
 
 dev-extension browser:
 	pnpm "dev:extension:{{browser}}"
+
+test-dev-browser-bridge:
+	node tools/check-dev-browser-bridge.mjs
 
 test-integration:
 	cargo test --workspace --locked

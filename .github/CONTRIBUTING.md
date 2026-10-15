@@ -1,9 +1,10 @@
 # Contributing to Open Resume Toolkit
 
-Thank you for your interest in Open Resume Toolkit (ORT). The project is in its
-planning and architecture phase, so the most useful contributions right now are
-careful review, documentation corrections, test scenarios, accessibility
-feedback, and focused discussion of open decisions.
+Open Resume Toolkit is in active implementation for macOS Apple Silicon, with
+working desktop, direct-AI, tracker, Chrome development-capture, and optional
+Codex paths. It is not yet a production-qualified stable release. Start with the
+[current implementation map](../docs/development/current-state.md) and
+[development guide](../DEVELOPMENT.md).
 
 ## Before contributing
 
@@ -19,7 +20,7 @@ feedback, and focused discussion of open decisions.
 Security vulnerabilities must follow the private process in
 [SECURITY.md](SECURITY.md), not the public issue tracker.
 
-## Contributions accepted during planning
+## Contribution scope
 
 Welcome contributions include:
 
@@ -36,15 +37,11 @@ feature as approved merely by adding it to a supporting document.
 
 ## Substantial code contributions
 
-Substantial implementation contributions are temporarily deferred until the
-initial architecture, dependency policy, contributor licensing process, and the
-recorded GPLv3-versus-AGPLv3 decision are finalized. This protects contributors
-and avoids accepting code under terms that may need to change before the first
-implementation milestone.
-
-The maintainers will update this file when implementation contributions open.
-Do not begin a large code contribution without an issue explicitly confirming
-that it is ready to accept.
+The architecture and dependency policy are implemented. The existing restriction
+on substantial external code contributions remains while contributor licensing
+and the recorded GPLv3-versus-AGPLv3 decision are unresolved. Do not begin a large
+code contribution without an issue explicitly confirming that it is ready to
+accept. This restriction does not mean implementation has not begun.
 
 ## Pull-request expectations
 
@@ -55,7 +52,8 @@ A contribution should:
 - Avoid unrelated formatting or restructuring.
 - Update every authoritative and supporting plan affected by a product-rule
   change.
-- Include verification appropriate to the change.
+- Include verification appropriate to the change; use the [CI guide](../docs/development/ci.md) and preserve default and feature-enabled checks.
+- Update current behavior/setup documentation when controls, state, packaging, or persistence changes; keep historical evidence labeled as historical.
 - Identify third-party content and its license or provenance.
 - Contain no generated artifacts, personal data, secrets, or unrelated files.
 

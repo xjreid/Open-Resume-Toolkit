@@ -48,7 +48,8 @@ const MIN_MEMORY_KIB: u32 = 64 * 1_024;
 const MAX_MEMORY_KIB: u32 = 256 * 1_024;
 const MIN_ITERATIONS: u32 = 3;
 const MAX_ITERATIONS: u32 = 10;
-const MAX_PAYLOAD_BYTES: usize = 64 * 1_024 * 1_024;
+mod bounded;
+pub use bounded::{MAX_PAYLOAD_BYTES, serialized_size};
 const MAX_RENDER_MANIFESTS: usize = 100;
 const MAX_SETTINGS: usize = 128;
 const MAX_TRACKER_ENTRIES: usize = 100_000;
@@ -348,6 +349,7 @@ fn create_backup_with_entropy_for_format(
     database_schema: u16,
 ) -> Result<Vec<u8>, BackupError> {
     validate_export_metadata(&request.app_version, &request.created_at)?;
+    let profile_json = Zeroizing::new(bounded::to_vec(&request.profile, MAX_PAYLOAD_BYTES)?);
     validate_profile(&request.profile)?;
     let document_schema = profile_document_schema(&request.profile);
     let supported_writer = (format_minor == 0
@@ -402,11 +404,6 @@ fn create_backup_with_entropy_for_format(
     {
         return Err(BackupError::InvalidContent);
     }
-    let profile_json =
-        serde_json::to_vec(&request.profile).map_err(|_| BackupError::InvalidContent)?;
-    if profile_json.len() > MAX_PAYLOAD_BYTES {
-        return Err(BackupError::InvalidContent);
-    }
     let manifest = BackupManifestV1 {
         format_major: FORMAT_MAJOR,
         format_minor,
@@ -417,15 +414,25 @@ fn create_backup_with_entropy_for_format(
         inventory: inventory_for(&request.profile)?,
         profile_sha256: hex::encode(Sha256::digest(&profile_json)),
     };
-    let payload = PortableBackupV1 {
-        manifest,
-        profile: request.profile,
-    };
-    let plaintext =
-        Zeroizing::new(serde_json::to_vec(&payload).map_err(|_| BackupError::InvalidContent)?);
-    if plaintext.len() > MAX_PAYLOAD_BYTES {
-        return Err(BackupError::InvalidContent);
-    }
+    // Reuse the exact canonical profile bytes for hashing and the encrypted
+    // envelope. No second full-profile serialization or plaintext allocation.
+    let mut prefix = b"{\"manifest\":".to_vec();
+    serde_json::to_writer(&mut prefix, &manifest).map_err(|_| BackupError::InvalidContent)?;
+    prefix.extend_from_slice(b",\"profile\":");
+    let profile_len = profile_json.len();
+    let total = prefix
+        .len()
+        .checked_add(profile_len)
+        .and_then(|len| len.checked_add(1))
+        .filter(|len| *len <= MAX_PAYLOAD_BYTES)
+        .ok_or(BackupError::InvalidContent)?;
+    let mut plaintext = profile_json;
+    plaintext.reserve_exact(total - profile_len);
+    plaintext.resize(total, 0);
+    plaintext.copy_within(..profile_len, prefix.len());
+    plaintext[..prefix.len()].copy_from_slice(&prefix);
+    plaintext[total - 1] = b'}';
+    drop(request.profile); // Release record trees before Argon2 allocates its memory.
     let ciphertext_len = plaintext
         .len()
         .checked_add(TAG_LEN)
@@ -458,6 +465,7 @@ fn create_backup_with_entropy_for_format(
             },
         )
         .map_err(|_| BackupError::CryptoUnavailable)?;
+    drop(plaintext);
     if ciphertext.len() != ciphertext_len {
         return Err(BackupError::CryptoUnavailable);
     }
@@ -703,8 +711,10 @@ fn validate_payload(
     {
         return Err(BackupError::InvalidBackup);
     }
-    let profile_json =
-        serde_json::to_vec(&payload.profile).map_err(|_| BackupError::InvalidBackup)?;
+    let profile_json = Zeroizing::new(
+        bounded::to_vec(&payload.profile, MAX_PAYLOAD_BYTES)
+            .map_err(|_| BackupError::InvalidBackup)?,
+    );
     let expected_hash = hex::encode(Sha256::digest(&profile_json));
     if payload.manifest.profile_sha256 != expected_hash {
         return Err(BackupError::InvalidBackup);
@@ -772,7 +782,7 @@ fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
     let mut tracker_ids = BTreeSet::new();
     for entry in &profile.tracker_entries {
         let id = uuid::Uuid::parse_str(&entry.id).map_err(|_| BackupError::InvalidContent)?;
-        let bytes = serde_json::to_vec(&entry.value).map_err(|_| BackupError::InvalidContent)?;
+        let bytes = bounded::to_vec(&entry.value, MAX_TRACKER_ENTRY_BYTES)?;
         if id.to_string() != entry.id
             || entry.revision < 1
             || bytes.len() > MAX_TRACKER_ENTRY_BYTES
@@ -790,10 +800,6 @@ fn validate_profile(profile: &PortableProfileV1) -> Result<(), BackupError> {
         &profile.ai_lifetime_totals,
         &profile.ai_guardrail_policies,
     )?;
-    let serialized = serde_json::to_vec(profile).map_err(|_| BackupError::InvalidContent)?;
-    if serialized.len() > MAX_PAYLOAD_BYTES {
-        return Err(BackupError::InvalidContent);
-    }
     Ok(())
 }
 
@@ -1049,9 +1055,8 @@ fn validate_setting(key: &str, value: &Value) -> Result<(), BackupError> {
         && !["secret", "password", "token", "credential", "api_key"]
             .iter()
             .any(|forbidden| normalized.contains(forbidden));
-    let serialized = serde_json::to_vec(value).map_err(|_| BackupError::InvalidContent)?;
     let limit = ort_domain::application_record_size_limit(key).unwrap_or(MAX_SETTING_BYTES);
-    if !valid_key || serialized.len() > limit {
+    if !valid_key || serialized_size(value, limit).is_err() {
         return Err(BackupError::InvalidContent);
     }
     Ok(())
@@ -1096,6 +1101,8 @@ const fn is_zero_u32(value: &u32) -> bool {
 
 #[cfg(test)]
 mod adversarial_tests;
+#[cfg(test)]
+mod resource_tests;
 
 #[cfg(test)]
 mod tests {

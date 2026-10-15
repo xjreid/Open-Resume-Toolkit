@@ -4,7 +4,9 @@
 
 This is the dated source register behind the initial technical selections. It is not a replacement for pinned dependency versions, license files, or release-time verification. Upstream behavior, API versions, platform rules, and program eligibility can change.
 
-Last reviewed: 2026-09-01.
+Upstream-source review snapshot: 2026-09-01. The October 15, 2026 documentation
+refresh checked local implementation/manifests only and did not reverify these
+external sources. Use current lockfiles and the [implementation map](../../docs/development/current-state.md); recheck upstream rules before release.
 
 ## Desktop and packaging
 

@@ -298,7 +298,7 @@ def main():
         text_digest = hashlib.sha256(text).hexdigest()
         assert schema_v2 or text_digest == text_goldens[name], f"{name}: reviewed plain-text golden changed"
     rejection_checks((root / "standard.docx").read_bytes(), json.loads((root / "standard.json").read_text(encoding="utf-8")), style)
-    print(f"{style}: Eight DOCX/text fixtures: {'golden SHA-256' if style == 'plain' and not schema_v2 else 'bundled style audit (golden/native qualification pending)'}, exact text, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; {9 if schema_v2 else 8} negative controls rejected.")
+    print(f"{style}: Eight DOCX/text fixtures: {'golden SHA-256' if style == 'plain' and not schema_v2 else 'independent style audit (corpus goldens checked separately)'}, exact text, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; {9 if schema_v2 else 8} negative controls rejected.")
 
 
 if __name__ == "__main__":

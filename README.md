@@ -1,67 +1,87 @@
 # Open Resume Toolkit
 
-## Status
+A free, open-source, local-first desktop application for maintaining a master
+resume and preparing application materials. The desktop app owns editing, AI,
+tracking, and exports; the Chrome extension captures job text only when you ask.
+ORT operates no account service, hosted resume store, subscription, or funded AI
+service.
 
-This repository defines and implements **Open Resume Toolkit**: a free, open-source, local-first desktop application with companion Chrome and Edge extensions.
+## Current state
 
-**M0, M1 and M2 are complete for macOS Apple Silicon development.** The build
-supports encrypted resume editing and publication, reviewed PDF/DOCX import,
-guarded quit, three PDF/DOCX styles, text export, render history, encrypted
-backup/recovery and local-data deletion. See the
-[acceptance record and known limitations](evidence/0.0.0-dev/m2-acceptance-closure.md).
+**Active development target: macOS on Apple Silicon.** This is a development
+build, not a production-qualified stable release. Windows and Intel Mac CI jobs
+check portability; they do not establish platform support.
 
-**M2.5 — usable desktop and resume designs and M3 Direct AI are complete for macOS Apple Silicon development.** See the [M3 evidence](evidence/0.0.0-dev/m3/README.md). Browser messaging, updates and release
-hardening remain later milestone work. Windows and Intel Mac remain deferred
-platform expansions; shared CI builds are portability signals, not native support.
-Start with the [next milestone guide](<Implementation Plans/Next_Milestones.md>).
+The current app includes:
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) to configure a development machine and run the shell.
-Developers changing user-visible workflows must also review and maintain the
-[application behavior reference](docs/application-behavior/README.md), which
-maps current resume, AI key, spending, monitoring, export, and deletion
-behavior for development and troubleshooting.
+- A structured master-resume editor, reviewed local PDF/DOCX import, immutable
+  publications, local PDF preview, and PDF/DOCX/text export. Technical,
+  Professional, and Modern styles keep presentation separate from content.
+- An application overlay for reviewing job descriptions, tailoring the published
+  resume, generating cover letters and answers, editing results, reviewing
+  qualification alerts, and downloading or dragging out final documents.
+- Multiple saved OpenAI, Anthropic, or Gemini API keys with one active key,
+  explicit model selection, local usage history, estimated spending, and
+  optional spending caps.
+- Optional Codex through a separately installed, verified official runtime.
+  Start the server explicitly and sign in with your ChatGPT account.
+  Authentication lasts only in that process's memory; stopping or quitting ends
+  the session. ORT never silently switches to an API key.
+- A local application tracker with retained materials, inline metadata editing,
+  search, status filters, paginated results, and visible-page CSV export.
+- Chrome 0.3.0 capture and an authenticated macOS development bridge. Edge is
+  still a capture-disabled scaffold. Production host identity and Store
+  distribution qualification remain release work.
+- SQLCipher-encrypted profiles with OS-vault database/API keys, exclusive profile
+  ownership, passphrase-encrypted backups, restart-staged restore and rollback,
+  and retryable deletion of active and retained profile credentials.
 
-## Start here
+M0–M4 have recorded development acceptance. M5 remains open for browser delivery
+and Edge qualification. Much of M6 Codex is implemented and locally tested; full
+milestone acceptance is not recorded. M7 production signing, notarization,
+release/update infrastructure, and final Store qualification remain planned.
+See the [current implementation map](docs/development/current-state.md) and
+[delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>).
 
-Read [Plan_Index.md](Plan_Index.md). It contains the reading order, authority rules, current decisions, document catalog, and change-control rules.
+## Develop and verify
 
-For a fast product review, read:
+Start with [DEVELOPMENT.md](DEVELOPMENT.md) for pinned prerequisites, local builds,
+synthetic profiles, and checks. The [CI guide](docs/development/ci.md) maps the
+checked-in workflows, test coverage, and platform limits. Complete development
+packaging is separate from a bare frontend/Tauri build because import and Codex
+installation require verified native helpers.
 
-1. [Plan index](Plan_Index.md)
-2. [Product scope and principles](<Product Plans/Product_Scope_and_Principles.md>)
-3. [Core workflows](<Product Plans/Core_Workflows.md>)
-4. [Product states and operations](<Product Plans/Product_States_and_Operations.md>)
-5. [Local data and document model](<Product Plans/Local_Data_and_Document_Model.md>)
-6. [Configuration limits and defaults](<Product Plans/Configuration_Limits_and_Defaults.md>)
-7. [Release scope and open decisions](<Product Plans/Release_Scope_and_Open_Decisions.md>)
+Developers changing a workflow should maintain its
+[application behavior reference](docs/application-behavior/README.md) and the
+relevant product and implementation plans.
 
-For implementation, continue with [Technical implementation plans](<Implementation Plans/README.md>), then read the system architecture/security documents and the applicable component plan.
+## Documentation
 
-## Workspace boundaries
+- [Plan index](Plan_Index.md): document authority, reading order, and decisions.
+- [Product scope](<Product Plans/Product_Scope_and_Principles.md>) and
+  [core workflows](<Product Plans/Core_Workflows.md>): approved product behavior.
+- [Application behavior](docs/application-behavior/README.md): how implemented
+  workflows behave, including persistence, failures, and cleanup.
+- [Implementation plans](<Implementation Plans/README.md>): architecture and
+  component design; unfinished work is identified explicitly.
+- [Open decisions and release work](<Product Plans/Release_Scope_and_Open_Decisions.md>).
+- [Chrome development setup](packaging/extension/chrome/development-testing.md)
+  and [Codex runtime guide](docs/ai/codex-plan-runtime.md).
 
-- Approved product behavior belongs in `Product Plans/`.
-- Code-level design belongs in `Implementation Plans/`; working code may refine internal details without changing approved product behavior.
-- The approved universal visual direction and future component/template work belong in `Aesthetic/`; application branding and professional document templates remain separate systems.
-- Unresolved choices and validation work belong only in `Product Plans/Release_Scope_and_Open_Decisions.md`.
-- Technical or aesthetic documents may implement approved behavior but may not silently redefine it.
+Dated evidence, reviews, ADRs, and archived plans describe their recorded
+snapshot. They are not current setup instructions or fresh test results.
 
-## Product summary
+## License and community
 
-Open Resume Toolkit is a free, open-source desktop tool for maintaining one master resume. Its overlay captures and reviews job descriptions, tailors resumes, generates optional cover letters and application answers, presents required-qualification alerts, and provides PDF preview/edit, Download, and drag-out controls. Users may configure a personal OpenAI/Anthropic/Gemini API key or eligible ChatGPT/Codex subscription, inspect aggregate local usage, set optional spend/quota guardrails, and track completed applications. User content, AI accounting, and guardrail records remain on the user's computer. The project operates no ORT-owned account system or subscription, hosted database, cloud document store, or centrally funded AI service.
+ORT uses GNU GPL version 3 only (`GPL-3.0-only`); commercial use, modification,
+and redistribution are permitted subject to the GPL. See [LICENSE](LICENSE),
+[NOTICE](NOTICE), the [attribution term](ADDITIONAL_TERMS.md), and
+[trademark policy](TRADEMARKS.md).
 
-## License, attribution, and official releases
+The [canonical source repository](https://github.com/xjreid/Open-Resume-Toolkit)
+is the public home for source, documentation, support, and release information.
+Development ad-hoc signatures do not establish an official production publisher.
 
-Open Resume Toolkit is licensed under the GNU General Public License version 3 only (`GPL-3.0-only`). Commercial use, modification, and redistribution are permitted subject to the GPL.
-
-- [`LICENSE`](LICENSE) contains the unmodified GPLv3 text.
-- [`NOTICE`](NOTICE) identifies the copyright holders and canonical source repository.
-- [`ADDITIONAL_TERMS.md`](ADDITIONAL_TERMS.md) contains the GPLv3 Section 7(b) attribution term applicable to identified project material.
-- [`TRADEMARKS.md`](TRADEMARKS.md) explains how modified and third-party distributions must distinguish themselves from official releases.
-
-The canonical source repository is <https://github.com/xjreid/Open-Resume-Toolkit>. Official binary channels and signing status will be documented before release; source availability alone does not make a third-party build official.
-
-## Community and security
-
-- Read the [contribution guidelines](.github/CONTRIBUTING.md) before proposing a change. Substantial code contributions are deferred until the recorded architecture and licensing decisions are finalized.
-- Participation is governed by the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
-- Report vulnerabilities through the private process in the [security policy](.github/SECURITY.md), never through a public issue containing sensitive details.
+Read the [contribution guidelines](.github/CONTRIBUTING.md) and
+[Code of Conduct](.github/CODE_OF_CONDUCT.md). Report vulnerabilities through the
+[private security process](.github/SECURITY.md).

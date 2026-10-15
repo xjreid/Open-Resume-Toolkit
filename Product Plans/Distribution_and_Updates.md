@@ -4,8 +4,11 @@
 
 The active development and preview-qualification channel is macOS Apple Silicon.
 The Windows channel design and Intel-Mac packaging requirements below are
-retained for later platform expansion and do not gate M0-M2 macOS-arm64
-completion. A shared CI build is not a supported distribution.
+retained for later platform expansion. A shared CI build is not a supported
+distribution. Local app/helper and preview packaging exist; production signing,
+notarization, updater/release workflows, final identities, and Store publication
+remain M7 work. The channel/update requirements below describe that release
+design, not presently available distribution services.
 
 ## Distribution principles
 
@@ -60,8 +63,8 @@ identity. M7 owns final Store publication, Developer ID/Keychain integration and
 qualification of the exact distributed desktop/host/extension combination. A
 Store extension does not download or install its required native host by itself.
 
-- Chrome is distributed through Chrome Web Store.
-- Edge is distributed through Microsoft Edge Add-ons.
+- Planned Chrome distribution is Chrome Web Store; a development upload/setup path exists, without a production-publication claim.
+- Planned Edge distribution is Microsoft Edge Add-ons; capture is currently disabled.
 - Store listings explain permissions, local-first behavior, provider transmission, desktop-app dependency, and the exact official project links.
 - Extension updates are handled by their stores. The desktop and extension negotiate protocol compatibility during staggered rollouts.
 - Sideload instructions are available for developers and advanced users but are not the default mainstream installation path.

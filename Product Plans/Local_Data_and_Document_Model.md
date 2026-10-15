@@ -16,7 +16,7 @@ Implementation plans must preserve these logical boundaries without prematurely 
 
 ### Local profile
 
-Contains local preferences, schema version, installation identity, backup preferences, the active AI connection mode, opaque direct-credential references or a Codex connection reference, update channel, and pointers to the records below. It must not duplicate API keys or Codex authentication tokens stored in the operating-system vault.
+Contains local preferences, schema version, installation identity, backup preferences, the active AI connection mode, opaque direct-credential references or a Codex connection reference, update channel, and pointers to the records below. It must not duplicate API keys stored in the operating-system vault or Codex authorization held only in the supervised runtime process.
 
 ### Master-resume draft
 
@@ -27,7 +27,7 @@ Contains local preferences, schema version, installation identity, backup prefer
 
 ### Published master resume
 
-- At most one per profile.
+- One current published master per profile; earlier immutable publication revisions remain available for replay/backup.
 - Immutable snapshot of an accepted draft revision until deliberately replaced.
 - Records its schema, style, and publication revision so application materials retain their factual source.
 
@@ -124,14 +124,14 @@ Because ORT has no cloud recovery, the application must provide a first-class po
 - Backups use a documented, versioned container such as `.ort-backup`.
 - Backups are encrypted with a user-supplied passphrase using the versioned Argon2id/XChaCha20-Poly1305 format and bounded reader policy in `Configuration_Limits_and_Defaults.md`; exact header/associated-data behavior is defined by the implementation plan and frozen with test vectors.
 - API keys, Codex sessions, and credential-vault secrets are excluded by default and must be reconfigured on the destination device. Imported guardrail policies remain inactive until the user binds and confirms them for a new credential or Codex connection; historical counters never silently attach to a different identity.
-- Restore validates format, integrity, schema compatibility, available disk space, and conflicts before replacing or merging data.
+- The implemented restore authenticates and validates format, schema, and conflicts, then stages a fresh encrypted replacement for restart. It retains the former profile as a rollback safety copy. Merge restore and proactive disk-space prediction remain unimplemented.
 - Before a destructive migration or restore, ORT creates or offers a recoverable safety copy.
-- Automatic backup may target a directory chosen by the user, including a folder synchronized by a third party. ORT must explain that choosing such a folder causes that third party—not ORT—to receive the encrypted backup.
+- A future automatic-backup feature may target a directory chosen by the user, including a folder synchronized by a third party. ORT must explain that choosing such a folder causes that third party—not ORT—to receive the encrypted backup.
 
 ## Import and export portability
 
 - Full data export uses a documented versioned format and does not require ORT servers.
-- Tracker CSV includes tracking fields and artifact-presence metadata, not embedded document JSON.
+- Current tracker CSV includes the visible page's editable tracking fields, not document JSON. Artifact-presence metadata and per-material export are future additions.
 - A full portable export includes structured material snapshots and render manifests.
 - Import must validate untrusted archives, paths, sizes, compression ratios, schemas, and checksums before writing canonical data.
 

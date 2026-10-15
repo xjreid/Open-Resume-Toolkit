@@ -235,4 +235,4 @@ performed. Existing development-signing/notarization limitations remain; this
 repair does not claim production distribution approval. The installed app is
 updated from the verified development bundle without being launched.
 
-Delivery record: [codex-installer-update-20261009T041621Z](/Users/xavierreid/Open-Resume-Toolkit/target/codex-installer-update-20261009T041621Z/delivery-manifest.json). The installed bundle was signature/hash verified and confirmed closed after replacement; a rollback bundle is retained.
+Delivery record: `target/codex-installer-update-20261009T041621Z/delivery-manifest.json` (local historical codex-installer-update-20261009T041621Z, not a published repository artifact). The installed bundle was signature/hash verified and confirmed closed after replacement; a rollback bundle is retained.

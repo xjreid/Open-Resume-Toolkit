@@ -101,3 +101,19 @@ pub(crate) fn preflight_pdf(
         .map(|_| ())
         .map_err(|_| "PDF_UNAVAILABLE")
 }
+
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn blocking_work_runs_on_another_thread() {
+        let caller = std::thread::current().id();
+        let response = super::run(move || {
+            ort_domain::CommandResponse::success(std::thread::current().id() != caller)
+        })
+        .await;
+        assert!(matches!(
+            response,
+            ort_domain::CommandResponse::Success { value: true, .. }
+        ));
+    }
+}

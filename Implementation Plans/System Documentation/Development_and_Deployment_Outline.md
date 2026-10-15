@@ -9,10 +9,15 @@
 
 This document turns the architecture, repository, roadmap, security, and distribution plans into one build-and-release outline. It does not create four independent applications. ORT uses one shared desktop codebase and one shared browser-extension codebase, producing platform- and Store-specific artifacts through narrow adapters and packaging configuration.
 
-For the current M0-M2 phase, the only qualified native target is macOS Apple
-Silicon. Windows and Intel-Mac outputs below are retained future artifact designs;
+The active development/native target is macOS Apple Silicon. Windows and Intel-Mac outputs below are retained future artifact designs;
 their CI builds are portability signals and their native/package matrices are
 not current milestone blockers.
+
+The [current implementation map](../../docs/development/current-state.md),
+[development guide](../../DEVELOPMENT.md), and [CI map](../../docs/development/ci.md)
+identify implemented paths. This outline includes planned production artifacts;
+there is no completed release/publish workflow. M0–M4 acceptance is recorded,
+M5 browser acceptance remains open, and M6 is implemented in development.
 
 ## Source and artifact model
 
@@ -243,4 +248,4 @@ The first implementation pull request should contain only the M0 skeleton:
 8. macOS-arm64 qualification CI plus Windows/Intel-Mac portability builds, tests, contract drift, license/vulnerability, secret, and remote-asset checks;
 9. initial ADRs and an empty versioned evidence manifest.
 
-It should not yet implement real credentials, parsing, AI, updater installation, signing, or production native-host registration. Those enter only with their milestone-specific controls and evidence.
+This restriction described the original M0 handoff. Credentials, reviewed parsing, and AI are now implemented under later milestone controls. Production updater/signing/native-host registration still require their release gates.

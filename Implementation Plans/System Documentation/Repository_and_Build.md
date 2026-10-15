@@ -2,70 +2,66 @@
 
 ## Status
 
-- Status: approved baseline
+- Status: implemented workspace; release automation remains planned
 - Owner: core maintainers
-- Milestone: M0
+- Milestones: M0–M7
 - Non-goal: visual component design or aesthetic assets
 
-M0-M2 qualify the repository on macOS Apple Silicon. Windows and Intel-Mac
+The active development target is macOS Apple Silicon. Windows and Intel-Mac
 folders and CI builds preserve the intended adapter boundaries and detect
 portable-code regressions, but their native evidence is deferred.
 
-## Proposed source tree
-
-The existing planning folders remain at the repository root. Implementation adds:
+## Current source tree
 
 ```text
-apps/
-  desktop/                    React/TypeScript UI and Tauri configuration
-    src/features/             feature-owned views, view models, and tests
-    src/shared/               typed command client and accessible primitives
-    src/platform/             narrow UI-only platform presentation adapters
-    src-tauri/                shared entry point, commands, capabilities, packaging
-      platform/windows/       Windows composition and packaging hooks
-      platform/macos/         macOS composition and packaging hooks
-  extension/                  shared Manifest V3 Chrome/Edge source
-    src/                      shared capture, messaging, status, and validation
-    manifest/                 Chrome/Edge and channel-specific manifest templates
-crates/
-  ort-domain/                 entities, value objects, policies, state machines
-  ort-application/            use cases, coordinator, ports, error model
-  ort-backup/                 portable authenticated backup format and validation
-  ort-storage/                SQLCipher repositories and migrations
-  ort-vault/                  OS credential-vault adapter
-  ort-ai/                     provider and Codex adapters, accounting, guardrails
-  ort-documents/              import, normalization, Typst/DOCX/plain-text output
-  ort-document-worker/        disposable sandboxed PDF/DOCX extraction executable
-  ort-ipc/                    authenticated local protocol and framing
-  ort-native-host/            browser native-messaging executable
-  ort-platform/               paths, permissions, process, update, single-instance
-packages/
-  contracts/                  source schemas and generated TypeScript bindings
-  catalog/                    provider/model/pricing catalog schema and verifier
-templates/
-  resume/                     versioned Typst templates; aesthetics added later
-  fonts/                      approved redistributable font files and licenses
-fixtures/
-  documents/                  synthetic PDF/DOCX/text corpus
-  ai/                         synthetic provider and prompt-injection fixtures
-  ipc/                        valid and hostile protocol corpus
-tools/                        generation, verification, and release helper commands
-packaging/                    Windows/macOS/Chrome/Edge package configuration
-.github/workflows/            CI, preview packaging, and protected release workflows
+apps/desktop/src/shared/       React workspaces, state owners, styles and tests
+apps/desktop/src-tauri/        Tauri commands, permissions, native composition
+apps/extension/               Chrome capture, Edge scaffold, manifests/build/tests
+crates/ort-domain/             canonical records and validation
+crates/ort-application/        workflow, import review, artifact projection
+crates/ort-storage/            SQLCipher schema 9, lifecycle, repositories, accounting
+crates/ort-vault/              OS credential adapter and synthetic test vaults
+crates/ort-backup/             portable container 1.9, bounds and compatibility
+crates/ort-ai/                 direct-provider requests, catalog and structured results
+crates/ort-render/             Typst PDF renderer and bundled fonts
+crates/ort-documents/          DOCX/text and document mapping
+crates/ort-parser-runtime/     metered guest execution
+crates/ort-parser-helper/      packaged helper for reviewed PDF/DOCX import
+crates/ort-document-worker/    legacy native worker boundary and fixtures
+crates/ort-platform/           filesystem, export and native adapters
+crates/ort-macos-lifecycle/    native quit/termination guard
+crates/ort-codex-install/      constrained privileged install helper
+crates/ort-ipc/                protocol, capture sessions, development transport
+crates/ort-native-host/        browser native-message executable
+crates/ort-contract-generator/ Rust-owned schema/type/decoder/fixture generator
+packages/contracts/           checked-in generated contracts and boundary tests
+packages/catalog/             signed direct-model/pricing data
+fixtures/                     synthetic documents, AI responses and IPC inputs
+templates/                    bundled document templates and license references
+tools/                        local build, audit and qualification scripts
+packaging/                    platform and extension packaging/setup guidance
+docs/adr/                     dated architecture decisions
+docs/application-behavior/    current workflow/persistence documentation
+docs/development/             current implementation and CI maps; labeled history
+.github/workflows/            CI and hosted dependency scan; no release workflow yet
 ```
 
-Early milestones keep a deliberately plain functional fixture in `templates/resume/` to prove layout and accessibility before the approved document styles are finalized through development testing. The fixture is not a shipped product theme.
+Codex runtime/session/transport orchestration currently lives in desktop-native
+modules; it is not an implemented `ort-ai` Codex adapter. UI owners mostly live
+under `src/shared`, not the proposed `src/features` tree. The Plain document
+fixture remains for replay/compatibility; Technical, Professional, and Modern
+are the three selectable designs.
 
 ## Workspace tooling
 
 - Rust stable, pinned by `rust-toolchain.toml`.
 - Cargo workspace with one lockfile committed.
 - Node LTS, Corepack, and pnpm with an exact package-manager version.
-- TypeScript strict mode, ESLint, Prettier, and Vitest.
+- TypeScript strict checking, Prettier, Vitest, and Node test runners.
 - Tauri 2 with the smallest required official plugins.
-- `justfile` or `cargo xtask` exposes platform-neutral developer commands; scripts contain no embedded credentials.
+- `justfile` exposes platform-neutral developer commands; scripts contain no embedded credentials.
 
-The bootstrap pull request records the exact versions selected after compatibility and license verification. Dependabot or Renovate may propose updates, but security-sensitive libraries and Tauri major/minor updates require a human-reviewed compatibility run.
+The toolchain files, manifests, and lockfiles record the selected versions. Dependabot or Renovate may propose updates, but security-sensitive libraries and Tauri major/minor updates require a human-reviewed compatibility run.
 
 ## Contract ownership
 
@@ -76,7 +72,7 @@ Rust domain types are canonical for application records. The build generates:
 - JSON Schema for native-messaging and catalog payloads;
 - a machine-readable compatibility manifest used by desktop, host, extension, and updater tests.
 
-Generated output is checked in so extension builds do not require Rust. CI regenerates into a temporary tree and fails on a diff. Hand editing generated files is forbidden.
+Generated output is checked in so extension builds do not require Rust. CI regenerates the checked-in output and fails on a Git diff. Local reviews preserve candidate output before checking regeneration. Hand editing generated files is forbidden.
 
 Cross-language integer counters use bounded integers whose JSON range is safe in JavaScript; currency uses `{currency, micros}` or provider-native decimal strings, never floating point. Timestamps are RFC 3339 UTC plus an IANA time-zone identifier when calendar boundaries matter.
 
@@ -87,8 +83,7 @@ The M0 license gate is implemented through
 `../../tools/check-licenses.mjs`. It checks the complete locked Cargo metadata
 graph plus every pnpm lock package, rejects missing/unknown licenses, and writes
 the deterministic inventory under `target/licenses/`. Platform-specific
-JavaScript packages are rechecked on each supported CI target. The policy has no
-package exceptions as of 2026-09-04. Binary-asset notices and the release SBOM
+JavaScript packages are rechecked on each supported CI target. The current policy file is authoritative for exact, justified, expiring exceptions. Binary-asset notices and the release SBOM
 remain separate packaging gates.
 
 Before adding a runtime dependency, record:
@@ -107,15 +102,16 @@ Binary inputs such as PDFium and fonts are pinned by digest, mirrored only when 
 
 ## Local developer workflow
 
-Initial commands will provide these stable intents:
+The implemented commands provide these intents:
 
 ```text
 just bootstrap       validate toolchains and install locked JS dependencies
 just generate        regenerate schemas and bindings
-just check           format, lint, unit test, license and contract drift checks
+just check           format, lint, tests/builds, licenses, contracts, macOS dev bridge
 just dev             run desktop with an isolated synthetic-data profile
 just test-integration run storage, renderer, IPC, and mocked-provider tests
-just package-preview build local preview packages (explicitly ad-hoc signed on macOS)
+just package-preview local app/DMG integrity testing; not production-qualified
+python3 tools/build-development-app.py  complete app with parser/install helpers
 ```
 
 Development uses an app-data suffix such as `OpenResumeToolkit-Dev`; it must never open a stable user database. Test profiles live in per-test temporary directories. Networked tests are opt-in and never use personal provider credentials in CI.
@@ -137,6 +133,10 @@ Document import is runtime-disabled on a platform/package whose parser-worker sa
 
 ### Pull request
 
+[Current CI map](../../docs/development/ci.md) lists exact commands and runner
+coverage. Default builds check production fail-closed behavior; the explicit
+macOS development-feature job also executes authenticated bridge tests.
+
 - formatting and static analysis;
 - Rust and TypeScript unit tests;
 - generated-contract drift;
@@ -156,7 +156,7 @@ require a standing nightly schedule. Fuzzing, live provider probes, broad
 compatibility/install matrices, and reproducibility comparisons are targeted
 tools for a specific defect, security finding, or release risk.
 
-### Protected release
+### Planned protected release
 
 - build from a signed tag or immutable commit;
 - produce packages, updater artifacts, checksums, SBOM, licenses, provenance, and compatibility manifest;

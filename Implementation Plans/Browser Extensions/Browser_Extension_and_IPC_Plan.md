@@ -2,7 +2,7 @@
 
 ## Status and requirements
 
-- Status: approved baseline; Store/package registration probes required
+- Status: Chrome 0.3.0 development capture implemented; Edge and production qualification open
 - Owner: browser/IPC maintainer
 - Milestone: M5 development functionality; M7 signed production bridge and Store qualification
 - Product authority: `../../Product Plans/Desktop_Extension_Communication.md`, `Security_Privacy_and_Open_Source.md`, and `Configuration_Limits_and_Defaults.md`
@@ -32,55 +32,49 @@ feature or complete either milestone.
 
 One TypeScript codebase produces Chrome and Edge Manifest V3 packages. Browser-specific checked-in templates provide extension name, Store ID, icons later supplied by the aesthetic plan, and native-host allowlist. Production, preview, and development IDs are distinct.
 
-Modules:
+Current modules in `apps/extension/src/` are `service-worker.ts`, `capture.ts`,
+`page-capture.ts`, `selection.ts`, `native-client.ts`, and shared contracts.
+Manifests/build scripts select the browser and host identity. There is no popup,
+toolbar action, context-menu flow, parallel editor, extension storage, or AI code.
+The service worker is the authority; page scripts cannot address the native host.
 
-```text
-content/selection.ts        reads current selection only after service-worker request
-background/capture.ts       coordinates user gesture, confirmation, native message
-popup/                      status, editable review, Send/Cancel, safe errors
-shared/contracts.ts         generated schemas and protocol negotiation
-shared/url.ts               URL normalization/sanitization
-manifest/*.json             browser/channel templates
-```
+## Current permissions
 
-The service worker is the authority. Content scripts are treated as exposed to hostile pages and cannot talk to the native host directly.
+The implemented Chrome manifest requests exactly `scripting`, `nativeMessaging`,
+and `alarms`, plus HTTP/HTTPS site access. A desktop overlay click cannot grant
+`activeTab`; site access permits deliberate rectangle injection on user-selected
+job sites. It does not initiate reading. Chrome users can restrict site access;
+missing access and restricted browser pages fail visibly. The earlier toolbar/
+shortcut/optional-host-permission proposal is superseded for Chrome 0.3.0.
 
-## Permissions
+No startup content script, remote code, telemetry, cookies, browsing-history,
+clipboard, downloads, identity, or persistent extension storage is requested.
+The privacy/listing documentation explains the site-access requirement.
 
-Target permissions:
+## Current capture flow
 
-- `nativeMessaging` for the native host;
-- `activeTab` and `scripting` for explicit selection capture after the extension action/shortcut supplies the browser user gesture;
-- `contextMenus` only if the approved capture UX uses it;
-- no broad host permissions;
-- no browsing-history, tabs history, clipboard, downloads, identity, or persistent storage permission beyond small non-content settings.
+1. The overlay creates a bounded capture session and sends Capture to the
+   connected Chrome service worker; no AI operation starts.
+2. The user clicks two corners on the active page. The rectangle highlights only
+   visible selected DOM text and stays anchored through supported scrolling.
+3. The service worker validates extension/tab/frame/document/URL authority,
+   normalizes and bounds UTF-8 text, and removes URL credentials/fragments and
+   known sensitive/tracking query fields before native delivery.
+4. The native host and authenticated current-user development transport deliver
+   it only to that capture session. The desktop owns editable review/Continue.
+5. Cancel/Escape, navigation, tab/window changes, resize, timeout, and disconnect
+   invalidate the capture. An unconfirmed delivery is not automatically resent.
 
-Use `optional_host_permissions` only for an explicitly enabled overlay-initiated convenience path and scope the grant to sites the user approves. Do not request `<all_urls>` by default. Store disclosures describe the exact selected-text flow. A permission expansion requires product/security review.
+The native port serializes requests, has bounded queue/frame sizes, and carries
+content-free heartbeat state while connected. Disconnected workers release the
+port and recover through a Chrome alarm. Content is never queued across worker
+restart or persisted. See the [extension README](../../apps/extension/README.md),
+[protocol v1](../../packaging/extension/chrome/native-protocol-v1.md), and
+[development setup](../../packaging/extension/chrome/development-testing.md).
 
-## Capture flow
-
-1. From overlay Stage 1 or the Answers tab, the user selects page text. The overlay's Capture control arms/explains the request; in the default least-permission path the user invokes the extension toolbar action or registered keyboard shortcut to provide the browser-required gesture.
-2. Service worker requests the current selection from a minimal content script.
-3. Content script returns plain text and the current document URL/title; HTML is discarded.
-4. Service worker normalizes line endings/Unicode, enforces the 128 KiB captured-text limit, and sanitizes the URL by removing credentials, fragments, and known tracking parameters.
-5. Service worker opens a native-messaging connection and transmits the bounded capture immediately to the authenticated desktop recipient. The extension has no competing editable review or tailoring UI.
-6. The overlay shows editable text/URL with Capture again and Continue for job text, or review and Generate answer for question text.
-7. Desktop returns accepted/rejected/version status; the extension shows only compact bridge status/error feedback and clears content from memory.
-
-No content is written to extension local/sync storage. If the desktop is unavailable, the extension may keep the current payload only while the confirmation/native-call page is alive; it does not queue it for later.
-
-Restricted browser pages, empty selections, over-limit content, invalid URLs, and unsupported encodings produce local actionable errors.
-
-### Optional overlay-initiated capture feasibility gate
-
-An optional direct response to the overlay Capture button may use a bounded `runtime.connectNative()` session so desktop can signal the extension, but only when all of the following are proven in Chrome and Edge:
-
-- the user explicitly granted a narrow optional site permission that permits script access without a fresh extension action;
-- the native session is authenticated, short-lived, reconnectable, and does not keep the Manifest V3 service worker alive indefinitely;
-- no default broad host access is added and store disclosures remain accurate;
-- failures fall back to the extension action/shortcut flow without losing reviewed overlay state.
-
-Until those gates pass, the toolbar/shortcut gesture flow is the shipped behavior even though capture is initiated conceptually from the overlay workflow.
+Edge remains a capture-disabled scaffold; no functional Edge capture is implied.
+Production signed identity/vault-secret integration below remains a release
+requirement, not the current development capability's trust claim.
 
 ## Native-messaging contract
 
@@ -103,9 +97,9 @@ Request envelope v1:
 }
 ```
 
-Response is the common `ok/value` or `ok/error` shape with desktop/host/protocol versions and retryability. Unknown fields are tolerated only for additive minor versions. Unsupported major versions return `PROTOCOL_INCOMPATIBLE` and a repair/update action.
+Response is the common `ok/value` or `ok/error` shape with desktop/host/protocol versions and retryability. The current capture envelope rejects unknown fields; future additive protocol changes require an explicit compatible version/schema. Unsupported major versions return `PROTOCOL_INCOMPATIBLE` and a repair/update action.
 
-Limits are lower than browser maximums: 256 KiB total envelope, 128 KiB captured text, 4 KiB URL, bounded JSON depth/fields, one request/response in the default host process, a five-second capability-acknowledgement target, and one desktop-launch attempt of up to 15 seconds. A separately negotiated bounded session is allowed only for the optional overlay-initiated feasibility path.
+Limits are lower than browser maximums: 256 KiB total envelope, 128 KiB captured text, 4 KiB URL, bounded JSON depth/fields, serialized requests on the current native port, with bounded heartbeat/reconnect and capture-session lifetime. The detailed production desktop-launch/repair design below is not implemented by the development host.
 
 ## Native host
 

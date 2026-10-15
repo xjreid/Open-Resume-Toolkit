@@ -13,6 +13,28 @@ M1-M2 native storage qualification is currently macOS Apple Silicon only. The
 Windows adapter contract and portable format remain in source, but Windows and
 Intel-Mac native matrices are deferred and are not inferred from shared tests.
 
+## Current implementation — October 15, 2026
+
+The database is schema 9. Canonical tables are implemented by
+`ort-storage/src/migrations.rs`; application/stage-one/capture state currently
+uses revisioned namespaced settings, and retained tracker JSON lives in
+`tracker_entries`. The table decomposition below is a logical target, not a
+claim that separate workspace/artifact tables exist.
+
+`lifecycle.rs` owns the stable process lock; `retirement.rs` owns durable provider
+cleanup inventories shared by safety-copy and delete-all recovery; `portable.rs`
+owns bounded snapshot collection. The lock stays held while active/staging/safety
+directories move, stores are replaced, or storage retries fail. Permanent
+retirement removes provider credentials before database keys/rosters; rollback
+retains those credentials.
+
+The derived `tracker_search` projection is populated/mutated atomically by
+schema-9 triggers. Portable format 1.9 still declares content schema 8 because
+the projection is rebuilt rather than exported. Publication history and typed
+AI lifetime/guardrail accounting remain portable. See the
+[backup reference](../../docs/backup/backup-v1.md) and
+[current implementation map](../../docs/development/current-state.md).
+
 ## Storage layout
 
 Resolve all paths through the operating-system application-data APIs. Never derive them from the current working directory.
@@ -96,7 +118,7 @@ All IDs are UUIDv7 strings generated locally. Every mutable row includes `create
 
 `schema_migrations`, `app_metadata`, `renderer_bundles`, `catalog_receipts`, and `maintenance_jobs` record compatibility and recovery state. SQLite full-text tables are introduced only for explicitly selected tracker/resume fields, and remain inside SQLCipher.
 
-### Implemented development schema v2
+### Historical development schema-v2 render checkpoint
 
 The first additive M2 migration creates `render_manifests`. Each row records a
 content-free PDF render identity for one saved-draft or published-snapshot
@@ -119,7 +141,7 @@ renderer replay remains later M2 work.
 
 - Resume/workspace/snapshot payloads are JSON validated against the canonical generated schema before write and after read.
 - Company, title, job text, resume content, URLs, and activity details are treated as sensitive even though SQLCipher encrypts the whole database.
-- The published master is immutable in place but zero-or-one per profile. Publishing creates a new row/value and replaces the previous association atomically; it does not create a hidden master-history library. A workspace temporarily copies the published baseline it needs and records its revision so later publishing cannot change an in-progress application silently. Tracker material snapshots remain append-only.
+- The published master is immutable in place but zero-or-one per profile. Publishing creates a new row/value and replaces the previous association atomically; earlier immutable publication revisions remain retained for replay and backup, without creating another editable master. A workspace temporarily copies the published baseline it needs and records its revision so later publishing cannot change an in-progress application silently. Tracker material snapshots remain append-only.
 - Qualification alerts store requirement text/span, mandatory-classification evidence, mapped resume field IDs/evidence, result type, confidence metadata for diagnostics, and presentation state. They do not store inferred sensitive personal status.
 - A partial unique constraint permits at most one non-finished current workspace per profile. Finishing/discarding it removes temporary qualification alerts rather than copying them into tracker snapshots.
 - Stage/tab values use constrained codes: Stage 1 capture/review; Stage 2 `resume`, `cover_letter`, or `answers`. A current answer capture/draft may reset independently without changing job text or other artifacts.
@@ -130,7 +152,7 @@ renderer replay remains later M2 work.
 Required atomic units:
 
 - draft update plus revision check;
-- creation/replacement of the single published snapshot;
+- creation of a publication and atomic replacement of the current published association;
 - AI attempt creation plus direct-cap reservation;
 - attempt finalization plus usage/cost rows plus reservation settlement;
 - tailoring result plus change summary plus alerts;
@@ -297,7 +319,7 @@ separately prove format and native-vault compatibility.
 The local Step 5 reader supports document schemas 1 and 2. Explicit upgrades add
 stable ordered links and date records without parsing legacy date text or
 rewriting publications. Draft saves cannot downgrade the schema. No SQLite table
-migration is required. V1-only profiles retain backup format 1.1; mixed profiles
+migration is required. Historically, v1-only profiles used backup format 1.1; mixed profiles
 containing v2 documents use format 1.2 with authenticated documentSchema 2 and
 existing databaseSchema 2. New document creation stays v1 until structured editor
 activation. Evidence and remaining gates:

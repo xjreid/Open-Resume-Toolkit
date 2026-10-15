@@ -1,6 +1,6 @@
 # Application behavior reference
 
-Last reviewed: 2026-09-20
+Last reviewed against local implementation: 2026-10-15
 
 This folder documents how the implemented desktop application behaves from a
 user and troubleshooting perspective. It records workflows, state changes,
@@ -24,6 +24,11 @@ drift and resolve it before relying on either description.
 | [AI resume tailoring](resume-tailoring.md) | Editorial freedom, the seven template regions, factual grounding, refinement, and response validation. |
 | [Shared application behavior](shared-application-behavior.md) | Main navigation, encrypted storage, import, backup/recovery, destructive operations, and common failure rules. |
 | [Maintenance and troubleshooting map](maintenance-and-troubleshooting.md) | How to update this reference and where to find the corresponding UI, native commands, storage logic, and tests. |
+
+The [implementation map](../development/current-state.md) records platform and
+milestone boundaries; the [Codex guide](../ai/codex-plan-runtime.md) covers the
+third AI page, installation, Start/Stop server, and memory-only sign-in. Current
+AI navigation is **My Keys**, **Codex**, and **Data**.
 
 ## Core distinctions
 

@@ -415,6 +415,49 @@ pub mod testing {
 
     use super::{DatabaseKey, DatabaseKeyVault, VaultError, VaultReference};
 
+    /// In-memory provider vault for lifecycle tests; never accesses Keychain.
+    #[derive(Default)]
+    pub struct MemoryProviderCredentialVault {
+        values: Mutex<HashMap<super::ProviderCredentialReference, super::ProviderSecret>>,
+    }
+    impl MemoryProviderCredentialVault {
+        #[must_use]
+        pub fn new() -> Self {
+            Self::default()
+        }
+    }
+    impl super::ProviderCredentialVault for MemoryProviderCredentialVault {
+        fn use_secret<T>(
+            &self,
+            reference: &super::ProviderCredentialReference,
+            operation: impl FnOnce(&super::ProviderSecret) -> T,
+        ) -> Result<T, VaultError> {
+            let values = self.values.lock().map_err(|_| VaultError::Unavailable)?;
+            Ok(operation(values.get(reference).ok_or(VaultError::Missing)?))
+        }
+        fn store_new(
+            &self,
+            reference: &super::ProviderCredentialReference,
+            secret: &super::ProviderSecret,
+        ) -> Result<(), VaultError> {
+            let mut values = self.values.lock().map_err(|_| VaultError::Unavailable)?;
+            if values.contains_key(reference) {
+                return Err(VaultError::AlreadyExists);
+            }
+            let copy =
+                secret.expose_for(|bytes| super::ProviderSecret::from_bytes(bytes.to_vec()))?;
+            values.insert(reference.clone(), copy);
+            Ok(())
+        }
+        fn delete(&self, reference: &super::ProviderCredentialReference) -> Result<(), VaultError> {
+            self.values
+                .lock()
+                .map_err(|_| VaultError::Unavailable)?
+                .remove(reference);
+            Ok(())
+        }
+    }
+
     #[derive(Default)]
     pub struct MemoryDatabaseKeyVault {
         values: Mutex<HashMap<(String, String), Vec<u8>>>,

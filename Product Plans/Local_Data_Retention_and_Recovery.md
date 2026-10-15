@@ -9,14 +9,27 @@ Every local data category has a purpose, location, access rule, cleanup trigger,
 - Retained on the current device until the user deletes all local ORT data or removes it according to documented uninstall behavior.
 - Portable settings may be included in full backup/export.
 - Installation identifiers and update preferences are reset when all local data is deleted.
-- Direct-provider keys and Codex sessions are references only; secret values remain in the OS credential vault and are excluded from ordinary backup/export.
+- Direct-provider secrets remain in the OS credential vault. Codex authorization is memory-only in its supervised process and ends when that process stops. Neither is included in ordinary backup/export.
 
 ## Master resume
 
-- The one draft and zero-or-one published snapshot remain until changed or deleted by the user.
+- The one draft and current published master remain until changed or deleted by the user; earlier immutable publication revisions remain stored for replay and backup.
 - Publishing replaces the published association while preserving the draft.
-- Full backup/export contains both structured records and the render manifests needed for supported rendering.
+- Full backup/export contains the draft and all publication revisions and the render manifests needed for supported rendering.
 - ORT does not maintain a hidden permanent user-visible version history. Transaction journals and migration safety copies are bounded recovery mechanisms and are cleaned after successful validation.
+
+## Profile ownership and retirement
+
+One process owns the profile before startup recovery and throughout retries,
+restore, rollback, and deletion. A second launch refuses profile access. The
+ownership file is outside every profile directory that recovery renames.
+
+A retained safety profile keeps its provider credentials for rollback. Permanent
+safety-copy deletion and delete-all collect provider references from every target
+profile and persist a cleanup inventory before removing credentials, database
+keys, or rosters. Failures remain restart-retryable and never report finished
+cleanup. Malformed rosters block key destruction rather than being treated as
+empty. External exports and backups stay outside this boundary.
 
 ## Resume import
 
@@ -113,3 +126,12 @@ The settings area supports:
 Destructive actions identify what will and will not be deleted, mention external exports/backups, and require confirmation. There is no remote recovery window; recovery is possible only from an existing user-controlled backup or a still-valid local safety copy disclosed by the interface.
 
 Uninstall documentation must state separately whether it removes application binaries, native-host registration, settings/database, credentials, and user-selected exports/backups. The safest mainstream default is to avoid silently destroying the only local profile merely because the application binary is uninstalled, while still providing a complete removal path.
+
+## Drag-out artifacts
+
+New plaintext drag artifacts have private `0700` roots, private files, and a live
+OS lease. Normal Finish/profile retirement clears them after active drags finish;
+startup removes abandoned roots older than 24 hours without touching live leases.
+Legacy roots without leases require a subsequent boot and strict owner, filename,
+permission, and content checks. A legacy artifact may therefore remain longer
+than 24 hours until safe cleanup can be established.

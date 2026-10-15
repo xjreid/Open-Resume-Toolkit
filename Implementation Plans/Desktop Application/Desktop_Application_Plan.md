@@ -9,7 +9,7 @@
 
 This plan defines functional structure and interaction contracts only. It expressly does not select the application aesthetic.
 
-The active native implementation and qualification target through M2 is macOS
+The active native implementation and qualification target is macOS
 Apple Silicon with WKWebView. Windows WebView2 and Intel-Mac verification remain
 later platform-expansion work; shared UI behavior must not intentionally diverge.
 
@@ -33,7 +33,7 @@ accessibility qualification rather than inheriting the macOS result.
 
 ### Main window
 
-Owns master-resume creation/import/editing/publishing plus tracker, aggregate AI Monitoring, connection setup, settings, backup, update, and repair. It contains no current-job tailoring/editor route. A single-instance guard routes file-open intents to this window and browser-capture intents to the overlay. Closing behavior follows the OS convention; the app does not stay resident merely to collect browsing data.
+Owns master-resume creation/import/editing/publishing plus tracker, aggregate AI Monitoring, connection setup, settings, backup, update, and repair. It contains no current-job tailoring/editor route. The current profile-lifecycle owner acquires a stable OS lock before recovery and refuses secondary profile access. Existing-instance intent forwarding is still planned. Authorized browser capture targets the overlay. Closing behavior follows the OS convention; the app does not stay resident merely to collect browsing data.
 
 ### Overlay window
 
@@ -47,7 +47,10 @@ File selection/save uses native dialogs through specific Rust commands. External
 
 ## Functional information architecture
 
-The initial routes/views are:
+The following routes sketch functional responsibilities, not implemented URL
+routes. Current navigation and component ownership are documented in
+[desktop workspaces](../../docs/development/desktop-workspaces.md). Update,
+browser repair, and production About/Legal controls remain release work:
 
 ```text
 /start                    local profile and recovery/startup states
@@ -181,7 +184,7 @@ The selected connection mode is exactly one of `none`, `direct`, or `codex`.
 
 ### Direct
 
-- Add/test/delete one credential per provider through a secret-entry dialog backed by the OS vault.
+- Add/test/delete multiple saved credentials per provider through a secret-entry dialog backed by the OS vault; choose at most one active key.
 - The UI receives only key presence, label, last test time, and safe error; it cannot read the secret back.
 - Settings explain that the vault protects against offline/other-user access, not malware or another person already controlling the same unlocked OS account. Optional user-presence protection is not promised until native-host, recovery, and accessibility behavior is proven.
 - Provider/model selection is derived from the verified catalog and adapter capability result.
@@ -189,10 +192,10 @@ The selected connection mode is exactly one of `none`, `direct`, or `codex`.
 
 ### Codex
 
-- Locate supported runtime, choose an executable if automatic discovery fails, verify version/signature/path, and initiate managed ChatGPT/device-code authentication.
+- Check the pinned official runtime without launching it; explicitly install if needed, then Start server and initiate managed ChatGPT browser authentication. Device-code/manual executable selection are not current UI controls. Identity/digest/path verification cannot be bypassed.
 - Show runtime compatibility, containment status, account state, usage snapshot age/provenance, model intersection, and quota threshold controls.
 - Do not show Codex as available when the platform containment gate is not satisfied.
-- Removal disconnects ORT's isolated configuration/reference without uninstalling Codex or affecting unrelated Codex use.
+- Sign out ends memory-only authorization while retaining server permission. Stop server revokes permission, restores the saved API-key choice, and ends authorization without uninstalling Codex or affecting unrelated clients. Every application launch starts stopped.
 
 Switching modes cancels no active request silently. If an operation is running, require it to complete/cancel before the new mode becomes active.
 

@@ -24,6 +24,19 @@ The application is local-first: resume content, settings, AI accounting,
 guardrails, diagnostics, and render receipts remain local unless the user
 explicitly exports or invokes an external AI provider.
 
+Only one process can own the local profile. A second launch refuses profile
+access while the owner is alive. Ownership stays held during recovery,
+restore, deletion, and storage retries, and is released when the process exits.
+
+## Application tracker
+
+Search waits briefly for typing to settle and includes retained application
+materials. The table loads at most 100 applications per page, ordered by date
+applied, with Previous page and Next page controls. Changing search or status
+returns to the first page. Superseded requests cannot replace the current
+results or start fetching more pages. Export visible CSV includes the current
+page.
+
 ## Closing the app
 
 Closing the main window or overlay, choosing Quit, and native macOS Quit all
@@ -73,7 +86,12 @@ review content from silently overwriting the draft.
 - Restore stages a fresh encrypted replacement profile and activates it safely
   on restart rather than merging it into the current profile.
 - The former profile can be retained as an encrypted local safety copy.
-  Rollback and permanent safety-copy deletion are explicit actions.
+  Its provider credentials remain available for rollback. Permanent safety-copy
+  deletion removes its provider credentials before its database key and files;
+  interrupted cleanup retries on restart.
+- Export checks aggregate sizes and record counts before loading history,
+  then enforces a 64 MiB payload budget during collection and serialization.
+  Encryption runs after the consistent storage snapshot is read.
 - External exports and unrelated backup files are not changed by profile
   restore or local profile deletion.
 
@@ -86,7 +104,9 @@ items, and in-memory preview bytes.
 **Delete all local ORT data** requires the exact confirmation phrase. It
 deletes the active encrypted profile, draft, publications, settings, render
 history, diagnostics, local recovery data, pending restore state, provider
-credentials, and profile keys. It also discards unsaved editor state. It does
+credentials, and profile keys from active, staged, and retained safety profiles.
+A durable credential inventory keeps interrupted removal retryable before any
+profile key or roster is destroyed. It also discards unsaved editor state. It does
 not uninstall the application or delete external exports and backups.
 
 If committed cleanup is incomplete, the application reports that state and

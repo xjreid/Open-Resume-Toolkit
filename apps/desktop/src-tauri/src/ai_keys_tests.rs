@@ -481,20 +481,20 @@ fn explicit_test_can_use_paused_key_without_unpausing_or_selecting_it() {
     assert!(test_connection(&store, Uuid::now_v7()).is_err());
 }
 #[test]
-fn non_primary_removal_preserves_primary_and_all_keys_can_be_found_for_data_deletion() {
+fn non_primary_removal_preserves_primary_and_suspension_pauses_remaining_keys() {
     let (_temp, store, vault) = fixture();
     add(&store, &vault, "anthropic");
     let registry = add(&store, &vault, "anthropic");
     let first = registry.keys[0].credential_id;
     let second = registry.keys[1].credential_id;
     action(&store, &vault, first, AiKeyAction::SelectPrimary);
-    assert_eq!(saved_credential_references(&store).unwrap().len(), 2);
+    assert_eq!(vault.secrets.lock().unwrap().len(), 2);
     assert_eq!(
         action(&store, &vault, second, AiKeyAction::Remove).primary_credential_id,
         Some(first)
     );
     assert!(request_connection(&store, Some(second)).is_err());
-    assert_eq!(saved_credential_references(&store).unwrap().len(), 1);
+    assert_eq!(vault.secrets.lock().unwrap().len(), 1);
     suspend_for_deletion(&store).unwrap();
     assert!(
         load_registry(&store)

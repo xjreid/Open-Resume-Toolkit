@@ -12,9 +12,9 @@ covers the JSON's exact bytes. The deterministic checkout test exercises real
 Git conversion with Windows-style `core.autocrlf=true` so a platform checkout
 cannot silently invalidate the bundled signature.
 
-The current development catalog records the three Balanced fixtures used for
+The current development catalog contains three entries with legacy Balanced metadata used for
 the M3 adapter boundary and a Gemini Economy entry for `gemini-3.5-flash-lite`.
-OpenAI and Anthropic Economy, and all Quality presets, remain unavailable. A
+The current UI selects these explicit model IDs; tier names are legacy catalog/migration metadata. Other tier/model candidates are not automatically available. A
 provider model-list response may hide these entries; it cannot add an untrusted
 model.
 

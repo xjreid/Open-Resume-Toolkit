@@ -110,14 +110,16 @@ A provider call begins only after the dispatch record commits. If the network ou
 ## AI connection-mode lifecycle
 
 - **No AI** — no credential/session is active and all AI-dependent actions explain how to configure one.
-- **Direct provider configured** — one OpenAI, Anthropic, or Gemini credential identity and tested model preset are active; other stored direct credentials are inactive.
+- **Direct provider configured** — one OpenAI, Anthropic, or Gemini credential identity and explicit tested model ID are active; other stored direct credentials are inactive.
+- **Codex stopped** — the server is not permitted to start; every app launch begins here. A selected direct key becomes available again when the server is stopped.
+- **Codex started, signed out** — Codex remains the exclusive AI provider choice, but AI requests wait for managed sign-in; there is no API-key fallback.
 - **Codex runtime unavailable** — Codex mode was selected, but no compatible separately installed runtime passed executable, version, protocol, method, and capability checks; ORT provides installation or update guidance and does not alter the user's general Codex environment.
-- **Codex sign-in pending** — the managed browser or device-code flow is underway and can be cancelled without changing the prior mode.
+- **Codex sign-in pending** — the managed browser flow is underway and can be cancelled without changing the prior mode.
 - **Codex connected** — the compatible runtime is launched and supervised by ORT over local `stdio`; isolated ChatGPT auth, a tested returned model, account/quota visibility, and app-server compatibility have passed checks.
 - **Connection degraded** — credential/session, external runtime availability, child-process health, model availability, protocol compatibility, pricing, or quota refresh needs action; ORT does not fall back to another mode.
 - **Switch pending** — an active operation must finish or be cancelled before a confirmed mode/provider switch commits atomically.
 
-A failed runtime check, child-process launch, sign-in, or connection test preserves the prior usable mode. Removing the active direct credential or signing out of Codex transitions to No AI after confirmation. Mode changes never import, expose, or exchange credentials between adapters. Closing or disconnecting Codex stops the ORT-launched child process; interrupted or orphaned processes are detected and handled recoverably.
+A failed runtime check, child-process launch, sign-in, or connection test preserves the prior usable mode. Removing the active direct credential leaves no active direct key. Signing out of Codex ends its memory-only account session while server permission remains for this run, so it cannot silently fall back. Stop server restores the saved direct key when available. Mode changes never import, expose, or exchange credentials between adapters. Closing or disconnecting Codex stops the ORT-launched child process; interrupted or orphaned processes are detected and handled recoverably.
 
 ## Retry and cancellation rules
 

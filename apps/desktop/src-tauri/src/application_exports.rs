@@ -20,6 +20,9 @@ pub struct DragFiles {
 
 #[derive(Default)]
 pub(crate) struct DragSession {
+    #[cfg(target_os = "macos")]
+    pub(crate) directory: Option<crate::drag_artifacts::DragArtifact>,
+    #[cfg(not(target_os = "macos"))]
     pub(crate) directory: Option<tempfile::TempDir>,
     pub(crate) active_drags: usize,
     pub(crate) clear_pending: bool,
@@ -174,48 +177,7 @@ impl ApplicationExportState {
 impl DragFiles {
     #[cfg(target_os = "macos")]
     pub(crate) fn sweep_stale() {
-        use std::os::unix::fs::MetadataExt;
-        use std::time::Duration;
-
-        let root = std::env::temp_dir();
-        // This is a cleanup hint, never a reason to fail desktop startup.
-        // An age threshold avoids touching another live ORT process.
-        let Ok(owner_probe) = tempfile::Builder::new()
-            .prefix("ort-drag-probe-")
-            .tempdir_in(&root)
-        else {
-            return;
-        };
-        let Ok(owner) = owner_probe.path().metadata().map(|value| value.uid()) else {
-            return;
-        };
-        let Ok(children) = std::fs::read_dir(&root) else {
-            return;
-        };
-        for child in children.flatten() {
-            let path = child.path();
-            let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
-                continue;
-            };
-            if !name.starts_with("ort-drag-") || name.starts_with("ort-drag-probe-") {
-                continue;
-            }
-            let Ok(meta) = std::fs::symlink_metadata(&path) else {
-                continue;
-            };
-            if !meta.file_type().is_dir()
-                || meta.uid() != owner
-                || meta.mode() & 0o777 != 0o700
-                || meta
-                    .modified()
-                    .ok()
-                    .and_then(|time| time.elapsed().ok())
-                    .is_none_or(|age| age < Duration::from_hours(24))
-            {
-                continue;
-            }
-            let _ = std::fs::remove_dir_all(path);
-        }
+        crate::drag_artifacts::sweep_stale();
     }
 
     pub(crate) fn clear(&self) {
@@ -245,7 +207,7 @@ impl DragFiles {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if guard.directory.is_none() {
-            guard.directory = Some(tempfile::Builder::new().prefix("ort-drag-").tempdir()?);
+            guard.directory = Some(crate::drag_artifacts::DragArtifact::new()?);
         }
         let root = guard
             .directory

@@ -369,17 +369,6 @@ fn reference(
     )
     .map_err(|_| StorageError::InvalidData)
 }
-pub(crate) fn saved_credential_references(
-    store: &EncryptedStore,
-) -> Result<Vec<ProviderCredentialReference>, StorageError> {
-    load_registry(store)?
-        .0
-        .keys
-        .iter()
-        .filter(|key| !key.removed)
-        .map(|key| reference(store, key))
-        .collect()
-}
 pub(crate) fn suspend_for_deletion(store: &EncryptedStore) -> Result<(), StorageError> {
     let (mut registry, revision) = load_registry(store)?;
     for key in &mut registry.keys {

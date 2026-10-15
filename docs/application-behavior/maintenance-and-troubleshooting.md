@@ -40,7 +40,7 @@ user concepts, then link to the owning code and tests here.
 
 1. Is there an active key, or is the Active key bucket empty?
 2. Is the key paused, removal-failed, or successfully removed?
-3. Does its provider/preset have an enabled catalog model?
+3. Does its provider/model ID have an enabled compatible catalog entry?
 4. Has either its per-key cap or the general cap run out of available
    exposure?
 5. Is another test or request still active?

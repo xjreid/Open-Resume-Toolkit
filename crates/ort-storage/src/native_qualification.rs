@@ -70,6 +70,17 @@ impl NativeProfile {
         store
     }
 
+    fn activate(&self, vault: &OsDatabaseKeyVault) -> EncryptedStore {
+        EncryptedStore::open_or_activate_pending_restore(
+            &self.root(),
+            CHANNEL,
+            vault,
+            &ort_vault::OsProviderCredentialVault::new(),
+        )
+        .unwrap()
+        .0
+    }
+
     fn child(&self, action: &str, point: Option<&str>) -> Child {
         let mut command = Command::new(std::env::current_exe().unwrap());
         command
@@ -317,16 +328,34 @@ fn native_child() {
     let action = std::env::var("ORT_M1_ACTION").unwrap();
     let vault = OsDatabaseKeyVault::new();
     if action == "activate" {
-        EncryptedStore::open_or_activate_pending_restore(&root, CHANNEL, &vault).unwrap();
+        EncryptedStore::open_or_activate_pending_restore(
+            &root,
+            CHANNEL,
+            &vault,
+            &ort_vault::OsProviderCredentialVault::new(),
+        )
+        .unwrap();
         return;
     }
     if action == "delete-all" {
-        EncryptedStore::delete_all_local_data(&root, CHANNEL, &vault).unwrap();
+        EncryptedStore::delete_all_local_data(
+            &root,
+            CHANNEL,
+            &vault,
+            &ort_vault::OsProviderCredentialVault::new(),
+        )
+        .unwrap();
         return;
     }
     let store = EncryptedStore::open_or_initialize(&root, CHANNEL, &vault).unwrap();
     if action == "delete-safety" {
-        store.delete_retained_safety_copy(CHANNEL, &vault).unwrap();
+        store
+            .delete_retained_safety_copy(
+                CHANNEL,
+                &vault,
+                &ort_vault::OsProviderCredentialVault::new(),
+            )
+            .unwrap();
         return;
     }
     let draft = store.load_draft().unwrap().unwrap();
@@ -339,6 +368,29 @@ fn native_child() {
         assert_eq!(action, "reopen");
     }
     store.verify_integrity().unwrap();
+}
+
+fn simulate_v1_profile(root: &Path, store: EncryptedStore) {
+    store
+        .connection
+        .lock()
+        .unwrap()
+        .execute_batch(
+        "DROP VIEW tracker_projection; DROP TRIGGER tracker_search_insert; DROP TRIGGER tracker_search_update;
+         DROP TABLE tracker_search; DROP TABLE tracker_entries;
+         DROP TABLE ai_lifetime_totals; DROP TABLE ai_imported_guardrails;
+         DROP TABLE ai_guardrail_policies; DROP TABLE ai_attempts; DROP TABLE ai_operations;
+         DROP TABLE render_manifests; DELETE FROM schema_migrations WHERE version >= 2;",
+        )
+        .unwrap();
+    let mut manifest = store.manifest().clone();
+    drop(store);
+    manifest.schema_version = 1;
+    fs::write(
+        root.join(MANIFEST_FILENAME),
+        serde_json::to_vec_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -425,22 +477,7 @@ fn native_storage_failure_matrix() {
     ] {
         let mut profile = NativeProfile::new();
         let store = profile.initialize();
-        store
-            .connection
-            .lock()
-            .unwrap()
-            .execute_batch(
-                "DROP TABLE render_manifests; DELETE FROM schema_migrations WHERE version = 2;",
-            )
-            .unwrap();
-        let mut manifest = store.manifest().clone();
-        drop(store);
-        manifest.schema_version = 1;
-        fs::write(
-            profile.root().join(MANIFEST_FILENAME),
-            serde_json::to_vec_pretty(&manifest).unwrap(),
-        )
-        .unwrap();
+        simulate_v1_profile(&profile.root(), store);
         profile.crash("reopen", point);
         profile.run("reopen");
         let store = EncryptedStore::open_or_initialize(&profile.root(), CHANNEL, &vault).unwrap();
@@ -511,7 +548,13 @@ fn qualify_portable_key_separation_and_deletion(vault: &OsDatabaseKeyVault) {
     assert_eq!(target.load_draft().unwrap().unwrap().document.title, MARKER);
     drop(target);
     assert_eq!(
-        EncryptedStore::delete_all_local_data(&destination, CHANNEL, vault).unwrap(),
+        EncryptedStore::delete_all_local_data(
+            &destination,
+            CHANNEL,
+            vault,
+            &ort_vault::OsProviderCredentialVault::new()
+        )
+        .unwrap(),
         AllLocalDataDeletion::Deleted
     );
     assert!(matches!(vault.load(&target_ref), Err(VaultError::Missing)));
@@ -572,9 +615,7 @@ fn qualify_m2_recovery_crash(point: &str, vault: &OsDatabaseKeyVault) {
     drop(store);
     if point.starts_with("restore-") {
         profile.crash("activate", point);
-        let (restored, _) =
-            EncryptedStore::open_or_activate_pending_restore(&profile.root(), CHANNEL, vault)
-                .unwrap();
+        let restored = profile.activate(vault);
         assert_eq!(
             restored.load_draft().unwrap().unwrap().document.title,
             MARKER
@@ -585,9 +626,7 @@ fn qualify_m2_recovery_crash(point: &str, vault: &OsDatabaseKeyVault) {
         );
         restored.verify_integrity().unwrap();
     } else {
-        let (restored, _) =
-            EncryptedStore::open_or_activate_pending_restore(&profile.root(), CHANNEL, vault)
-                .unwrap();
+        let restored = profile.activate(vault);
         if point == "rollback-safety-removed" {
             restored.stage_safety_rollback(CHANNEL, vault).unwrap();
         }
@@ -600,9 +639,7 @@ fn qualify_m2_recovery_crash(point: &str, vault: &OsDatabaseKeyVault) {
             "delete-all"
         };
         profile.crash(action, point);
-        let (reopened, _) =
-            EncryptedStore::open_or_activate_pending_restore(&profile.root(), CHANNEL, vault)
-                .unwrap();
+        let reopened = profile.activate(vault);
         if action == "delete-all" {
             assert!(reopened.load_draft().unwrap().is_none());
             assert!(reopened.load_latest_published().unwrap().is_none());

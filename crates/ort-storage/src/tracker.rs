@@ -64,8 +64,8 @@ impl EncryptedStore {
         .transpose()
     }
 
-    /// A bounded metadata projection. Search includes retained text inside SQLite,
-    /// but retained documents are never allocated or transferred for the table.
+    /// A bounded search projection maintained atomically with canonical records.
+    /// Retained snapshots are never parsed or transferred for table queries.
     /// # Errors
     /// Rejects invalid bounds and unavailable or corrupt storage.
     pub fn tracker_summaries(
@@ -83,7 +83,7 @@ impl EncryptedStore {
             .lock()
             .map_err(|_| StorageError::Unavailable)?;
         let mut statement = connection.prepare(
-            "SELECT entry_id, revision, json_object('company',json_extract(CAST(entry_json AS TEXT),'$.company'),'title',json_extract(CAST(entry_json AS TEXT),'$.title'),'location',json_extract(CAST(entry_json AS TEXT),'$.location'),'dateApplied',json_extract(CAST(entry_json AS TEXT),'$.dateApplied'),'status',json_extract(CAST(entry_json AS TEXT),'$.status'),'customStatus',json_extract(CAST(entry_json AS TEXT),'$.customStatus'),'sourceUrl',json_extract(CAST(entry_json AS TEXT),'$.sourceUrl')), json_type(CAST(entry_json AS TEXT),'$.resume') = 'object', json_type(CAST(entry_json AS TEXT),'$.coverLetter') = 'text', coalesce(json_array_length(CAST(entry_json AS TEXT),'$.answers'),0) FROM tracker_entries WHERE profile_id = ?1 AND (?2 = '' OR instr(lower(CAST(entry_json AS TEXT)),lower(?2)) > 0) AND (?3 = '' OR json_extract(CAST(entry_json AS TEXT),'$.status') = ?3) ORDER BY updated_at DESC, entry_id DESC LIMIT ?4 OFFSET ?5"
+            "SELECT entry_id, revision, metadata_json, has_resume, has_cover_letter, answer_count FROM tracker_search WHERE profile_id = ?1 AND (?2 = '' OR instr(search_text,lower(?2)) > 0) AND (?3 = '' OR status = ?3) ORDER BY date_applied DESC, updated_at DESC, entry_id DESC LIMIT ?4 OFFSET ?5"
         ).map_err(|_| StorageError::Unavailable)?;
         statement
             .query_map(
@@ -332,6 +332,51 @@ mod tests {
         // The same connection must never expose a different profile's rows.
         store.manifest.profile_id = Uuid::now_v7();
         assert!(store.tracker_get(&id).unwrap().is_none());
+        assert!(store.tracker_summaries(0, 100, "", "").unwrap().is_empty());
+    }
+
+    #[test]
+    fn search_projection_backfills_and_tracks_updates_and_deletes() {
+        let temp = TempDir::new().unwrap();
+        let vault = MemoryDatabaseKeyVault::new();
+        let store = EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+        let id = Uuid::now_v7().to_string();
+        let mut value = json!({"company":"Synthetic","title":"Engineer","location":"Remote","dateApplied":"2026-10-14","status":"applied","customStatus":"","sourceUrl":"","resume":null,"coverLetter":"Original marker","answers":[]});
+        store.tracker_save(&id, None, &value).unwrap();
+        {
+            let db = store.connection.lock().unwrap();
+            db.execute_batch("DROP VIEW tracker_projection; DROP TRIGGER tracker_search_insert; DROP TRIGGER tracker_search_update; DROP TABLE tracker_search; DELETE FROM schema_migrations WHERE version=9;").unwrap();
+        }
+        drop(store);
+        let store = EncryptedStore::open_or_initialize(temp.path(), "test", &vault).unwrap();
+        assert_eq!(
+            store
+                .tracker_summaries(0, 100, "original marker", "applied")
+                .unwrap()
+                .len(),
+            1
+        );
+        value["coverLetter"] = json!("Replacement marker");
+        value["status"] = json!("interview");
+        store.tracker_save(&id, Some(1), &value).unwrap();
+        assert!(
+            store
+                .tracker_summaries(0, 100, "original marker", "")
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .tracker_summaries(0, 100, "replacement marker", "applied")
+                .unwrap()
+                .is_empty()
+        );
+        let matches = store
+            .tracker_summaries(0, 100, "REPLACEMENT MARKER", "interview")
+            .unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].revision, 2);
+        store.tracker_delete(&id, 2).unwrap();
         assert!(store.tracker_summaries(0, 100, "", "").unwrap().is_empty());
     }
 

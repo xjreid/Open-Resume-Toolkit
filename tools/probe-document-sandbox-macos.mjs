@@ -150,7 +150,7 @@ try {
   console.log(JSON.stringify(report, null, 2));
   console.log(`Synthetic measurements saved: ${reportPath}`);
   console.log(
-    "Probe completion is not full containment proof. Document import remains disabled.",
+    "This legacy native-parser probe is not full containment proof and does not qualify the packaged metered-Wasm importer.",
   );
   if (
     !conclusions.filesystemIsolationPassed ||

@@ -13,6 +13,17 @@ Chrome and Edge extensions send only user-reviewed captures to the locally insta
 
 Browser content can never directly read local records, access credentials, change the tracker, select a final document, execute a local command, or initiate an AI call without desktop authorization.
 
+## Current implementation boundary
+
+Chrome 0.3.0 implements desktop-authorized two-corner rectangle capture through
+the explicit macOS development host. The overlay owns review and AI dispatch.
+Chrome uses `scripting`, `nativeMessaging`, `alarms`, and declared HTTP/HTTPS site
+access because an overlay click cannot grant `activeTab`; it has no toolbar
+popup/action or background content reader. Users may restrict site access.
+Question text can be entered manually in Answers. Edge remains capture-disabled.
+Production launch/repair/identity/Store requirements below remain open; see the
+[implementation map](../docs/development/current-state.md).
+
 ## Capture behavior
 
 - Initial actions are job-description capture, application-question capture, capability check, acknowledgement, and user-facing error.
@@ -37,12 +48,15 @@ configuration, never an automatic fallback from production to development.
 - Development and production use different identifiers, host names, manifests, and IPC endpoints.
 - The native host communicates with the desktop through a per-user protected mechanism such as a Windows named pipe and macOS Unix-domain socket or equivalent.
 - The IPC handshake uses operating-system access control and an installation-scoped secret or equivalent defense so another local process cannot impersonate the extension bridge casually.
-- Messages are bounded, expire quickly, and are idempotent. The protocol supports a deliberate compatibility window and fails safely when an update is required.
+- Messages are bounded and expire quickly. Repeated control commands are idempotent; captures have session/replay checks and unconfirmed payloads are never automatically resent. The implemented browser contract is protocol v1; a broader production compatibility window remains planned.
 - The bridge contains no AI key and retains no permanent resume or application content.
 
 Exact message-size, timeout, retry, protocol-version, and compatibility values belong in implementation planning and must remain within browser-native-messaging constraints.
 
-## Desktop launch behavior
+## Planned production desktop launch behavior
+
+The current development host reports an unavailable desktop without launching
+it. Open ORT manually. The following launch/repair behavior remains release work.
 
 If the app is not running, the native host may launch it through a platform-approved mechanism and complete a time-bounded handshake. If launch or connection fails, the extension provides actions to:
 
@@ -53,7 +67,10 @@ If the app is not running, the native host may launch it through a platform-appr
 
 It must not repeatedly spawn processes or silently discard the reviewed capture.
 
-## Installation and repair
+## Planned production installation and repair
+
+Current development registration is explicit through the checked-in setup
+helpers; it is not a shipped automatic installer or Browser connections screen.
 
 - The desktop installation places the native host and manifest in controlled locations.
 - Normal installation or first-run setup registers per-user Chrome and Edge native hosts without requiring manual registry or filesystem edits.
@@ -64,12 +81,10 @@ It must not repeatedly spawn processes or silently discard the reviewed capture.
 
 ## Permissions
 
-- Prefer `activeTab`, `scripting`, `nativeMessaging`, and the narrowest permissions that implement deliberate capture.
-- In the default least-permission flow, the overlay can arm or explain a capture request, but the browser extension action or registered keyboard shortcut supplies the browser-required user gesture before selected text is read.
-- An overlay-initiated capture may be offered only after the user explicitly grants a narrowly scoped optional site permission and the browser/native bridge proves a bounded authenticated session. It is an optional convenience, not a prerequisite for capture.
-- Do not request `<all_urls>` by default merely to make the overlay button appear to initiate capture directly.
-- Broad host permissions require a documented product need, explicit store disclosure, and security review.
-- Extension storage contains only non-sensitive preferences and pending non-content state when necessary.
+- Use `scripting`, `nativeMessaging`, `alarms`, and declared HTTP/HTTPS host access for the implemented desktop-owned capture flow. An overlay click cannot grant `activeTab`; there is no toolbar action or shortcut-based capture path.
+- Host access supports user-chosen job sites. It permits injection only after a bounded authenticated desktop capture session; it does not authorize idle reading. Users may restrict Chrome site access.
+- Store disclosures explain each permission and the explicit two-corner capture workflow. Restricted browser pages remain unavailable; no permission workaround or background scan is offered.
+- The current extension has no persistent storage, startup content scripts, cookies, browsing-history access, remote code, or external network calls. Selected text exists only in bounded memory for delivery.
 - Extension source is published with the desktop source, and store packages must be traceable to repository revisions.
 
 ## Chrome and Edge variants
@@ -78,7 +93,7 @@ The extensions should share one codebase where practical while retaining distinc
 
 ## Failure behavior
 
-- Duplicate messages return the original acknowledgement or are ignored safely.
+- Repeated controls are handled idempotently; duplicate/replayed capture delivery cannot overwrite another session.
 - Oversized, stale, malformed, unrecognized, or unauthorized messages are rejected before desktop processing.
-- If the desktop rejects a capture, the extension keeps the reviewed text only long enough to let the user retry or copy it, then clears it.
+- If delivery is rejected or unconfirmed, capture controls are removed and no text is resent automatically. Existing desktop fields stay available; inspect them before capturing again. No content is queued across worker restarts.
 - No extension failure may expose local database paths, secrets, stack traces, or unrelated application content.

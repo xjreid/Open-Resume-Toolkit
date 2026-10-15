@@ -6,34 +6,25 @@ This is the navigation and authority map for the product and technical implement
 
 ## Current planning status
 
-Testing for M3 onward follows the [revised focused policy](<Product Plans/Quality_Accessibility_and_Verification.md>).
-The roadmap now lists minimum checks; older exhaustive testing instructions are superseded.
+Reviewed against the implementation on October 15, 2026. The
+[current implementation map](docs/development/current-state.md) and
+[application behavior reference](docs/application-behavior/README.md) describe
+working features; the [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>)
+owns milestone scope and acceptance.
 
+M0–M4 have recorded macOS Apple Silicon development acceptance. M5 remains open:
+the overlay, tracker, and Chrome development capture are implemented, while Edge
+capture and the remaining browser acceptance are unfinished. Optional M6 Codex
+runtime/install/login/accounting work is implemented and locally tested, but no
+full M6 acceptance is recorded. M7 production signing, notarization, final host/
+Store identities, and release/update qualification remain planned. Do not infer
+milestone closure from feature code or portability CI alone.
 
-The product direction and core workflows are defined. M0, M1, and M2 are
-complete for the macOS Apple Silicon development scope on the selected Tauri 2,
-React/TypeScript, Rust, SQLCipher and Typst baseline. The development build supports encrypted structured editing,
-publication, local exports/rendering, portable backup/recovery, storage reporting
-and exact crash-resumable local-profile deletion. The signed metered-Wasm import
-path provides explicit review before it changes a master record; AI, browser
-messaging, updates and release hardening remain later milestones. Open Folio is
-the user-approved application direction as of October 4, 2026. M2 completion includes the complete manual
-master-editor behavior in the authoritative resume-editor plan and all three
-qualified PDF/DOCX style categories. Historical replay retains immutable structured sources and uses a
-truthfully identified current renderer when the original tuple is unavailable,
-without retaining superseded drafts or old executable renderer bundles solely
-for replay.
-
-The [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>)
-is authoritative for milestone scope and order. The completed offline-path
-boundary is recorded in [M2 acceptance closure](evidence/0.0.0-dev/m2-acceptance-closure.md).
-M2.5, usable desktop and resume designs, M3 Direct AI foundation, and M4 application materials are complete for macOS Apple Silicon development. The user accepted [M4](evidence/0.0.0-dev/m4/closure.md) on October 5, 2026. M5 remains in progress. The October 7, 2026 app delivery order is M6 optional external Codex integration, then M7 distribution and stable hardening. The public GitHub repository is the primary home for project information, documentation, support, and releases.
-
-M0-M2 are currently qualified only on macOS Apple Silicon. Windows and Intel
-Mac remain later platform-expansion goals. Their shared builds may remain in CI
-as portability regression signals, but native implementation and manual evidence
-on those platforms do not block macOS-arm64 milestone completion and must not be
-represented as current support.
+The app uses Open Folio; the former Quiet Navy/Precision Workbench direction is
+historical. Windows and Intel Mac remain later platform expansions. Testing
+follows the [focused quality policy](<Product Plans/Quality_Accessibility_and_Verification.md>)
+while preserving the checked-in unconditional CI gates. Dated evidence and
+checkpoint documents retain their original results and limitations.
 
 ## Authority and precedence
 
@@ -56,12 +47,12 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - The desktop application is the primary product. Chrome and Edge extensions are narrow capture companions, not replacements for the desktop experience.
 - User content is local-first and remains on the user's computer. ORT operates no account service, ORT subscription, product database, cloud document store, provider quota, admin portal, or centrally funded AI key. Optional local guardrails govern only future ORT calls.
 - The desktop app remains useful without AI for manual resume editing, deterministic reviewed PDF/DOCX import into existing/custom sections, local document rendering, application tracking, and exports.
-- AI features use exactly one active mode: a deliberately configured OpenAI, Anthropic, or Gemini API key; a managed ChatGPT/Codex subscription connection; or No AI. API keys and Codex tokens use the operating-system credential vault and are never exposed to the browser extension. Vault storage protects the documented OS-user boundary and is not claimed to defeat malware already executing as the same unlocked user.
-- Direct API models use curated Economy/Balanced/Quality presets. Codex models are the tested intersection of the account's current app-server model list and ORT compatibility catalog; no adapter silently falls back or enables an untested model.
+- AI features use exactly one active mode: a deliberately configured OpenAI, Anthropic, or Gemini API key; a managed ChatGPT/Codex subscription connection; or No AI. Direct-provider API keys use the operating-system credential vault. Codex authorization is memory-only in its supervised process and ends at Stop server or quit; neither kind is exposed to the browser extension. Vault storage protects the documented OS-user boundary and is not claimed to defeat malware already executing as the same unlocked user.
+- Direct API keys store explicit tested model IDs from the signed catalog; the earlier Economy/Balanced/Quality names remain legacy catalog/migration metadata. Codex models are the tested intersection of the account's current app-server model list and ORT compatibility catalog; no adapter silently falls back or enables an untested model.
 - A private local ledger records every provider call initiated by ORT. The user-facing AI Monitoring view shows aggregate token/direct-cost graphs and totals for Week/Month/Year/All time plus secondary breakdowns; it is not an individual-call feed. Direct totals cannot claim to show calls made by other applications using the key; Codex account summaries are visibly account-wide and have no invented dollar cost.
 - Users may configure optional direct estimated-spend caps for calendar week/month/year/all-time periods or Codex provider-quota percentage thresholds. Guardrail state is durable and separate from activity-history deletion, while provider billing and quota controls remain authoritative.
 - AI requests require internet access unless a later local-model adapter is installed. Ordinary editing, tracking, rendering, and local search should work offline.
-- There is exactly one autosaved master-resume draft and at most one deliberately published master-resume snapshot in a local profile.
+- There is exactly one autosaved master-resume draft and one current published master in a local profile; earlier immutable publication revisions remain stored for replay and backup.
 - Tailoring uses the published master, never unpublished draft changes.
 - The tailoring operation also produces optional Required Qualification Alerts for explicit mandatory job requirements that map to resume content. Alerts distinguish a confirmed conflict from a qualification not found in the published master, ignore preferred/ambiguous/personal-or-legal requirements, never become a fit score, and never block the user from continuing.
 - One active overlay-owned application workspace has Stage 1 capture/review and Stage 2 Resume/Cover letter/Answers tabs. The main window has no job-specific route.
@@ -71,7 +62,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - Structured JSON is the canonical document format. PDF, DOCX, and plain text are locally rendered derived artifacts and are not retained by default.
 - There are no ORT plan-based application, import, AI, or storage quotas. Practical safety limits prevent malformed or excessively large inputs, and optional user-defined AI guardrails protect the user's provider budget or subscription quota.
 - Chrome and Edge on macOS Apple Silicon are the active browser/platform target. Windows and Intel Mac are later platform expansions; Firefox, Safari, Linux, mobile, OCR, local AI models, job-board notifications, and automatic form submission are not initial commitments.
-- Codex subscription mode requires a separately installed compatible Codex runtime; ORT does not bundle Codex in the initial release. ORT detects and validates the runtime, launches and stops `codex app-server` automatically over local `stdio`, and keeps its configuration, authentication, keyring, and temporary-data boundary separate from the user's general Codex environment.
+- Codex subscription mode requires a separately installed compatible Codex runtime; ORT does not bundle Codex in the initial release. ORT detects and validates the runtime, launches and stops `codex app-server` automatically over local `stdio`, and keeps its configuration, memory-only authentication, and temporary-data boundary separate from the user's general Codex environment.
 - When Windows development resumes, the preferred stable channel is a SignPath Foundation-signed direct package published through canonical GitHub Releases after the project meets eligibility and is accepted. Microsoft Store MSIX remains the fallback. This is deferred platform design, not a current channel.
 - Signed direct installations may check canonical GitHub Releases; a fallback Store edition uses Microsoft Store update APIs. Update channels must never overwrite one another.
 - Initial macOS GitHub artifacts are explicitly unsigned previews with checksums, provenance, Gatekeeper instructions, and authenticated update metadata. A stable macOS release requires Apple Developer ID signing and notarization once usage, support burden, organizational adoption, or funding justifies the recurring membership cost.
@@ -147,7 +138,7 @@ and final extension Store qualification, per the user decision of October 5,
 1. Read [Next milestones](<Implementation Plans/Next_Milestones.md>).
 2. Read M5 in the [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>) and its linked product authority before continuing work.
 3. Use [M2 acceptance closure](evidence/0.0.0-dev/m2-acceptance-closure.md) as the completed offline-path boundary; do not reopen completed M0–M2 scope unless a regression requires it.
-4. Use the [M3 evidence](evidence/0.0.0-dev/m3/README.md) and [M4 closure](evidence/0.0.0-dev/m4/closure.md) as completed boundaries. Continue through M5–M7 only in roadmap order and after their stated dependencies and gates are satisfied.
+4. Use the [M3 evidence](evidence/0.0.0-dev/m3/README.md) and [M4 closure](evidence/0.0.0-dev/m4/closure.md) as completed boundaries. Track remaining M5–M7 acceptance against the roadmap; locally implemented M6 work does not close missing M5 browser evidence or M7 release gates.
 
 ### Security and privacy review
 

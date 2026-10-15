@@ -1,9 +1,17 @@
+> **Current status — October 15, 2026:** M2 was accepted for macOS Apple Silicon.
+> Reviewed import is implemented through the pinned `ort-parser-helper` and
+> metered-Wasm guests when packaged identity pins are present. A bare shell build
+> cannot enable import. The legacy native-worker/XPC probe design below remains
+> disabled as a parser path; its earlier pending/disabled statements describe
+> that historical architecture. See [ADR 0012](../../docs/adr/0012-metered-wasm-document-parsers.md),
+> [M2 closure](../../evidence/0.0.0-dev/m2-acceptance-closure.md), and the
+> [current implementation map](../../docs/development/current-state.md).
+
 > **2026-09-07 implementation update:** The signed metered-Wasm helper and desktop
 > integration are implemented and locally qualified for macOS arm64. The new
 > packaged path requires both executable and running-code identity pins; the
 > legacy native-parser path remains disabled. Plaintext staging and whole-native
-> process rlimits/XPC are superseded for this path by ADR 0012. Step 6 human/native
-> acceptance remains pending. See [completion evidence](../../evidence/0.0.0-dev/m2-implementation-completion.md).
+> process rlimits/XPC are superseded for this path by ADR 0012. Step 6 acceptance was pending at that checkpoint and was later closed by the M2 acceptance record. See [completion evidence](../../evidence/0.0.0-dev/m2-implementation-completion.md).
 > Earlier status/probe paragraphs below are historical.
 
 # Security and threat model
@@ -15,7 +23,7 @@ helper/watchdog. For this path, guest linear-memory and instruction-fuel limits
 replace the unproven whole-native-process 512 MiB / 30 CPU-second requirements.
 Older native-probe requirements below are historical for that architecture;
 no previous failed gate is reclassified as a pass. Production integration and
-qualification remain required, and import remains disabled.
+qualification were still pending at that checkpoint. The current packaged path is described in the status note above.
 
 
 ## Status and scope
@@ -71,7 +79,7 @@ The vault is not treated as an application-identity sandbox on every platform. W
 
 Only the vault adapter can obtain secret bytes. Its public application ports expose presence, creation, replacement, operation-scoped use, and deletion—not general read or enumeration. Provider and database secrets never cross into the webview or native host. The native host can obtain only the IPC secret. Buffers are short-lived, excluded from core dumps where the platform permits, memory-locked where practical, and zeroized after use.
 
-Codex authentication is owned by the separately installed Codex runtime in an isolated ORT-specific configuration/keyring namespace. ORT stores only a connection record and safe account/status metadata.
+Codex authentication is owned by the separately installed Codex runtime in an isolated ORT-specific configuration root with ephemeral process-memory authorization. No keyring or credential-file fallback is allowed; Stop server, quit, and process replacement end authorization. ORT stores only a connection record and safe account/status metadata.
 
 ### Application authority
 

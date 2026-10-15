@@ -1,0 +1,908 @@
+# Archived M0–M2 development checkpoints
+
+This is the former DEVELOPMENT.md, preserved as historical evidence of the
+incremental implementation. Its commands, UI labels, test counts, and statements
+that features are disabled describe those checkpoints. They are not current
+setup instructions. Paths and commands in code spans are relative to the
+repository root. Use [the current development guide](../../DEVELOPMENT.md) and
+[implementation map](current-state.md) for current behavior.
+
+# Original development record
+
+## Application behavior reference
+
+Before changing user-visible workflows, read the applicable document in
+[`docs/application-behavior/`](../../docs/application-behavior/README.md). This
+reference records the desktop application's implemented behavior, including
+resume Edit/View/publish/export semantics, AI key states and organization,
+spending limits, Data aggregation, export, retention, and deletion boundaries.
+
+Update the applicable behavior document in the same change whenever a control,
+state transition, failure/retry path, aggregation rule, or persistence boundary
+changes. The folder is descriptive implementation documentation and does not
+replace the authority of `Product Plans/`, architecture decisions, generated
+contracts, or tested code.
+
+Open Resume Toolkit implements the M0 architecture skeleton, the local M1
+encrypted-storage slice, and the completed M2 offline resume path for macOS Apple Silicon development. The development
+app can autosave synthetic resume drafts and publish immutable snapshots through
+its OS-vault-backed encrypted database, and export a saved draft or published
+snapshot as unencrypted UTF-8 text, constrained DOCX, or the exact locally
+previewed PDF through a native Save dialog. It can also create a passphrase-
+protected portable backup of saved profile records through a native Save dialog.
+It can authenticate and inspect an existing backup through a native Open dialog,
+or stage it into a fresh encrypted replacement profile that is activated safely
+on restart. PDF/DOCX import is available through the signed, pinned metered parser
+helper and explicit review. AI, updater, and browser-native messaging remain
+later milestone work.
+
+The active M0-M2 development and native-test environment is macOS Apple Silicon.
+Windows and Intel Mac remain later platform-expansion goals. Their CI jobs may
+continue to catch shared-code regressions, but they are not current support or
+manual-qualification targets.
+
+## Current milestone status
+
+M0, M1 and M2 are complete. See [closure and accepted limitations](../../evidence/0.0.0-dev/m2-acceptance-closure.md)
+and [next milestones](../../Implementation%20Plans/Next_Milestones.md). Older checkpoint
+notes below are historical. New changes still need the normal commit/CI workflow.
+
+## Prerequisites
+
+- macOS on Apple Silicon with Xcode Command Line Tools (the exact minimum supported release is not yet frozen);
+- Node.js 24.16.0;
+- pnpm 11.19.0 through Corepack;
+- Rust 1.98.0 through rustup;
+- `just` 1.x.
+
+On macOS with Homebrew, install missing developer tools with:
+
+```sh
+brew install rustup just
+export PATH="$(brew --prefix rustup)/bin:$PATH"
+rustup toolchain install 1.98.0 --profile minimal --component clippy,llvm-tools,rustfmt
+```
+
+Add the Rust path export to your shell profile for future terminals, then run:
+
+```sh
+just bootstrap
+just check
+just dev
+```
+
+`just check` is the canonical offline-capable repository gate after bootstrap.
+It validates the checked-in JavaScript and Rust dependency licenses against
+`config/dependency-license-policy.json`, writes a machine-readable inventory to
+`target/licenses/dependency-inventory.json`, regenerates contracts, and fails if
+the checked-in bindings drift. License metadata for every locked target must
+already be available locally when running without network access.
+
+`just dev` always verifies the `com.openresumetoolkit.dev` identity before it starts. Development and test builds must use only synthetic data.
+
+## Step 3: M0 macOS Apple Silicon qualification
+
+Run these commands in the project directory, using the developer account that
+owns the checkout and the local signing certificate. No Apple Developer
+membership, Developer ID certificate, notarization, Windows VM, or second-account
+login is required for this step. A stable, trusted local code-signing identity
+with its private key is required for the signed-artifact checks; ad-hoc signing
+does not substitute for that identity in later Keychain tests.
+
+```sh
+just check
+just test-platform
+just package-qualification "ORT Local Test Signing"
+```
+
+`test-platform` now runs real macOS-arm64 preflight and synthetic isolation
+tests. It checks the development identifier, production CSP, local main/overlay
+entrypoints, and exact Tauri capability policy. The desktop refuses another
+package identifier before resolving profile paths or accessing the vault.
+Storage tests refuse a mismatched dev/preview/stable/test channel without
+changing the synthetic database, manifest, or key. They do not prove OS-vault
+cross-account or cross-process isolation.
+
+`package-qualification` builds a release-profile `.app`, uses the selected local
+certificate without exporting its private key, and verifies arm64 architecture,
+the development bundle identifier, hardened runtime, no signing entitlements,
+the exact signing certificate, and the sealed bundle's strict signature. It
+also inventories generated frontend assets and rejects nonlocal entrypoint
+asset references. This combines reviewed source configuration with the freshly
+built signed artifact; it is not a network-denial test or an arbitrary-binary
+configuration decompiler. Import remains disabled.
+
+Quit the installed development app, preserving any saved synthetic work. Keep a
+recoverable copy of an existing installation, then copy
+`target/release/bundle/macos/Open Resume Toolkit Dev.app` into `/Applications`.
+Verify the installed copy before opening it:
+
+```sh
+just verify-macos-app "/Applications/Open Resume Toolkit Dev.app"
+```
+
+This must match the build's executable digest, certificate, and designated
+requirement. Launch that installed app and observe **Encrypted storage ready**
+in both the main and overlay windows, using the Window menu to select each.
+Those badges require the typed health response. Record the observations
+separately; the verifier deliberately does not mark GUI health or M0 complete.
+Do not delete or reset a profile to make a failed check pass.
+
+For clean-checkout evidence after committing the step:
+
+```sh
+just qualify-clean-checkout
+```
+
+Before committing, an equivalent local implementation check is available with
+`node tools/qualify-macos.mjs clean-snapshot`. It creates a temporary commit of
+the current tracked changes and unignored new files **only in a disposable
+clone**; it does not commit or push the working project. Both modes bootstrap
+fresh dependencies, run `just check` and `just test-platform`, and require no
+tracked-file drift. System toolchains and download caches may be shared, but
+`node_modules` and `target` are not copied. The clone is retained for inspection.
+Run the secret check first and do not leave unrelated unignored files in the
+checkout when taking a snapshot.
+
+Reports are written under `target/m0-qualification/`; they include source and
+artifact digests but no keys or resume contents. Implementation changes make
+build evidence stale and require rebuilding. Documentation/evidence-only edits
+do not. A successful local run still requires green hosted CI on the containing
+commit before M0 signoff. Windows/Intel jobs remain portability checks, not
+native support claims.
+
+The completed M1 native-vault matrix used an interactive developer session and
+an interactive standard test-account session. Keep the same local signing
+certificate/private key in the developer account; do not copy its private key
+or the developer's login keychain into the test account. Account switching and
+Keychain prompts will be requested when needed. Offline use is sufficient for
+M0 health and local profile checks; later network-containment positive controls
+need a working connection. Local self-signing never qualifies Developer ID,
+Gatekeeper download behavior, notarization, or production distribution.
+
+Current recorded results: `evidence/0.0.0-dev/m0-macos-qualification.md`.
+M0 is complete for macOS-arm64 development at `4bd2594`: its four hosted CI
+jobs and separate vulnerability scan were independently verified green on
+2026-09-05, and the unchanged installed app passed signature/digest verification
+again. M1 is now complete at `65518eb` for the qualified macOS-arm64 scope; M2 remains
+incomplete. This is not distribution qualification.
+
+## Step 4: M1 local macOS storage qualification complete
+
+M1 is complete for the qualified macOS-arm64 development scope at `65518eb`.
+The local matrix and all four hosted CI jobs plus the dependency scan passed;
+the hosted results were independently verified against that commit. It includes
+user-observed standard-account restore, lock/deny, forced-quit recovery and
+account-only deletion, plus the signed native failure suite described below.
+The final app reopened in both accounts; the test account selected Always Allow
+on first launch after update and had no repeated prompt on reopen.
+
+The first Step 4 review repaired macOS database-key creation: it now uses an
+exclusive native Keychain add operation. The previous lookup followed by an
+upsert could overwrite another caller's newly created key. The public namespace,
+load/delete behavior, and profile format are unchanged. The fix alone does not prove
+signed-app access control; the separate account/identity results are recorded
+in the Step 4 evidence.
+
+Run the focused noninteractive checks with:
+
+```sh
+cargo test --locked -p ort-backup -p ort-storage -p ort-vault
+just test-platform-vault-concurrency
+```
+
+The first command uses memory vaults only. The second must run in the ordinary
+developer session outside an enclosing agent sandbox. It creates/deletes only
+randomized `com.openresumetoolkit.platform-test.database` items, never profile
+keys. Each test process disables Keychain prompts. It fails if the vault is
+unavailable; it does not unlock the Keychain or alter its trust/access policy.
+A deterministic upsert negative control demonstrates the old race, and four
+eight-adapter races require one winner whose bytes remain unchanged. These are
+native Keychain tests in one process, not cross-process ACL or app-signing tests.
+
+Expanded portable-backup tests exercise every truncation, invalid header/KDF
+parameters, oversized/concatenated files, independently authenticated hostile
+JSON and records, unchanged active-profile files/keys after invalid restores,
+and transaction rollback after an injected late write failure. The injected
+failure is not native low-disk evidence.
+
+Before interactive destructive or failure tests, create and validate a portable
+backup of the existing synthetic developer profile using the installed app.
+The user chooses and enters the backup passphrase locally; do not put it in
+commands, environment variables, reports, or this repository. Keep it available
+for the later `orttest` restore. Transfer only the encrypted backup through
+`/Users/Shared`. Never transfer the database key, signing private key, or login
+Keychain. Request the account switch immediately before the standard-account
+tests, and run them from that account's real interactive login session.
+
+Checkpoint evidence and remaining matrix:
+`evidence/0.0.0-dev/m1-macos-storage-qualification.md`.
+
+The extended native failure harness is opt-in:
+
+```sh
+just test-platform-storage "ORT Local Test Signing"
+just test-backup-mutations
+```
+
+The storage recipe signs a separate test executable, creates disposable
+`platform-test` Keychain items and SQLCipher profiles, kills only its own child
+processes at WAL/migration boundaries, and fills a private 64 MiB HFS+ disk image
+to exercise real ENOSPC. The filler has an independent 80 MiB limit; subsequent
+database writes are also bounded. The image is detached afterward and reports
+remain under `target/m1-qualification/native-storage-*`. It does not alter either
+account's application profile, default Keychain, or trust settings. Keychain UI
+is disabled in each test process. Crash hooks compile only into macOS tests and
+expire after 30 seconds if the parent fails to kill the child.
+
+With explicit approval for the installed-key read-denial probe, run
+`node tools/qualify-storage-macos.mjs "ORT Local Test Signing" --installed-key-probe`.
+The helper first confirms the exact installed item's metadata exists, then
+requires its secret read to fail with interaction disabled. It never prints
+secret bytes. This is a specific unapproved-process denial check, not a claim
+that the unlocked account resists all same-user malware.
+
+The mutation recipe runs fixed-seed header mutations and ciphertext/tag changes
+with valid controls. It is bounded and reproducible, not a sustained,
+coverage-guided fuzzing claim. The ordinary full gate skips all native and
+mutation opt-in tests.
+
+`tools/m1-account-check.py` and `tools/m1-locked-check.py` are read-only manual
+qualification helpers for the real `orttest` console login. They inspect
+non-secret manifests, encrypted-file digests/markers, file access denial, and
+Keychain metadata only, and retain receipts in that user's home. They do not
+retrieve passwords, lock/unlock Keychain, delete ORT data, or impersonate an
+account. The user performs the installed-app and Keychain actions explicitly.
+
+## Development editor checks
+
+The current frontend adds a build-from-scratch starting screen for an untouched
+empty workspace. Optional profiles suggest empty sections only; Custom starts
+with contact information. After building, focus moves to Full name and ordinary
+autosave applies. Backup recovery remains available before building, and import
+is explicitly unavailable. The section selector includes the suggested product
+sections. This frontend checkpoint is not yet installed/native-qualified; see
+`evidence/0.0.0-dev/m2-manual-start.md`.
+
+The main window reports `ready` after it opens the isolated development profile
+under the platform application-data directory. Its database key is stored in
+macOS Keychain or Windows Credential Manager. A vault or database failure leaves
+the editor unavailable rather than creating a plaintext fallback or silently
+replacing a key.
+
+For the M2 editor manual check:
+
+1. Enter synthetic contact information, add sections, entries, bullets, links,
+   and custom fields; a custom field can be marked as a skill.
+2. Pause for about 1.2 seconds and wait for **Saved**, or choose **Save draft**.
+   Invalid content blocks both autosave and manual save; correct the inline
+   errors before proceeding. Limits come from the generated Rust contracts.
+3. Reorder sections/entries/bullets/fields with their up/down buttons (also
+   available through Tab and Space). Verify **Undo edit** and **Redo edit**;
+   history holds up to 30 document states in memory for this session only.
+4. Choose **Publish snapshot**, then expand its read-only text review. Editing
+   the draft must not change that review. Publishing is disabled for unsaved
+   changes or content already matching the latest published snapshot.
+5. Restart only after **Saved** and verify the draft, ordering, custom fields,
+   and published snapshot return. See the recorded native smoke check in
+   `evidence/0.0.0-dev/m2-editor-smoke.md`.
+
+For the M2 quit-safety check, change the synthetic title and immediately use
+Command-Q on macOS (Ctrl-Q on Windows), the application's Quit menu item, or the
+main window's close button. Choose **Keep editing**, **Save and quit**, or
+**Discard unsaved edits and quit**. Invalid edits disable Save and quit. Escape
+keeps editing. A running save/publication/document export/portable backup is
+allowed to finish before quit; failed saves keep the editor open. Closing the
+main window currently quits the whole development workspace; closing the overlay
+alone does not quit the editor.
+See `evidence/0.0.0-dev/m2-close-guard-smoke.md` for verified paths and limitations.
+
+The desktop test suite includes axe-core semantic checks for the complete
+initial main and overlay routes, including PDF preview, quit, encrypted-backup,
+recovery, storage, and all-local-data deletion controls. Live component cases
+cover the loaded editor, required-field feedback, revision-conflict recovery,
+quit-dialog focus restoration, exact destructive confirmation feedback,
+announced recovery/deletion progress, and focus placement after a local-data
+deletion outcome. Run the checks with:
+
+```sh
+pnpm --filter @ort/desktop test
+```
+
+The harness has a failing unnamed-button positive control and disables only the
+color-contrast rule because jsdom cannot resolve native layout or colors. The
+destructive commands remain synthetic and never access a profile or vault.
+These checks do not replace keyboard, zoom, forced-color, reduced-motion,
+VoiceOver, NVDA, WKWebView, WebView2, native-dialog, interruption, or
+cross-platform testing. See
+`evidence/0.0.0-dev/m2-desktop-accessibility-automation.md`.
+
+For the M2 text-export check:
+
+1. Wait for **Saved**, then choose **Export saved draft (.txt)**. Alternatively,
+   choose **Export published snapshot (.txt)** to export the latest immutable
+   snapshot; unsaved editor changes are never included in either choice.
+2. Choose a private local folder and a **new** `.txt` filename. The file is
+   unencrypted, outside the encrypted database, and may be uploaded by any sync
+   service managing that folder. Only synthetic data is allowed in development.
+3. Check the success notice and inspect the text. The internal title, IDs,
+   revision metadata, empty fields, and app branding must not appear. Ordering,
+   Unicode, custom field values, bullets, and link destinations must be preserved.
+4. Cancel a second export: no file should be written and the editor should remain
+   usable. Select an existing test filename: even if the OS offers **Replace**,
+   this checkpoint refuses replacement and asks for a new filename.
+
+Text output is bounded to 256 KiB. The current macOS implementation requires
+descriptor-based file cloning and directory sync (locally tested on APFS).
+It removes and syncs all staging names before writing document bytes, then
+clones the unnamed file to a new destination. Forced termination can leave an
+empty `.ort-export-*` directory/file before unlinking, or the complete chosen
+export after publication; no startup scan removes unknown files. Filesystems
+without these operations fail closed. Other platforms retain hard-link
+publication and can leave staging plaintext after interruption. Inspect the
+chosen folder before retrying an uncertain result.
+Post-write cleanup/durability warnings distinguish an already-written file from
+a failed export. Windows Save-dialog, ACL, and filesystem behavior still require
+native VM verification; CI compilation alone does not prove those behaviors.
+See `evidence/0.0.0-dev/m2-text-export-smoke.md` for checkpoint evidence.
+
+## DOCX export checkpoint
+
+In **Document export**, choose **Word document (.docx) — plain layout v1**,
+then export either the saved draft or latest published snapshot. The same
+revision checks, native Save dialog, one-operation gate, no-overwrite policy,
+unencrypted-file warning and quit wait apply to both formats. Choose a new
+`.docx` filename; `.docm`, special names and existing entries are refused.
+Unsaved edits never substitute for the selected saved content. Canceling or
+failing an export does not change drafts, snapshots or autosave state.
+
+DOCX format v1 (`plain_docx_v1`) is an intentionally plain, editable,
+single-column layout, not one of the final three template categories or a
+preview of PDF output. It has semantic headings and real bullet lists, visible
+link destinations and clickable allowlisted hyperlinks. Font availability and
+pagination depend on the reader; inspect the document before sending it.
+No font binaries, macros, fields, images or external templates are embedded.
+Exports are capped at 2 MiB, with a separate 1 MiB XML expansion ceiling;
+text exports retain their 256 KiB cap. Recovery/replacement and Windows-native
+Save-dialog/ACL/reader verification remain gated.
+
+Synthetic tests need no desktop launch, OS vault or document-reader installation:
+
+```sh
+cargo test --locked -p ort-documents -p ort-platform -p ort-application -p ort-desktop
+cargo run --locked -p ort-documents --example docx_fixtures -- target/docx-review-fixtures
+python3 tools/verify-docx-fixtures.py target/docx-review-fixtures
+```
+
+Use a **new** output directory each time; the fixture generator deliberately
+refuses an existing directory. Python uses only its standard library (`python`
+on Windows). The shared eight-case output corpus covers standard, sparse,
+supported multilingual, code-like literal, dense four-page, omitted optional
+data, multi-section/field/link ordering, and exact two-page resumes. All four CI
+jobs independently check deterministic DOCX and plain-text bytes, package/CRC/
+XML integrity, exact source-text parity, heading/list semantics and hyperlink
+relationships. The shared plain-text golden also has to match the PDF fixture
+path, so the three output formats cannot silently diverge.
+Local headless-render and manual/platform limits are recorded in
+`evidence/0.0.0-dev/m2-output-golden-corpus.md`. There is no production Python
+or LibreOffice dependency; the exporter is Rust-only.
+
+The first DOCX CI run passed three jobs but Windows failed the golden-byte
+check after its Rust tests passed. Git's CRLF checkout conversion changed the
+four XML assets embedded by `include_str!`. `.gitattributes` now pins only
+those assets to LF; no global Git setting or golden hash change is required.
+`node --test tools/tests/docx-checkout.test.mjs` exercises real Git checkouts
+with positive/negative controls and runs early in all four CI jobs, as well as
+through `just check`. Existing Windows working copies should use a fresh
+checkout if these files still contain CRLF; preserve local edits first.
+The verifier now identifies noncanonical line endings explicitly. The same
+repair updates the pinned Node setup action to its Node 24 runtime; the project's
+Node version stays unchanged. The user confirmed all four CI jobs passed for
+`748d13b` before PDF development resumed; that result was not independently retrieved.
+See `evidence/0.0.0-dev/windows-docx-checkout.md`.
+
+## Local PDF preview and export
+
+The main editor offers **Preview saved draft** and **Preview published snapshot**.
+Save pending draft edits first. Rendering is manual and uses the selected exact
+saved revision. The fixed `plain_pdf_v1` layout uses US Letter, one-inch margins,
+11 pt Libertinus Serif, and no user-authored Typst or system fonts. The bundled
+renderer is Typst 0.15.1; PDF.js 6.3.289 displays its exact output locally.
+
+Review pages with Previous/Next and 100–200% zoom. The scrollable page is keyboard
+focusable; an accessible, read-only content view follows it. PDF links are visible
+text in the privileged preview, not clickable navigation. **Export this preview**
+uses the same cached bytes, not a second render. It opens the native Save dialog
+for a new `.pdf` filename and never replaces an existing file. Cancel creates no
+file; committed cleanup/durability warnings remain distinct from failures.
+
+Edits or newer saved revisions mark a draft preview stale and disable export.
+Published preview revisions are independent of draft edits. Generate a fresh
+preview after changes or ten-minute expiry. Clear/refresh/unmount releases the
+preview; Rust holds at most one cached PDF and checks expiry on access. Renderer
+reloads can leave that bounded cache until its next access or process exit; this
+is not guaranteed timed memory erasure. No preview file is staged on disk.
+
+Current development limits are 4 MiB, five pages, 800 content blocks and 200 hard
+line breaks, in addition to document limits. Overflow, uncovered glyphs (covered
+by an explicit negative control), compile warnings, and unsupported layouts are
+explicit failures, never silent truncation or font substitution. Tabs become four
+spaces. Text and DOCX remain alternatives. This original plain fixture is not the
+final template catalogue. The fixed typography/language options and full bundled
+licenses are visible in the panel. Each successful preview stores a content-free
+receipt in the encrypted profile before the PDF is exposed to the UI. Repeated
+identical source/revision/PDF identities increment a counter instead of adding
+duplicate rows. Storage keeps the newest 100 identities and the UI shows the
+newest 20; resume text, PDF bytes, paths and preview tickets are not retained.
+For a receipt whose exact revision is still the current draft or any retained
+immutable published snapshot, **Verify & replay** regenerates with the installed
+bundle and exposes a preview only when every receipt field matches. An older
+publication can be reviewed through bounded accessible text and exported from
+the verified expiring preview. It never substitutes a newer revision or
+different output. Superseded draft bodies are not retained and superseded renderer
+binaries are not bundled. The separate **Regenerate with current renderer** action
+uses the selected style and exact retained source, verifies document identity,
+and returns a current receipt with a persistent regeneration label. It never
+claims to reproduce historical bytes or automatically replaces a failed replay.
+See `evidence/0.0.0-dev/m2-current-renderer-regeneration.md` for local verification;
+native acceptance is pending.
+
+Use **Replay from an encrypted portable backup** to select a supported encrypted backup
+and enter its passphrase. ORT authenticates the complete archive on a blocking
+native worker, then retains at most the newest 20 exact manifest/source pairs in
+one memory-only session for ten minutes. It returns only an opaque archive
+ticket, content-free receipt metadata, and counts for receipts whose source is
+missing or whose renderer bundle differs. The selected path, passphrase, source
+documents, settings, and backup metadata do not cross into the webview.
+
+Choose **Verify archived receipt & replay** to regenerate one retained draft or
+publication with the installed renderer. The preview is exposed only if every
+receipt field matches; otherwise no PDF or accessible text is returned. A
+successful replay supplies bounded accessible text and uses the existing
+expiring, exact-byte, no-overwrite PDF export. Opening or replaying a backup does
+not restore, merge, write to, or add render history to the active profile.
+**Regenerate archived source with current renderer** also supports receipts for
+historical bundles, uses the selected style, and preserves the same read-only
+boundary with a clearly labeled current receipt. Clearing or expiring the archive
+session drops the retained sources; a generated
+preview remains independently bounded by its own ten-minute ticket.
+
+Headless structural verification, without launching the app or OS vault:
+
+```sh
+cargo run --locked -p ort-render --example pdf_fixtures -- target/pdf-review-fixtures
+node tools/verify-pdf-fixtures.mjs target/pdf-review-fixtures
+# Optional second independent parser (requires pypdf):
+python3 tools/verify-pdf-fonts.py target/pdf-review-fixtures
+```
+
+Every CI runner checks all eight PDF golden bytes, exact shared plain-text parity,
+fixed page counts, visible text/order, page geometry, semantic structure roles,
+safe links, and absence of active content. New template sources retain LF bytes under Windows
+checkout conversion. `tools/smoke-pdf-browser.mjs` performs optional headless
+Chromium QA against a loopback production frontend with synthetic mocked native
+commands; supply `ORT_PLAYWRIGHT_MODULE` / `ORT_BROWSER_EXECUTABLE` if needed.
+It never proves native IPC, WKWebView/WebView2, save dialogs, vaults or ACLs.
+See `evidence/0.0.0-dev/m2-output-golden-corpus.md` for the expanded output
+checkpoint and `evidence/0.0.0-dev/m2-pdf-preview.md` for preview behavior and
+manual gates. Portable archived-source replay is recorded in
+`evidence/0.0.0-dev/m2-portable-archived-source-replay.md`.
+
+## Encrypted portable backup export
+
+Wait for **Saved**, then use **Create encrypted backup**. Enter the same synthetic
+passphrase twice; the fields clear as soon as the operation begins. The passphrase
+is never recoverable by ORT, so store it separately from the backup. The native
+Save dialog accepts only a new `.ort-backup` filename. Existing entries, special
+filenames, and last-moment target races fail without replacement. Canceling writes
+nothing. A selected iCloud, OneDrive, Dropbox, or other synchronized folder sends
+the encrypted archive to that provider under the user's account.
+
+The format-1.1 archive contains the saved draft, immutable published snapshots,
+portable settings, and bounded content-free PDF render manifests. It excludes the
+SQLCipher/database key, vault reference, provider credentials, native IPC secrets,
+diagnostics, PDF bytes, preview tickets, and unsaved editor changes. Creation uses
+the existing Argon2id/XChaCha20-Poly1305 container and performs its KDF on a
+blocking native worker. Only one file operation may run; quit waits for it. The
+response contains format/byte and cleanup/durability receipts, never the path,
+passphrase, content, or native error text.
+
+## Delete all local data checkpoint
+
+The **Encrypted profile storage** panel includes **Delete all local ORT data**.
+This is destructive and requires the exact phrase `DELETE ALL LOCAL ORT DATA`.
+It deletes the active encrypted profile, saved and unsaved resume state,
+published snapshot, settings, render history, diagnostics, retained safety copy,
+staged restore data, and every database-vault key identified by those exact
+profiles. User-selected backups and exported PDF, DOCX, or text files are never
+targeted, and the application is not uninstalled.
+
+Deletion first closes the live SQLCipher store and validates every fixed target.
+A private, durable intent marker is created before the first vault or filesystem
+deletion. Once committed, interruption or a temporarily unavailable vault leaves
+cleanup pending; startup must resume that exact cleanup before it can create a
+new empty encrypted profile. Unsafe symlinks, unknown profile entries, malformed
+manifests, or invalid markers fail closed. The interface distinguishes an action
+that never started from committed cleanup that requires restart.
+
+For a synthetic native check, first create an encrypted backup and save its
+hash outside ORT. Then add a saved draft, published snapshot and PDF render
+receipt. Type the exact deletion phrase and confirm that the editor reloads as a
+new empty profile, storage counts return to zero, and the external backup remains
+byte-for-byte unchanged. Restart once more and confirm the empty profile remains.
+Native macOS vault failure, locked-vault, symlink, process-kill and
+assistive-technology verification are still active release gates. Windows vault
+and reparse-point verification are deferred with Windows qualification; see
+`evidence/0.0.0-dev/m2-all-local-data-deletion.md`.
+
+The file publisher uses a held-directory capability, mode 0600 on Unix where
+supported, and an exact generated byte limit. macOS uses unnamed staging and
+no-clobber file cloning as described above; other platforms retain a private
+sibling staging directory and hard-link commit. Unsupported filesystems fail
+closed. Old builds and other platforms can leave an encrypted `.ort-export-*`
+staging directory; the UI conservatively reports that possibility. See
+`evidence/0.0.0-dev/m2-unlinked-export.md` for the macOS implementation limits.
+
+Use **Select and check encrypted backup** to choose an existing `.ort-backup`
+through the native Open dialog. The backend holds the selected parent directory,
+refuses a symlink or non-regular final entry, bounds the file before allocation,
+then authenticates and validates the complete archive on a blocking worker. The
+passphrase field clears at dispatch. A successful result shows only format,
+schema, creation time, application version, byte count, and bounded record counts;
+the filename, path, passphrase, resume text, settings values, hashes, and native
+errors never return to the webview. Wrong passphrases, damaged archives, and
+unsupported encrypted content deliberately share one failure result.
+
+Validation is read-only. To replace saved profile data, enter the backup
+passphrase under **Replace saved profile from backup**, type
+`REPLACE SAVED PROFILE`, and select the archive again. ORT authenticates it,
+creates a fresh OS-vault database key, imports it into a private encrypted staging
+profile, verifies integrity, and writes a content-free restart marker. The current
+profile remains active and unchanged until the app is quit and reopened.
+
+At the next startup, ORT renames the current encrypted profile to its fixed local
+safety-copy slot, promotes the separately keyed staged profile, verifies it, and
+then removes the marker. Startup resumes the handoff after interruption between
+renames, or restores the old directory if the staged profile disappeared or the
+promoted profile cannot open. The safety copy and its old vault key are retained;
+external exports/backups are untouched. Restart promptly after staging and use
+only synthetic data in development.
+
+After activation, **Local recovery safety copy** reports only whether a retained
+copy, restart operation, or cleanup operation exists. To return to the retained
+profile, type `ROLL BACK SAVED PROFILE`. ORT verifies it, stages an encrypted
+checkpoint, and swaps it in at the next restart; the current profile becomes the
+new safety copy. To free the fixed safety slot, type `DELETE SAFETY COPY`. This
+permanently removes only that encrypted directory and its OS-vault key. The active
+profile and user-selected exports/backups are never included. An interrupted
+confirmed cleanup resumes before the active database opens on the next startup.
+See `evidence/0.0.0-dev/m2-portable-backup-export.md` and
+`evidence/0.0.0-dev/m2-backup-validation.md`, plus the replacement checkpoint in
+`evidence/0.0.0-dev/m2-replace-restore.md` and safety-copy management in
+`evidence/0.0.0-dev/m2-safety-copy-management.md`.
+
+## Encrypted profile storage usage
+
+The **Encrypted profile storage** panel automatically reads a content-free
+inventory after startup and after completed editor/file operations. Use
+**Refresh usage** for an explicit reread. It shows the database schema and counts
+for the master draft, immutable published snapshots, portable settings, PDF
+render manifests, and bounded diagnostic records. It also shows exact bytes for
+the encrypted database, encrypted write-ahead log, SQLite shared-memory file,
+non-secret profile manifest, and transient manifest-recovery metadata.
+
+The total covers only those fixed known files in the active profile. It does not
+scan or count user-controlled exports/backups, OS-vault items, unrelated files,
+or the in-memory PDF preview. WAL/shared-memory sizes can change after saves or
+SQLite maintenance, so the panel labels the reading as refreshable rather than a
+quota. The command accepts no path, profile identifier, category selector,
+cleanup flag, or content-bearing value. This checkpoint is read-only: deletion,
+vacuum/cleanup and all-local-data removal remain gated. Retained restore safety
+copies are reported and managed through their separate content-free recovery
+boundary, and their bytes are not included in this active-profile total. See
+`evidence/0.0.0-dev/m2-storage-usage.md`.
+
+## No-AI import core (backend-only checkpoint)
+
+The deterministic mapper and in-memory review engine now have synthetic tests,
+including an encrypted database commit/restart test. They do not enable a new
+button or file import in the app yet. A constrained DOCX parser is linked only
+into the worker library. A pinned PDFium text adapter is now also linked only
+there, while the worker executable remains inert until native containment is
+proven. No standalone `.txt` importer or AI transmission was added.
+
+Run this checkpoint without starting the desktop or accessing an OS vault:
+
+```sh
+cargo test --locked -p ort-documents -p ort-application -p ort-document-worker
+```
+
+The storage integration test uses temporary synthetic profiles and an in-memory
+vault. It checks explicit review, preservation of published snapshots, stale
+commit/replay refusal, and restart. Mapping tests preserve unknown/multilingual
+source text and reject malformed/oversized worker responses. Review changes are
+not automatically written: the prepared result must use the existing storage
+revision check. See `evidence/0.0.0-dev/m2-import-core.md` for limits and remaining
+UI/parser integration work. No new installer or preview package is needed to
+exercise this backend checkpoint.
+
+The following transport-policy checkpoint adds bounded output collection,
+discarded/capped stderr, deadline/cancellation checks and successful-exit/EOF
+gating. The subsequent production coordinator in
+`ort-documents::worker_supervisor` composes that policy with a native-adapter
+contract for macOS XPC/App Sandbox and Windows AppContainer/Job containment.
+It always requests whole-containment termination and accepts valid extraction
+only after verified reaping, empty-tree, pipe/handle closure and teardown.
+Adversarial mocks cover missing launch controls, weak resource ceilings,
+cancellation, silence, floods, malformed/failed output, native event failure,
+termination failure and every missing cleanup fact on both platform profiles.
+The following bounded source-envelope checkpoint also adds
+`ort-platform::read_native_document` and `ort-documents::import_source`: a held,
+no-follow, 10 MiB PDF/DOCX snapshot plus signature/container preflight over the
+same bytes. DOCX metadata inspection does not decompress or parse XML and rejects
+unsafe/duplicate paths, encryption, known active parts, ZIP64/multidisk packages
+and declared expansion over 100:1. The real synthetic DOCX output corpus and
+adversarial malformed envelopes are covered. At that checkpoint it did not yet
+implement private worker staging, native pipes, OS containment or a content parser.
+See `evidence/0.0.0-dev/m2-import-transport.md` and
+`evidence/0.0.0-dev/m2-parser-supervision-core.md`,
+`evidence/0.0.0-dev/m2-import-source-envelope.md`, plus
+`Implementation Plans/System Documentation/Document_Worker_Containment.md`.
+
+The next private-staging subset adds Unix `0700` operation directories, a `0600`
+fixed source, one transferred read-only handle, exact cleanup and a conservative
+24-hour/128-entry startup scavenger. The application binds preflight and staging
+to the same owned bytes and defines future launch/supervision/cleanup ordering;
+the public path still cleans and returns disabled before any launcher call. A
+parser-side builder now enforces the extraction protocol limits before encoding.
+Windows staging deliberately fails closed pending ACL/reparse implementation.
+See `evidence/0.0.0-dev/m2-import-private-staging.md` and ADR 0009.
+
+The next disabled worker-parser checkpoint adds bounded ZIP32 store/deflate and
+streaming WordprocessingML extraction in `ort-document-worker`. It independently
+checks package identity, CRC/local metadata, content types, root/document
+relationships, XML complexity, active content and extraction limits. It parses
+the shipping fixed DOCX export in a round-trip integration test, reports one
+logical page without claiming DOCX layout fidelity, and returns the existing OCR-
+unavailable result for image-only/empty content. The executable still exits 78;
+see `evidence/0.0.0-dev/m2-docx-worker-parser.md` and ADR 0010.
+
+The following disabled PDF checkpoint pins `pdfium-render` 0.9.3 to the
+`pdfium_7881` API and records exact non-V8/non-XFA PDFium 151.0.7881.0 archive
+and extracted-library identities for macOS ARM64/x64 and Windows ARM64/x64.
+The adapter loads only an absolute target-matching library whose size and hash
+match, with no system fallback. It parses only bounded in-memory input, caps
+pages, top-level objects and text, maps literal lines conservatively, and rejects
+image-only or partially scanned content without OCR. Pure adversarial tests and
+an opt-in pinned macOS ARM64 native smoke pass. The binary is not packaged and
+the worker remains inert; see `evidence/0.0.0-dev/m2-pdf-worker-parser.md` and
+ADR 0011.
+
+The next checkpoint adds a separate synthetic macOS App Sandbox/XPC test:
+
+```sh
+just probe-document-sandbox-macos
+```
+
+Run from an ordinary macOS terminal with Command Line Tools, outside an enclosing
+agent sandbox so its restrictions cannot contaminate the unsandboxed positive
+control. It builds and ad-hoc signs only a test bundle, uses temporary synthetic
+files and its own loopback listener, and never reads your profile or Keychain.
+Generated bundles and reports remain in `target/native-probes`; the runner
+removes its fresh fixture directory. `--build-only` can be passed to the Node
+script to compile/sign without executing the probe.
+
+Locally, read-only input transfer, seeded sibling/symlink restrictions and
+loopback denial passed. Plain App Sandbox allowed direct children; the extended
+probe now compares that baseline with helper-only hard limits (NPROC zero,
+64 descriptors, core-file size zero). Direct spawn/fork and hard-limit increases
+were denied, descriptor exhaustion/recovery passed, and the parent was unaffected.
+Do not run this test as root: it is deliberately refused. It never changes the
+desktop, shell or account-wide limits. The helper exits cooperatively; forced
+cleanup and memory/CPU/thread/Mach-port/credential/broker limits are unproven.
+Subsequent isolated measurements rejected the proposed 512 MiB address-space
+limit and demonstrated that ignoring the CPU-limit signal can outlive the
+configured hard CPU value. Run `node tools/check-worker-resources-macos.mjs`
+to record local behavior; successful execution means measurements completed,
+not that containment passed. Run `node tools/check-worker-output-macos.mjs`
+for the separate real-pipe output-reader sanitizer regression. This component
+is not yet linked into the production adapter. See
+`evidence/0.0.0-dev/m2-native-output-and-resources.md` for scope and next gates.
+A green probe invocation or CI job is **not** a full containment pass. Import is
+still disabled. See `evidence/0.0.0-dev/m2-macos-hard-limits.md`. The report printed
+in CI includes the synthetic measurements and hashes, not document content.
+
+The subsequent lifecycle checkpoint runs a separate signed XPC supervisor and
+its own fixed, sandbox-inheriting child:
+
+```sh
+just probe-document-lifecycle-macos
+```
+
+It tests nine synthetic cases: normal completion, cancellation, silent timeout,
+stdout/stderr floods, nonzero exit, malformed output, complete output without
+exit, and both pipe EOFs without exit. Stop cases require actual SIGKILL status
+and `waitpid` reaping; no reused XPC PID or unrelated process is signaled.
+The test uses small per-child limits, temporary marker files and no OS vault or
+network. It does not launch the desktop or alter your shell/system limits.
+Run outside an enclosing agent sandbox; `--build-only` is also supported by the
+Node script. Generated signed test bundles/reports remain in `target/native-probes`;
+the runner removes its own fresh input fixture directory.
+
+This is a test candidate, not the production parser driver. Parent/supervisor
+death, broker-created descendants, the child's complete authority boundary and
+the remaining resource ceilings are still gated. Import is still disabled.
+See `evidence/0.0.0-dev/m2-macos-lifecycle.md`. The user subsequently confirmed
+all four CI jobs passing for `e978cfe`; this is user-reported, not an independently
+retrieved run. The DOCX checkpoint subsequently passed three of four jobs;
+its Windows golden-byte failure and subsequently confirmed repair are recorded above.
+
+The preceding Windows log showed both isolated startup and import-storage tests crash
+while opening the encrypted profile. A matching pinned SQLCipher logging defect
+is now mitigated by `.cargo/config.toml`: its native diagnostic logger is compiled
+out for local, CI and package builds. Run Cargo from the repository root (or a
+subdirectory) so this policy is loaded; profile opening fails closed if the
+required native configuration is missing. A clean/rebuilt native dependency is
+expected the first time. App-level sanitized errors remain available, and memory
+security/encryption remain on. The user reports all CI checks passed after this
+mitigation (`bdc3e10`), including Windows; a run URL/log was not retrieved here.
+Windows native UI/vault/installer verification remains a separate requirement.
+Details: `evidence/0.0.0-dev/windows-sqlcipher-logging.md`.
+
+On Windows, retain the last stage label if either command crashes:
+
+```sh
+cargo test --locked -p ort-storage --test native_startup -- --nocapture
+cargo test --locked -p ort-application --test import_storage -- --nocapture
+```
+
+These probes use only temporary synthetic profiles and an in-memory vault.
+No installer or Keychain/Credential Manager approval is required.
+
+**Current limitations:** the new macOS termination bridge has passed isolated
+AppKit and Tauri event-loop checks, but installed Dock Quit and logout/shutdown
+qualification remain pending. Wait for **Saved** before using them. The bridge
+adds only an absent delegate method and fails startup if a runtime update makes
+that integration unavailable; it does not replace an existing implementation.
+Run `node tools/check-termination-macos.mjs` for its synthetic regression and
+native static analysis. See `evidence/0.0.0-dev/m2-native-termination.md`.
+Force Quit, crashes, renderer reloads, and power loss can also lose unsaved edits;
+undo history is not crash recovery. Windows native interaction still needs VM
+testing. Keep using synthetic data. On a failed save, autosave pauses; revision conflicts or
+uncertain transport results require an explicit reload. Reloading asks before
+discarding edited unsaved content, so copy anything needed before confirming.
+If the quit connection fails, Keep editing leaves the editor available to copy
+unsaved text while reconnecting. No missing response authorizes native quit.
+
+The native vault proof is opt-in because it writes one randomized temporary
+credential to macOS Keychain or Windows Credential Manager and then deletes it:
+
+```sh
+just test-platform-vault
+```
+
+An interruption can leave only a credential in the
+`com.openresumetoolkit.platform-test.database` service namespace; no application
+profile or real database key is used.
+
+## Browser extension skeleton
+
+Generate either development package with:
+
+```sh
+just dev-extension chrome
+just dev-extension edge
+```
+
+The generated folders are `apps/extension/dist/chrome` and `apps/extension/dist/edge`. The M0 extension is intentionally inert and requests no host access or native-messaging permission.
+
+## M2 style foundation (local, not installed)
+
+Step 5 now has an optional bundled style in PDF/DOCX requests, versioned template
+receipts, and exact replay for the installed style. Old requests and plain golden
+output remain compatible. See `evidence/0.0.0-dev/m2-style-foundation.md` for
+validation and remaining work. The session-local style selector now defaults to
+Technical / Engineering; existing previews retain their actual style labels.
+Final template layout review and native qualification are pending; this does not
+complete M2.
+
+## M2 date/link schema foundation (local, not installed)
+
+Document readers now support v1 and v2. Schema v2 adds identified, ordered links
+and structured date ranges with explicit precision. Upgrades preserve legacy date
+text and immutable publications. Backups containing v2 documents use format 1.2;
+v1-only profiles continue to write format 1.1. Existing empty-document creation
+stays v1 until the user chooses Enable structured dates and link ordering.
+The date controls support optional precision, expected/Present dates and stable
+reordering; legacy text replacement is explicit. See
+`evidence/0.0.0-dev/m2-schema-v2-foundation.md` for compatibility and
+`evidence/0.0.0-dev/m2-date-link-editor.md` for the 80-test UI checkpoint.
+The installed application is unchanged.
+
+## M2 focused-editor layout (local, not installed)
+
+The editor now keeps a full live draft reading view beside a collapsible section
+navigator and focused contact/section fields. Close editor returns focus to the
+reading view; reading zoom does not change export layout. Exact pages remain in
+PDF preview. See `evidence/0.0.0-dev/m2-focused-editor.md` for the 81-test checkpoint
+and remaining entry-level, layout and native qualification work.
+
+
+## Style output regression audit
+
+Run `python3 tools/check-style-output.py` to generate fresh synthetic v1/v2 corpora
+and independently audit all three PDF/DOCX styles, source hashes, partial dates,
+semantic content, links, geometry and local regression hashes. CI runs the same
+command. The output directory is printed and retained under `target/` for review.
+Original plain goldens are enforced by the existing separate PDF/DOCX audit steps.
+See `evidence/0.0.0-dev/m2-style-parity.md` for evidence and the remaining native
+font, accessibility, presentation and exact editor pagination qualification.
+
+## Exact pages in the editor
+
+Choose **Exact PDF pages** in the center pane's **Resume view** selector. Generate
+a saved-draft preview or enable **Automatically refresh saved-draft pages**.
+Refresh waits for valid autosaved content and pauses in the live reading view.
+Errors do not retry in a loop. All pages scroll continuously; Fit width responds
+to the pane, and explicit zoom leaves exported bytes unchanged. Historical and
+published previews disable automatic draft refresh.
+
+**Discard pending preview** suppresses the result but waits for native rendering
+to finish. Unsaved edits remain labeled and can be read in the live view.
+See `evidence/0.0.0-dev/m2-center-pdf-preview.md` for resource bounds, 101-test
+local coverage, real PDF.js browser checks and pending native qualification.
+
+## M2 metered import integration (2026-09-07)
+
+The earlier native-parser checkpoint above is historical. The current local
+implementation uses `ort-parser-runtime` (Wasmi), a cross-compiled constrained
+DOCX guest, pinned PDFium Wasm, and the one-request `ort-parser-helper`. Desktop
+picker, cancellation, review and atomic audit/save integration are implemented.
+The signed candidate now passes helper identity/lifecycle qualification and enables
+import through compiled helper pins. Ordinary unbundled workspace builds remain
+unavailable. Step 5 implementation is complete; Step 6 final native/user
+acceptance remains pending.
+
+Build prerequisites are the pinned Rust toolchain and `wasm32-wasip1` target.
+`tools/build-parser-guests.py` verifies a previously downloaded immutable PDFium
+archive, builds DOCX and creates `target/parser-guests` with module digests and
+license notices. `--download` explicitly opts into downloading the pinned archive.
+`tools/package-parser-helper.py` builds and ad-hoc signs only a development helper
+under `target`; it does not install or launch the desktop app.
+`tools/package-m2-macos.py --identity FINGERPRINT` assembles the desktop with the
+exact nested helper, compiled `ORT_PARSER_HELPER_SHA256` and
+`ORT_PARSER_HELPER_CDHASH`, then signs and verifies the containing bundle. These
+packaging inputs cannot be supplied through renderer IPC. The legacy native
+parser remains disabled; its `IMPORT_ENABLED` flag is not the new path's gate.
+
+Current local checks include eight runtime callback tests, encrypted atomic import
+audit rollback, empty-profile explicit import commit, native job-slot cancellation,
+and frontend import/review interaction tests. The explicit `guest_corpus` example
+checks repository-generated fixtures and is not a general user-document CLI.
+See `evidence/0.0.0-dev/m2-implementation-completion.md` for final evidence and
+`evidence/0.0.0-dev/m2-final-native-acceptance.md` for the Step 6 checklist.
+M0/M1 completion remains unchanged.
+
+## M2 round-three acceptance candidate
+
+The final native rounds found stale-review cancellation and quit blocking. The
+current source permits dismissal after native review expiry and distinguishes idle
+review from running parser/save work for quit. Existing mutation/identity gates
+remain in place. See `evidence/0.0.0-dev/m2-round3-preparation.md` for the new signed
+candidate and qualification identities, passing native recovery/APFS checks, and
+unresolved full-app overlay regression. `tools/package-m2-macos.py --output PATH`
+and `tools/stage-m2-acceptance.py --candidate PATH --checklist PATH` preserve prior
+candidates and transfer folders. Do not use an earlier candidate for new acceptance.
+
+Use `evidence/0.0.0-dev/m2-round3-orttest-handoff.md` for the remaining real-account
+session. No further manual host-disk filling or improvised profile crash injection
+is required. The canonical gate passes locally; the new fixes still need the user's
+commit/CI workflow and final native acceptance before M2 signoff.
+
+## M2 final scoped acceptance
+
+M2 is now complete under the user's accepted development scope. Round four passed
+menu Quit with the overlay frontmost, Command-Q and saved-state persistence.
+See `evidence/0.0.0-dev/m2-acceptance-closure.md` for the decision, signing-trust
+limitation and waived/unrun checks. The earlier handoffs above are historical;
+no further M2 acceptance session is requested. Commit/CI integration remains separate.

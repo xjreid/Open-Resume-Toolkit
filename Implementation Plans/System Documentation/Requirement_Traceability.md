@@ -1,5 +1,13 @@
 # Requirement traceability
 
+## Implementation status
+
+Use the [current implementation map](../../docs/development/current-state.md)
+and [CI map](../../docs/development/ci.md) to locate existing coverage. This table
+contains requirements and evidence categories, not assertions that every future
+production/platform gate has passed. M0–M4 have development closure; M5/M6
+acceptance and M7 production gates remain as recorded in the roadmap.
+
 ## Use
 
 These IDs provide stable anchors for code issues, tests, and release evidence. They summarize—without replacing—the named authoritative product sections. A behavior change still requires the product plan to change first.
@@ -10,7 +18,7 @@ These IDs provide stable anchors for code issues, tests, and release evidence. T
 | ORT-SYS-002 | Exactly one active AI mode: No AI, Direct, or Codex | AI and import / AI operating model | Desktop, AI | connection transition tests |
 | ORT-SYS-003 | Remote telemetry and hosted user-content services are absent | Security / Telemetry and diagnostics | Architecture, desktop | binary network audit |
 | ORT-DATA-001 | Canonical local records use versioned structured schemas | Local data / Canonical records | Local data | schema drift and round-trip tests |
-| ORT-DATA-002 | At most one master draft, published master, and current workspace exist per profile | Configuration / Fixed product values | Local data | database constraint tests |
+| ORT-DATA-002 | One master draft, current published master, and current workspace exist per profile; earlier publications remain immutable | Configuration / Fixed product values | Local data | database constraint tests |
 | ORT-DATA-003 | Sensitive local records are encrypted at rest and keys remain in the OS vault | Security / Local data exposure | Local data, vault | database/WAL plaintext and vault tests |
 | ORT-DATA-007 | Vault behavior states and tests the Windows same-user boundary and macOS desktop/native-host access policy without plaintext fallback | Security / Local data exposure | Vault, IPC, distribution | focused vault boundary check |
 | ORT-DATA-004 | Writes, Finish Application, and guardrail reservations are atomic and crash recoverable | Product states / operation lifecycle | Local data | atomicity and recovery check |
@@ -35,7 +43,7 @@ These IDs provide stable anchors for code issues, tests, and release evidence. T
 | ORT-ALT-002 | Alerts only show Confirmed mismatch or Not found for explicit mandatory resume-comparable requirements | Core workflows / alerts | AI | focused classification/evidence fixtures |
 | ORT-ALT-003 | Alerts are dismissible/ignorable/reopenable and never block or auto-edit | Core workflows / alerts | Desktop, local data | interaction/accessibility tests |
 | ORT-CODEX-001 | Codex is separately installed, verified, and app-managed over stdio | AI and import / Codex | AI, distribution | identity and lifecycle check |
-| ORT-CODEX-002 | Codex uses isolated config/auth/keyring and does not inherit normal user Codex state | Configuration / Codex defaults | AI, platform | seeded-config isolation tests |
+| ORT-CODEX-002 | Codex uses isolated config and memory-only auth, starts stopped on launch, and never inherits general Codex state | Configuration / Codex defaults | AI, platform | seeded-config isolation tests |
 | ORT-CODEX-003 | Codex cannot use tools/files/commands and has provider-only egress | Security / Codex containment | AI, security | per-platform containment report |
 | ORT-CODEX-005 | A manual or discovered Codex path cannot bypass official runtime identity/provenance checks or enable experimental/side-effect protocol surfaces | Security / Codex containment | AI, platform | counterfeit-runtime and method/event allowlist suite |
 | ORT-CODEX-004 | Codex quota data retains provider/account-wide provenance; no API-equivalent cost is shown | AI and import / Codex usage | AI, desktop | account snapshot/provenance tests |

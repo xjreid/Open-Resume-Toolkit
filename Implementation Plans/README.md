@@ -2,13 +2,13 @@
 
 ## Status
 
-These plans select the architecture, module boundaries, durable records, protocols, security controls, test strategy, and release workflow. M0–M4 are complete for the macOS Apple Silicon development scope; see the [M2 acceptance closure](../evidence/0.0.0-dev/m2-acceptance-closure.md), [M2.5 closure](../evidence/0.0.0-dev/m2.5/closure.md), [M3 evidence](../evidence/0.0.0-dev/m3/README.md), and [M4 closure](../evidence/0.0.0-dev/m4/closure.md). M5 remains in progress. The approved visual direction remains owned by `../Aesthetic/`.
+These plans select the architecture, module boundaries, durable records, protocols, security controls, test strategy, and release workflow. M0–M4 are complete for the macOS Apple Silicon development scope; see the [M2 acceptance closure](../evidence/0.0.0-dev/m2-acceptance-closure.md), [M2.5 closure](../evidence/0.0.0-dev/m2.5/closure.md), [M3 evidence](../evidence/0.0.0-dev/m3/README.md), and [M4 closure](../evidence/0.0.0-dev/m4/closure.md). M5 remains in progress: Chrome development capture and tracker are implemented; Edge capture/acceptance remains open. M6 Codex is implemented in development, with full milestone acceptance still open. See the [current implementation map](../docs/development/current-state.md) and [CI guide](../docs/development/ci.md), reviewed October 15, 2026. The approved visual direction remains owned by `../Aesthetic/`.
 
 Implementation may refine library versions and internal names without changing product behavior. Any change to privacy promises, supported AI modes, data ownership, release channels, or the user-visible lifecycle must first be approved in `../Product Plans/`.
 
 ## Active platform scope
 
-M0-M2 development and qualification currently target macOS Apple Silicon only.
+Active development and native qualification target macOS Apple Silicon only.
 The architecture continues to isolate operating-system code so Windows and Intel
 Mac can be added later without forking contracts, schemas, or product behavior.
 Existing non-arm64 CI builds remain useful portability regression signals, but
@@ -33,18 +33,18 @@ work to the M0-M2 exit gates.
 | Packaging | Tauri macOS-arm64 app/DMG preview initially; NSIS/Windows signing and Intel/universal Mac packages later |
 | Updates | Signed ORT update metadata and GitHub Release assets, with channel separation |
 
-Exact dependency versions are chosen and locked when the workspace is bootstrapped. They must pass the license, security, and platform-build gates in the plans below.
+Exact versions are pinned in the current manifests and lockfiles. They must pass the license, security, and platform-build gates in the plans below.
 
 ## Plan map
 
 ### System documentation
 
 - [`System Documentation/Architecture.md`](System%20Documentation/Architecture.md) — component boundaries, execution model, dependency direction, data flows, and failure domains.
-- [`System Documentation/Repository_and_Build.md`](System%20Documentation/Repository_and_Build.md) — proposed source tree, contracts, local development, dependency policy, and CI layers.
+- [`System Documentation/Repository_and_Build.md`](System%20Documentation/Repository_and_Build.md) — current source tree, contracts, local development, dependency policy, and CI layers.
 - [`System Documentation/Development_and_Deployment_Outline.md`](System%20Documentation/Development_and_Deployment_Outline.md) — shared-code ownership, build targets, environments, artifact matrix, CI/deployment flow, gates, rollback, and M0 readiness checklist.
 - [`System Documentation/Security_and_Threat_Model.md`](System%20Documentation/Security_and_Threat_Model.md) — trust boundaries, controls, abuse cases, and release-blocking security gates.
 - [`System Documentation/Delivery_Roadmap.md`](System%20Documentation/Delivery_Roadmap.md) — vertical milestones, dependencies, evidence, and explicit deferrals.
-- [`Next_Milestones.md`](Next_Milestones.md) — completed M3 review route and ordered navigation for M4–M7; it summarizes and does not supersede the delivery roadmap.
+- [`Next_Milestones.md`](Next_Milestones.md) — completed M3/M4 references and remaining M5–M7 acceptance; it summarizes and does not supersede the delivery roadmap.
 - [`System Documentation/Requirement_Traceability.md`](System%20Documentation/Requirement_Traceability.md) — stable requirement IDs for issues, tests, and release evidence.
 
 ### Component plans

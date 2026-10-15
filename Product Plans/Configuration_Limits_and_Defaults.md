@@ -9,17 +9,20 @@ Every implemented value should have a stable name, unit, scope, default, rationa
 ## Fixed product values
 
 - One master-resume draft per local profile.
-- At most one published master resume per local profile.
+- One current published master per profile; earlier immutable publication revisions are retained.
 - At most one current application workspace per local profile.
 - At most one selected final tailored resume, one selected cover letter, and one ordered approved question-answer set per tracker entry.
-- Exactly one active AI connection mode per profile: no AI, one direct-API provider/credential/model preset, or one Codex subscription connection.
+- Exactly one active AI connection mode per profile: no AI, one direct-API provider/credential/explicit model ID, or one Codex subscription connection.
 - No plan-based usage or retained-record quotas.
 - No automatic expiry of the canonical current application workspace merely because it has been inactive; clearing requires explicit Finish Application, discard, replacement confirmation, or user data deletion.
 - Required Qualification Alerts have exactly two user-visible classifications: **Confirmed mismatch** and **Not found in your published resume**. They are non-blocking temporary workspace data and are never retained automatically in the tracker.
 - The application workflow has two overlay stages: capture/review, then materials. Stage 2 has exactly three primary tabs: Resume, Cover letter, and Answers.
 - Tailoring returns no more than three concise change-summary points.
 
-## Platform compatibility defaults
+## Planned stable-release compatibility targets
+
+These are release targets, not present support claims. Current development is
+macOS Apple Silicon; Windows/Intel and functional Edge qualification are open.
 
 - macOS: current public major release and two preceding major releases at each stable desktop release, on Apple silicon and Intel only where both the OS and selected framework remain supportable and tested.
 - Windows: supported, fully patched Windows 11 on x64. Windows on ARM requires a separately built, signed, and tested package before advertising support.
@@ -29,6 +32,11 @@ Every implemented value should have a stable name, unit, scope, default, rationa
 Exact minimum version numbers are frozen in release documentation rather than inferred dynamically by users.
 
 ## Native messaging and IPC defaults
+
+The [Chrome protocol reference](../packaging/extension/chrome/native-protocol-v1.md)
+and generated contracts own the implemented development behavior. Launch/version-
+window/retry bullets below are production design; current capture delivery never
+resends an unconfirmed payload automatically.
 
 - Native-message envelope: 256 KiB maximum UTF-8 JSON in either direction.
 - Captured job-description or question text in one message: 128 KiB maximum UTF-8.
@@ -85,6 +93,12 @@ Limits protect rendering and parsing; they are not monetization quotas. When leg
 
 The parser also has format-specific recursion, object/image count, XML entity, relationship, archive-entry, and archive-expansion limits selected and frozen with the parser version during implementation.
 
+The current implementation and generated contracts take precedence over older
+planning estimates above. In particular, metered-Wasm guest memory/fuel and
+identity-pinned helper supervision supersede the legacy whole-native-process
+parser ceilings; see [ADR 0012](../docs/adr/0012-metered-wasm-document-parsers.md).
+Other unimplemented performance/release targets remain goals, not measurements.
+
 ## Backup cryptography defaults
 
 - New `.ort-backup` files use Argon2id version 1.3 with a 16-byte random salt, 32-byte derived key, 64 MiB memory, three iterations, and four lanes, matching the memory-constrained recommendation in RFC 9106. XChaCha20-Poly1305 uses a fresh 24-byte nonce.
@@ -97,7 +111,12 @@ The parser also has format-specific recursion, object/image count, XML entity, r
 - PDF: 10 pages and 20 MiB maximum.
 - DOCX: 10 pages and 25 MiB maximum.
 - Plain text: 2 MiB maximum.
-- Portable full-data or backup archive: 1 GiB before a segmented-export strategy is required.
+- Implemented portable backup: 64 MiB authenticated JSON payload; larger exports
+  fail explicitly. Collection checks database byte/count aggregates before loading
+  rows and applies an exact serialized-byte budget as records are retained.
+  Collection also caps total records at 100,000 and applies per-category bounds;
+  this does not prune retained publications or activity. A future segmented-export
+  strategy is unimplemented.
 - Supported-maximum PDF render: p95 within five seconds and at least 99.5% successful after content validation.
 - Supported-maximum DOCX render: p95 within 10 seconds and at least 99% successful after content validation.
 
@@ -147,14 +166,14 @@ Provider limits may be lower. ORT reports those errors without silently changing
 - Usage aggregation: the primary UI offers Week, Month, Year, and All time. Week/month graph daily buckets; year/all-time graph monthly buckets unless all-time density requires a documented adaptive bucket. Logical-operation totals and provider-call-attempt accounting remain distinct so retries do not appear to be new user operations.
 - Activity export: CSV and JSON exports contain selected aggregate buckets and non-content breakdowns. Scrubbed attempt metadata is available only through a deliberate diagnostic/support export.
 - Pricing catalog: versioned with each supported provider/model preset; signed independently for content-only updates through canonical GitHub release infrastructure; and reviewed whenever a preset/provider price changes and before each release that advertises cost estimates. Entries carry official source, verification, and effective/expiry metadata.
-- Initial direct providers: OpenAI, Anthropic, and Google Gemini only. Curated Economy, Balanced, and Quality presets are selected from the dated research baseline in `AI_and_Import.md`; Balanced is the initial direct-API default after provider configuration.
-- Model discovery: provider availability may hide a preset, but never enables an untested model. A selected model that becomes unavailable blocks with an explicit replacement choice and never silently reroutes.
+- Initial direct providers: OpenAI, Anthropic, and Google Gemini only. Each saved key selects an explicit compatible model ID from the signed catalog. Legacy Economy/Balanced/Quality values remain catalog/migration metadata, not the visible selector.
+- Model discovery: provider availability may hide a model, but never enables an untested model. A selected model that becomes unavailable blocks with an explicit replacement choice and never silently reroutes.
 - Provider/model summaries: secondary aggregate breakdowns show logical operations, attempts, reported input, cached/cache-write, output, reasoning, total and other supported token categories, estimated cost, and missing/unpriced counts. Cross-currency totals are not computed.
 
 ## Direct-API guardrail defaults
 
 - Spending limits: disabled until deliberately enabled by the user.
-- Supported periods: calendar week, calendar month, calendar year, and all time; any or all may be enabled simultaneously for the active credential identity.
+- The current per-key/general controls expose all-time caps. Typed storage also preserves historical calendar-week/month/year policies and imported inactive policies; calendar controls are not currently exposed as a new UI choice.
 - Initial baseline: each cap starts at zero when it is enabled and displays that activation time. It does not retroactively claim to include earlier ORT calls or outside provider use.
 - Calendar boundary: the user's current local time zone at policy creation; weeks begin Monday at 00:00. The selected zone and next reset are stored so travel or a later zone change does not move a period silently.
 - Currency: the pricing catalog's billing currency for the active provider/model. Initial catalogs use official USD list prices; automatic foreign-exchange conversion is unsupported.
@@ -165,18 +184,19 @@ Provider limits may be lower. ORT reports those errors without silently changing
 
 ## Codex subscription defaults
 
-- Authentication: managed ChatGPT browser flow through local Codex app-server, with device-code fallback where available; API-key auth is not accepted in Codex subscription mode.
+- Authentication: managed ChatGPT browser flow through local Codex app-server with memory-only authorization and no credential-file/keyring fallback. Device-code fallback is not currently exposed. API-key auth is not accepted in Codex subscription mode.
 - Runtime distribution: separately installed compatible Codex runtime; ORT does not bundle or silently install/update it initially.
 - Transport and lifecycle: ORT-managed local `stdio` child process with bounded startup/shutdown timeouts, health and capability checks, orphan recovery, and an explicit supported runtime/protocol version window; WebSocket transport is unsupported initially.
-- Isolation: ORT-specific configuration/authentication root, keyring namespace, environment, and scratch directories; the user's general Codex configuration and authentication state are neither inherited nor modified.
-- Model selection: intersect picker-visible `model/list` results with ORT-tested models; prefer the service-recommended tested model. The initial compatibility candidates are GPT-5.6 Luna, Terra, and Sol.
-- Reasoning: use the returned model default initially; expose only supported efforts that ORT has evaluated. Ultra/subagent operation is unsupported.
+- Isolation: ORT-specific configuration root, ephemeral process-memory authorization, cleared environment, and scratch directories; the user's general Codex configuration and authentication state are neither inherited nor modified.
+- Server permission: Start server is explicit for the current app run. Stop server and quit end sign-in; relaunch starts stopped while model/reasoning/reserve settings and activity remain.
+- Model selection: enable the visible `model/list` intersection with the tested GPT-5.6 Luna/Terra/Sol, GPT-6 Luna/Sol, and GPT-6.1 Sol catalog; unsupported entries remain unavailable. With no saved choice, select GPT-6.1 Sol only when supported. Never silently replace a saved model.
+- Reasoning: the first-session default is Medium when GPT-6.1 Sol supports it; expose only supported Low/Medium/High/Extra high efforts. Ultra/subagent operation is unsupported.
 - Execution: one ephemeral thread per ORT operation in an empty ORT scratch directory; `approvalPolicy: never`; restricted read-only/external process sandbox; provider-only network egress; no configured dynamic tools, MCP, apps, plugins, skills, collaboration, or web access; fail on any tool/command/file event; and cleanup immediately after the activity record settles.
-- Quota refresh: on connection, when AI Monitoring opens, immediately before dispatch when a cap is enabled, after an operation, and on provider update notifications. Background polling is bounded and does not create ORT telemetry.
-- Usage caps: disabled until enabled. A threshold from 1% through 100% may apply to an individual stable quota-bucket identifier or all currently returned buckets. Failure to refresh an enabled cap blocks dispatch.
+- Quota refresh: bounded reads on connection, every 30 seconds on the connected Codex page, and before each AI pass while the reserve is enabled. Background polling does not create ORT telemetry.
+- Usage reserve: enabled at 20% minimum remaining by default, configurable from 1–100%, applied to every returned quota bucket. Dispatch is allowed exactly at the reserve and blocked below it. Missing/invalid quota blocks dispatch while enabled; the reserve may be explicitly disabled. Per-bucket policy controls are not implemented.
 - Codex costs: do not show API-equivalent currency estimates. Show provider-reported quota windows and token activity with account-wide versus ORT-only provenance.
 
-## Update defaults
+## Planned distribution update defaults
 
 - Background application update check: at most once every 24 hours by default, plus explicit user-triggered checks.
 - Background signed pricing/model-catalog check: at most once every 24 hours by default, plus an explicit refresh. A valid cached catalog remains usable until its applicable entry expires.

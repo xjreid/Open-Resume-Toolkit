@@ -15,7 +15,8 @@ This value describes the React/TypeScript interface rendered in Tauri desktop
 webviews, not a browser-hosted resume service. The desktop runtime is Tauri 2 with
 Rust. macOS Apple Silicon is the active development and preview target; Windows
 and Intel Mac are later expansions. Chrome and Edge extensions are narrow capture
-companions. English is the initial interface and document language.
+companions; Chrome capture is implemented for development, while Edge remains a
+capture-disabled scaffold. English is the initial interface and document language.
 
 ## Users
 
@@ -45,7 +46,8 @@ subscription connection; it never silently switches provider or model.
 - The main desktop window owns master-resume editing and publication, the tracker,
   aggregate AI monitoring, settings, backup, and recovery.
 - There is one autosaved master draft and at most one deliberately published
-  snapshot. Tailoring uses the published snapshot, never unpublished draft edits.
+  current published master. Earlier immutable publication revisions remain stored
+  for replay/backup. Tailoring uses the published master, never unpublished draft edits.
 - The separate desktop overlay owns the one active application workspace: capture
   and review job text, tailor, review changes and qualification alerts, then work
   across Resume, Cover letter, and Answers tabs.
@@ -83,7 +85,7 @@ The public name is Open Resume Toolkit, abbreviated ORT. Copy is direct, specifi
 functional, and documentation-oriented; it explains actions, state, limits,
 privacy, installation, and source without inflated AI or employment claims.
 
-Future interface work uses the user-approved Open Folio document workspace,
+The current interface uses the user-approved Open Folio document workspace,
 muted blue-green palette, Hanken Grotesk interface typography, Open Folio assets,
 and light-only application UI. The October 4, 2026 implementation supersedes
 Precision Workbench / Quiet Navy / Offset Open Frame. The [aesthetic overview](Aesthetic/README.md)

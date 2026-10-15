@@ -199,11 +199,17 @@ fn export_with_dialog(
         Err(error) => return backup_write_failure(&error),
     };
     let state = window.app_handle().state::<DesktopState>();
-    let bytes = match state
-        .with_store(|store| store.create_portable_backup(&passphrase, env!("CARGO_PKG_VERSION")))
-    {
-        Ok(value) => value,
-        Err(error) => return backup_storage_failure(&error),
+    let snapshot =
+        match state.with_store(|store| store.portable_backup_request(env!("CARGO_PKG_VERSION"))) {
+            Ok(value) => value,
+            Err(error) => return backup_storage_failure(&error),
+        };
+    let bytes = match ort_backup::create_backup(&passphrase, snapshot) {
+        Ok(bytes) => bytes,
+        Err(ort_backup::BackupError::InvalidContent) => {
+            return backup_failure("BACKUP_INVALID_CONTENT");
+        }
+        Err(_) => return backup_failure("BACKUP_UNAVAILABLE"),
     };
     let Ok(header) = inspect_backup(&bytes) else {
         return backup_failure("BACKUP_INVALID_CONTENT");
@@ -331,9 +337,13 @@ fn delete_safety_copy_blocking(
 ) -> CommandResponse<DeleteSafetyCopyResponse> {
     let state = window.app_handle().state::<DesktopState>();
     let vault = OsDatabaseKeyVault::new();
-    match state
-        .with_store(|store| store.delete_retained_safety_copy(&store.manifest().channel, &vault))
-    {
+    match state.with_store(|store| {
+        store.delete_retained_safety_copy(
+            &store.manifest().channel,
+            &vault,
+            &ort_vault::OsProviderCredentialVault::new(),
+        )
+    }) {
         Ok(deleted) => CommandResponse::success(DeleteSafetyCopyResponse { deleted }),
         Err(error) => recovery_storage_failure(&error),
     }

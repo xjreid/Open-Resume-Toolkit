@@ -1,4 +1,8 @@
-# Codex runtime qualification
+# Codex runtime, server controls, and qualification
+
+Current controls reviewed against local source on October 15, 2026. Dated
+qualification sections retain their original scope; no live account/provider
+claims are added by this documentation review.
 
 ORT supervises an optional, separately installed official Codex app-server.
 The Codex page offers an explicit runtime installer after the main app
@@ -46,20 +50,20 @@ and compatibility-manifest update; arbitrary PATH executables are never used.
 ## Installation readiness
 
 Opening the Codex page or returning focus to it runs a main-window-only,
-offline installation check, even with Enable Codex off. It checks the protected
+offline installation check, even while the server is stopped. It checks the protected
 locations, permissions, executable access, supported architecture, size, Mach-O
 header and pinned digest on a background thread. It does not start Codex,
 connect an account, read credentials, enable the provider or send network requests.
 Live authentication, network access and runtime policy are checked only after
-the user enables Codex.
+the user chooses **Start server**.
 
-While checking, Enable Codex cannot be switched on. Missing or rejected runtimes
+While checking, **Start server** is unavailable. Missing or rejected runtimes
 show the explicit install action and its optional details. A verified runtime
 hides all installation guidance, download controls and old installer messages;
-when disabled, the page presents Enable Codex before any account controls.
+when stopped, the page presents **Start server** before account controls.
 Successful installation checks readiness again without enabling or connecting.
-Already-enabled users can still disable Codex if the runtime becomes unavailable.
-The saved preference and API-key restoration behavior remain unchanged.
+A started server can still be stopped if the runtime becomes unavailable.
+Stopping restores the previously selected API key without changing its saved pause state.
 
 ## Optional development installer
 
@@ -85,7 +89,7 @@ prefixes and extensions, and checks bounded zero-only padding/trailers. It never
 extracts paths supplied by an archive.
 
 The payload is verified again without executing it. Installation never starts a
-Codex process, including when Enable Codex is off. Only the enabled, supervised
+Codex process, including while the server is stopped. Only the enabled, supervised
 runtime owner can launch Codex after installation. macOS requests approval after
 the archive and payload checks succeed.
 
@@ -178,6 +182,21 @@ access or quota availability.
 
 ## Containment and confidentiality
 
+The model picker enables only supported, visible runtime models from ORT's
+tested list: GPT-5.6 Luna/Terra/Sol, GPT-6 Luna/Sol, and GPT-6.1 Sol. Other
+known entries remain marked unavailable. With no saved selection, the first
+session chooses GPT-6.1 Sol with Medium reasoning only if supported; a saved
+choice is never silently replaced. Low, Medium, High, and Extra high reasoning
+are enabled only when the selected model reports support.
+
+Usage reserve defaults to enabled at 20% minimum remaining across every
+reported quota bucket. Users may set 1–100% or disable it. Exactly the reserve
+is allowed; below it, or without valid quota while enabled, new work is blocked.
+The connected Codex page refreshes usage every 30 seconds; each AI pass checks
+the enabled reserve again. Data contains token activity, while the Codex page
+contains current account quota. Ongoing requests and other clients can cross
+the reserve.
+
 Every ORT profile has a separate canonical `CODEX_HOME`. Codex manages ChatGPT
 login and renewal using `cli_auth_credentials_store = "ephemeral"`: authorization
 stays in its supervised process's memory, with no Keychain or credential-file
@@ -189,36 +208,34 @@ credential-database file access or Keychain authorization rights. Native TLS
 certificate validation still requires the existing SecurityServer/trust services;
 the ephemeral credential backend does not call the Keychain store.
 
-**Enable Codex** is a saved, profile-scoped runtime permission and exclusive AI
-provider choice, independent of sign-in. It is always visible on the Codex page,
-including before login or runtime installation. Disabled status reads do not
-start Codex. Turning it on from the page first requires successful offline
-installation verification; an already-enabled preference remains available to
-turn off if installation becomes unavailable. Login and workflow session acquisition recheck permission under the
-runtime lock, so an older queued poll cannot recreate a disabled runtime.
+**Start server** grants profile-scoped runtime permission for this application
+run and selects Codex as the exclusive AI provider. It requires successful offline
+installation verification. **Stop server** remains available to revoke permission
+when installation becomes unavailable. Stopped status reads never start a runtime.
+Login and workflow acquisition recheck permission under the runtime lock, so a
+queued status read cannot recreate a stopped server.
 
 While enabled, every AI request uses Codex. This remains true while signed out:
 the overlay identifies Codex and replaces model/reasoning controls with
 “AI is disabled until an account is connected.” My Keys is grayed out and noninteractive with
 “Codex must be disabled to use API keys.” Native key mutations, tests and spending
-changes are also blocked. Enabling does not pause or change the selected API key.
-Disabling restores that key immediately; manual key pauses remain intact. Older
+changes are also blocked. Starting the server does not pause or change the selected API key.
+Stopping the server restores that key immediately; manual key pauses remain intact. Older
 Codex-created key pauses migrate away without changing the selected key.
 
-Quitting ORT, replacing/switching profiles, cancellation that stops the runtime,
-or a runtime failure ends memory-only sign-in. The enabled preference, model,
-reasoning, reserve and activity history remain saved. On relaunch an enabled
-profile can start the runtime for status checks, but the user must sign in again.
-Each new signed-in process receives a fresh activity identity.
+Quitting ORT, profile retirement, cancellation that retires the process, or a
+runtime failure ends memory-only sign-in. Model, reasoning, reserve settings,
+and activity history remain saved. Every app launch explicitly resets server
+permission and account identity; the user must choose **Start server** and sign
+in again. Each new signed-in process receives a fresh activity identity.
 
-The bottom **Sign out** control keeps Codex enabled, cancels current Codex work,
-and destroys the old process and its memory-only
-authorization. Later status checks may start a fresh signed-out process because
-permission remains enabled. Unchecking **Enable Codex** also signs out and stops
-the process, and prevents all future runtime starts until reenabled. It can stop
-an active Codex operation. Neither action requires starting a missing/broken
-runtime to forget credentials. Managed-directory cleanup failure remains blocked
-and recoverable through **Retry sign-out**.
+**Sign out** ends the account session while keeping server permission for the
+current app run. Later status checks may create a fresh signed-out process.
+**Stop server** also signs out, cancels work, and prevents runtime starts until
+**Start server** is chosen again. Neither action needs to start a missing/broken
+runtime to forget authorization. Managed-directory cleanup failure stays blocked
+and retryable. Approved quit reaps the server before allowing app termination;
+cancelling quit leaves the existing process available.
 
 The macOS sandbox denies process forks and execution of anything except the
 verified runtime, and allows file content only in the private auth/scratch roots
@@ -313,12 +330,12 @@ main-window controls. The shared model-change event reloads the latest settings
 in both windows without waiting for a quota refresh. Polls already in flight
 cannot overwrite newer selections.
 
-Known account-wide quota windows appear as remaining percentages in the banner;
-unknown quota is omitted. A failed or invalid refresh clears the previous
-snapshot rather than showing stale percentages as current. Usage refreshes every
-30 seconds while the overlay is
-open and after an AI operation completes. The API key model selector continues
-to use its existing command and synchronization event.
+Account-wide remaining quota and reserve controls belong to the main **Codex**
+page, which refreshes usage every 30 seconds while appropriate. A failed refresh
+clears the last snapshot rather than presenting stale values as current. The
+overlay footer shows connection/model identity and readiness, not quota charts;
+Token activity is available in **Data**. Model changes continue to synchronize
+between windows without changing server permission or reserve settings.
 
 ## Responsiveness and protocol review — October 8, 2026
 

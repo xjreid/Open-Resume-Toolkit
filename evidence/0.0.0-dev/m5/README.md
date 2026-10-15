@@ -1,5 +1,15 @@
 # M5 implementation record
 
+> **Current reading note — October 15, 2026:** This is an accumulating historical
+> checkpoint record, not the current setup guide or suite-size inventory.
+> Chrome is now 0.3.0, the database is schema 9, and backup is format 1.9.
+> Earlier counts, schema numbers, and blanket "bridge disabled until signing"
+> statements below describe earlier checkpoints. The explicit development
+> bridge is implemented; signed production transport and functional Edge remain
+> open. Use the [current implementation map](../../../docs/development/current-state.md),
+> [CI guide](../../../docs/development/ci.md), and [Chrome README](../../../apps/extension/README.md).
+
+
 Scope revision, October 5, 2026: the user assigned paid ORT application signing,
 production desktop/helper identity and vault qualification, and final Store
 publication/installed production checks to M7. M5 now targets authenticated

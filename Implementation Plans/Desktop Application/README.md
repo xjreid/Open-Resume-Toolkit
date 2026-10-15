@@ -5,8 +5,15 @@
 
 This folder intentionally contains no theme, palette, typography, illustration, or polished component design. Those decisions belong in `../../Aesthetic/`.
 
-## Next delivery
+## Current implementation
 
-[M2.5 — Usable desktop and resume designs](M2_5_Usable_Desktop_and_Resume_Designs.md)
-owns the actual app layout, approved aesthetic, resume-builder usability and three
-professional document designs before M3.
+The Open Folio main window, master editor, AI My Keys/Codex/Data pages, tracker,
+Settings, and application overlay are implemented. The tracker loads bounded
+pages and native reads run in background work. Profile replacement retires
+window/cache state and pending saves. See the
+[behavior reference](../../docs/application-behavior/README.md) and
+[current implementation map](../../docs/development/current-state.md).
+
+[M2.5](M2_5_Usable_Desktop_and_Resume_Designs.md) is a completed milestone,
+not the next delivery. Remaining work is tracked by the
+[roadmap](../System%20Documentation/Delivery_Roadmap.md).

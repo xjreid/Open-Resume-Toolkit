@@ -73,22 +73,9 @@ fn delete_and_reinitialize<P: ProviderCredentialVault>(
         let _ = state.replace_storage(DesktopStorage::Ready(store));
         return deletion_failure(&error);
     }
-    let credentials = match ai_keys::saved_credential_references(&store) {
-        Ok(value) => value,
-        Err(error) => {
-            let _ = state.replace_storage(DesktopStorage::Ready(store));
-            return deletion_failure(&error);
-        }
-    };
-    // A partial multi-key cleanup must never leave a missing key selected for requests.
-    if !credentials.is_empty() && ai_keys::suspend_for_deletion(&store).is_err() {
-        let _ = state.replace_storage(DesktopStorage::Ready(store));
-        return failure("LOCAL_DATA_CREDENTIAL_DELETE_UNAVAILABLE", true);
-    }
-    if credentials
-        .iter()
-        .any(|reference| provider_vault.delete(reference).is_err())
-    {
+    // Suspend dispatch before committing retirement; the storage lifecycle inventories
+    // active and retained profiles and retries provider cleanup before database keys.
+    if ai_keys::suspend_for_deletion(&store).is_err() {
         let _ = state.replace_storage(DesktopStorage::Ready(store));
         return failure("LOCAL_DATA_CREDENTIAL_DELETE_UNAVAILABLE", true);
     }
@@ -99,17 +86,18 @@ fn delete_and_reinitialize<P: ProviderCredentialVault>(
     let channel = store.manifest().channel.clone();
     drop(store); // Close SQLCipher/WAL handles before committing deletion intent.
 
-    let deletion = match EncryptedStore::delete_all_local_data(&root, &channel, vault) {
-        Ok(value) => value,
-        Err(error) => {
-            // A refused deletion must not consume a separately staged restore.
-            // Reopen only the same active root that was just closed.
-            let reopened = EncryptedStore::open_or_initialize(&root, &channel, vault)
-                .map_or(DesktopStorage::Unavailable, DesktopStorage::Ready);
-            let _ = state.replace_storage(reopened);
-            return deletion_failure(&error);
-        }
-    };
+    let deletion =
+        match EncryptedStore::delete_all_local_data(&root, &channel, vault, provider_vault) {
+            Ok(value) => value,
+            Err(error) => {
+                // A refused deletion must not consume a separately staged restore.
+                // Reopen only the same active root that was just closed.
+                let reopened = EncryptedStore::open_or_initialize(&root, &channel, vault)
+                    .map_or(DesktopStorage::Unavailable, DesktopStorage::Ready);
+                let _ = state.replace_storage(reopened);
+                return deletion_failure(&error);
+            }
+        };
 
     let _ = previews.clear();
     match deletion {
@@ -120,8 +108,13 @@ fn delete_and_reinitialize<P: ProviderCredentialVault>(
             })
         }
         AllLocalDataDeletion::Deleted => {
-            let fresh = EncryptedStore::open_or_activate_pending_restore(&root, &channel, vault)
-                .map(|(store, _)| store);
+            let fresh = EncryptedStore::open_or_activate_pending_restore(
+                &root,
+                &channel,
+                vault,
+                provider_vault,
+            )
+            .map(|(store, _)| store);
             let fresh_profile_ready = fresh.is_ok();
             let replacement = fresh.map_or(DesktopStorage::Unavailable, DesktopStorage::Ready);
             let stored = state.replace_storage(replacement).is_ok();

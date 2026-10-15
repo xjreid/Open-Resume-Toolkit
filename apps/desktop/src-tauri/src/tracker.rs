@@ -198,7 +198,7 @@ fn summary(record: TrackerRecord) -> Result<TrackerSummary, StorageError> {
 }
 
 #[tauri::command]
-pub fn list_tracker_entries(
+pub async fn list_tracker_entries(
     window: WebviewWindow,
     offset: Option<u32>,
     limit: Option<u32>,
@@ -208,17 +208,20 @@ pub fn list_tracker_entries(
     if window.label() != "main" {
         return window_not_authorized();
     }
-    match window.state::<DesktopState>().with_store(|store| {
-        store.tracker_summaries(
-            offset.unwrap_or(0),
-            limit.unwrap_or(100),
-            search.as_deref().unwrap_or(""),
-            status.as_deref().unwrap_or(""),
-        )
-    }) {
-        Ok(entries) => CommandResponse::success(entries),
-        Err(error) => tracker_failure(&error),
-    }
+    crate::background_work::run(move || {
+        match window.state::<DesktopState>().with_store(|store| {
+            store.tracker_summaries(
+                offset.unwrap_or(0),
+                limit.unwrap_or(100),
+                search.as_deref().unwrap_or(""),
+                status.as_deref().unwrap_or(""),
+            )
+        }) {
+            Ok(entries) => CommandResponse::success(entries),
+            Err(error) => tracker_failure(&error),
+        }
+    })
+    .await
 }
 
 #[tauri::command]
