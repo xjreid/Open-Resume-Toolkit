@@ -174,13 +174,13 @@ try {
         )
           throw Error("Sign-in before server startup");
         await page
-          .getByRole("button", { name: "Start Codex server", exact: true })
+          .getByRole("button", { name: "Start server", exact: true })
           .click();
         await page
           .getByRole("button", { name: "Sign in to ChatGPT", exact: true })
           .waitFor();
         await page
-          .getByRole("button", { name: "Stop Codex server", exact: true })
+          .getByRole("button", { name: "Stop server", exact: true })
           .waitFor();
         await page
           .getByRole("button", { name: "Sign in to ChatGPT", exact: true })
@@ -189,18 +189,49 @@ try {
           .getByRole("button", { name: "Cancel sign-in", exact: true })
           .click();
         await page
-          .getByRole("button", { name: "Stop Codex server", exact: true })
+          .getByRole("button", { name: "Stop server", exact: true })
           .click();
         await page
-          .getByRole("button", { name: "Start Codex server", exact: true })
+          .getByRole("button", { name: "Start server", exact: true })
           .waitFor();
         if (await refresh.count())
           throw Error("Refresh must disappear on stop");
       }
       if (scenario === "connected") {
+        const connectionDetails = page.locator(".plan-connection-details");
+        if (await connectionDetails.evaluate((details) => details.open))
+          throw Error("Connection details should start collapsed");
+        const summary = connectionDetails.locator("summary");
+        await summary.focus();
+        await page.keyboard.press("Enter");
+        if (!(await connectionDetails.evaluate((details) => details.open)))
+          throw Error("Connection details cannot be opened by keyboard");
+        await page
+          .getByText("Sign-in stays in memory only", { exact: false })
+          .waitFor();
+        await page.keyboard.press("Enter");
+        if (await connectionDetails.evaluate((details) => details.open))
+          throw Error("Connection details cannot be closed by keyboard");
+        await page
+          .getByRole("switch", { name: "Keep a usage reserve" })
+          .uncheck();
+        if (await page.getByLabel("Usage reserve percentage").isEnabled())
+          throw Error("Reserve is editable while disabled");
+        await page
+          .getByRole("switch", { name: "Keep a usage reserve" })
+          .check();
+        await page.waitForFunction(
+          () =>
+            !document.querySelector('[aria-label="Usage reserve percentage"]')
+              .disabled &&
+            !document.querySelector('[aria-label="Codex model"]').disabled,
+        );
         await page.getByLabel("Codex model").selectOption("gpt-6-sol");
-        if ((await page.getByLabel("Codex model").inputValue()) !== "gpt-6-sol")
-          throw Error("Model save failed");
+        await page.waitForFunction(
+          () =>
+            document.querySelector('[aria-label="Codex model"]').value ===
+            "gpt-6-sol",
+        );
         await page.getByLabel("Usage reserve percentage").fill("35");
         await page
           .getByRole("button", { name: "Save reserve", exact: true })
@@ -218,7 +249,7 @@ try {
           .waitFor();
         if (
           !(await page
-            .getByRole("button", { name: "Stop Codex server", exact: true })
+            .getByRole("button", { name: "Stop server", exact: true })
             .count())
         )
           throw Error("Sign-out disabled server");
@@ -230,7 +261,7 @@ try {
           throw Error("Busy model is editable");
         if (
           !(await page
-            .getByRole("button", { name: "Stop Codex server", exact: true })
+            .getByRole("button", { name: "Stop server", exact: true })
             .isEnabled())
         )
           throw Error("Stop unavailable during AI work");

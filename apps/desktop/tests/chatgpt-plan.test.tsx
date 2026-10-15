@@ -366,7 +366,7 @@ it("saves explicit activation with the frozen model, reasoning and reserve revis
   const toggle = document.querySelector<HTMLButtonElement>(
     ".plan-server-actions button:last-child",
   )!;
-  expect(document.body.textContent!.includes("Stop Codex server")).toBe(false);
+  expect(document.body.textContent!.includes("Stop server")).toBe(false);
   await act(async () => toggle.click());
   expect(native.invoke).toHaveBeenCalledWith("save_chatgpt_plan", {
     request: {
@@ -378,7 +378,7 @@ it("saves explicit activation with the frozen model, reasoning and reserve revis
       reservePercent: 20,
     },
   });
-  expect(document.body.textContent!.includes("Stop Codex server")).toBe(true);
+  expect(document.body.textContent!.includes("Stop server")).toBe(true);
 });
 it("locks model and reserve controls during operations while keeping Stop and Sign out usable", async () => {
   status.operationActive = true;
@@ -428,7 +428,7 @@ it("explains the session lifetime while connected and preserves preferences afte
   expect(status.settings.model).toBe("gpt-6-sol");
   expect(status.settings.reservePercent).toBe(35);
   expect(status.settings.enabled).toBe(true);
-  expect(document.body.textContent).toContain("Stop Codex server");
+  expect(document.body.textContent).toContain("Stop server");
   expect(document.body.textContent).toContain("Sign-in stays in memory only");
 });
 
@@ -813,7 +813,7 @@ it("reloads a shared setting change arriving during a slow usage poll without pu
   ).toBe("high");
 });
 
-it("shows Start Codex server before sign-in and starts independently of model selection", async () => {
+it("shows Start server before sign-in and starts independently of model selection", async () => {
   status.settings.enabled = false;
   status.connected = false;
   status.settings.connectionId = null;
@@ -866,7 +866,7 @@ it("allows stopping the Codex server during an active operation", async () => {
 it("keeps one connection refresh at the top and refreshes both installation and account usage", async () => {
   await render();
   const refreshes = [...document.querySelectorAll("button")].filter(
-    (button) => button.textContent?.trim() === "Refresh connection",
+    (button) => button.getAttribute("aria-label") === "Refresh connection",
   );
   expect(refreshes).toHaveLength(1);
   expect(refreshes[0].closest(".plan-server-actions")).not.toBeNull();
@@ -874,7 +874,7 @@ it("keeps one connection refresh at the top and refreshes both installation and 
     /Codex serverRunning.*ChatGPT accountSigned in/,
   );
   native.invoke.mockClear();
-  await click("Refresh connection");
+  await click("Refresh");
   expect(native.invoke).toHaveBeenCalledWith("check_codex_runtime");
   expect(native.invoke).toHaveBeenCalledWith("load_chatgpt_plan", {
     request: { refreshUsage: true },
@@ -883,7 +883,7 @@ it("keeps one connection refresh at the top and refreshes both installation and 
 
 it("stops a signed-in server, clears account controls, and hides connection refresh", async () => {
   await render();
-  await click("Stop Codex server");
+  await click("Stop server");
   expect(status.connected).toBe(false);
   expect(status.runtimeVersion).toBeNull();
   expect(status.settings.connectionId).toBeNull();
@@ -894,8 +894,10 @@ it("stops a signed-in server, clears account controls, and hides connection refr
   expect(
     document.querySelector('[aria-label="Usage reserve percentage"]'),
   ).toBeNull();
-  expect(document.body.textContent).not.toContain("Refresh connection");
-  expect(document.body.textContent).toContain("Start Codex server");
+  expect(
+    document.querySelector('[aria-label="Refresh connection"]'),
+  ).toBeNull();
+  expect(document.body.textContent).toContain("Start server");
 });
 
 it("waits for a live server before showing sign-in and leaves recovery controls available on startup failure", async () => {
@@ -916,7 +918,9 @@ it("waits for a live server before showing sign-in and leaves recovery controls 
       (button) => button.textContent === "Sign in to ChatGPT",
     ),
   ).toBe(false);
-  expect(document.body.textContent).toContain("Refresh connection");
-  await click("Stop Codex server");
+  expect(
+    document.querySelector('[aria-label="Refresh connection"]'),
+  ).not.toBeNull();
+  await click("Stop server");
   expect(status.settings.enabled).toBe(false);
 });

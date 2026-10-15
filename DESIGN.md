@@ -197,6 +197,8 @@ The rail is Deep Teal with white brand lockup, compact navigation rows, and a cl
 
 The resume paper is the signature surface: white, centered, bounded by the navigator and toolbar, and intentionally quieter than controls around it. The AI workspace uses charts, provider badges, usage summaries, and prompt/result panels within the same paper-and-rule grammar. The application overlay compresses the same system into a 360px fixed rail for capture, view/edit popups, downloads, and native file drag.
 
+The main-window Codex tab groups connection, model controls, usage, and reserve in one flat white workspace. Keep server and account status distinct; place the plan and Sign out alongside account status. Model and reasoning labels provide their own hierarchy. Use 16px headings for usage and setup groups, 14px values, and 12px supporting text. Usage meters and the reserve switch share two columns above 850px and stack below it. Keep privacy transmission guidance and actionable errors visible; put detailed session, installation, and reserve explanations in keyboard-accessible native disclosures.
+
 ## Do's and Don'ts
 
 - **Do** use `apps/desktop/src/shared/workspace-theme.css` as the canonical token and layout layer.

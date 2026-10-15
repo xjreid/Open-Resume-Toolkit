@@ -140,9 +140,8 @@ export function CodexRuntimeInstaller({
       {needed && !busy && (
         <>
           <p className="ai-help">
-            Optional download: Codex 0.162.0 for Apple Silicon, about 94 MB.
-            macOS will ask for administrator approval to install it. This does
-            not start the server or sign you in.
+            Codex 0.162.0 · Apple Silicon · 94 MB. macOS requires administrator
+            approval. Installation doesn’t start the server or sign you in.
           </p>
           <button
             type="button"

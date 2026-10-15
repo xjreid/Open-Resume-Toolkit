@@ -15,16 +15,12 @@ const efforts = Object.entries(REASONING_EFFORT_LABELS) as [
 export function CodexAccountSettings({
   status,
   locked,
-  signOutDisabled,
   onSave,
-  onSignOut,
   onNotice,
 }: {
   status: Wire.PlanStatus;
   locked: boolean;
-  signOutDisabled: boolean;
   onSave: (change: Partial<Wire.PlanSettings>) => void;
-  onSignOut: () => void;
   onNotice: (notice: string) => void;
 }) {
   const { settings } = status;
@@ -40,27 +36,12 @@ export function CodexAccountSettings({
   return (
     <>
       <section
-        className="ai-panel plan-account-settings"
+        className="plan-account-settings"
         aria-labelledby="plan-account-title"
       >
-        <div className="plan-account-heading">
-          <div>
-            <h3 id="plan-account-title">ChatGPT account</h3>
-            <p className="plan-account-plan">
-              {status.accountPlan
-                ? `${status.accountPlan.charAt(0).toUpperCase()}${status.accountPlan.slice(1)} plan`
-                : "Plan unavailable"}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="button--secondary"
-            disabled={signOutDisabled}
-            onClick={onSignOut}
-          >
-            Sign out
-          </button>
-        </div>
+        <h3 id="plan-account-title" className="visually-hidden">
+          AI settings
+        </h3>
         <div className="plan-model-controls">
           <label>
             Model
@@ -121,15 +102,12 @@ export function CodexAccountSettings({
         </div>
         {model?.explanation && <p className="ai-help">{model.explanation}</p>}
         <p className="ai-help plan-data-note">
-          Your resume, job description, and instructions are sent to OpenAI
-          under your account’s plan and privacy terms. Account access is checked
-          when a request runs.
+          AI work sends your resume, job description, and instructions to
+          OpenAI.
         </p>
         {status.operationActive && (
           <div className="plan-operation" role="status">
-            <span>
-              AI work is in progress. Model and reserve controls are locked.
-            </span>
+            <span>AI work in progress. Settings are paused.</span>
             <button
               type="button"
               className="button--secondary"
@@ -139,22 +117,15 @@ export function CodexAccountSettings({
             </button>
           </div>
         )}
-        <p className="ai-help plan-session-note">
-          Sign-in stays in memory only. Sign in again after quitting ORT,
-          switching profiles, or restarting the server. Signing out ends this
-          account session; the server stays enabled.
-        </p>
       </section>
       <section
-        className="ai-panel plan-usage-settings"
+        className="plan-usage-settings"
         aria-labelledby="plan-usage-title"
       >
         <div className="plan-usage-layout">
           <div className="plan-usage">
             <h3 id="plan-usage-title">Account usage</h3>
-            <p className="ai-help">
-              Remaining usage across your ChatGPT account, including other apps.
-            </p>
+            <p className="ai-help">Shared across your ChatGPT account.</p>
             {status.quota?.windows.length ? (
               <ul className="plan-quota-list">
                 {status.quota.windows.map((window) => (
@@ -180,7 +151,7 @@ export function CodexAccountSettings({
                       )}
                       <span>
                         {window.resetsAt
-                          ? `Resets ${new Date(window.resetsAt * 1000).toLocaleString()}`
+                          ? `Resets ${new Date(window.resetsAt * 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
                           : "Reset time not supplied"}
                       </span>
                     </div>
@@ -192,33 +163,33 @@ export function CodexAccountSettings({
                 <strong>Usage unavailable</strong>
                 <span>
                   {settings.reserveEnabled
-                    ? "Your reserve blocks new AI work until Codex reports valid usage."
-                    : "Your reserve is disabled."}{" "}
-                  Refresh the connection to check again.
+                    ? "New AI work is paused until usage is available."
+                    : "Your reserve is off."}{" "}
+                  Refresh to check again.
                 </span>
               </p>
             )}
             <p className="ai-help plan-usage-note">
-              Updates every 30 seconds while this page is open. ORT’s token
-              activity is shown separately in Data.
+              Refreshes every 30 seconds. Token activity is in Data.
             </p>
           </div>
           <div className="plan-reserve" aria-labelledby="plan-reserve-title">
-            <h3 id="plan-reserve-title">Usage reserve</h3>
-            <p className="ai-help">
-              Keep some account usage available for work outside ORT.
-            </p>
-            <label className="plan-reserve-toggle">
-              <input
-                type="checkbox"
-                checked={settings.reserveEnabled}
-                disabled={locked}
-                onChange={(event) =>
-                  onSave({ reserveEnabled: event.target.checked })
-                }
-              />
-              <span>Keep a usage reserve</span>
-            </label>
+            <div className="plan-reserve-heading">
+              <h3 id="plan-reserve-title">Usage reserve</h3>
+              <label className="plan-reserve-toggle">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={settings.reserveEnabled}
+                  disabled={locked}
+                  onChange={(event) =>
+                    onSave({ reserveEnabled: event.target.checked })
+                  }
+                />
+                <span className="visually-hidden">Keep a usage reserve</span>
+              </label>
+            </div>
+            <p className="ai-help">Save some usage for other apps.</p>
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -264,17 +235,27 @@ export function CodexAccountSettings({
               {settings.reserveEnabled ? (
                 <>
                   ORT pauses new AI work below {settings.reservePercent}%
-                  remaining. At exactly {settings.reservePercent}% remaining,
-                  dispatch is allowed.
+                  remaining.
                 </>
               ) : (
-                "The reserve is off. ORT can start AI work without a minimum remaining percentage."
+                "The reserve is off. No minimum is set."
               )}
             </p>
-            <p className="ai-help plan-reserve-limit">
-              Checked before every pass. Ongoing requests and usage elsewhere
-              can cross the reserve.
-            </p>
+            <details className="plan-details plan-reserve-details">
+              <summary>How the reserve works</summary>
+              <div className="plan-details-content">
+                <p>
+                  At exactly {settings.reservePercent}% remaining, dispatch is
+                  allowed. Checked before every pass. Ongoing requests and usage
+                  elsewhere can cross the reserve.
+                </p>
+                <p>
+                  When enabled, your reserve blocks new AI work until Codex
+                  reports valid usage. Usage includes other apps on your
+                  account.
+                </p>
+              </div>
+            </details>
           </div>
         </div>
       </section>

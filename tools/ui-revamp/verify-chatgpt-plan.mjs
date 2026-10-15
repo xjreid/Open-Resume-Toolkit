@@ -329,7 +329,7 @@ try {
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     if (
       !(await page
-        .getByRole("button", { name: "Stop Codex server", exact: true })
+        .getByRole("button", { name: "Stop server", exact: true })
         .count())
     )
       throw new Error("Sign out changed the enabled preference");
@@ -368,13 +368,11 @@ try {
   await capture(page, { path: `${out}/plan-disconnected.png` });
   if (
     !(await page
-      .getByRole("button", { name: "Stop Codex server", exact: true })
+      .getByRole("button", { name: "Stop server", exact: true })
       .count())
   )
     throw new Error("Enabled preference disappeared after sign-out");
-  await page
-    .getByRole("button", { name: "Stop Codex server", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Stop server", exact: true }).click();
   if (
     await page
       .getByRole("button", { name: "Sign in to ChatGPT", exact: true })

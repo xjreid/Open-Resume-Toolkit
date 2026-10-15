@@ -32,7 +32,7 @@ try {
     await page.goto("http://127.0.0.1:1420/preview/ai.html?disabled=1");
     await page.getByRole("button", { name: "Codex", exact: true }).click();
     const start = page.getByRole("button", {
-      name: "Start Codex server",
+      name: "Start server",
       exact: true,
     });
     await page.waitForFunction(
@@ -42,7 +42,7 @@ try {
     );
     if (
       await page
-        .getByRole("button", { name: "Stop Codex server", exact: true })
+        .getByRole("button", { name: "Stop server", exact: true })
         .count()
     )
       throw Error("Readiness must not enable Codex");

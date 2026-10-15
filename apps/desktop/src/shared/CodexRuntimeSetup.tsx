@@ -28,7 +28,7 @@ export function CodexRuntimeSetup({
   const supported = readiness?.errorCode !== "PLAN_PLATFORM_UNSUPPORTED";
   return (
     <section
-      className="ai-panel plan-setup"
+      className="plan-setup"
       hidden={!!readiness?.ready && !error}
       aria-labelledby="plan-setup-title"
     >
@@ -74,7 +74,7 @@ export function CodexRuntimeSetup({
         onComplete={onInstalled}
       />
       {needed && supported && (
-        <details className="plan-installation">
+        <details className="plan-details plan-installation">
           <summary>Runtime installation details</summary>
           <p className="ai-help">
             The optional installer downloads Codex 0.162.0 for macOS Apple
