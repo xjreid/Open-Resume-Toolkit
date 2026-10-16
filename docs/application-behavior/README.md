@@ -27,8 +27,8 @@ drift and resolve it before relying on either description.
 
 The [implementation map](../development/current-state.md) records platform and
 milestone boundaries; the [Codex guide](../ai/codex-plan-runtime.md) covers the
-third AI page, installation, Start/Stop server, and memory-only sign-in. Current
-AI navigation is **My Keys**, **Codex**, and **Data**.
+ChatGPT page, installation, Launch/Quit, and memory-only sign-in.
+Current AI navigation is **My Keys**, **ChatGPT**, and **Data**.
 
 ## Core distinctions
 

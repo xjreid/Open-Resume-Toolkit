@@ -3,11 +3,17 @@
 //! never executes the downloaded runtime, launches a shell, or uses the network.
 use sha2::{Digest, Sha256};
 #[cfg(unix)]
-use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+#[cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(test, unix)))]
 use std::{
-    fs::{self, File, OpenOptions},
+    fs,
+    os::unix::fs::{DirBuilderExt, PermissionsExt},
+    path::PathBuf,
+};
+use std::{
+    fs::{File, OpenOptions},
     io::{Read, Write},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 pub const DESTINATION: &str = "/Library/Application Support/Open Resume Toolkit/Codex/codex";
@@ -129,7 +135,7 @@ pub fn verify_payload(path: &Path) -> Result<()> {
 
 /// Parent directories are checked from the filesystem root down. Once checked,
 /// an unprivileged process cannot swap them; symlinks are never repaired/followed.
-#[cfg(unix)]
+#[cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(test, unix)))]
 fn protected_directory(path: &Path, owner: u32, anchor: &Path) -> Result<()> {
     if !path.starts_with(anchor) {
         return Err("PLAN_INSTALL_UNSAFE_PATH");
@@ -166,7 +172,7 @@ fn protected_directory(path: &Path, owner: u32, anchor: &Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(unix)]
+#[cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(test, unix)))]
 fn install_at(
     source: &Path,
     destination: &Path,
@@ -234,10 +240,8 @@ fn install_at(
 /// # Errors
 /// Rejects unsupported platforms, non-root callers, invalid arguments, unsafe
 /// paths, altered payloads, and filesystem failures before atomic publication.
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 pub fn privileged_main(arguments: impl Iterator<Item = std::ffi::OsString>) -> Result<()> {
-    if !cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-        return Err("PLAN_PLATFORM_UNSUPPORTED");
-    }
     if !rustix::process::geteuid().is_root() {
         return Err("PLAN_INSTALL_PERMISSION_DENIED");
     }
@@ -249,15 +253,19 @@ pub fn privileged_main(arguments: impl Iterator<Item = std::ffi::OsString>) -> R
     if !source.is_absolute() {
         return Err("PLAN_INSTALL_UNSAFE_PATH");
     }
-    #[cfg(unix)]
-    return install_at(
+    install_at(
         &source,
         Path::new(DESTINATION),
         manifest(),
         0,
         Path::new("/"),
-    );
-    #[cfg(not(unix))]
+    )
+}
+
+/// # Errors
+/// Installation is supported only on Apple Silicon macOS.
+#[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+pub fn privileged_main(_arguments: impl Iterator<Item = std::ffi::OsString>) -> Result<()> {
     Err("PLAN_PLATFORM_UNSUPPORTED")
 }
 

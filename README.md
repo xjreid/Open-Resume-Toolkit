@@ -24,7 +24,7 @@ The current app includes:
   explicit model selection, local usage history, estimated spending, and
   optional spending caps.
 - Optional Codex through a separately installed, verified official runtime.
-  Start the server explicitly and sign in with your ChatGPT account.
+  Launch explicitly and sign in with your ChatGPT account.
   Authentication lasts only in that process's memory; stopping or quitting ends
   the session. ORT never silently switches to an API key.
 - A local application tracker with retained materials, inline metadata editing,

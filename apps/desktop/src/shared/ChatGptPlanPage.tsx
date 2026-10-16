@@ -5,6 +5,8 @@ import { planErrorMessage } from "./chatgpt-plan-presentation";
 import { CodexAccountSettings } from "./CodexAccountSettings";
 import { CodexRuntimeSetup } from "./CodexRuntimeSetup";
 import { useCodexRuntimeReadiness } from "./use-codex-runtime-readiness";
+import { CodexPageIcon } from "./CodexPageIcon";
+import openaiLogo from "../assets/providers/openai.svg";
 import "./styles/chatgpt-plan.css";
 
 export function ChatGptPlanPage({
@@ -67,39 +69,62 @@ export function ChatGptPlanPage({
     // server with no authorization so another browser sign-in is available.
     await refresh(true);
   }
-  const serverLabel = !status
-    ? "Checking…"
-    : serverAction === "stop"
-      ? "Stopping…"
-      : serverAction === "start" || (enabled && !running && refreshing)
-        ? "Starting…"
+  const installed = runtime.readiness?.ready === true;
+  const installationLabel =
+    runtime.checking && !runtime.readiness
+      ? "Checking Codex Runtime…"
+      : installed
+        ? "Codex Runtime is Installed"
+        : runtime.error
+          ? "Codex Runtime could not be checked"
+          : runtime.readiness?.errorCode === "PLAN_RUNTIME_MISSING"
+            ? "Codex Runtime isn’t Detected"
+            : installationNeeded
+              ? "Codex Runtime needs attention"
+              : "Checking Codex Runtime…";
+  const serverLabel =
+    serverAction === "stop"
+      ? "Quitting…"
+      : serverAction === "start" || (!running && refreshing)
+        ? "Launching…"
         : running
           ? "Running"
-          : enabled
-            ? "Unavailable"
-            : installationNeeded
-              ? runtime.readiness?.errorCode === "PLAN_RUNTIME_MISSING"
-                ? "Not installed"
-                : "Not ready"
-              : "Stopped";
+          : "Unavailable";
 
   return (
     <div
-      className="ai-page-panels chatgpt-plan-page"
+      className="ai-page-panels chatgpt-plan-page plan-workspace"
       hidden={!visible}
-      aria-label="Codex settings"
+      aria-label="ChatGPT settings"
     >
-      <div className="ai-panel plan-workspace">
+      <div className="plan-server-frame">
         <section className="plan-server" aria-labelledby="chatgpt-plan-title">
-          <div className="plan-server-heading">
-            <div>
-              <h3 id="chatgpt-plan-title">Codex</h3>
-              <p className="ai-help">
-                Use your ChatGPT account for AI work in ORT.
-              </p>
-            </div>
-            <div className="plan-server-actions">
-              {enabled && (
+          <div className="plan-server-identity">
+            <h3 id="chatgpt-plan-title" className="plan-brand">
+              <img src={openaiLogo} alt="" />
+              <span>ChatGPT</span>
+            </h3>
+            <p
+              className={`plan-installation-status${installed ? " plan-installation-status--ready" : ""}`}
+              role="status"
+            >
+              {installed && <CodexPageIcon name="check" />}
+              {installationLabel}
+            </p>
+          </div>
+          <div className="plan-server-actions">
+            {enabled && (
+              <>
+                <span
+                  className={`plan-runtime-status${running ? " plan-runtime-status--running" : ""}`}
+                  role="status"
+                >
+                  <span
+                    className={`plan-status-dot${running ? " plan-status-dot--ready" : ""}`}
+                    aria-hidden="true"
+                  />
+                  {serverLabel}
+                </span>
                 <button
                   type="button"
                   className="button--quiet plan-refresh"
@@ -108,202 +133,148 @@ export function ChatGptPlanPage({
                       ? "Refreshing connection"
                       : "Refresh connection"
                   }
-                  title="Refresh connection"
+                  title="Refresh runtime status and account usage"
                   disabled={locked || refreshing || runtime.checking}
                   onClick={refreshConnection}
                 >
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 17.9 17" />
-                  </svg>
-                  {refreshing || runtime.checking ? "Refreshing…" : "Refresh"}
+                  <CodexPageIcon name="refresh" />
                 </button>
-              )}
-              {(enabled || !installationNeeded) && (
-                <button
-                  type="button"
-                  className={enabled ? "button--secondary" : undefined}
-                  title={enabled ? "Stop AI work and sign out" : undefined}
-                  disabled={
-                    blocked ||
-                    working ||
-                    installing ||
-                    !!serverAction ||
-                    !settings ||
-                    (!enabled &&
-                      (!!status?.operationActive ||
-                        runtime.checking ||
-                        !runtime.readiness?.ready ||
-                        settings.cleanupRequired))
-                  }
-                  onClick={() => void changeServer()}
-                >
-                  {serverAction === "stop"
-                    ? "Stopping…"
-                    : serverAction === "start"
-                      ? "Starting…"
-                      : enabled
-                        ? "Stop server"
-                        : "Start server"}
-                </button>
-              )}
-            </div>
-          </div>
-          <dl className="plan-status-strip" aria-live="polite">
-            <div>
-              <dt>Codex server</dt>
-              <dd>
-                <span
-                  className={`plan-status-dot${running ? " plan-status-dot--ready" : ""}`}
-                />
-                {serverLabel}
-              </dd>
-            </div>
-            <div>
-              <dt>ChatGPT account</dt>
-              <dd>
-                <span
-                  className={`plan-status-dot${connected ? " plan-status-dot--ready" : ""}`}
-                />
-                {!status
-                  ? "Checking…"
-                  : connected
-                    ? "Signed in"
-                    : status.loginPending && running
-                      ? "Signing in…"
-                      : "Signed out"}
-                {connected && (
-                  <small className="plan-account-plan">
-                    {status?.accountPlan
-                      ? `${status.accountPlan.charAt(0).toUpperCase()}${status.accountPlan.slice(1)} plan`
-                      : "Plan unavailable"}
-                  </small>
-                )}
-                {connected && (
-                  <button
-                    type="button"
-                    className="button--quiet plan-sign-out"
-                    disabled={blocked || working || installing}
-                    onClick={() => void signOut()}
-                  >
-                    Sign out
-                  </button>
-                )}
-              </dd>
-            </div>
-          </dl>
-          {!running && !installationNeeded && (
-            <p className="ai-help plan-server-note">
-              {enabled
-                ? "Refresh the connection or restart the server to try again."
-                : "Start the server, then sign in to ChatGPT."}
-            </p>
-          )}
-        </section>
-        {error && (
-          <p className="notice plan-notice" role="alert">
-            {error}
-          </p>
-        )}
-        <CodexRuntimeSetup
-          visible={visible}
-          blocked={
-            blocked ||
-            working ||
-            installing ||
-            !!status?.operationActive ||
-            !!status?.loginPending
-          }
-          readiness={runtime.readiness}
-          checking={runtime.checking}
-          error={runtime.error}
-          showCheck={!enabled}
-          onCheck={refreshConnection}
-          onInstalled={refreshConnection}
-          onBusy={setInstalling}
-        />
-        {connected && status ? (
-          <CodexAccountSettings
-            status={status}
-            locked={locked}
-            onSave={save}
-            onNotice={setNotice}
-          />
-        ) : running ? (
-          <section
-            className="plan-connect"
-            aria-labelledby="plan-sign-in-title"
-          >
-            <h3 id="plan-sign-in-title">Connect your account</h3>
-            <p className="plan-body">
-              Sign in with your browser to use your ChatGPT plan.
-            </p>
-            {status?.loginPending ? (
-              <div className="plan-operation" role="status">
-                <span>Waiting for browser sign-in…</span>
-                <button
-                  type="button"
-                  className="button--secondary"
-                  disabled={working}
-                  onClick={() => void act("cancel")}
-                >
-                  Cancel sign-in
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                disabled={
-                  locked || runtime.checking || !runtime.readiness?.ready
-                }
-                onClick={() => void act("connect")}
-              >
-                Sign in to ChatGPT
-              </button>
+              </>
             )}
-            <p className="ai-help plan-session-note">
-              You’ll need to sign in again after restarting ORT.
-            </p>
-          </section>
-        ) : null}
-        {settings?.cleanupRequired && (
-          <div className="plan-operation plan-cleanup">
-            <p className="ai-help">
-              Clear the previous session before starting the server or signing
-              in again.
-            </p>
             <button
               type="button"
-              className="button--secondary"
-              disabled={blocked || working}
-              onClick={() => void signOut()}
+              className={enabled ? "button--danger plan-power" : "plan-power"}
+              title={enabled ? "Stop AI work and sign out" : undefined}
+              disabled={
+                blocked ||
+                working ||
+                installing ||
+                !!serverAction ||
+                !settings ||
+                (!enabled &&
+                  (!!status?.operationActive ||
+                    runtime.checking ||
+                    !runtime.readiness?.ready ||
+                    settings.cleanupRequired))
+              }
+              onClick={() => void changeServer()}
             >
-              Retry sign-out
+              {serverAction === "stop"
+                ? "Quitting…"
+                : serverAction === "start"
+                  ? "Launching…"
+                  : enabled
+                    ? "Quit"
+                    : "Launch"}
             </button>
           </div>
-        )}
-        <details className="plan-details plan-connection-details">
-          <summary>Connection &amp; privacy</summary>
-          <div className="plan-details-content">
-            <p>
-              Stopping the server ends Codex work and signs you out. Your model,
-              reserve settings, and activity history stay saved. Stop the server
-              to use API keys.
-            </p>
-            <p>
-              Sign-in stays in memory only, without saving it to Keychain or a
-              credential file. Sign in again after quitting ORT, switching
-              profiles, or restarting the server. Signing out ends this account
-              session; the server stays enabled.
-            </p>
-            <p>
-              Your resume, job description, and instructions are sent to OpenAI
-              under your account’s plan and privacy terms. Account access is
-              checked when a request runs.
-            </p>
-            {running && <p>Codex runtime v{status!.runtimeVersion}</p>}
-          </div>
-        </details>
+        </section>
       </div>
+      {error && (
+        <p className="notice plan-notice" role="alert">
+          {error}
+        </p>
+      )}
+      <CodexRuntimeSetup
+        visible={visible}
+        blocked={
+          blocked ||
+          working ||
+          installing ||
+          !!status?.operationActive ||
+          !!status?.loginPending
+        }
+        readiness={runtime.readiness}
+        checking={runtime.checking}
+        error={runtime.error}
+        showCheck={!enabled}
+        onCheck={refreshConnection}
+        onInstalled={refreshConnection}
+        onBusy={setInstalling}
+      />
+      {connected && status ? (
+        <CodexAccountSettings
+          status={status}
+          locked={locked}
+          onSave={save}
+          onNotice={setNotice}
+          onSignOut={() => void signOut()}
+          signOutDisabled={blocked || working || installing}
+        />
+      ) : running ? (
+        <section className="plan-connect" aria-labelledby="plan-sign-in-title">
+          <h3 id="plan-sign-in-title" className="visually-hidden">
+            Connect your account
+          </h3>
+          {status?.loginPending ? (
+            <div className="plan-operation" role="status">
+              <span>Waiting for browser sign-in…</span>
+              <button
+                type="button"
+                className="button--secondary"
+                disabled={working}
+                onClick={() => void act("cancel")}
+              >
+                Cancel sign-in
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="plan-login-button"
+              disabled={locked || runtime.checking || !runtime.readiness?.ready}
+              onClick={() => void act("connect")}
+            >
+              <span>Log in with</span>{" "}
+              <span className="plan-login-brand">
+                <img src={openaiLogo} alt="" />
+                OpenAI
+              </span>
+            </button>
+          )}
+          <p className="ai-help plan-session-note">
+            Opens in your browser. Sign in again after restarting ORT.
+          </p>
+        </section>
+      ) : null}
+      {settings?.cleanupRequired && (
+        <div className="plan-operation plan-cleanup">
+          <p className="ai-help">
+            Clear the previous session before starting the server or signing in
+            again.
+          </p>
+          <button
+            type="button"
+            className="button--secondary"
+            disabled={blocked || working}
+            onClick={() => void signOut()}
+          >
+            Retry sign-out
+          </button>
+        </div>
+      )}
+      <details className="plan-details plan-connection-details">
+        <summary>Connection &amp; privacy</summary>
+        <div className="plan-details-content">
+          <p>
+            Stopping the server ends Codex work and signs you out. Your model,
+            reserve settings, and activity history stay saved. Stop the server
+            to use API keys.
+          </p>
+          <p>
+            Sign-in stays in memory only, without saving it to Keychain or a
+            credential file. Sign in again after quitting ORT, switching
+            profiles, or restarting the server. Signing out ends this account
+            session; the server stays enabled.
+          </p>
+          <p>
+            Your resume, job description, and instructions are sent to OpenAI
+            under your account’s plan and privacy terms. Account access is
+            checked when a request runs.
+          </p>
+          {running && <p>Codex runtime v{status!.runtimeVersion}</p>}
+        </div>
+      </details>
     </div>
   );
 }

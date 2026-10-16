@@ -848,7 +848,11 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
             aria-current={page === tab ? "page" : undefined}
             onClick={() => setPage(tab)}
           >
-            {tab === "general" ? "My Keys" : tab === "plan" ? "Codex" : "Data"}
+            {tab === "general"
+              ? "My Keys"
+              : tab === "plan"
+                ? "ChatGPT"
+                : "Data"}
           </button>
         ))}
       </nav>
@@ -877,7 +881,7 @@ export function AiWorkspace({ blocked }: { blocked: boolean }) {
                 className="button--quiet"
                 onClick={() => setPage("plan")}
               >
-                Open Codex
+                Open ChatGPT
               </button>
             </div>
           )}

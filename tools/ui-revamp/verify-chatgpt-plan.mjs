@@ -313,7 +313,7 @@ try {
   ]) {
     await page.setViewportSize(viewport);
     await page.goto("http://127.0.0.1:1420/preview/ai.html?codex=1");
-    await page.getByRole("button", { name: "Codex", exact: true }).click();
+    await page.getByRole("button", { name: "ChatGPT", exact: true }).click();
     await page.getByLabel("Codex model").waitFor();
     await capture(page, { path: `${out}/plan-${viewport.width}.png` });
     const overflow = await page.evaluate(() => ({
@@ -328,9 +328,7 @@ try {
     await capture(page, { path: `${out}/plan-bottom-${viewport.width}.png` });
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     if (
-      !(await page
-        .getByRole("button", { name: "Stop server", exact: true })
-        .count())
+      !(await page.getByRole("button", { name: "Quit", exact: true }).count())
     )
       throw new Error("Sign out changed the enabled preference");
     await page.getByRole("button", { name: "My Keys", exact: true }).click();
@@ -361,21 +359,17 @@ try {
   }
   await page.setViewportSize({ width: 1080, height: 760 });
   await page.goto("http://127.0.0.1:1420/preview/ai.html?disconnected=1");
-  await page.getByRole("button", { name: "Codex", exact: true }).click();
+  await page.getByRole("button", { name: "ChatGPT", exact: true }).click();
   await page
-    .getByRole("button", { name: "Sign in to ChatGPT", exact: true })
+    .getByRole("button", { name: "Log in with OpenAI", exact: true })
     .waitFor();
   await capture(page, { path: `${out}/plan-disconnected.png` });
-  if (
-    !(await page
-      .getByRole("button", { name: "Stop server", exact: true })
-      .count())
-  )
+  if (!(await page.getByRole("button", { name: "Quit", exact: true }).count()))
     throw new Error("Enabled preference disappeared after sign-out");
-  await page.getByRole("button", { name: "Stop server", exact: true }).click();
+  await page.getByRole("button", { name: "Quit", exact: true }).click();
   if (
     await page
-      .getByRole("button", { name: "Sign in to ChatGPT", exact: true })
+      .getByRole("button", { name: "Log in with OpenAI", exact: true })
       .count()
   )
     throw new Error("Account controls must be hidden while Codex is disabled");

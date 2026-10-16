@@ -1,7 +1,7 @@
 use super::*;
-use std::io::Cursor;
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
+use std::{fs, io::Cursor};
 
 fn binary() -> Vec<u8> {
     let mut bytes = vec![0; 128];
@@ -194,6 +194,7 @@ fn destination_symlinks_hardlinks_and_writable_parents_fail_closed() {
     }
 }
 #[test]
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 fn elevated_entry_point_rejects_non_administrators_without_writing() {
     if !rustix::process::geteuid().is_root() {
         assert_eq!(
@@ -280,4 +281,13 @@ fn fragmented_reads_and_write_failures_are_handled() {
         ),
         Err("PLAN_INSTALL_IO_FAILED")
     );
+}
+
+#[test]
+#[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+fn unsupported_platform_rejects_installation_before_reading_arguments() {
+    let arguments = std::iter::from_fn(|| -> Option<std::ffi::OsString> {
+        panic!("unsupported installers must not inspect the payload");
+    });
+    assert_eq!(privileged_main(arguments), Err("PLAN_PLATFORM_UNSUPPORTED"));
 }

@@ -2,6 +2,7 @@
   "results": [
     {
       "name": "connected-1080",
+      "widths": [852, 852, 852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -12,6 +13,29 @@
     },
     {
       "name": "connected-bottom-1080",
+      "widths": [852, 852, 852],
+      "overflow": {
+        "viewport": 1080,
+        "document": 1080,
+        "content": 900,
+        "scroll": 900
+      },
+      "accessibilityViolations": 0
+    },
+    {
+      "name": "connected-account-1080",
+      "widths": [852, 852, 852],
+      "overflow": {
+        "viewport": 1080,
+        "document": 1080,
+        "content": 900,
+        "scroll": 900
+      },
+      "accessibilityViolations": 0
+    },
+    {
+      "name": "connected-reserve-1080",
+      "widths": [852, 852, 852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -22,6 +46,7 @@
     },
     {
       "name": "stopped-1080",
+      "widths": [852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -32,6 +57,7 @@
     },
     {
       "name": "missing-1080",
+      "widths": [852, 852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -42,6 +68,7 @@
     },
     {
       "name": "missing-bottom-1080",
+      "widths": [852, 852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -52,6 +79,7 @@
     },
     {
       "name": "signed-out-1080",
+      "widths": [852, 852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -62,6 +90,7 @@
     },
     {
       "name": "pending-1080",
+      "widths": [852, 852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -72,6 +101,7 @@
     },
     {
       "name": "unknown-usage-1080",
+      "widths": [852, 852, 852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -82,6 +112,7 @@
     },
     {
       "name": "unknown-usage-bottom-1080",
+      "widths": [852, 852, 852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -92,6 +123,7 @@
     },
     {
       "name": "unavailable-1080",
+      "widths": [852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -102,6 +134,7 @@
     },
     {
       "name": "busy-1080",
+      "widths": [852, 852, 852],
       "overflow": {
         "viewport": 1080,
         "document": 1080,
@@ -112,6 +145,7 @@
     },
     {
       "name": "connected-720",
+      "widths": [608, 608, 608],
       "overflow": {
         "viewport": 720,
         "document": 720,
@@ -122,6 +156,29 @@
     },
     {
       "name": "connected-bottom-720",
+      "widths": [608, 608, 608],
+      "overflow": {
+        "viewport": 720,
+        "document": 720,
+        "content": 648,
+        "scroll": 648
+      },
+      "accessibilityViolations": 0
+    },
+    {
+      "name": "connected-account-720",
+      "widths": [608, 608, 608],
+      "overflow": {
+        "viewport": 720,
+        "document": 720,
+        "content": 648,
+        "scroll": 648
+      },
+      "accessibilityViolations": 0
+    },
+    {
+      "name": "connected-reserve-720",
+      "widths": [608, 608, 608],
       "overflow": {
         "viewport": 720,
         "document": 720,
@@ -132,6 +189,7 @@
     },
     {
       "name": "stopped-720",
+      "widths": [608],
       "overflow": {
         "viewport": 720,
         "document": 720,
@@ -142,6 +200,7 @@
     },
     {
       "name": "missing-720",
+      "widths": [608, 608],
       "overflow": {
         "viewport": 720,
         "document": 720,
@@ -152,6 +211,7 @@
     },
     {
       "name": "missing-bottom-720",
+      "widths": [608, 608],
       "overflow": {
         "viewport": 720,
         "document": 720,
@@ -162,6 +222,7 @@
     },
     {
       "name": "signed-out-720",
+      "widths": [608, 608],
       "overflow": {
         "viewport": 720,
         "document": 720,
@@ -172,6 +233,7 @@
     },
     {
       "name": "pending-720",
+      "widths": [608, 608],
       "overflow": {
         "viewport": 720,
         "document": 720,
@@ -182,6 +244,7 @@
     },
     {
       "name": "unknown-usage-720",
+      "widths": [608, 608, 608],
       "overflow": {
         "viewport": 720,
         "document": 720,
@@ -192,6 +255,7 @@
     },
     {
       "name": "unknown-usage-bottom-720",
+      "widths": [608, 608, 608],
       "overflow": {
         "viewport": 720,
         "document": 720,
@@ -202,6 +266,7 @@
     },
     {
       "name": "unavailable-720",
+      "widths": [608],
       "overflow": {
         "viewport": 720,
         "document": 720,
@@ -212,6 +277,7 @@
     },
     {
       "name": "busy-720",
+      "widths": [608, 608, 608],
       "overflow": {
         "viewport": 720,
         "document": 720,

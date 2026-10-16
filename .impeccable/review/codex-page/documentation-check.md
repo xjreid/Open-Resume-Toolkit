@@ -1,17 +1,40 @@
 # Codex page documentation check
 
-This check was performed by an independent documentation subagent using the Impeccable Documenter contract.
+This check follows the Impeccable Documenter contract and records the shipped
+Codex page as implemented. It checks `PRODUCT.md`, the Codex paragraph in
+`DESIGN.md`, `.impeccable/design.json`, `.impeccable/surfaces/codex.md`,
+`ChatGptPlanPage.tsx`, `CodexAccountSettings.tsx`, `CodexPageIcon.tsx`, and
+`styles/chatgpt-plan.css`, together with the scoped behavior documents.
 
-Evidence checked: `PRODUCT.md`, `DESIGN.md`, `.impeccable/design.json`, the Codex surface contract, `ChatGptPlanPage.tsx`, `CodexAccountSettings.tsx`, `CodexRuntimeSetup.tsx`, `CodexRuntimeInstaller.tsx`, and `styles/chatgpt-plan.css` against the shared `foundation.css`, `controls.css`, and `ai-workspace.css`. Reviewed `finish-review.md`, the 22 Codex state captures at 1080×760 and 720×520, the installer/readiness captures, and the recorded 32 targeted tests, TypeScript/production build, axe/overflow/error, and synthetic installer progression results.
+Documented structure: the **ChatGPT** navigation page keeps Codex runtime
+terminology inside the page without a separate Codex subtitle. Its persistent header shows the
+OpenAI/ChatGPT mark, installation state, runtime status, Refresh connection,
+and Launch or Quit. A running signed-out runtime
+shows the large white Log in with OpenAI control. A connected account shows
+Model, Reasoning, Account and plan, Sign out, Usage limits, and Usage reserve;
+usage and reserve share a row at roomy widths and stack at the supported
+minimum. Detailed connection, installation, privacy, and reserve explanations
+remain in native keyboard-accessible disclosures.
 
-Outcome: documented evidence supports the shipped Codex page. The page preserves the Open Folio system and the contract’s state story: check installation, opt-in install, start server, sign in, manage account, and stop. The finish review is `ship` with no material fixes. No raster assets were created.
+Evidence recorded for this pass: 32 targeted tests passed; TypeScript and
+production build passed; 26 synthetic screenshots across Codex states and
+desktop sizes passed overflow, page-error, and axe checks. Persisted verification
+confirms all panels stay 852px wide at 1080px and 608px wide at 720px, with a
+stable scroll gutter while visible. Account, sign-in, reserve, and reserve-toggle
+states preserve those widths. Evidence is stored under this directory and in
+`/private/tmp/ort-codex-ui-verification.json`.
+The captures use existing Open Folio and sourced OpenAI SVG assets; no raster
+asset or runtime behavior was changed.
 
 System summary:
 
-- Palette: deep teal rail and controlled teal action accent on pale canvas, white paper, blue-grey rules, and documented semantic statuses.
-- Type ramp: Hanken Grotesk with the documented 28/20/16/14/12px display-to-label hierarchy and compact metadata usage.
-- Layout: compact status strip, paper-and-rule grammar, asymmetric usage/reserve columns at roomy widths, and stacked 720×520 adaptation.
-- Depth and shape: flat-by-default tonal layering, rare ambient separation, restrained small radii, and fine borders.
-- Named rules: Teal Anchor, Quiet Type, and Flat-by-Default remain the applicable documented guardrails.
+- Palette: inherited Open Folio deep teal, pale canvas, white paper, blue-grey rules, and semantic status colors; black OpenAI branding is the user-directed mark treatment.
+- Type ramp: Hanken Grotesk; group headings 16px, values 14px, and supporting labels 12px; the broader system display remains 28px.
+- Layout: persistent branded runtime header, centered login state, then model/account/usage sections in a width-100%-capped-960px shell; minmax grid tracks prevent intrinsic content expansion, and usage/reserve columns stack at the minimum.
+- Depth and shape: flat white workspace, restrained rules, inherited 12px panel corners, 40px controls, and no new global tokens.
+- Named rules: Teal Anchor, Quiet Type, and Flat-by-Default remain the applicable system guardrails.
 
-Drift and defects not canonized: detector advisories for 13/18px font sizes and 4px meter rounding were aligned in final source to documented 14/20px and 3px values; no second detector was run. Synthetic fixtures cover the review; native install/runtime/account behavior remains outside scope. No pre-existing context drift was repaired.
+Drift not canonized or repaired: stale references to Start server and Codex as
+the navigation label were updated to Launch and ChatGPT; stale finish-review
+claims were not used as approval evidence. Native installer,
+runtime, and live account behavior remain outside this UI documentation check.

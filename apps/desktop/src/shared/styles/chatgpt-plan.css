@@ -1,116 +1,223 @@
-/* A single, quiet workspace for the main-window Codex connection. */
+/* Main-window Codex: a persistent runtime header and separate task surfaces. */
 .chatgpt-plan-page {
+  width: 100%;
   max-width: 960px;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
 }
-.chatgpt-plan-page .plan-workspace {
-  padding: 24px;
+.ai-page-content:has(.chatgpt-plan-page:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr);
 }
-.chatgpt-plan-page .plan-workspace h3 {
+.app-content:has(.chatgpt-plan-page:not([hidden])) {
+  scrollbar-gutter: stable;
+  scroll-padding-block-start: 220px;
+}
+.chatgpt-plan-page :is(h3, h4) {
   margin: 0;
   font-size: 16px;
   font-weight: 650;
   letter-spacing: -0.015em;
 }
-.chatgpt-plan-page .plan-workspace #chatgpt-plan-title {
-  font-size: 20px;
+.chatgpt-plan-page h4 {
+  font-size: 14px;
 }
-.chatgpt-plan-page .plan-server-heading,
-.chatgpt-plan-page .plan-reserve-heading,
-.chatgpt-plan-page .plan-runtime {
-  display: flex;
-  flex-wrap: wrap;
+.chatgpt-plan-page
+  :is(
+    .plan-server,
+    .plan-account-settings,
+    .plan-usage-settings,
+    .plan-connect,
+    .plan-setup
+  ) {
+  width: 100%;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.chatgpt-plan-page .plan-server-frame {
+  width: 100%;
+  min-width: 0;
+  position: sticky;
+  top: 54px;
+  z-index: 10;
+  margin-block: -14px;
+  padding-block: 14px;
+  background: var(--canvas);
+}
+.chatgpt-plan-page .plan-server {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 24px;
+  padding: 24px 28px;
 }
-.chatgpt-plan-page .plan-server-heading .ai-help {
-  margin: 4px 0 0;
-}
-.chatgpt-plan-page .plan-server-actions {
+.chatgpt-plan-page .plan-brand {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.chatgpt-plan-page .plan-server-actions button {
-  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 4px;
+  margin-left: -8px;
+  color: #000;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
 }
-.chatgpt-plan-page .plan-server-actions svg {
-  width: 16px;
-  height: 16px;
+.chatgpt-plan-page .plan-brand img {
+  width: 46px;
+  height: 46px;
+}
+.chatgpt-plan-page .plan-installation-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.chatgpt-plan-page .plan-installation-status--ready {
+  color: var(--success);
+}
+.chatgpt-plan-page .plan-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.chatgpt-plan-page :is(.plan-refresh, .plan-sign-out) {
+.chatgpt-plan-page .plan-installation-status .plan-icon {
+  width: 15px;
+  height: 15px;
+}
+.chatgpt-plan-page
+  :is(
+    .plan-server-actions,
+    .plan-account-heading,
+    .plan-account-identity,
+    .plan-reserve-heading,
+    .plan-runtime
+  ) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.chatgpt-plan-page
+  :is(.plan-account-heading, .plan-reserve-heading, .plan-runtime) {
+  justify-content: space-between;
+}
+.chatgpt-plan-page .plan-server-actions {
+  justify-content: flex-end;
+  gap: 8px;
+}
+.chatgpt-plan-page :is(.plan-power, .plan-refresh, .plan-sign-out) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+}
+.chatgpt-plan-page .plan-power.button--danger {
+  color: var(--surface);
+  border-color: var(--danger);
+  background: var(--danger);
+}
+.chatgpt-plan-page .plan-power.button--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger), black 18%);
+  border-color: color-mix(in srgb, var(--danger), black 18%);
+}
+.chatgpt-plan-page .plan-refresh {
+  width: 40px;
+  padding: 0;
   border-color: transparent;
   background: transparent;
   color: var(--muted);
 }
-.chatgpt-plan-page :is(.plan-refresh, .plan-sign-out):hover:not(:disabled) {
-  border-color: transparent;
+.chatgpt-plan-page .plan-refresh:hover:not(:disabled) {
   background: var(--canvas);
-  color: var(--accent);
+  border-color: var(--line);
 }
-.chatgpt-plan-page .plan-status-strip {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: 24px;
-  margin: 16px 0 0;
-  padding: 12px 0 0;
-  border-top: 1px solid var(--line);
-}
-.chatgpt-plan-page .plan-status-strip > div {
-  min-width: 0;
-}
-.chatgpt-plan-page .plan-status-strip dt {
+.chatgpt-plan-page .plan-runtime-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 4px;
   color: var(--muted);
   font-size: 12px;
-}
-.chatgpt-plan-page .plan-status-strip dd {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  margin: 0;
   font-weight: 600;
 }
-.chatgpt-plan-page .plan-account-plan {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 400;
-}
-.chatgpt-plan-page .plan-sign-out {
-  margin-left: auto;
+.chatgpt-plan-page .plan-runtime-status--running {
+  color: var(--success);
 }
 .chatgpt-plan-page .plan-status-dot {
-  flex: 0 0 7px;
   width: 7px;
   height: 7px;
+  flex: none;
   border-radius: 50%;
   background: var(--muted);
 }
 .chatgpt-plan-page .plan-status-dot--ready {
   background: var(--success);
 }
-.chatgpt-plan-page .plan-server-note {
-  margin: 4px 0 0;
+.chatgpt-plan-page .plan-account-heading {
+  margin-bottom: 24px;
 }
-.chatgpt-plan-page .plan-account-settings,
-.chatgpt-plan-page .plan-usage-settings,
-.chatgpt-plan-page .plan-connect,
-.chatgpt-plan-page .plan-setup {
-  margin-top: 16px;
-  padding-top: 20px;
-  border-top: 1px solid var(--line);
+.chatgpt-plan-page .plan-account-plan {
+  padding: 3px 9px;
+  border-radius: 5px;
+  color: var(--muted);
+  background: var(--canvas);
+  font-size: 12px;
+  font-weight: 600;
 }
 .chatgpt-plan-page .plan-notice {
-  margin: 16px 0 0;
+  margin: 0;
+}
+.chatgpt-plan-page .plan-connect {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-height: 216px;
+  padding: 36px 24px;
+  background: var(--canvas);
+}
+.chatgpt-plan-page .plan-connect[hidden] {
+  display: none;
+}
+.chatgpt-plan-page .plan-login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: min(100%, 380px);
+  min-height: 64px;
+  padding: 12px 24px;
+  border-color: var(--line);
+  border-radius: 7px;
+  color: #000;
+  background: var(--surface);
+  font-size: 20px;
+  font-weight: 500;
+}
+.chatgpt-plan-page .plan-login-button:hover:not(:disabled) {
+  border-color: var(--muted);
+  background: var(--canvas);
+}
+.chatgpt-plan-page .plan-login-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-weight: 650;
+}
+.chatgpt-plan-page .plan-login-brand img {
+  width: 34px;
+  height: 34px;
 }
 .chatgpt-plan-page .plan-model-controls {
   display: grid;
@@ -129,7 +236,7 @@
   min-width: 0;
 }
 .chatgpt-plan-page .plan-data-note {
-  margin: 8px 0 0;
+  margin: 0;
 }
 .chatgpt-plan-page .plan-session-note {
   margin: 12px 0 0;
@@ -143,7 +250,7 @@
 .chatgpt-plan-page .plan-usage-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 32px;
+  gap: 28px;
 }
 .chatgpt-plan-page .plan-usage-layout .ai-help {
   margin: 4px 0 0;
@@ -211,6 +318,8 @@
 }
 .chatgpt-plan-page .plan-reserve {
   min-width: 0;
+  padding-left: 28px;
+  border-left: 1px solid var(--line);
 }
 .chatgpt-plan-page .plan-reserve-heading {
   flex-wrap: nowrap;
@@ -218,6 +327,8 @@
 .chatgpt-plan-page .plan-reserve-toggle {
   display: flex;
   align-items: center;
+  min-height: 40px;
+  margin-block: -8px;
   cursor: pointer;
 }
 .chatgpt-plan-page .plan-reserve-toggle input[type="checkbox"] {
@@ -327,9 +438,7 @@
   margin-bottom: 0;
 }
 .chatgpt-plan-page .plan-connection-details {
-  margin-top: 20px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+  margin-top: -8px;
 }
 .chatgpt-plan-page .plan-installation code {
   display: block;
@@ -338,25 +447,52 @@
   line-height: 1.6;
 }
 @media (max-width: 850px) {
-  .chatgpt-plan-page .plan-workspace {
+  .app-content:has(.chatgpt-plan-page:not([hidden])) {
+    scroll-padding-block-start: 204px;
+  }
+  .chatgpt-plan-page
+    :is(
+      .plan-server,
+      .plan-account-settings,
+      .plan-usage-settings,
+      .plan-setup
+    ) {
     padding: 20px;
+  }
+  .chatgpt-plan-page .plan-server {
+    gap: 16px;
+  }
+  .chatgpt-plan-page .plan-brand img {
+    width: 40px;
+    height: 40px;
   }
   .chatgpt-plan-page .plan-usage-layout {
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
   }
   .chatgpt-plan-page .plan-reserve {
-    padding-top: 20px;
+    padding: 20px 0 0;
+    border-left: 0;
     border-top: 1px solid var(--line);
   }
 }
 @media (max-width: 600px) {
-  .chatgpt-plan-page .plan-model-controls,
-  .chatgpt-plan-page .plan-status-strip {
+  .chatgpt-plan-page .plan-server {
     grid-template-columns: minmax(0, 1fr);
   }
-  .chatgpt-plan-page .plan-status-strip {
-    gap: 12px;
+  .chatgpt-plan-page .plan-server-actions {
+    justify-content: flex-start;
+  }
+  .chatgpt-plan-page .plan-model-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-content:has(.chatgpt-plan-page:not([hidden])) {
+    scroll-padding-block-start: 260px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chatgpt-plan-page .plan-reserve-toggle input::before {
+    transition: none;
   }
 }
 

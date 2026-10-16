@@ -779,6 +779,8 @@ mod tests {
             r#"#import "@preview/unavailable:1.0.0": *"#,
             r#"#image("private.png")"#,
             r#"#plugin("private.wasm")"#,
+            r#"#yaml("private.yaml")"#,
+            r#"#bibliography("private.yaml")"#,
         ] {
             world.source = Source::detached(code);
             assert!(

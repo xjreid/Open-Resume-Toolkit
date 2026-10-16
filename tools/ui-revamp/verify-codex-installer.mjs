@@ -30,9 +30,9 @@ try {
   ]) {
     await page.setViewportSize(viewport);
     await page.goto("http://127.0.0.1:1420/preview/ai.html?disabled=1");
-    await page.getByRole("button", { name: "Codex", exact: true }).click();
+    await page.getByRole("button", { name: "ChatGPT", exact: true }).click();
     const start = page.getByRole("button", {
-      name: "Start server",
+      name: "Launch",
       exact: true,
     });
     await page.waitForFunction(
@@ -40,11 +40,7 @@ try {
         !document.querySelector(".plan-server-actions button:last-child")
           ?.disabled,
     );
-    if (
-      await page
-        .getByRole("button", { name: "Stop server", exact: true })
-        .count()
-    )
+    if (await page.getByRole("button", { name: "Quit", exact: true }).count())
       throw Error("Readiness must not enable Codex");
     if (
       (await page.getByText("Runtime installation details").count()) ||
@@ -60,13 +56,13 @@ try {
     await page.goto(
       "http://127.0.0.1:1420/preview/ai.html?runtime-missing=1&disabled=1",
     );
-    await page.getByRole("button", { name: "Codex", exact: true }).click();
+    await page.getByRole("button", { name: "ChatGPT", exact: true }).click();
     const button = page.getByRole("button", {
       name: "Install Codex runtime",
       exact: true,
     });
     await button.waitFor();
-    if (await start.count())
+    if (await start.isEnabled())
       throw Error("Unverified runtimes must not enable Codex");
     await button.scrollIntoViewIfNeeded();
     await button.focus();

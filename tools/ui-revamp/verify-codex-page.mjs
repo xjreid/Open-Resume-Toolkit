@@ -32,6 +32,7 @@ page.setDefaultTimeout(7000);
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 const results = [];
+const sectionWidths = new Map();
 async function open(scenario) {
   const query =
     scenario === "missing"
@@ -40,7 +41,7 @@ async function open(scenario) {
         ? "disabled=1"
         : "codex=1";
   await page.goto(`http://127.0.0.1:1420/preview/ai.html?${query}`);
-  await page.getByRole("button", { name: "Codex", exact: true }).waitFor();
+  await page.getByRole("button", { name: "ChatGPT", exact: true }).waitFor();
   await page.evaluate(async (scenario) => {
     const native = window.__TAURI_INTERNALS__;
     const original = native.invoke;
@@ -91,7 +92,7 @@ async function open(scenario) {
       return { ok: true, value: structuredClone(plan) };
     };
   }, scenario);
-  await page.getByRole("button", { name: "Codex", exact: true }).click();
+  await page.getByRole("button", { name: "ChatGPT", exact: true }).click();
   await page.waitForFunction(
     () =>
       !document.querySelector(".plan-server-actions button:last-child")
@@ -104,13 +105,33 @@ async function open(scenario) {
 async function capture(name, bottom = false) {
   await page.evaluate(async (bottom) => {
     await document.fonts.ready;
+    window.scrollTo(0, 0);
     const content = document.querySelector(".app-content");
-    content.scrollTop = bottom ? content.scrollHeight : 0;
+    content.scrollTop = bottom === true ? content.scrollHeight : 0;
+    if (typeof bottom === "string") {
+      const target = document.querySelector(bottom);
+      content.scrollTop =
+        target.getBoundingClientRect().top -
+        content.getBoundingClientRect().top -
+        parseFloat(getComputedStyle(content).scrollPaddingBlockStart);
+    }
     await new Promise((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(resolve)),
     );
   }, bottom);
   await page.screenshot({ path: `${out}/${name}.png`, animations: "disabled" });
+  const widths = await page
+    .locator(".chatgpt-plan-page section:visible")
+    .evaluateAll((sections) =>
+      sections.map((section) => section.getBoundingClientRect().width),
+    );
+  const viewportWidth = page.viewportSize().width;
+  const expectedWidth = sectionWidths.get(viewportWidth) ?? widths[0];
+  sectionWidths.set(viewportWidth, expectedWidth);
+  if (widths.some((width) => Math.abs(width - expectedWidth) > 1))
+    throw Error(
+      `Section widths changed in ${name}: ${widths}, expected ${expectedWidth}`,
+    );
   const overflow = await page.evaluate(() => ({
     viewport: innerWidth,
     document: document.documentElement.scrollWidth,
@@ -135,7 +156,12 @@ async function capture(name, bottom = false) {
   );
   if (violations.length)
     throw Error(`Accessibility: ${JSON.stringify(violations)}`);
-  results.push({ name, overflow, accessibilityViolations: violations.length });
+  results.push({
+    name,
+    widths,
+    overflow,
+    accessibilityViolations: violations.length,
+  });
 }
 try {
   for (const viewport of [
@@ -157,6 +183,25 @@ try {
       await capture(`${scenario}-${viewport.width}`);
       if (["connected", "unknown-usage", "missing"].includes(scenario))
         await capture(`${scenario}-bottom-${viewport.width}`, true);
+      if (scenario === "connected") {
+        await capture(
+          `connected-account-${viewport.width}`,
+          ".plan-usage-settings",
+        );
+        await capture(`connected-reserve-${viewport.width}`, ".plan-reserve");
+        const header = await page.locator(".plan-server").boundingBox();
+        const tabs = await page
+          .locator('[aria-label="AI section"]')
+          .boundingBox();
+        if (
+          !header ||
+          !tabs ||
+          Math.abs(header.y - (tabs.y + tabs.height + 14)) > 1
+        )
+          throw Error(
+            "Runtime header did not stay below the AI tabs on scroll",
+          );
+      }
       const refresh = page.getByRole("button", {
         name: "Refresh connection",
         exact: true,
@@ -169,30 +214,24 @@ try {
       if (scenario === "stopped") {
         if (
           await page
-            .getByRole("button", { name: "Sign in to ChatGPT", exact: true })
+            .getByRole("button", { name: "Log in with OpenAI", exact: true })
             .count()
         )
           throw Error("Sign-in before server startup");
+        await page.getByRole("button", { name: "Launch", exact: true }).click();
         await page
-          .getByRole("button", { name: "Start server", exact: true })
-          .click();
-        await page
-          .getByRole("button", { name: "Sign in to ChatGPT", exact: true })
+          .getByRole("button", { name: "Log in with OpenAI", exact: true })
           .waitFor();
+        await page.getByRole("button", { name: "Quit", exact: true }).waitFor();
         await page
-          .getByRole("button", { name: "Stop server", exact: true })
-          .waitFor();
-        await page
-          .getByRole("button", { name: "Sign in to ChatGPT", exact: true })
+          .getByRole("button", { name: "Log in with OpenAI", exact: true })
           .click();
         await page
           .getByRole("button", { name: "Cancel sign-in", exact: true })
           .click();
+        await page.getByRole("button", { name: "Quit", exact: true }).click();
         await page
-          .getByRole("button", { name: "Stop server", exact: true })
-          .click();
-        await page
-          .getByRole("button", { name: "Start server", exact: true })
+          .getByRole("button", { name: "Launch", exact: true })
           .waitFor();
         if (await refresh.count())
           throw Error("Refresh must disappear on stop");
@@ -215,6 +254,13 @@ try {
         await page
           .getByRole("switch", { name: "Keep a usage reserve" })
           .uncheck();
+        const disabledReserveWidth = await page
+          .locator(".plan-usage-settings")
+          .evaluate((section) => section.getBoundingClientRect().width);
+        if (
+          Math.abs(disabledReserveWidth - sectionWidths.get(viewport.width)) > 1
+        )
+          throw Error("Disabling reserve changed section width");
         if (await page.getByLabel("Usage reserve percentage").isEnabled())
           throw Error("Reserve is editable while disabled");
         await page
@@ -245,11 +291,11 @@ try {
           .getByRole("button", { name: "Sign out", exact: true })
           .click();
         await page
-          .getByRole("button", { name: "Sign in to ChatGPT", exact: true })
+          .getByRole("button", { name: "Log in with OpenAI", exact: true })
           .waitFor();
         if (
           !(await page
-            .getByRole("button", { name: "Stop server", exact: true })
+            .getByRole("button", { name: "Quit", exact: true })
             .count())
         )
           throw Error("Sign-out disabled server");
@@ -261,7 +307,7 @@ try {
           throw Error("Busy model is editable");
         if (
           !(await page
-            .getByRole("button", { name: "Stop server", exact: true })
+            .getByRole("button", { name: "Quit", exact: true })
             .isEnabled())
         )
           throw Error("Stop unavailable during AI work");

@@ -45,8 +45,9 @@ and reaps its Codex server before allowing the app to terminate. Pending status
 checks cannot restart that server during shutdown. Cancelling quit leaves it
 running.
 
-Codex starts stopped when the app reopens and waits for **Start server** in the
-Codex tab.
+Codex starts stopped when the app reopens and waits for **Launch**
+in the **ChatGPT** tab. While enabled, the same control is **Quit**; **Sign out**
+ends only the account session and leaves the runtime enabled.
 The selected model, reasoning, reserve settings, and activity history stay
 saved. Any previously selected API key becomes available again; its saved key
 and pause state are preserved.

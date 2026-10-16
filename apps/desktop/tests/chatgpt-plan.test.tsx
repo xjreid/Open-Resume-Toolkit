@@ -204,7 +204,7 @@ it("checks installation while disabled and hides all setup for a verified, stopp
     document.querySelector('[aria-label="Codex runtime installation"]'),
   ).toBeNull();
   expect(document.body.textContent).not.toMatch(
-    /Runtime installation details|official runtime download|Sign in to ChatGPT|Refresh connection/,
+    /Runtime installation details|official runtime download|Log in with OpenAI|Refresh connection/,
   );
   expect(native.invoke.mock.calls.map(([command]) => command)).not.toEqual(
     expect.arrayContaining([
@@ -224,8 +224,13 @@ it("prompts for installation while disabled, without relying on a session error"
   await render();
   expect(document.body.textContent).toContain("Install Codex runtime");
   expect(
-    document.querySelector(".plan-server-actions button:last-child"),
-  ).toBeNull();
+    document.querySelector<HTMLButtonElement>(
+      ".plan-server-actions button:last-child",
+    )!.disabled,
+  ).toBe(true);
+  expect(document.querySelector(".plan-installation-status")?.textContent).toBe(
+    "Codex Runtime isn’t Detected",
+  );
   expect(native.invoke).not.toHaveBeenCalledWith("install_codex_runtime");
 });
 
@@ -366,7 +371,7 @@ it("saves explicit activation with the frozen model, reasoning and reserve revis
   const toggle = document.querySelector<HTMLButtonElement>(
     ".plan-server-actions button:last-child",
   )!;
-  expect(document.body.textContent!.includes("Stop server")).toBe(false);
+  expect(document.body.textContent!.includes("Quit")).toBe(false);
   await act(async () => toggle.click());
   expect(native.invoke).toHaveBeenCalledWith("save_chatgpt_plan", {
     request: {
@@ -378,7 +383,7 @@ it("saves explicit activation with the frozen model, reasoning and reserve revis
       reservePercent: 20,
     },
   });
-  expect(document.body.textContent!.includes("Stop server")).toBe(true);
+  expect(document.body.textContent!.includes("Quit")).toBe(true);
 });
 it("locks model and reserve controls during operations while keeping Stop and Sign out usable", async () => {
   status.operationActive = true;
@@ -407,7 +412,7 @@ it("supports cancellable browser login and explains an unavailable runtime", asy
   expect(document.body.textContent).toContain(
     "without saving it to Keychain or a credential file",
   );
-  await click("Sign in to ChatGPT");
+  await click("Log in with OpenAI");
   expect(document.body.textContent).toContain("Waiting for browser sign-in");
   await click("Cancel sign-in");
   expect(native.invoke).toHaveBeenCalledWith("cancel_chatgpt_login");
@@ -428,7 +433,7 @@ it("explains the session lifetime while connected and preserves preferences afte
   expect(status.settings.model).toBe("gpt-6-sol");
   expect(status.settings.reservePercent).toBe(35);
   expect(status.settings.enabled).toBe(true);
-  expect(document.body.textContent).toContain("Stop server");
+  expect(document.body.textContent).toContain("Quit");
   expect(document.body.textContent).toContain("Sign-in stays in memory only");
 });
 
@@ -442,7 +447,7 @@ it("explains an authentication transport failure and allows a fresh sign-in", as
     "could not reach OpenAI’s authentication service",
   );
   expect(document.body.textContent).not.toContain("Sign-in was declined");
-  await click("Sign in to ChatGPT");
+  await click("Log in with OpenAI");
   expect(native.invoke).toHaveBeenCalledWith("connect_chatgpt_plan");
   expect(
     native.invoke.mock.calls.some(([name]) => String(name).includes("ai_key")),
@@ -495,7 +500,7 @@ it("allows enabling independently of model availability but blocks sign-in until
   await render();
   expect(
     [...document.querySelectorAll("button")].find(
-      (b) => b.textContent === "Sign in to ChatGPT",
+      (b) => b.textContent === "Log in with OpenAI",
     ),
   ).toBeUndefined();
   expect(document.body.textContent).toContain("Retry sign-out");
@@ -813,7 +818,7 @@ it("reloads a shared setting change arriving during a slow usage poll without pu
   ).toBe("high");
 });
 
-it("shows Start server before sign-in and starts independently of model selection", async () => {
+it("shows Launch before sign-in and starts independently of model selection", async () => {
   status.settings.enabled = false;
   status.connected = false;
   status.settings.connectionId = null;
@@ -827,11 +832,11 @@ it("shows Start server before sign-in and starts independently of model selectio
     ".plan-server-actions button:last-child",
   )!;
   expect(toggle.disabled).toBe(false);
-  expect(document.body.textContent).not.toContain("Sign in to ChatGPT");
+  expect(document.body.textContent).not.toContain("Log in with OpenAI");
   await act(async () => toggle.click());
   expect(status.settings.enabled).toBe(true);
   const connect = [...document.querySelectorAll("button")].find(
-    (b) => b.textContent === "Sign in to ChatGPT",
+    (b) => b.textContent === "Log in with OpenAI",
   )!;
   expect(connect.disabled).toBe(false);
   expect(native.invoke).not.toHaveBeenCalledWith("connect_chatgpt_plan");
@@ -844,7 +849,7 @@ it("starts a previously enabled server on a signed-out app relaunch", async () =
   status.runtimeVersion = null;
   await render();
   expect(status.settings.enabled).toBe(true);
-  await click("Sign in to ChatGPT");
+  await click("Log in with OpenAI");
   expect(status.settings.enabled).toBe(true);
 });
 
@@ -870,11 +875,17 @@ it("keeps one connection refresh at the top and refreshes both installation and 
   );
   expect(refreshes).toHaveLength(1);
   expect(refreshes[0].closest(".plan-server-actions")).not.toBeNull();
-  expect(document.querySelector(".plan-status-strip")?.textContent).toMatch(
-    /Codex serverRunning.*ChatGPT accountSigned in/,
+  expect(document.querySelector(".plan-runtime-status")?.textContent).toBe(
+    "Running",
   );
+  expect(document.querySelector(".plan-installation-status")?.textContent).toBe(
+    "Codex Runtime is Installed",
+  );
+  expect(
+    document.querySelector(".plan-usage-settings .plan-sign-out"),
+  ).not.toBeNull();
   native.invoke.mockClear();
-  await click("Refresh");
+  await act(async () => refreshes[0].click());
   expect(native.invoke).toHaveBeenCalledWith("check_codex_runtime");
   expect(native.invoke).toHaveBeenCalledWith("load_chatgpt_plan", {
     request: { refreshUsage: true },
@@ -883,12 +894,13 @@ it("keeps one connection refresh at the top and refreshes both installation and 
 
 it("stops a signed-in server, clears account controls, and hides connection refresh", async () => {
   await render();
-  await click("Stop server");
+  await click("Quit");
   expect(status.connected).toBe(false);
   expect(status.runtimeVersion).toBeNull();
   expect(status.settings.connectionId).toBeNull();
-  expect(document.querySelector(".plan-status-strip")?.textContent).toMatch(
-    /Codex serverStopped.*ChatGPT accountSigned out/,
+  expect(document.querySelector(".plan-runtime-status")).toBeNull();
+  expect(document.querySelector(".plan-installation-status")?.textContent).toBe(
+    "Codex Runtime is Installed",
   );
   expect(document.querySelector('[aria-label="Codex model"]')).toBeNull();
   expect(
@@ -897,7 +909,7 @@ it("stops a signed-in server, clears account controls, and hides connection refr
   expect(
     document.querySelector('[aria-label="Refresh connection"]'),
   ).toBeNull();
-  expect(document.body.textContent).toContain("Start server");
+  expect(document.body.textContent).toContain("Launch");
 });
 
 it("waits for a live server before showing sign-in and leaves recovery controls available on startup failure", async () => {
@@ -915,12 +927,12 @@ it("waits for a live server before showing sign-in and leaves recovery controls 
   expect(document.body.textContent).toContain("Unavailable");
   expect(
     [...document.querySelectorAll("button")].some(
-      (button) => button.textContent === "Sign in to ChatGPT",
+      (button) => button.textContent === "Log in with OpenAI",
     ),
   ).toBe(false);
   expect(
     document.querySelector('[aria-label="Refresh connection"]'),
   ).not.toBeNull();
-  await click("Stop server");
+  await click("Quit");
   expect(status.settings.enabled).toBe(false);
 });

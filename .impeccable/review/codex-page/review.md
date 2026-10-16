@@ -1,41 +1,15 @@
-disposition: ship
+# ChatGPT page verification
 
-Finish review performed inline; no independent subagent was used. This is a code-led refinement of the existing Open Folio surface, with no new concept comp or shipping raster asset.
+The main-window AI tabs are My Keys, ChatGPT, and Data. The page keeps a
+persistent ChatGPT brand header with installation status, launch or text-only
+Quit, runtime state, and icon-only refresh. The Codex subtitle is removed.
 
-## persistence
+Verification on the final source: 32 targeted Codex tests passed; TypeScript
+and production build passed (existing bundle-size advisory); 26 synthetic
+state/scroll captures at 1080×760 and 720×520 passed axe, overflow, page-error,
+and sticky-header checks. The browser exercise covers launch, browser login
+cancellation, quit, sign-out, model selection, and reserve edits. See
+`verification.json` and `finish-review.md` for the evidence and independent review.
 
-Pass. PRODUCT.md and DESIGN.md retain the established palette, typography, product behavior, and local ownership constraints. The Codex surface brief now records the simplified layout and progressive disclosure.
-
-## fidelity
-
-| Element | Result | Evidence |
-| --- | --- | --- |
-| Type | Match | Hanken, 20px surface title, 16px group headings, 14px values, 12px help. |
-| Material | Match | Flat white workspace, fine rules, native form controls; no invented physical effects. |
-| Ground | Match | Existing pale canvas and teal rail are preserved. |
-| Connection status | Match | Server and account remain separate; account plan and Sign out share the account row. |
-| Everyday controls | Adaptation | Model labels replace the repeated account/settings heading; usage and reserve move higher. |
-| Detailed help | Adaptation | Native disclosures retain session, privacy, installation, and exact reserve behavior. |
-| Responsive layout | Match | Usage and reserve stack at the desktop minimum; all content remains reachable through the existing scroll area. |
-| State handling | Match | Start/stop, login/cancel, missing runtime, unavailable usage, runtime error, and operation locks remain functional. |
-
-## ceiling
-
-Reached for this scoped simplification. Screenshots were inspected in one initial batch and one confirmation batch, including 1080 × 760 and 720 × 520. The supported desktop minimum deliberately scrolls.
-
-## material_fixes
-
-None remaining. The confirmation captures resolve the oversized secondary headings and redundant settings heading found in the initial inspection. The design detector reports no findings.
-
-## keep
-
-Keep brief labels, independently readable connection states, visible transmission guidance, usage meters, the reserve switch, and keyboard-accessible detailed help.
-
-## Verification and capture provenance
-
-- 76 focused Codex and AI workspace tests passed.
-- TypeScript and the production web build passed. Vite retains its existing large-chunk warning.
-- `tools/ui-revamp/verify-codex-page.mjs` exercised eight states at both supported desktop sizes, producing 22 captures without horizontal overflow, page errors, or axe WCAG A/AA violations.
-- Browser checks covered keyboard disclosure open/close, reserve enable/disable, model saving, reserve saving, sign-out, sign-in cancellation, server start/stop, and operation locks.
-- PNGs in this directory were captured on October 12, 2026 from the development-only preview with synthetic, memory-only native responses. They use the app's existing font and brand assets. No live account, runtime, or native installer was used.
-- No measured usability or live account integration claim is made by this UI review.
+No live runtime, installation, provider request, or real account was exercised.
+Existing sourced OpenAI SVG reused; no new shipping raster assets.

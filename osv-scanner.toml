@@ -118,3 +118,11 @@ reason = "Vulnerable quick-xml namespace parsing is unreachable: ORT has a fixed
 id = "RUSTSEC-2026-0206"
 ignoreUntil = 2026-12-04
 reason = "Informational unmaintained rustybuzz is pinned by Typst; ORT uses bounded text and reviewed bundled fonts."
+
+# https://rustsec.org/advisories/RUSTSEC-2024-0449.html is an informational
+# unmaintained notice with no patched release. Typst brings this through
+# serde_yaml/hayagriva; ORT renders fixed templates, not user YAML/bibliographies.
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0449"
+ignoreUntil = 2026-12-04
+reason = "Informational unmaintained unsafe-libyaml is transitive through Typst serde_yaml; fixed templates and denied external files exclude user YAML/bibliographies; awaiting upstream replacement."

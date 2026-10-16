@@ -3,7 +3,7 @@
 The executable definitions are [CI](../../.github/workflows/ci.yml),
 [dependency scanning](../../.github/workflows/dependency-scan.yml),
 [package scripts](../../package.json), and [justfile](../../justfile).
-This map was reviewed on October 15, 2026. It describes checks, not a claim that
+This map was reviewed on October 16, 2026. It describes checks, not a claim that
 the hosted runs for an uncommitted working tree have passed.
 
 ## Gates
@@ -18,11 +18,19 @@ the hosted runs for an uncommitted working tree have passed.
 | Generated contracts | `cargo run --locked -p ort-contract-generator` then `git diff --exit-code -- packages/contracts/generated` | Ubuntu; Rust-owned schemas, types, decoders, wire fixtures |
 | Rust | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --locked` | Ubuntu quality job |
 | Desktop portability | Frontend build and `cargo check --locked -p ort-desktop` | macOS 15 arm64, macOS 15 Intel, Windows 2025 |
-| Native storage | Separate `native_startup` test plus domain/document/render/desktop/worker/application/platform/storage suites | Each desktop runner |
+| Native storage | Separate `native_startup` test plus installer/domain/document/render/desktop/worker/application/platform/storage suites | Each desktop runner |
 | Development browser bridge | `node tools/check-dev-browser-bridge.mjs` | Both macOS runners and macOS `just check`; explicit feature-enabled IPC/host and desktop disconnect tests |
 | Independent documents | DOCX/PDF fixtures, independent parsers, field-preservation checks, all three selectable styles with schema v1/v2 | Ubuntu and desktop runners; field-preservation pair additionally in Ubuntu |
 | macOS native probes | Legacy parser sandbox/hard-limit measurements, child lifecycle, bounded output with sanitizers, AppKit termination | Both macOS runners; isolated synthetic programs |
 | Vulnerability scan | SHA-pinned OSV reusable workflow; `osv-scanner.toml`, `Cargo.lock`, `pnpm-lock.yaml` | Hosted PR/main/scheduled/manual workflow; separate from local source/license checks |
+
+The October 16 dependency repair updates rustls to 0.23.46 and source-map-js to
+1.2.2. The exact RUSTSEC-2024-0449 exception expires December 4, 2026: it is an
+[informational unmaintained notice](https://rustsec.org/advisories/RUSTSEC-2024-0449.html)
+with no patched release, inherited through Typst's serde_yaml dependencies.
+The renderer uses fixed templates and denies external YAML/bibliography files;
+regression tests exercise both paths. This exception does not suppress other
+advisories against that package or either lockfile.
 
 The default build's fail-closed native-host tests are preserved. Feature-enabled
 macOS tests exercise the current-user development capability; they do not enable
@@ -60,6 +68,11 @@ A golden hash change requires inspecting rendered semantics and intended design;
 do not regenerate goldens merely to hide a failing assertion.
 
 ## Current regression coverage
+
+- The Codex installer enforces administrator access on Apple Silicon macOS and
+  rejects installation before inspecting arguments on unsupported platforms. Its
+  suite runs in Ubuntu quality and every desktop matrix job, including Windows
+  and Intel macOS; Unix filesystem safety tests remain active on Unix runners.
 
 - Profile ownership excludes another process and is released after forced process
   death, even if the profile directory is removed.
