@@ -75,3 +75,10 @@ it("rejects malformed imported documents and unsupported schema versions", () =>
   value.importedDocument.schemaVersion = 99;
   expect(isImportReviewSnapshot(value)).toBe(false);
 });
+
+it("accepts a validated AI review without local extraction blocks", () => {
+  expect(isImportReviewSnapshot({ ...snapshot(), blocks: [] })).toBe(true);
+  expect(
+    isImportReviewSnapshot({ ...snapshot(), blocks: [], importedDocument: {} }),
+  ).toBe(false);
+});

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listenForImportRendering } from "./ai-import-pdf";
 import { CONTRACT_VERSION } from "@ort/contracts/health";
 import {
   isCommandResponse,
@@ -107,13 +108,32 @@ export async function documentImportAvailable(): Promise<boolean> {
 export async function beginDocumentImport(
   expectedRevision: number | null,
 ): Promise<CommandResponse<ImportReviewSnapshot | null>> {
+  return beginImport("begin_document_import", expectedRevision);
+}
+export async function beginAiDocumentImport(
+  expectedRevision: number | null,
+): Promise<CommandResponse<ImportReviewSnapshot | null>> {
+  let stop: (() => void) | undefined;
+  try {
+    stop = await listenForImportRendering();
+    return await beginImport("begin_ai_document_import", expectedRevision);
+  } catch {
+    return failure();
+  } finally {
+    stop?.();
+  }
+}
+async function beginImport(
+  command: "begin_document_import" | "begin_ai_document_import",
+  expectedRevision: number | null,
+): Promise<CommandResponse<ImportReviewSnapshot | null>> {
   const request: import("@ort/contracts/import").BeginImportRequest = {
     contractVersion: CONTRACT_VERSION,
     requestId: crypto.randomUUID(),
     payload: { expectedRevision },
   };
   try {
-    const response: unknown = await invoke("begin_document_import", {
+    const response: unknown = await invoke(command, {
       request,
     });
     return isCommandResponse(

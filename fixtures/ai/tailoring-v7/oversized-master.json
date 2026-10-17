@@ -973,7 +973,7 @@
     ]
   },
   "candidate": {
-    "schemaVersion": 6,
+    "schemaVersion": 7,
     "tailoringPlan": ["Emphasize direct published evidence for the role."],
     "rolePriorities": ["Direct technical evidence"],
     "reviewIssues": [],
@@ -985,12 +985,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000012",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000012"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000013",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1004,12 +998,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000015",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000015"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000016",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1023,12 +1011,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000018",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000018"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000019",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1042,12 +1024,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000001b",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000001b"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000001c",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1061,12 +1037,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000001e",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000001e"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000001f",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1080,12 +1050,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000021",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000021"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000022",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1099,12 +1063,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000024",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000024"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000025",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1118,12 +1076,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000027",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000027"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000028",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1137,12 +1089,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000002a",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000002a"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000002b",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1156,12 +1102,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000002d",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000002d"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000002e",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1175,12 +1115,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000030",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000030"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000031",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1194,12 +1128,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000033",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000033"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000034",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1213,12 +1141,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000036",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000036"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000037",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1232,12 +1154,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000039",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000039"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000003a",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1251,12 +1167,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000003c",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000003c"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000003d",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1270,12 +1180,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000003f",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000003f"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000040",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1289,12 +1193,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000042",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000042"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000043",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1308,12 +1206,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000045",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000045"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000046",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1327,12 +1219,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000048",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000048"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000049",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1346,12 +1232,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000004b",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000004b"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000004c",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1365,12 +1245,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000004e",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000004e"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000004f",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1384,12 +1258,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000051",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000051"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000052",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1403,12 +1271,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000054",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000054"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000055",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1422,12 +1284,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000057",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000057"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000058",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1441,12 +1297,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000005a",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000005a"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000005b",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1460,12 +1310,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000005d",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000005d"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000005e",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1479,12 +1323,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000060",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000060"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000061",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1498,12 +1336,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000063",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000063"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000064",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1517,12 +1349,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000066",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000066"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000067",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1536,12 +1362,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000069",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000069"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000006a",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1555,12 +1375,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000006c",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000006c"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000006d",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1574,12 +1388,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000006f",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000006f"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000070",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1593,12 +1401,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000072",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000072"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000073",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1612,12 +1414,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000075",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000075"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000076",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1631,12 +1427,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000078",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000078"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000079",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1650,12 +1440,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000007b",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000007b"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000007c",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1669,12 +1453,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-00000000007e",
             "sourceEntryIds": ["019a0000-0000-7000-8000-00000000007e"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-00000000007f",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [
@@ -1688,12 +1466,6 @@
           {
             "entryId": "019a0000-0000-7000-8000-000000000081",
             "sourceEntryIds": ["019a0000-0000-7000-8000-000000000081"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000082",
-                "itemIndexes": [0, 1]
-              }
-            ],
             "mainInfo": {
               "format": "bullets",
               "items": [

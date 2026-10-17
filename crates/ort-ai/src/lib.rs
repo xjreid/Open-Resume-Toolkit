@@ -2,6 +2,8 @@
 
 pub mod materials;
 pub mod plan;
+mod provider_diagnostics;
+pub use provider_diagnostics::provider_request_issues;
 
 use base64::Engine as _;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
@@ -397,6 +399,8 @@ pub trait ProviderAdapter {
     /// Rejects malformed, non-UTF-8, or oversized provider event streams.
     fn parse_stream(&self, bytes: &[u8]) -> Result<Vec<StreamEvent>, AiError>;
 }
+pub mod resume_import;
+
 pub struct OpenAiAdapter;
 pub struct AnthropicAdapter;
 pub struct GeminiAdapter;

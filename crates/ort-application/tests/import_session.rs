@@ -116,6 +116,7 @@ fn validation_and_storage_failure_preserve_review_but_success_retires_it() {
             .read(owner, token, now)
             .unwrap()
             .proposal()
+            .unwrap()
             .source()
             .blocks()[0]
             .text,
@@ -527,4 +528,60 @@ fn cancelling_an_edited_replacement_keeps_saved_data_and_allows_a_fresh_import()
             .is_err()
     );
     assert!(sessions.begin(owner, current, proposal(), now).is_ok());
+}
+
+#[test]
+fn ai_document_uses_the_same_owned_expiring_review_and_commit_boundary() {
+    let now = Instant::now();
+    let owner = ReviewOwner::default();
+    let current = base();
+    let mut imported = ort_domain::ResumeDocument::empty("AI import")
+        .upgraded_v2()
+        .unwrap();
+    imported.contact.full_name = "Imported Person".into();
+    let mut sessions = ReviewSessions::default();
+    let token = sessions
+        .begin_document(owner, current.clone(), imported.clone(), now)
+        .unwrap();
+    assert!(
+        sessions
+            .begin(owner, current.clone(), proposal(), now)
+            .is_err()
+    );
+    let review = sessions.read(owner, token, now).unwrap();
+    assert!(review.proposal().is_none());
+    assert!(review.snapshot(token.identifier()).blocks.is_empty());
+    assert_eq!(
+        review.snapshot(token.identifier()).imported_document,
+        imported
+    );
+    // AI reviews cannot accidentally take the old block-choice apply path.
+    assert!(review.prepare(&current).is_err());
+    let mut stale = current.clone();
+    stale.revision += 1;
+    assert!(
+        sessions
+            .commit_replacement::<()>(owner, token, now, &stale, imported.clone(), |_| panic!(
+                "stale import reached storage"
+            ))
+            .is_err()
+    );
+    assert!(sessions.read(ReviewOwner::default(), token, now).is_err());
+    imported.contact.full_name = "User corrected person".into();
+    let expected = imported.clone();
+    let saved = sessions
+        .commit_replacement::<()>(owner, token, now, &current, imported, |payload| {
+            assert_eq!(payload.document, expected);
+            Ok(VersionedResumeResponse {
+                revision: current.revision + 1,
+                document: payload.document.clone(),
+            })
+        })
+        .unwrap();
+    assert_eq!(saved.document, expected);
+    assert!(sessions.read(owner, token, now).is_err());
+    let next = sessions
+        .begin_document(owner, current, expected, now)
+        .unwrap();
+    assert!(sessions.read(owner, next, now + REVIEW_LIFETIME).is_err());
 }

@@ -28,7 +28,10 @@ fn shared_frontend_fixture_maps_to_authoritative_native_review() {
         candidate.document.sections[0].entries[0].bullets[0].text,
         "Synthetic contribution"
     );
-    assert_eq!(review.proposal().source().blocks()[0].text, "Projects");
+    assert_eq!(
+        review.proposal().unwrap().source().blocks()[0].text,
+        "Projects"
+    );
 }
 #[test]
 fn invalid_batches_leave_all_prior_decisions_intact_and_pending_resets_are_explicit() {

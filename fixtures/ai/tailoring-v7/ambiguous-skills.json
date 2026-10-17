@@ -1,9 +1,9 @@
 {
-  "name": "student-backend",
-  "job": "Required: Rust and SQL. Backend internship.",
+  "name": "ambiguous-skills",
+  "job": "Required: Rust. C++ preferred.",
   "source": {
     "schemaVersion": 1,
-    "documentId": "019a0000-0000-7000-8000-000000000001",
+    "documentId": "019a0000-0000-7000-8000-00000000008e",
     "title": "Synthetic master",
     "contact": {
       "fullName": "Alex Example",
@@ -14,12 +14,12 @@
     },
     "sections": [
       {
-        "id": "019a0000-0000-7000-8000-000000000002",
+        "id": "019a0000-0000-7000-8000-00000000008f",
         "order": 0,
         "heading": "Projects",
         "entries": [
           {
-            "id": "019a0000-0000-7000-8000-000000000003",
+            "id": "019a0000-0000-7000-8000-000000000090",
             "order": 0,
             "heading": "Example 1",
             "subheading": "Engineer",
@@ -27,18 +27,18 @@
             "location": "",
             "fields": [
               {
-                "id": "019a0000-0000-7000-8000-000000000004",
+                "id": "019a0000-0000-7000-8000-000000000091",
                 "order": 0,
                 "label": "Technologies",
-                "value": "Rust, SQL",
+                "value": "Languages: Rust, SQL | C/C++",
                 "isSkill": true
               }
             ],
             "bullets": [
               {
-                "id": "019a0000-0000-7000-8000-000000000005",
+                "id": "019a0000-0000-7000-8000-000000000092",
                 "order": 0,
-                "text": "Built a Rust API and wrote SQL queries for a course project."
+                "text": "Built a Rust service using SQL."
               }
             ],
             "links": []
@@ -48,30 +48,24 @@
     ]
   },
   "candidate": {
-    "schemaVersion": 6,
+    "schemaVersion": 7,
     "tailoringPlan": ["Emphasize direct published evidence for the role."],
     "rolePriorities": ["Direct technical evidence"],
     "reviewIssues": [],
     "roleInfo": null,
     "templateSections": [
       {
-        "sectionId": "019a0000-0000-7000-8000-000000000002",
+        "sectionId": "019a0000-0000-7000-8000-00000000008f",
         "entries": [
           {
-            "entryId": "019a0000-0000-7000-8000-000000000003",
-            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000003"],
-            "selectedLists": [
-              {
-                "fieldId": "019a0000-0000-7000-8000-000000000004",
-                "itemIndexes": [0, 1]
-              }
-            ],
+            "entryId": "019a0000-0000-7000-8000-000000000090",
+            "sourceEntryIds": ["019a0000-0000-7000-8000-000000000090"],
             "mainInfo": {
               "format": "bullets",
               "items": [
                 {
-                  "text": "Built a Rust API and wrote SQL queries for a course project.",
-                  "sourceRefs": ["019a0000-0000-7000-8000-000000000005"]
+                  "text": "Built a Rust service using SQL.",
+                  "sourceRefs": ["019a0000-0000-7000-8000-000000000092"]
                 }
               ]
             }

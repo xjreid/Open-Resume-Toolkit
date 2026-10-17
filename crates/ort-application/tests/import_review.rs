@@ -38,7 +38,7 @@ fn base() -> VersionedResumeResponse {
 }
 
 fn accept_suggestions(review: &mut ImportReview) {
-    for index in 0..review.proposal().items().len() {
+    for index in 0..review.proposal().unwrap().items().len() {
         review
             .decide(index, review.suggested_decision(index).unwrap())
             .unwrap();
@@ -97,7 +97,7 @@ fn review_requires_all_items_and_cannot_write_or_erase_the_source() {
     );
     assert_eq!(base, original);
     assert_eq!(
-        review.proposal().source().blocks()[0].text,
+        review.proposal().unwrap().source().blocks()[0].text,
         "Name: Imported Person"
     );
     review.reset_decision(2).unwrap();
@@ -249,7 +249,7 @@ fn limits_and_invalid_destinations_preserve_the_complete_review_for_correction()
         review.prepare(&base).unwrap_err(),
         ReviewError::InvalidContent
     );
-    assert_eq!(review.proposal().source().blocks()[0].text, long);
+    assert_eq!(review.proposal().unwrap().source().blocks()[0].text, long);
     review
         .decide(
             0,
@@ -329,7 +329,7 @@ fn unknown_content_and_blank_blocks_remain_reviewable_and_source_is_never_execut
     assert!(output.contains("Unusual 🌻 heading"));
     assert!(output.contains("- Text after blank"));
     assert!(!format!("{review:?}").contains(text));
-    assert_eq!(review.proposal().source().blocks().len(), 4);
+    assert_eq!(review.proposal().unwrap().source().blocks().len(), 4);
 }
 
 #[test]

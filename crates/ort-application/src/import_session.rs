@@ -92,6 +92,28 @@ impl ReviewSessions {
         proposal: ImportProposal,
         now: Instant,
     ) -> Result<ReviewToken, SessionError> {
+        self.insert(owner, ImportReview::new(base, proposal)?, now)
+    }
+
+    /// Starts the same review lifecycle from a validated AI import.
+    /// # Errors
+    /// Refuses active reviews and invalid documents, just like local import.
+    pub fn begin_document(
+        &mut self,
+        owner: ReviewOwner,
+        base: VersionedResumeResponse,
+        document: ort_domain::ResumeDocument,
+        now: Instant,
+    ) -> Result<ReviewToken, SessionError> {
+        self.insert(owner, ImportReview::from_document(base, document)?, now)
+    }
+
+    fn insert(
+        &mut self,
+        owner: ReviewOwner,
+        review: ImportReview,
+        now: Instant,
+    ) -> Result<ReviewToken, SessionError> {
         self.expire(now);
         if self.active.is_some() {
             return Err(SessionError::Busy);
@@ -99,7 +121,6 @@ impl ReviewSessions {
         let deadline = now
             .checked_add(REVIEW_LIFETIME)
             .ok_or(SessionError::Unavailable)?;
-        let review = ImportReview::new(base, proposal)?;
         let token = ReviewToken(Uuid::now_v7());
         self.active = Some(ActiveReview {
             owner,

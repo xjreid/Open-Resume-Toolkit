@@ -17,6 +17,24 @@ use std::{
 };
 
 const MAX_MESSAGE: usize = 2 * 1024 * 1024;
+fn image_models(catalog: &[Value]) -> std::collections::HashSet<String> {
+    catalog
+        .iter()
+        .filter(|model| {
+            model.get("hidden").and_then(Value::as_bool) != Some(true)
+                && model
+                    .get("inputModalities")
+                    .and_then(Value::as_array)
+                    .is_some_and(|items| items.iter().any(|item| item.as_str() == Some("image")))
+        })
+        .filter_map(|model| {
+            model
+                .get("model")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
+        .collect()
+}
 fn compatibility() -> &'static ort_codex_install::Manifest {
     ort_codex_install::manifest()
 }
@@ -169,6 +187,10 @@ fn quoted(path: &Path) -> Result<String, &'static str> {
 #[path = "codex_login_tests.rs"]
 mod login_tests;
 
+#[cfg(all(test, target_os = "macos"))]
+#[path = "codex_pdf_qualification.rs"]
+mod pdf_qualification;
+
 fn login_failure_code(value: &Value) -> &'static str {
     let error = value
         .pointer("/params/error")
@@ -239,6 +261,7 @@ pub struct Session {
     messages: mpsc::Receiver<Result<Value, &'static str>>,
     next_id: u64,
     pub models: Vec<PlanModel>,
+    pub(crate) image_models: std::collections::HashSet<String>,
     pub login_id: Option<String>,
     pub login_started: Option<Instant>,
     pub login_error: Option<&'static str>,
@@ -425,6 +448,7 @@ impl Session {
             messages,
             next_id: 0,
             models: Vec::new(),
+            image_models: std::collections::HashSet::new(),
             login_id: None,
             login_started: None,
             login_error: None,
@@ -475,6 +499,7 @@ impl Session {
                 .and_then(Value::as_str)
                 .map(str::to_owned);
             if cursor.is_none() {
+                session.image_models = image_models(&catalog);
                 session.models = models_from_catalog(&json!({"data":catalog}));
                 return Ok(session);
             }

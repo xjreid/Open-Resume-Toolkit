@@ -13,12 +13,12 @@ use std::{
 use tauri::{Manager, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
-struct JobLease {
+pub(super) struct JobLease {
     state: Arc<ReviewState>,
-    cancel: Arc<AtomicBool>,
+    pub(super) cancel: Arc<AtomicBool>,
 }
 impl JobLease {
-    fn begin(state: &Arc<ReviewState>) -> Option<Self> {
+    pub(super) fn begin(state: &Arc<ReviewState>) -> Option<Self> {
         let mut current = state.job.lock().ok()?;
         if current.is_some() {
             return None;

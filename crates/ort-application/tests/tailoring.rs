@@ -3,7 +3,7 @@ use ort_domain::{DocumentStyle, ResumeDocument};
 use serde_json::{Value, json};
 fn fixture(name: &str) -> (ResumeDocument, String, Value) {
     let raw = std::fs::read_to_string(format!(
-        "{}/../../fixtures/ai/tailoring-v6/{name}.json",
+        "{}/../../fixtures/ai/tailoring-v7/{name}.json",
         env!("CARGO_MANIFEST_DIR")
     ))
     .unwrap();
@@ -58,7 +58,7 @@ fn malformed_draft_is_repaired_in_review_slot() {
 }
 
 #[test]
-fn correction_receives_specific_schema_and_selection_failures() {
+fn correction_receives_specific_schema_failures() {
     let (source, job, mut candidate) = fixture("student-backend");
     candidate.as_object_mut().unwrap().remove("reviewIssues");
     let mut run = TailoringRun::new(
@@ -75,7 +75,7 @@ fn correction_receives_specific_schema_and_selection_failures() {
     assert!(
         next["validationFeedback"]
             .to_string()
-            .contains("Missing required schema v6 field: reviewIssues")
+            .contains("Missing required schema v7 field: reviewIssues")
     );
     assert!(run.validation_feedback()[0].contains("reviewIssues"));
     assert_eq!(run.page_count(), None);
@@ -332,7 +332,7 @@ fn summary_does_not_report_reordering_from_removal_alone() {
 }
 
 #[test]
-fn summary_ignores_field_slot_changes_when_exact_list_is_unchanged() {
+fn summary_ignores_header_field_slot_changes() {
     let (source, _, _) = fixture("student-backend");
     let mut after = source.clone();
     after.sections[0].entries[0].fields[0].order = 1;

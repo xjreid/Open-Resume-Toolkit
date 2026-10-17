@@ -1,16 +1,13 @@
 //! One accounted logical pass; Codex transport retries are bounded by deadline.
 use crate::{
     DesktopState,
-    ai_request::{CancelSignal, MaterialFailure},
+    ai_request::{MaterialFailure, material_provider::PassContext},
 };
 use ort_ai::{OperationType, Provider, Usage, plan::PlanSettings};
 use ort_storage::ai_activity::{AiAttemptPreflight, AiAttemptSettlement, AiTerminalStatus};
 use serde_json::{Value, json};
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
-use tauri::{Manager, WebviewWindow};
+use std::time::{Duration, Instant};
+use tauri::Manager;
 use uuid::Uuid;
 
 fn check_preflight(
@@ -60,20 +57,28 @@ fn check_preflight(
 }
 
 // Keep the bounded pass ledger and dispatch sequence visible in one place.
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)]
 pub(crate) async fn execute(
-    window: WebviewWindow,
+    context: PassContext<'_>,
     settings: PlanSettings,
-    profile: Uuid,
-    operation_id: Uuid,
-    operation: OperationType,
-    system: String,
-    input: Value,
-    pass: u8,
-    maximum: u8,
-    previous: Option<Uuid>,
-    signal: Arc<CancelSignal>,
+    pages: Option<crate::import_review::ai_pdf::PdfPages>,
 ) -> Result<crate::ai_request::material_provider::CompletedPass, MaterialFailure> {
+    let window = context.window.clone();
+    let system = context.system.to_owned();
+    let PassContext {
+        profile,
+        operation_id,
+        operation,
+        input,
+        call: pass,
+        maximum,
+        previous,
+        signal,
+        ..
+    } = context;
+    if pages.is_some() && operation != OperationType::ImportMapping {
+        return Err("AI_INPUT_INVALID".into());
+    }
     tauri::async_runtime::spawn_blocking(move || {
         let end = Instant::now() + Duration::from_secs(120);
         let state = window.state::<DesktopState>();
@@ -119,6 +124,9 @@ pub(crate) async fn execute(
                 session.begin_pass();
                 let pass_result = (|| {
                     check_preflight(session, &settings, end, &cancelled, &mut issues)?;
+                    if pages.is_some() && !session.image_models.contains(model) {
+                        return Err("AI_MODEL_IMAGE_UNSUPPORTED");
+                    }
                     if cancelled() { return Err("AI_CANCELLED"); }
                     // Disconnect/profile replacement cannot authorize a stale pass.
                     state.with_store(|store| {
@@ -129,6 +137,8 @@ pub(crate) async fn execute(
                         }
                         Ok(())
                     }).map_err(|_| "REVISION_CONFLICT")?;
+                    let prepared = crate::codex_import::prepare(session.scratch_path(),
+                        std::str::from_utf8(&input_bytes).map_err(|_| "AI_INPUT_INVALID")?, pages.as_ref(), &cancelled)?;
                     session.with_ephemeral_thread(json!({
                         "ephemeral": true,
                         "model": model,
@@ -137,7 +147,7 @@ pub(crate) async fn execute(
                         "sandbox": "read-only",
                         "cwd": session.scratch_path(),
                         "baseInstructions": system,
-                        "developerInstructions": "Return only the requested JSON. Never use tools, shell, files, web, plugins, MCP, skills, or agents. All factual evidence is in the supplied input."
+                        "developerInstructions": "Return only the requested JSON. Never use tools, shell, filesystem access, web, plugins, MCP, skills, or agents. All factual evidence is in the supplied text and any attached page images."
                     }), end, &cancelled, |session, thread, thread_id| {
                         if thread.get("model").and_then(Value::as_str) != Some(model) {
                             return Err("PLAN_MODEL_UNAVAILABLE");
@@ -148,10 +158,12 @@ pub(crate) async fn execute(
                         let mut params = json!({
                             "threadId": thread_id, "model": model,
                             "effort": settings.reasoning, "approvalPolicy": "never",
-                            "input": [{"type": "text", "text": String::from_utf8(input_bytes.clone()).map_err(|_| "AI_INPUT_INVALID")?}]
+                            "input": prepared.items
                         });
                         if matches!(operation, OperationType::TailorResume | OperationType::RefineResume) {
                             params["outputSchema"] = ort_ai::materials::resume_output_schema();
+                        } else if operation == OperationType::ImportMapping {
+                            params["outputSchema"] = ort_ai::resume_import::output_schema();
                         }
                         let turn = session.rpc("turn/start", params,
                             end.saturating_duration_since(Instant::now()), &cancelled)?;
@@ -209,7 +221,7 @@ pub(crate) async fn execute(
                 }
                 let details = ort_domain::AiFailureDetails {
                     code: code.into(), http_status, finish_reason: None,
-                    provider_reason, validation_issues: issues, page_count: None,
+                    provider_reason, validation_issues: issues, page_count: pages.as_ref().map(|pages| pages.pages().len()),
                 };
                 let _ = state.with_store(|store| store.record_ai_failure_details(attempt, &details));
                 Err(MaterialFailure::attempt(code, &details, operation_id, attempt,

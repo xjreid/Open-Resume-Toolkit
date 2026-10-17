@@ -1,3 +1,5 @@
+pub(crate) mod ai;
+pub(crate) mod ai_pdf;
 pub(crate) mod begin;
 use super::{DesktopState, text_export::ExportState, window_not_authorized};
 use ort_application::import_session::{CommitError, ReviewOwner, ReviewSessions, ReviewToken};
@@ -17,6 +19,7 @@ pub(crate) struct ReviewState {
     sessions: Mutex<ReviewSessions>,
     owner: ReviewOwner,
     job: Mutex<Option<Arc<std::sync::atomic::AtomicBool>>>,
+    pdf_render: ai_pdf::RenderState,
 }
 impl ReviewState {
     pub(crate) fn clear(&self) -> Result<(), StorageError> {
@@ -72,7 +75,11 @@ impl ReviewState {
         let Ok(review) = sessions.read(self.owner, token, Instant::now()) else {
             return failure("IMPORT_REVIEW_UNAVAILABLE");
         };
-        let Ok(accepted) = u16::try_from(review.proposal().items().len()) else {
+        let Ok(accepted) = u16::try_from(
+            review
+                .proposal()
+                .map_or(0, |proposal| proposal.items().len()),
+        ) else {
             return failure("IMPORT_REVIEW_INVALID");
         };
         let current = match store.load_draft() {
@@ -213,9 +220,6 @@ pub(crate) async fn read_import_review(
     if window.label() != "main" {
         return window_not_authorized();
     }
-    if !import_available(window.label()) {
-        return failure("IMPORT_DISABLED");
-    }
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };
     }
@@ -286,9 +290,6 @@ pub(crate) async fn map_import_review(
     if window.label() != "main" {
         return window_not_authorized();
     }
-    if !import_available(window.label()) {
-        return failure("IMPORT_DISABLED");
-    }
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };
     }
@@ -323,9 +324,6 @@ pub(crate) async fn cancel_import_review(
 ) -> CommandResponse<bool> {
     if window.label() != "main" {
         return window_not_authorized();
-    }
-    if !import_available(window.label()) {
-        return failure("IMPORT_DISABLED");
     }
     if let Err(error) = request.validate() {
         return CommandResponse::Failure { ok: false, error };

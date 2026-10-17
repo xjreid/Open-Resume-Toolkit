@@ -1,6 +1,32 @@
 use super::*;
 
 #[test]
+fn pdf_readiness_requires_the_current_signed_in_image_capable_model() {
+    for mode in ["success", "text_only"] {
+        let (manager, profile, settings) = signed_in(mode);
+        assert_eq!(
+            manager.validate_image_selection(profile, &settings).is_ok(),
+            mode == "success"
+        );
+        assert_eq!(
+            manager.validate_image_selection(Uuid::now_v7(), &settings),
+            Err("PLAN_AUTH_REQUIRED")
+        );
+        let mut wrong = settings.clone();
+        wrong.reasoning = ort_ai::plan::ReasoningEffort::Xhigh;
+        assert_eq!(
+            manager.validate_image_selection(profile, &wrong),
+            Err("PLAN_MODEL_UNAVAILABLE")
+        );
+        manager.disconnect(profile);
+        assert_eq!(
+            manager.validate_image_selection(profile, &settings),
+            Err("PLAN_AUTH_REQUIRED")
+        );
+    }
+}
+
+#[test]
 fn session_retirement_interrupts_stalled_writes_for_disconnect_and_shutdown() {
     for shutdown in [false, true] {
         let (manager, profile, settings) = signed_in("stall_after_account");

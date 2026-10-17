@@ -1,7 +1,6 @@
 //! Versioned application-material responses. Generated prose is user-reviewed;
 //! validation enforces response shape and document bounds, not factual truth.
 pub use ort_domain::{AlertCategory, AlertEvidence, AlertKind, QualificationAlert, RoleInfo};
-mod list_selection;
 mod resume_draft;
 
 pub use resume_draft::{gemini_resume_output_schema, resume_context, resume_output_schema};
@@ -342,7 +341,7 @@ pub fn validate_tailoring(
     if value
         .get("schemaVersion")
         .and_then(serde_json::Value::as_u64)
-        == Some(6)
+        == Some(7)
     {
         return resume_draft::validate(source, source, job, value, published_revision);
     }

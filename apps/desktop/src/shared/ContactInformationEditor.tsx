@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ResumeDocument } from "@ort/contracts/resume";
 import type { ContactDivider } from "./resume-view-types";
 import { FormattedText, safeInlineHref } from "./FormattedText";
+import { ContactLinkField } from "./ContactLinkField";
 import {
   linkSelection,
   toggleBoldSelection,
@@ -137,7 +138,12 @@ export function ContactInformationEditor({
       <details ref={details} className="contact-information-details">
         <summary aria-label="Edit contact information">
           <span>
-            {items.filter(Boolean).map((item, index) => (
+            {[
+              ...items.filter(Boolean),
+              ...contact.links.map(
+                (link) => `[${link.label || link.url}](${link.url})`,
+              ),
+            ].map((item, index) => (
               <span key={index}>
                 {index > 0
                   ? divider === "bar"
@@ -149,7 +155,9 @@ export function ContactInformationEditor({
                 <FormattedText value={item} />
               </span>
             ))}
-            {!items.some(Boolean) ? "Add contact information" : null}
+            {!items.some(Boolean) && !contact.links.length
+              ? "Add contact information"
+              : null}
           </span>
           <svg
             className="workspace-icon"
@@ -273,6 +281,34 @@ export function ContactInformationEditor({
                   ×
                 </button>
               </div>
+            ))}
+            {contact.links.map((link, index) => (
+              <ContactLinkField
+                key={link.id ?? index}
+                link={link}
+                index={index}
+                disabled={disabled}
+                onChange={(next) =>
+                  onChange({
+                    ...contact,
+                    links: contact.links.map((current, at) =>
+                      at === index ? next : current,
+                    ),
+                  })
+                }
+                onRemove={() =>
+                  onChange({
+                    ...contact,
+                    links: contact.links
+                      .filter((_, at) => at !== index)
+                      .map((current, order) =>
+                        current.order === undefined
+                          ? current
+                          : { ...current, order },
+                      ),
+                  })
+                }
+              />
             ))}
           </div>
         </section>

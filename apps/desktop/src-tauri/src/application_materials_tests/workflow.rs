@@ -39,10 +39,10 @@ fn qualification_alerts_survive_refinement_and_encrypted_workspace_reload() {
         }],
     }];
     let source = current.resume.clone();
-    let raw = json!({"schemaVersion":6,"tailoringPlan":["Preserve the published Rust tooling experience."],"roleInfo":null,"rolePriorities":["Rust tooling"],"reviewIssues":[],
+    let raw = json!({"schemaVersion":7,"tailoringPlan":["Preserve the published Rust tooling experience."],"roleInfo":null,"rolePriorities":["Rust tooling"],"reviewIssues":[],
         "templateSections":[{"sectionId":source.sections[0].id,"entries":[{
             "entryId":source.sections[0].entries[0].id,"sourceEntryIds":[source.sections[0].entries[0].id],
-            "selectedLists":[],"mainInfo":{"format":"bullets","items":[{"text":"Built Rust tools.","sourceRefs":[source.sections[0].entries[0].bullets[0].id]}]}
+            "mainInfo":{"format":"bullets","items":[{"text":"Built Rust tools.","sourceRefs":[source.sections[0].entries[0].bullets[0].id]}]}
         }]}],"alerts":[
         {"kind":"not_found","category":"named_skill_or_technology","requirement":"Python","target":"Python","jobExcerpt":"Python","resumeEvidence":null},
         {"kind":"not_found","category":"named_skill_or_technology","requirement":"R","target":"R","jobExcerpt":"R","resumeEvidence":null}
@@ -178,10 +178,12 @@ fn resume_prompt_contract_makes_headers_read_only_for_all_providers() {
         ] {
             assert!(prompt.contains(region), "missing {region}");
         }
-        assert!(prompt.contains("\"schemaVersion\":6"));
+        assert!(prompt.contains("\"schemaVersion\":7"));
         assert!(prompt.contains("tailoringPlan"));
         assert!(prompt.contains("1–3"));
-        assert!(prompt.contains("selectedLists"));
+        assert!(!prompt.contains("selectedLists"));
+        assert!(!prompt.contains("selectableLists"));
+        assert!(prompt.contains("all details/extra"));
         assert!(prompt.contains("Do not return any of these fields"));
         assert!(prompt.contains("rolePriorities"));
         assert!(prompt.contains("reviewIssues"));
@@ -426,7 +428,7 @@ fn body_only_draft_with_plan_and_read_only_headers_preflights_and_renders() {
         entries: vec![entry.clone()],
     }];
     let draft = json!({
-        "schemaVersion": 6,
+        "schemaVersion": 7,
         "tailoringPlan": [
             "Rust platform role — Built dependable Rust services — foreground the service delivery bullet.",
             "Distributed-systems need — source details name distributed systems — retain that context beside the role.",
@@ -439,7 +441,6 @@ fn body_only_draft_with_plan_and_read_only_headers_preflights_and_renders() {
             "entries": [{
                 "entryId": entry.id,
                 "sourceEntryIds": [entry.id],
-                "selectedLists":[{"fieldId":entry.fields[1].id,"itemIndexes":[0,1]}],
                 "mainInfo": {"format":"paragraph","items":[{"text":"Built dependable Rust services for customer workflows.","sourceRefs":[entry.bullets[0].id]}]}
             }]
         }],

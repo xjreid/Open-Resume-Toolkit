@@ -16,6 +16,7 @@ struct SessionView {
     connection_id: Option<Uuid>,
     account_plan: Option<String>,
     models: Vec<PlanModel>,
+    image_models: std::collections::HashSet<String>,
     quota: Option<QuotaSnapshot>,
     login_pending: bool,
     error: Option<&'static str>,
@@ -26,6 +27,7 @@ impl From<&Session> for SessionView {
             connection_id: session.connection_id,
             account_plan: session.account_plan.clone(),
             models: session.models.clone(),
+            image_models: session.image_models.clone(),
             quota: session.quota.clone(),
             login_pending: session.login_id.is_some(),
             error: session.login_error,
@@ -142,6 +144,26 @@ impl PlanRuntime {
             return Err("PLAN_MODEL_UNAVAILABLE");
         }
         Ok(())
+    }
+
+    pub(crate) fn validate_image_selection(
+        &self,
+        profile: Uuid,
+        settings: &PlanSettings,
+    ) -> Result<(), &'static str> {
+        self.validate_selection(profile, settings)?;
+        let view = self.view.lock().map_err(|_| "PLAN_RUNTIME_UNAVAILABLE")?;
+        if view.as_ref().is_some_and(|(id, session)| {
+            *id == profile
+                && settings
+                    .model
+                    .as_ref()
+                    .is_some_and(|model| session.image_models.contains(model))
+        }) {
+            Ok(())
+        } else {
+            Err("AI_MODEL_IMAGE_UNSUPPORTED")
+        }
     }
 
     /// UI polls never queue behind a quota RPC or a workflow pass. Mutations

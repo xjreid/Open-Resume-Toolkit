@@ -690,6 +690,7 @@ function ResumeEditor() {
       <div className="import-page" hidden={destination !== "import"}>
         <section className="workspace-data" aria-label="Resume import">
           <DocumentImport
+            active={destination === "import"}
             style={documentStyle}
             reviewDisabled={!storageReady || mustReload || close.pending}
             disabledReason={

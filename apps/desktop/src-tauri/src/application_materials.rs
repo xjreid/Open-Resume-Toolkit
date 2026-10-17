@@ -571,7 +571,7 @@ pub async fn start_application(
         Err(StorageError::NotFound) => return error("PUBLISHED_RESUME_REQUIRED"),
         Err(problem) => return storage_failure(&problem),
     };
-    let input = json!({"schemaVersion":6,"qualityPhase":"draft","callNumber":1,"publishedRevision":source.revision,"publishedResume":materials::resume_context(&source.document),"reviewedJobDescription":job_description,"style":style});
+    let input = json!({"schemaVersion":7,"qualityPhase":"draft","callNumber":1,"publishedRevision":source.revision,"publishedResume":materials::resume_context(&source.document),"reviewedJobDescription":job_description,"style":style});
     let mut run = TailoringRun::new(
         &source.document,
         &source.document,
@@ -668,7 +668,7 @@ pub async fn regenerate_application_resume(
         Ok(value) => value,
         Err(problem) => return storage_failure(&problem),
     };
-    let input = json!({"schemaVersion":6,"qualityPhase":"draft","callNumber":1,"publishedRevision":source.revision,"publishedResume":materials::resume_context(&source.document),
+    let input = json!({"schemaVersion":7,"qualityPhase":"draft","callNumber":1,"publishedRevision":source.revision,"publishedResume":materials::resume_context(&source.document),
         "currentReviewedResume":materials::resume_context(&workspace.resume),"reviewedJobDescription":workspace.job_description,"reviewedRoleInfo":workspace.role_info,"style":workspace.style,"correctionInstruction":correction_instruction});
     let mut run = TailoringRun::new(
         &source.document,

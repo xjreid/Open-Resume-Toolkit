@@ -1,6 +1,5 @@
 //! Source-backed editing within the existing resume template.
 //! Evidence references establish traceability, not proof of generated claims.
-use super::list_selection::list_items;
 use super::{AlertCandidate, MaterialError, RoleInfo, TailoredMaterial, validate_alerts};
 use ort_domain::PARAGRAPH_FIELD_LABEL as PARAGRAPH;
 use ort_domain::{
@@ -32,14 +31,7 @@ struct TemplateSection {
 struct TemplateEntry {
     entry_id: EntityId,
     source_entry_ids: Vec<EntityId>,
-    selected_lists: Vec<ListSelection>,
     main_info: MainInfo,
-}
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ListSelection {
-    field_id: EntityId,
-    item_indexes: Vec<usize>,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -82,8 +74,7 @@ pub fn resume_context(document: &ResumeDocument) -> Value {
                 "details":entry.field_text(ort_domain::FieldRole::Details," | "),"date":date_text(entry),"location":entry.location,"extra":entry.field_text(ort_domain::FieldRole::Extra,"\n"),
                 "mainInfo":if paragraphs.is_empty() { json!({"format":"bullets","items":entry.bullets.iter().map(|b| &b.text).collect::<Vec<_>>()}) } else {json!({"format":"paragraph","items":paragraphs})},
                 "sourceBullets":entry.bullets.iter().map(|b|json!({"sourceId":b.id,"text":b.text})).collect::<Vec<_>>(),
-                "sourceFields":entry.fields.iter().map(|f|json!({"fieldId":f.id,"label":f.label,"value":f.value,"isSkill":f.is_skill,"listKind":f.list_kind})).collect::<Vec<_>>(),
-                "selectableLists":entry.fields.iter().filter(|f|f.selectable()).map(|f|json!({"fieldId":f.id,"items":list_items(f).items})).collect::<Vec<_>>(),
+                "sourceFields":entry.fields.iter().map(|f|json!({"fieldId":f.id,"label":f.label,"value":f.value})).collect::<Vec<_>>(),
                 "links":entry.links.iter().map(|l|json!({"label":l.label,"url":l.url})).collect::<Vec<_>>()})
         }).collect::<Vec<_>>()
     })).collect::<Vec<_>>()})
@@ -107,79 +98,6 @@ fn field(fields: &mut Vec<NamedField>, label: &str, value: &str) -> Result<(), M
     }
     Ok(())
 }
-fn select_fields(
-    selected_lists: Vec<ListSelection>,
-    original: &ResumeEntry,
-    published: Option<&ResumeEntry>,
-) -> Result<Vec<NamedField>, MaterialError> {
-    let mut selected_fields = Vec::new();
-    let mut selected = HashSet::new();
-    for selection in selected_lists {
-        if !selected.insert(selection.field_id) || selection.item_indexes.is_empty() {
-            return Err(MaterialError::InvalidDetail("selectedLists contains a duplicate fieldId or an empty itemIndexes array. Omit the field to remove it.".into()));
-        }
-        // Selections must use published units; reviewed-only metadata stays protected.
-        let f = published
-            .and_then(|e| e.fields.iter().find(|f| f.id == selection.field_id))
-            .ok_or_else(|| {
-                MaterialError::InvalidDetail(format!(
-                    "selectedLists.fieldId {} is not a published field in this entry.",
-                    selection.field_id
-                ))
-            })?;
-        if !f.selectable() {
-            return Err(MaterialError::InvalidDetail(format!(
-                "Field {} is protected; omit it from selectedLists.",
-                f.id
-            )));
-        }
-        let units = list_items(f);
-        let mut indexes = HashSet::new();
-        let mut values = Vec::new();
-        for i in selection.item_indexes {
-            if !indexes.insert(i) {
-                return Err(MaterialError::InvalidDetail(format!(
-                    "Field {} repeats item index {i}; each index may appear once.",
-                    f.id
-                )));
-            }
-            values.push(*units.items.get(i).ok_or_else(|| MaterialError::InvalidDetail(format!("Field {} has {} selectable items; index {i} is out of range. Use zero-based published indexes.", f.id, units.items.len())))?);
-        }
-        let mut retained = original
-            .fields
-            .iter()
-            .find(|v| v.id == f.id)
-            .unwrap_or(f)
-            .clone();
-        retained.value.clone_from(&f.value);
-        // Selecting every item in its original order preserves even whitespace.
-        if values != units.items {
-            retained.value = values.join(units.separator);
-        }
-        selected_fields.push(retained);
-    }
-    let mut selections = selected_fields.into_iter();
-    let mut fields = Vec::new();
-    for f in original.fields.iter().filter(|f| f.label != PARAGRAPH) {
-        if published.is_some_and(|e| {
-            e.fields
-                .iter()
-                .any(|source| source.id == f.id && source.selectable())
-        }) {
-            if let Some(selected) = selections.next() {
-                fields.push(selected);
-            }
-        } else {
-            fields.push(f.clone());
-        }
-    }
-    fields.extend(selections);
-    for (i, f) in fields.iter_mut().enumerate() {
-        f.order = order(i)?;
-    }
-    Ok(fields)
-}
-
 fn materialize_entry(
     draft: TemplateEntry,
     source: &ResumeDocument,
@@ -238,8 +156,17 @@ fn materialize_entry(
             )));
         }
     }
-    let published = entries(source).find(|e| e.id == draft.entry_id);
-    let mut fields = select_fields(draft.selected_lists, original, published)?;
+    // Header fields are always protected, including legacy skill/coursework
+    // classifications. Only body content is supplied by the model.
+    let mut fields: Vec<_> = original
+        .fields
+        .iter()
+        .filter(|field| field.role() != ort_domain::FieldRole::Paragraph)
+        .cloned()
+        .collect();
+    for (index, field) in fields.iter_mut().enumerate() {
+        field.order = order(index)?;
+    }
     let mut bullets = Vec::new();
     match draft.main_info.format {
         BodyFormat::Paragraph => field(
@@ -290,14 +217,14 @@ pub(super) fn validate(
         // arbitrary model output from serde's error message.
         let message = error.to_string();
         let missing = message.strip_prefix("missing field `").and_then(|v| v.strip_suffix('`'));
-        let known = ["schemaVersion", "tailoringPlan", "rolePriorities", "reviewIssues", "templateSections", "alerts", "sectionId", "entries", "entryId", "sourceEntryIds", "selectedLists", "mainInfo", "fieldId", "itemIndexes", "format", "items", "text", "sourceRefs"];
+        let known = ["schemaVersion", "tailoringPlan", "rolePriorities", "reviewIssues", "templateSections", "alerts", "sectionId", "entries", "entryId", "sourceEntryIds", "mainInfo", "fieldId", "format", "items", "text", "sourceRefs"];
         MaterialError::InvalidDetail(if let Some(field) = missing.filter(|field| known.contains(field)) {
-            format!("Missing required schema v6 field: {field}. Return the complete candidate, including empty arrays where appropriate.")
+            format!("Missing required schema v7 field: {field}. Return the complete candidate, including empty arrays where appropriate.")
         } else {
-            "Candidate JSON does not match schema v6. Check field types, UUID identities, format=bullets/paragraph, and remove unexpected properties.".into()
+            "Candidate JSON does not match schema v7. Check field types, UUID identities, format=bullets/paragraph, and remove unexpected properties.".into()
         })
     })?;
-    if proposed.schema_version != 6 {
+    if proposed.schema_version != 7 {
         return Err(MaterialError::Version);
     }
     let change_points = validate_strings("tailoringPlan", proposed.tailoring_plan, 1, 3)?;
@@ -428,11 +355,8 @@ pub fn resume_output_schema() -> Value {
     let strings = |min, max| json!({"type":"array","minItems":min,"maxItems":max,"items":{"type":"string","minLength":1,"maxLength":500}});
     let item =
         object(&json!({"text":text,"sourceRefs":{"type":"array","minItems":1,"items":text}}));
-    let list = object(
-        &json!({"fieldId":text,"itemIndexes":{"type":"array","minItems":1,"items":{"type":"integer","minimum":0}}}),
-    );
     let entry = object(
-        &json!({"entryId":text,"sourceEntryIds":{"type":"array","minItems":1,"items":text},"selectedLists":{"type":"array","items":list},"mainInfo":object(&json!({"format":{"type":"string","enum":["bullets","paragraph"]},"items":{"type":"array","items":item}}))}),
+        &json!({"entryId":text,"sourceEntryIds":{"type":"array","minItems":1,"items":text},"mainInfo":object(&json!({"format":{"type":"string","enum":["bullets","paragraph"]},"items":{"type":"array","items":item}}))}),
     );
     let section =
         object(&json!({"sectionId":text,"entries":{"type":"array","minItems":1,"items":entry}}));
@@ -442,7 +366,7 @@ pub fn resume_output_schema() -> Value {
         &json!({"kind":{"type":"string","enum":["not_found","confirmed_mismatch"]},"category":{"type":"string","enum":["degree_level","field_of_study","graduation_date","certification_or_professional_license","named_skill_or_technology","language_proficiency","experience_duration","portfolio_or_work_sample"]},"requirement":text,"target":text,"jobExcerpt":text,"resumeEvidence":{"anyOf":[evidence,{"type":"null"}]}}),
     );
     object(
-        &json!({"schemaVersion":{"type":"integer","enum":[6]},"tailoringPlan":strings(1,3),"rolePriorities":strings(1,6),"reviewIssues":strings(0,10),"roleInfo":{"anyOf":[role,{"type":"null"}]},"templateSections":{"type":"array","minItems":1,"items":section},"alerts":{"type":"array","maxItems":10,"items":alert}}),
+        &json!({"schemaVersion":{"type":"integer","enum":[7]},"tailoringPlan":strings(1,3),"rolePriorities":strings(1,6),"reviewIssues":strings(0,10),"roleInfo":{"anyOf":[role,{"type":"null"}]},"templateSections":{"type":"array","minItems":1,"items":section},"alerts":{"type":"array","maxItems":10,"items":alert}}),
     )
 }
 #[must_use]
@@ -476,13 +400,13 @@ mod tests {
         validate_refinement as validate_current_refinement,
         validate_tailoring as validate_current_tailoring,
     };
-    // Adapt pre-v6 editorial fixtures to the new wire shape. New evidence and
-    // list-permission tests below invoke the production validator directly.
+    // Adapt pre-v7 editorial fixtures to the new wire shape. New evidence and
+    // header-preservation tests below invoke the production validator directly.
     fn fixture_wire(source: &ResumeDocument, current: &ResumeDocument, raw: &str) -> String {
         let Ok(mut v) = serde_json::from_str::<Value>(raw) else {
             return raw.into();
         };
-        if v["schemaVersion"] != 6 {
+        if v["schemaVersion"] != 7 {
             return raw.into();
         }
         v.as_object_mut()
@@ -505,7 +429,6 @@ mod tests {
                                 .or_else(|| entries(current).find(|e| e.id == id))
                         });
                         if let Some(original) = original {
-                            e.as_object_mut().unwrap().entry("selectedLists").or_insert_with(||json!(original.fields.iter().filter(|f|f.selectable()).map(|f|json!({"fieldId":f.id,"itemIndexes":(0..list_items(f).items.len()).collect::<Vec<_>>()})).collect::<Vec<_>>()));
                             let refs: Vec<_> = original
                                 .bullets
                                 .iter()
@@ -593,7 +516,7 @@ mod tests {
 
     pub(super) fn proposal(source: &ResumeDocument) -> Value {
         let context = resume_context(source);
-        let v = json!({"schemaVersion":6,"tailoringPlan":[
+        let v = json!({"schemaVersion":7,"tailoringPlan":[
             "Emphasize tooling needs by leading with the published Rust support-tool work.",
             "Make the SQL reporting experience easier to find in a specific body bullet.",
             "Keep the published experience context while condensing repeated body details."
@@ -824,7 +747,6 @@ mod tests {
         entry.bullets[0].text = "Reviewed wording about Rust tools.".into();
         entry.links[0].url = "https://example.com/reviewed".into();
         let mut next = proposal(&current);
-        next["templateSections"][0]["entries"][0]["selectedLists"] = json!([]);
         next["templateSections"][0]["entries"][0]["sourceEntryIds"] =
             json!([source.sections[0].entries[0].id]);
         next["templateSections"][0]["entries"][0]["mainInfo"] =
@@ -1123,12 +1045,12 @@ mod tests {
         assert_eq!(plan["minItems"], 1);
         assert_eq!(plan["maxItems"], 3);
         assert_eq!(plan["items"]["maxLength"], 500);
-        assert_eq!(schema["properties"]["schemaVersion"]["enum"], json!([6]));
+        assert_eq!(schema["properties"]["schemaVersion"]["enum"], json!([7]));
     }
 }
 
 #[cfg(test)]
-mod v6_tests {
+mod v7_tests {
     use super::tests::{proposal, source};
     use super::*;
     use crate::materials::validate_refinement;
@@ -1138,6 +1060,24 @@ mod v6_tests {
         v: &Value,
     ) -> Result<TailoredMaterial, MaterialError> {
         validate_refinement(source, current, "Rust required", &v.to_string(), 1)
+    }
+    #[test]
+    fn retained_headers_preserve_reviewed_values_despite_legacy_list_flags() {
+        for kind in [
+            None,
+            Some(ort_domain::ListKind::Skills),
+            Some(ort_domain::ListKind::Coursework),
+        ] {
+            let mut source = source();
+            source.sections[0].entries[0].fields[0].list_kind = kind;
+            let mut current = source.clone();
+            current.sections[0].entries[0].fields[0].value = "Reviewed header text".into();
+            let result = check(&source, &current, &proposal(&source)).unwrap().resume;
+            assert_eq!(
+                result.sections[0].entries[0].fields,
+                current.sections[0].entries[0].fields
+            );
+        }
     }
     #[test]
     fn evidence_is_required_and_cannot_cross_entries() {
@@ -1170,47 +1110,40 @@ mod v6_tests {
         assert!(check(&source, &source, &v).is_err());
     }
     #[test]
-    fn exact_list_items_can_be_removed_reordered_and_restored() {
-        let source = source();
-        let mut v = proposal(&source);
-        v["templateSections"][0]["entries"][0]["selectedLists"][0]["itemIndexes"] = json!([1, 0]);
-        let first = check(&source, &source, &v).unwrap().resume;
-        assert_eq!(first.sections[0].entries[0].fields[0].value, "SQL, Rust");
-        v["templateSections"][0]["entries"][0]["selectedLists"][0]["itemIndexes"] = json!([0]);
-        let reduced = check(&source, &first, &v).unwrap().resume;
-        assert_eq!(reduced.sections[0].entries[0].fields[0].value, "Rust");
-        v["templateSections"][0]["entries"][0]["selectedLists"][0]["itemIndexes"] = json!([1]);
-        assert_eq!(
-            check(&source, &reduced, &v).unwrap().resume.sections[0].entries[0].fields[0].value,
-            "SQL"
-        );
-        for invalid in [json!([2]), json!([0, 0]), json!([])] {
-            v["templateSections"][0]["entries"][0]["selectedLists"][0]["itemIndexes"] = invalid;
-            assert!(check(&source, &source, &v).is_err());
-        }
-    }
-    #[test]
-    fn list_selection_cannot_change_text_or_protected_fields() {
+    fn all_header_fields_survive_body_removal_and_legacy_flags_grant_no_permission() {
         let mut source = source();
-        let mut protected = source.sections[0].entries[0].fields[0].clone();
-        protected.id = EntityId::new();
-        protected.order = 1;
-        protected.is_skill = false;
-        source.sections[0].entries[0].fields.push(protected.clone());
+        for (index, kind) in [
+            None,
+            Some(ort_domain::ListKind::Skills),
+            Some(ort_domain::ListKind::Coursework),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut field = source.sections[0].entries[0].fields[0].clone();
+            field.id = EntityId::new();
+            field.order = order(index + 1).unwrap();
+            field.label = if index == 2 { "Extra" } else { "Details" }.into();
+            field.list_kind = kind;
+            field.is_skill = index == 0;
+            source.sections[0].entries[0].fields.push(field);
+        }
         let mut v = proposal(&source);
-        v["templateSections"][0]["entries"][0]["selectedLists"][0]["fieldId"] = json!(protected.id);
-        assert!(check(&source, &source, &v).is_err());
-        let mut v = proposal(&source);
-        v["templateSections"][0]["entries"][0]["selectedLists"][0]["value"] = json!("Python");
-        assert!(check(&source, &source, &v).is_err());
-        let mut v = proposal(&source);
-        v["templateSections"][0]["entries"][0]["selectedLists"] = json!([]);
-        let result = check(&source, &source, &v).unwrap();
-        assert_eq!(result.resume.sections[0].entries[0].fields.len(), 1);
+        v["templateSections"][0]["entries"][0]["mainInfo"]["items"] = json!([]);
+        let result = check(&source, &source, &v).unwrap().resume;
         assert_eq!(
-            result.resume.sections[0].entries[0].fields[0].value,
-            protected.value
+            result.sections[0].entries[0].fields,
+            source.sections[0].entries[0].fields
         );
+        assert!(result.sections[0].entries[0].bullets.is_empty());
+        for selection in [
+            json!([]),
+            json!([{"fieldId":source.sections[0].entries[0].fields[0].id,"itemIndexes":[1]}]),
+        ] {
+            let mut invalid = v.clone();
+            invalid["templateSections"][0]["entries"][0]["selectedLists"] = selection;
+            assert!(check(&source, &source, &invalid).is_err());
+        }
     }
     #[test]
     fn reviewed_only_entries_cannot_combine_evidence_from_multiple_experiences() {
@@ -1223,7 +1156,6 @@ mod v6_tests {
         let mut v = proposal(&source);
         let entry = &mut v["templateSections"][0]["entries"][0];
         entry["entryId"] = json!(current.sections[0].entries[0].id);
-        entry["selectedLists"] = json!([]);
         entry["sourceEntryIds"] = json!([
             source.sections[0].entries[0].id,
             source.sections[0].entries[1].id
@@ -1234,45 +1166,32 @@ mod v6_tests {
         assert!(check(&source, &current, &v).is_ok());
     }
     #[test]
-    fn reviewed_only_lists_are_protected_and_cannot_supply_selection_items() {
+    fn reviewed_only_header_fields_are_preserved() {
         let source = source();
         let mut current = source.clone();
         let mut added = current.sections[0].entries[0].fields[0].clone();
         added.id = EntityId::new();
         added.order = 1;
         added.value = "Reviewed-only wording".into();
+        added.list_kind = Some(ort_domain::ListKind::Coursework);
         current.sections[0].entries[0].fields.push(added.clone());
-        let mut v = proposal(&source);
-        let result = check(&source, &current, &v).unwrap();
+        let result = check(&source, &current, &proposal(&source)).unwrap();
         assert_eq!(result.resume.sections[0].entries[0].fields[1], added);
-        v["templateSections"][0]["entries"][0]["selectedLists"]
-            .as_array_mut()
-            .unwrap()
-            .push(json!({"fieldId": added.id, "itemIndexes": [0]}));
-        assert!(check(&source, &current, &v).is_err());
     }
     #[test]
-    fn coursework_classification_is_explicit_and_legacy_flags_work() {
-        let mut source = source();
-        let f = &mut source.sections[0].entries[0].fields[0];
-        f.is_skill = false;
-        f.list_kind = Some(ort_domain::ListKind::Coursework);
-        f.value = "Algorithms; Systems (I, II)".into();
-        let mut v = proposal(&source);
-        v["templateSections"][0]["entries"][0]["selectedLists"][0]["itemIndexes"] = json!([1]);
-        assert_eq!(
-            check(&source, &source, &v).unwrap().resume.sections[0].entries[0].fields[0].value,
-            "Systems (I, II)"
-        );
-        let mut old =
-            serde_json::to_value(source.sections[0].entries[0].fields[0].clone()).unwrap();
-        old.as_object_mut().unwrap().remove("listKind");
-        old["isSkill"] = json!(true);
-        assert!(
-            serde_json::from_value::<NamedField>(old)
-                .unwrap()
-                .selectable()
-        );
+    fn context_and_output_schema_do_not_offer_header_selection() {
+        let source = source();
+        let context = resume_context(&source);
+        let entry = &context["sections"][0]["entries"][0];
+        assert!(entry.get("selectableLists").is_none());
+        assert_eq!(entry["sourceFields"][0]["value"], "Rust, SQL");
+        assert!(entry["sourceFields"][0].get("isSkill").is_none());
+        assert!(entry["sourceFields"][0].get("listKind").is_none());
+        let schema = resume_output_schema();
+        let entry_schema =
+            &schema["properties"]["templateSections"]["items"]["properties"]["entries"]["items"];
+        assert!(entry_schema["properties"].get("selectedLists").is_none());
+        assert_eq!(entry_schema["additionalProperties"], false);
     }
     #[test]
     fn refinement_restores_omitted_sections_and_keeps_reviewed_headers() {
@@ -1296,22 +1215,17 @@ mod v6_tests {
         );
     }
     #[test]
-    fn missing_review_contract_and_v5_are_rejected() {
+    fn missing_review_contract_and_previous_versions_are_rejected() {
         let source = source();
-        for key in ["rolePriorities", "reviewIssues", "selectedLists"] {
+        for key in ["rolePriorities", "reviewIssues"] {
             let mut v = proposal(&source);
-            if key == "selectedLists" {
-                v["templateSections"][0]["entries"][0]
-                    .as_object_mut()
-                    .unwrap()
-                    .remove(key);
-            } else {
-                v.as_object_mut().unwrap().remove(key);
-            }
+            v.as_object_mut().unwrap().remove(key);
             assert!(check(&source, &source, &v).is_err());
         }
-        let mut v = proposal(&source);
-        v["schemaVersion"] = json!(5);
-        assert!(check(&source, &source, &v).is_err());
+        for version in 1..=6 {
+            let mut v = proposal(&source);
+            v["schemaVersion"] = json!(version);
+            assert!(check(&source, &source, &v).is_err());
+        }
     }
 }

@@ -81,7 +81,7 @@ impl<'a> TailoringRun<'a> {
                     failure = "AI_GROUNDING_FAILED";
                 }
                 self.validation_feedback.push(error.to_string());
-                feedback.push(format!("Invalid response: {error}. Return a complete schema v6 candidate with valid same-entry source references and exact list selections."));
+                feedback.push(format!("Invalid response: {error}. Return a complete schema v7 candidate with valid same-entry source references."));
             }
             Ok(material) => {
                 if !material.review_issues.is_empty() {
@@ -206,7 +206,6 @@ pub fn change_summary(before: &ResumeDocument, after: &ResumeDocument) -> Vec<St
     let mut removed = Vec::new();
     let mut restored = Vec::new();
     let mut moved = Vec::new();
-    let mut lists = 0;
     let mut rewritten = 0;
     let section_moves = reordered(
         &before.sections.iter().map(|s| s.id).collect::<Vec<_>>(),
@@ -256,20 +255,6 @@ pub fn change_summary(before: &ResumeDocument, after: &ResumeDocument) -> Vec<St
                 {
                     rewritten += 1;
                 }
-                if previous
-                    .fields
-                    .iter()
-                    .filter(|f| f.selectable())
-                    .map(|f| (f.id, f.value.as_str()))
-                    .collect::<Vec<_>>()
-                    != e.fields
-                        .iter()
-                        .filter(|f| f.selectable())
-                        .map(|f| (f.id, f.value.as_str()))
-                        .collect::<Vec<_>>()
-                {
-                    lists += 1;
-                }
             } else {
                 restored.push(e.heading.as_str());
             }
@@ -289,11 +274,6 @@ pub fn change_summary(before: &ResumeDocument, after: &ResumeDocument) -> Vec<St
     }
     if rewritten > 0 {
         result.push(format!("Updated descriptions in {rewritten} items."));
-    }
-    if lists > 0 {
-        result.push(format!(
-            "Changed skill/coursework selection in {lists} items."
-        ));
     }
     result
 }

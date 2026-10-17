@@ -84,32 +84,72 @@ fn material_cap_reservations_include_both_provider_schemas() {
     }
 }
 
-fn resume_stream_fixture(provider: Provider, text: &str, split: usize) -> String {
+fn resume_stream_fixture(provider: Provider, model: &str, text: &str, split: usize) -> String {
     use std::fmt::Write;
     let (first, last) = text.split_at(split);
     let values = match provider {
         Provider::OpenAi => vec![
-            json!({"type":"response.created","response":{"model":"fixture-model"}}),
+            json!({"type":"response.created","response":{"model":model}}),
             json!({"type":"response.output_text.delta","delta":first}),
             json!({"type":"response.output_text.delta","delta":last}),
             json!({"type":"response.completed","response":{"usage":{"input_tokens":20,"output_tokens":100}}}),
         ],
         Provider::Anthropic => vec![
-            json!({"type":"message_start","message":{"model":"fixture-model","usage":{"input_tokens":20,"output_tokens":0}}}),
+            json!({"type":"message_start","message":{"model":model,"usage":{"input_tokens":20,"output_tokens":0}}}),
             json!({"type":"content_block_delta","delta":{"text":first}}),
             json!({"type":"content_block_delta","delta":{"text":last}}),
             json!({"type":"message_delta","usage":{"output_tokens":100}}),
             json!({"type":"message_stop"}),
         ],
         Provider::Gemini => vec![
-            json!({"modelVersion":"gemini-3.6-flash","candidates":[{"content":{"parts":[{"thought":true,"text":"private reasoning"},{"text":first}]}}]}),
-            json!({"modelVersion":"gemini-3.6-flash","candidates":[{"content":{"parts":[{"text":last}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":20,"candidatesTokenCount":100,"thoughtsTokenCount":10}}),
+            json!({"modelVersion":model,"candidates":[{"content":{"parts":[{"thought":true,"text":"private reasoning"},{"text":first}]}}]}),
+            json!({"modelVersion":model,"candidates":[{"content":{"parts":[{"text":last}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":20,"candidatesTokenCount":100,"thoughtsTokenCount":10}}),
         ],
     };
     values.iter().fold(String::new(), |mut raw, value| {
         write!(raw, "data: {value}\n\n").unwrap();
         raw
     })
+}
+
+#[test]
+fn pdf_import_streams_map_visible_links_and_preserve_resume_content() {
+    let mut proposal = ort_ai::resume_import::input()["formatExampleOnly"].clone();
+    proposal["contact"]["links"][0]["url"] = json!("linkedin.com/in/example-person");
+    let text = proposal.to_string();
+    for provider in [Provider::OpenAi, Provider::Anthropic, Provider::Gemini] {
+        let model = if provider == Provider::Gemini {
+            "gemini-3.5-flash-lite"
+        } else {
+            "fixture-model"
+        };
+        for split in [1, text.len() / 2, text.len() - 1] {
+            let raw = resume_stream_fixture(provider, model, &text, split);
+            let output = SyntheticStreamState::from_events(
+                adapter(provider).parse_stream(raw.as_bytes()).unwrap(),
+            );
+            assert_eq!(output.material_error(model), None);
+            let document = ort_ai::resume_import::decode(&output.text).unwrap();
+            document
+                .validate(ort_domain::DocumentLimits::default())
+                .unwrap();
+            assert_eq!(
+                document.contact.links[0].url,
+                "https://linkedin.com/in/example-person"
+            );
+            assert_eq!(document.sections[0].entries[0].heading, "Example Company");
+            assert_eq!(
+                document.sections[0].entries[0].bullets[0].text,
+                "Example source bullet, copied verbatim."
+            );
+        }
+        assert_eq!(
+            material_schema_bytes(provider, OperationType::ImportMapping).unwrap(),
+            serde_json::to_vec(&ort_ai::resume_import::provider_output_schema(provider))
+                .unwrap()
+                .len()
+        );
+    }
 }
 
 #[test]
@@ -147,8 +187,8 @@ fn all_provider_streams_apply_header_free_resume_consistently() {
             links: vec![],
         }],
     });
-    let text = json!({"schemaVersion":6,"tailoringPlan":["Emphasize Rust support tools for the tooling role."],"roleInfo":null,"alerts":[],"rolePriorities":["Rust tooling"],"reviewIssues":[],
-        "templateSections":[{"sectionId":section_id,"entries":[{"entryId":entry_id,"sourceEntryIds":[entry_id],"selectedLists":[{"fieldId":source.sections[0].entries[0].fields[0].id,"itemIndexes":[0,1]}],"mainInfo":{"format":"bullets","items":[{"text":"Developed Rust tools for support teams.","sourceRefs":[source.sections[0].entries[0].bullets[0].id]}]}}]}]}).to_string();
+    let text = json!({"schemaVersion":7,"tailoringPlan":["Emphasize Rust support tools for the tooling role."],"roleInfo":null,"alerts":[],"rolePriorities":["Rust tooling"],"reviewIssues":[],
+        "templateSections":[{"sectionId":section_id,"entries":[{"entryId":entry_id,"sourceEntryIds":[entry_id],"mainInfo":{"format":"bullets","items":[{"text":"Developed Rust tools for support teams.","sourceRefs":[source.sections[0].entries[0].bullets[0].id]}]}}]}]}).to_string();
     let mut expected = None;
     for provider in [Provider::OpenAi, Provider::Anthropic, Provider::Gemini] {
         let model = if provider == Provider::Gemini {
@@ -157,7 +197,7 @@ fn all_provider_streams_apply_header_free_resume_consistently() {
             "fixture-model"
         };
         for split in [1, text.len() / 2, text.len() - 1] {
-            let raw = resume_stream_fixture(provider, &text, split);
+            let raw = resume_stream_fixture(provider, model, &text, split);
             let output = SyntheticStreamState::from_events(
                 adapter(provider).parse_stream(raw.as_bytes()).unwrap(),
             );

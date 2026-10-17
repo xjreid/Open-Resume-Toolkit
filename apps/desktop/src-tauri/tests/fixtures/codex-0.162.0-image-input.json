@@ -1,0 +1,44 @@
+{
+  "provenance": "Generated from the SHA-256-pinned official Codex 0.162.0 executable using app-server generate-json-schema; no account or inference.",
+  "version": "0.162.0",
+  "executableSha256": "8238273076041e55beded03ba1d51e034f997b7d100b0642d36daf036620fe57",
+  "inputTypes": [
+    "text",
+    "image",
+    "localImage",
+    "audio",
+    "localAudio",
+    "skill",
+    "mention"
+  ],
+  "localImage": {
+    "properties": {
+      "detail": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ImageDetail"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "path": {
+        "type": "string"
+      },
+      "type": {
+        "enum": ["localImage"],
+        "title": "LocalImageUserInputType",
+        "type": "string"
+      }
+    },
+    "required": ["path", "type"],
+    "title": "LocalImageUserInput",
+    "type": "object"
+  },
+  "imageDetail": {
+    "enum": ["auto", "low", "high", "original"],
+    "type": "string"
+  }
+}

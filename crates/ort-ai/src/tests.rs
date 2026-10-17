@@ -90,11 +90,17 @@ fn gemini_requests_match_the_published_rest_generation_contract() {
             OperationType::CredentialTest,
             OperationType::CoverLetter,
             OperationType::AnswerQuestion,
+            OperationType::ImportMapping,
         ] {
             let mut normalized = request();
             normalized.model = model.into();
             normalized.operation = operation;
-            let built = GeminiAdapter.build_request(&normalized, &key).unwrap();
+            let built = if operation == OperationType::ImportMapping {
+                resume_import::build_request(&GeminiAdapter, &normalized, &key, b"%PDF-1.7\n%%EOF")
+                    .unwrap()
+            } else {
+                GeminiAdapter.build_request(&normalized, &key).unwrap()
+            };
             let body: Value = serde_json::from_slice(&built.body).unwrap();
             assert_discovery_contract(
                 &body["generationConfig"],

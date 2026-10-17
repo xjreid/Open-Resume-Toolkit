@@ -2,6 +2,114 @@
   padding-top: 12px;
 }
 
+.resume-import-start:has(.resume-import-methods) {
+  max-width: 1040px;
+}
+.resume-import-methods {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 28px;
+  border-block: 1px solid var(--line);
+}
+.resume-import-method {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  padding: 24px 24px 24px 0;
+}
+.resume-import-method + .resume-import-method {
+  padding-inline: 24px 0;
+  border-inline-start: 1px solid var(--line);
+}
+.resume-import-method h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 20px;
+  line-height: 1.25;
+}
+.resume-import-method p {
+  margin: 8px 0 0;
+  color: #566c70;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.resume-import-provider,
+.resume-import-method__local-note {
+  font-size: 13px;
+}
+.resume-import-provider__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.resume-import-provider__status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #566c70;
+}
+.resume-import-provider__status.is-ready::before {
+  background: #2d624f;
+}
+.resume-import-provider dl {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.resume-import-provider dl > div {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 12px;
+}
+.resume-import-provider dt {
+  color: #566c70;
+}
+.resume-import-provider dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.resume-import-provider .button--secondary {
+  margin-top: 12px;
+}
+.resume-import-method__action {
+  margin-top: auto;
+}
+.resume-import-method__action p {
+  margin: 0 0 12px;
+}
+.resume-import-error {
+  margin-block: 24px;
+  padding: 16px;
+  border: 1px solid #a13b3b;
+  border-radius: 6px;
+}
+.resume-import-error > p {
+  margin: 0 0 12px;
+  color: #a13b3b;
+}
+.resume-import-progress {
+  margin-top: 24px;
+  padding-block: 16px;
+  border-block: 1px solid var(--line);
+}
+@media (max-width: 850px) {
+  .resume-import-methods {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .resume-import-method,
+  .resume-import-method + .resume-import-method {
+    padding: 24px 0;
+    border-inline-start: 0;
+  }
+  .resume-import-method + .resume-import-method {
+    border-top: 1px solid var(--line);
+  }
+}
+
 .import-review {
   margin-inline: auto;
 }

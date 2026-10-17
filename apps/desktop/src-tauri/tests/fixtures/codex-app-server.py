@@ -2,6 +2,7 @@
 import json
 import sys
 import time
+from pathlib import Path
 
 mode = sys.argv[1]
 connected = False
@@ -26,7 +27,7 @@ for line in sys.stdin:
         }}
         result["layers"] = [{"config": result["config"], "disabledReason": None}]
     elif method == "model/list":
-        result = {"data": [{"model": "gpt-6.1-sol", "hidden": False, "supportedReasoningEfforts": [{"reasoningEffort": "medium"}, {"reasoningEffort": "high"}]}]}
+        result = {"data": [{"model": "gpt-6.1-sol", "hidden": False, "inputModalities": ["text"] if mode == "text_only" else ["text", "image"], "supportedReasoningEfforts": [{"reasoningEffort": "medium"}, {"reasoningEffort": "high"}]}]}
     elif method == "account/login/start":
         result = {"type": "chatgpt", "loginId": "login", "authUrl": "https://auth.openai.com/oauth/authorize"}
     elif method == "account/read":
@@ -53,6 +54,19 @@ for line in sys.stdin:
         loaded_threads -= 1
         result = {"status": "unsubscribed"}
     elif method == "turn/start":
+        if mode == "pdf_import":
+            params = request["params"]
+            assert params["effort"] == "medium"
+            assert params["approvalPolicy"] == "never"
+            assert "contact" in params["outputSchema"]["properties"]
+            items = params["input"]
+            assert "formatExampleOnly" in json.loads(items[0]["text"])
+            assert json.loads(items[0]["text"])["pdfHyperlinks"]["links"][0]["url"] == "https://github.com/example/project"
+            assert len(items) == 5
+            for index in [2, 4]:
+                assert items[index]["type"] == "localImage"
+                assert items[index]["detail"] == "original"
+                assert Path(items[index]["path"]).read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
         if mode == "turn_start_rejected":
             emit({"id": identifier, "error": {"message": "Synthetic turn rejection"}})
             continue
@@ -93,5 +107,10 @@ for line in sys.stdin:
             usage = {"method": "thread/tokenUsage/updated", "params": {"threadId": "thread", "turnId": "turn", "tokenUsage": {"total": {"inputTokens": 100, "cachedInputTokens": 40, "outputTokens": 30, "reasoningOutputTokens": 20}, "last": {"inputTokens": 100, "cachedInputTokens": 40, "outputTokens": 30, "reasoningOutputTokens": 20}}}}
             emit(usage)
             emit(usage)
-        emit({"method": "item/completed", "params": {"threadId": "thread", "turnId": "turn", "item": {"type": "agentMessage", "phase": "final_answer", "text": '{"schemaVersion":6}'}}})
+        text = '{"schemaVersion":6}'
+        if mode == "pdf_import":
+            proposal = json.loads(request["params"]["input"][0]["text"])["formatExampleOnly"]
+            proposal["contact"]["links"][0]["url"] = "linkedin.com/in/example-person"
+            text = json.dumps(proposal)
+        emit({"method": "item/completed", "params": {"threadId": "thread", "turnId": "turn", "item": {"type": "agentMessage", "phase": "final_answer", "text": text}}})
         emit({"method": "turn/completed", "params": {"threadId": "thread", "turn": {"id": "turn", "status": "failed" if mode == "failed" else "completed"}}})

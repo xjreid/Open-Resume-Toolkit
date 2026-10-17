@@ -9,6 +9,7 @@ const client = vi.hoisted(() => ({
   cancelDocumentImport: vi.fn(),
 }));
 vi.mock("../src/shared/import-client", () => client);
+vi.mock("../src/shared/AiImportPanel", () => ({ AiImportPanel: () => null }));
 vi.mock("../src/shared/ImportReviewFlow", () => ({
   ImportReviewFlow: ({ onCancelled }: { onCancelled: () => void }) => (
     <button onClick={onCancelled}>Cancel review</button>

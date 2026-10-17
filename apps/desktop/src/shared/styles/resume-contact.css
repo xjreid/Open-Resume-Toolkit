@@ -56,6 +56,9 @@
   background: #fff;
   font-size: 11px;
 }
+.contact-information-editor__item .field-error {
+  grid-column: 1 / -1;
+}
 .contact-information-editor__delete {
   width: 30px;
   min-width: 30px;

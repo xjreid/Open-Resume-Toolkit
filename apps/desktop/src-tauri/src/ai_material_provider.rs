@@ -135,22 +135,27 @@ impl MaterialProvider {
     ) -> Result<CompletedPass, MaterialFailure> {
         match self {
             Self::Codex(settings) => {
+                crate::codex_pass::execute(context, settings.clone(), None).await
+            }
+            Self::Api(provider) => provider.execute(context, None).await,
+        }
+    }
+    pub(crate) async fn execute_pdf(
+        &self,
+        context: PassContext<'_>,
+        pdf: &[u8],
+        pages: Option<crate::import_review::ai_pdf::PdfPages>,
+    ) -> Result<CompletedPass, MaterialFailure> {
+        match self {
+            Self::Api(provider) => provider.execute(context, Some(pdf)).await,
+            Self::Codex(settings) => {
                 crate::codex_pass::execute(
-                    context.window.clone(),
+                    context,
                     settings.clone(),
-                    context.profile,
-                    context.operation_id,
-                    context.operation,
-                    context.system.into(),
-                    context.input,
-                    context.call,
-                    context.maximum,
-                    context.previous,
-                    context.signal,
+                    Some(pages.ok_or("AI_PDF_RENDER_FAILED")?),
                 )
                 .await
             }
-            Self::Api(provider) => provider.execute(context).await,
         }
     }
 }
@@ -164,7 +169,11 @@ pub(crate) struct ApiProvider {
 }
 impl ApiProvider {
     #[allow(clippy::too_many_lines)]
-    async fn execute(&self, context: PassContext<'_>) -> Result<CompletedPass, MaterialFailure> {
+    async fn execute(
+        &self,
+        context: PassContext<'_>,
+        pdf: Option<&[u8]>,
+    ) -> Result<CompletedPass, MaterialFailure> {
         let PassContext {
             state,
             profile,
@@ -190,7 +199,7 @@ impl ApiProvider {
         }
         // Include provider output schemas in the spending-cap reservation.
         let schema_bytes = material_schema_bytes(provider, operation)?;
-        let input_bound = u32::try_from(
+        let mut input_bound = u32::try_from(
             input_bytes
                 .len()
                 .checked_add(system.len())
@@ -199,6 +208,11 @@ impl ApiProvider {
                 .ok_or("AI_INPUT_INVALID")?,
         )
         .map_err(|_| "AI_INPUT_INVALID")?;
+        if pdf.is_some() {
+            // Compressed PDF bytes cannot bound visual/text tokens. Reserve the
+            // model's entire input context so existing spend caps stay honest.
+            input_bound = entry.max_input_tokens;
+        }
         let output_bound = entry.max_output_tokens.min(ort_ai::MAX_OUTPUT_TOKENS);
         if input_bound > entry.max_input_tokens {
             return Err("AI_INPUT_TOO_LARGE".into());
@@ -243,7 +257,15 @@ impl ApiProvider {
         let built = OsProviderCredentialVault::new().use_secret(&reference, |secret| {
             secret.expose_for(|bytes| {
                 let key = ApiKey::new(bytes)?;
-                provider_adapter.build_request(&request, &key)
+                match pdf {
+                    Some(pdf) => ort_ai::resume_import::build_request(
+                        &*provider_adapter,
+                        &request,
+                        &key,
+                        pdf,
+                    ),
+                    None => provider_adapter.build_request(&request, &key),
+                }
             })
         });
         let http_request = built

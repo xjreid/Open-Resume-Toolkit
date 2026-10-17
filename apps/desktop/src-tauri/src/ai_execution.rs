@@ -256,6 +256,10 @@ pub(super) async fn execute<T>(
                 error.retryable = retryable;
                 error.details.http_status = Some(status.as_u16());
                 error.details.provider_reason = ort_ai::provider_error_reason(&body);
+                if status == reqwest::StatusCode::BAD_REQUEST {
+                    error.details.validation_issues =
+                        ort_ai::provider_request_issues(attempt.preflight.provider, &body);
+                }
                 state
                     .with_store(|store| {
                         store

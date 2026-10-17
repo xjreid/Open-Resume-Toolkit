@@ -77,7 +77,7 @@ pub enum ReviewError {
 
 pub struct ImportReview {
     base: VersionedResumeResponse,
-    proposal: ImportProposal,
+    proposal: Option<ImportProposal>,
     decisions: Vec<Option<ReviewDecision>>,
     imported_document: ResumeDocument,
 }
@@ -105,8 +105,36 @@ impl ImportReview {
             .map_err(|_| ReviewError::InvalidContent)?;
         Ok(Self {
             base,
-            proposal,
+            proposal: Some(proposal),
             decisions,
+            imported_document,
+        })
+    }
+
+    /// Starts editor review from a validated AI document, without running the
+    /// local extractor or mapper. The saved draft is still revision-bound.
+    /// # Errors
+    /// Rejects invalid base/candidate documents or a nonempty unsaved base.
+    pub fn from_document(
+        base: VersionedResumeResponse,
+        imported_document: ResumeDocument,
+    ) -> Result<Self, ReviewError> {
+        if base.revision < 0
+            || imported_document.schema_version != 2
+            || base.document.validate(DocumentLimits::default()).is_err()
+            || imported_document
+                .validate(DocumentLimits::default())
+                .is_err()
+            || (base.revision == 0
+                && (!base.document.sections.is_empty()
+                    || base.document.contact != ContactDetails::default()))
+        {
+            return Err(ReviewError::InvalidContent);
+        }
+        Ok(Self {
+            base,
+            proposal: None,
+            decisions: vec![],
             imported_document,
         })
     }
@@ -128,10 +156,10 @@ impl ImportReview {
         };
         let blocks = self
             .proposal
-            .items()
             .iter()
-            .map(|item| {
-                let source = &self.proposal.source().blocks()[item.source_index];
+            .flat_map(|proposal| proposal.items().iter().map(move |item| (proposal, item)))
+            .map(|(proposal, item)| {
+                let source = &proposal.source().blocks()[item.source_index];
                 let (suggested_target, suggested_value) = match &item.content {
                     ProposedContent::Section { heading, .. } => (T::Section, heading.clone()),
                     ProposedContent::Contact { field, value } => (
@@ -229,8 +257,8 @@ impl ImportReview {
     }
 
     #[must_use]
-    pub fn proposal(&self) -> &ImportProposal {
-        &self.proposal
+    pub fn proposal(&self) -> Option<&ImportProposal> {
+        self.proposal.as_ref()
     }
 
     #[must_use]
@@ -300,7 +328,7 @@ impl ImportReview {
     /// A suggestion for display only: calling this does NOT accept an item.
     #[must_use]
     pub fn suggested_decision(&self, index: usize) -> Option<ReviewDecision> {
-        let item = self.proposal.items().get(index)?;
+        let item = self.proposal.as_ref()?.items().get(index)?;
         Some(match &item.content {
             ProposedContent::Section { heading, .. } => ReviewDecision::Section {
                 heading: heading.clone(),
@@ -326,8 +354,11 @@ impl ImportReview {
     /// hints, never automatic merges or proof of duplicate factual content.
     #[must_use]
     pub fn possible_section_duplicates(&self, index: usize) -> Vec<EntityId> {
-        let Some(ProposedContent::Section { heading, kind }) =
-            self.proposal.items().get(index).map(|item| &item.content)
+        let Some(ProposedContent::Section { heading, kind }) = self
+            .proposal
+            .as_ref()
+            .and_then(|proposal| proposal.items().get(index))
+            .map(|item| &item.content)
         else {
             return vec![];
         };
@@ -345,7 +376,12 @@ impl ImportReview {
 
     #[must_use]
     pub fn contact_conflicts(&self, index: usize) -> bool {
-        match self.proposal.items().get(index).map(|item| &item.content) {
+        match self
+            .proposal
+            .as_ref()
+            .and_then(|proposal| proposal.items().get(index))
+            .map(|item| &item.content)
+        {
             Some(ProposedContent::Contact { field, .. }) => {
                 !contact_value(&self.base.document.contact, *field)
                     .trim()
@@ -369,6 +405,9 @@ impl ImportReview {
     ) -> Result<SaveResumePayload, ReviewError> {
         if &self.base != current {
             return Err(ReviewError::StaleDraft);
+        }
+        if self.proposal.is_none() {
+            return Err(ReviewError::InvalidContent);
         }
         let decisions = self
             .decisions

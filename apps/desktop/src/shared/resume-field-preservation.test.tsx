@@ -114,42 +114,42 @@ it("renders all paragraphs alongside retained bullets", async () => {
   }
 });
 
-it("classifies a list without altering its value, identity or other metadata", async () => {
+it("keeps legacy header classifications readable without exposing AI permission controls", async () => {
   const host = document.createElement("div");
-  document.body.append(host);
   const root = createRoot(host);
-  let resume = sample();
-  const original = { ...resume.sections[0].entries[0].fields[0] };
-  await act(async () =>
-    root.render(
-      <ResumeCanvas
-        document={resume}
-        style="technical"
-        contactDivider="dot"
-        onContactDividerChange={() => {}}
-        disabled={false}
-        canAddEntry
-        onChange={(update) => {
-          resume = update(resume);
-        }}
-      />,
-    ),
-  );
-  const select = host.querySelector<HTMLSelectElement>(
-    'select[aria-label="List type for Language 1"]',
-  )!;
-  await act(async () => {
-    select.value = "coursework";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  expect(resume.sections[0].entries[0].fields[0]).toEqual({
-    ...original,
+  const resume = sample();
+  resume.sections[0].entries[0].fields[0] = {
+    ...resume.sections[0].entries[0].fields[0],
+    isSkill: true,
+    listKind: "skills",
+  };
+  resume.sections[0].entries[0].fields[1] = {
+    ...resume.sections[0].entries[0].fields[1],
     listKind: "coursework",
-    isSkill: false,
-  });
-  expect(resume.sections[0].entries[0].fields[1].value).toBe(
-    "Preserve this certification",
-  );
-  await act(async () => root.unmount());
-  host.remove();
+  };
+  const onChange = () => {
+    throw new Error("Rendering must not mutate saved headers");
+  };
+  try {
+    await act(async () =>
+      root.render(
+        <ResumeCanvas
+          document={resume}
+          style="technical"
+          contactDivider="dot"
+          onContactDividerChange={() => {}}
+          disabled={false}
+          canAddEntry
+          onChange={onChange}
+        />,
+      ),
+    );
+    expect(host.textContent).toContain("Rust");
+    expect(host.textContent).toContain("Preserve this certification");
+    expect(host.textContent).not.toContain("AI list selection");
+    expect(host.querySelector('select[aria-label^="List type"]')).toBeNull();
+    expect(host.textContent).toContain("Information");
+  } finally {
+    await act(async () => root.unmount());
+  }
 });

@@ -365,3 +365,120 @@ A protocol failure by itself is not evidence of access outside the OS sandbox.
 Startup also verifies restrictive effective feature flags and explicitly disabled
 utility tools using the pinned runtime's supported raw configuration layers.
 See `docs/ai/codex-integration-review.md` for findings and verification.
+
+## PDF resume import — October 16, 2026
+
+Master Resume > Import offers local parsing and AI import. When Codex is enabled,
+AI import uses its selected model and reasoning, and requires a connected session
+whose model catalog explicitly reports image input support. It uses the existing
+authorization, quota reserve, cancellation, accounting, and ephemeral-thread flow.
+
+The pinned 0.162.0 app-server schema has `image` and `localImage` inputs, but no
+PDF/file attachment input. ORT renders the selected PDF into ordered PNG pages
+with its bundled PDF.js worker, then sends `localImage` inputs with `detail:
+original`. The AI extracts and maps the visible page content; the local resume
+parser and text extraction are not used. PDF.js also reads URI link annotations:
+exact destinations and rectangles in the rendered page's top-left coordinate
+system, normalized to 0–1000. This sidecar accompanies both Codex images and
+direct API PDF attachments, so neither route depends on URLs being visible as
+printed text. Link destinations are never fetched, and non-URI actions, unsafe
+schemes, unknown destinations, and unrelated annotations are not forwarded.
+
+Input is limited to 10 MiB and 1–10 pages for Codex. API preparation reads link
+annotations without rendering page images and permits up to 1,000 pages. Both
+routes limit the sidecar to 200 links, 2,000 characters per URL, and 48,000
+serialized bytes; excess metadata rejects preparation rather than dropping
+destinations. Rotated pages and crop offsets use the PDF.js viewport transform.
+Each Codex page is rendered with a longest edge of 1,800 pixels and bounded to
+3 MiB; total page images are limited to 20 MiB.
+Embedded raster images over 40 million pixels are rejected. Bundled font and CMap
+resources load without network fetches or CSP changes. Rendering errors, omitted
+images or fonts, and excessive limits reject the entire import. Page preparation
+has a 30-second native deadline (the worker aborts after 25 seconds), followed by
+the existing 120-second Codex pass deadline. Cancellation stops rendering and
+discards late replies. Temporary page files use private scratch directories and
+0600 permissions and are removed when the pass exits.
+
+Only validated resumes enter the existing inspect/edit workflow. Codex and API
+providers receive the same seven-slot mapping instructions, native content
+limits, URL rules, and a synthetic format example. Import keys describe positions:
+`leftHeading`, `headingSuffix` (same line), `leftSubheading` (below the heading),
+`rightTop`, `rightMiddle`, `rightBottom`, and `mainInfo`. These map to the editor's
+existing Title, Details, Role, Date, Location, Extra, and body fields respectively;
+the editor labels never override source placement. Linked entry text uses the
+editor's `[label](URL)` notation in its original slot. Personal profile links
+belong to the single top contact block; explicit extra contact-information
+sections are consolidated without moving project-specific links out of their
+entries. The contact editor shows and edits structured contact links, preserves
+their identities, and keeps invalid partial edits local.
+
+Structured output constrains the JSON shape for each provider. Unsupported schema constraints stay in field
+descriptions and remain enforced locally, following the
+[OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs),
+[Anthropic](https://platform.claude.com/docs/en/build-with-claude/structured-outputs),
+and [Gemini](https://ai.google.dev/gemini-api/docs/structured-output) schema subsets.
+Gemini 3.x import requests use Low thinking to leave more of the existing output
+allowance for resume JSON.
+
+Gemini's PDF import schema uses one body object with a `bullets`/`paragraph` enum
+and an array of strings. It does not compile the native schema's conditional
+body branches or nested array-count limits into the provider grammar. Counts and
+mode-specific text limits stay in descriptions and native validation. Gemini
+receives this schema once in `responseFormat`; its text prompt retains the task,
+format example, and source hyperlinks without repeating the native schema.
+This addresses a suspected cause of HTTP 400 `INVALID_ARGUMENT` after the import
+schema was expanded: Google documents that
+[schema complexity can cause this error](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/control-generated-output).
+The exact cause of earlier rejections is unavailable because raw provider error
+messages are intentionally not retained. Future Gemini 400 responses are
+classified into fixed schema, generation-setting, or document-input hints when
+the provider identifies those categories; no raw messages or field values are
+stored or displayed. Generic rejections remain unspecified.
+
+Visible bare web addresses such as `linkedin.com/in/person` gain `https://`
+before validation. Existing supported schemes and URL paths stay intact; unknown
+destinations, Markdown inside a contact URL field, unsafe schemes, and ambiguous
+labels are rejected with an indexed field diagnostic that does not expose resume content. A complete
+JSON code fence and absent/null display text are normalized, while missing
+structure, extra fields, wrong types, and truncated output remain errors. Several
+paragraph items can occupy consecutive native fields without overflowing one
+field or losing their text. These corrections do not require another AI request.
+
+The saved master resume changes only after the user confirms mapping. Readiness,
+rendering, provider, timeout, and schema errors are displayed in the Import page
+with diagnostic details. Offline regressions cover streamed API replies and the
+Codex 6.1 Sol/Medium image route returning bare LinkedIn URLs. They verify mapping
+and validation, not live model extraction quality.
+
+The checked-in protocol fixture is extracted from this exact executable's
+`app-server generate-json-schema` output. The explicit offline qualification runs
+the official executable under the production OS sandbox with a disposable,
+loopback-only mock Responses provider. It verifies that both page images reach
+the provider unchanged and in order, the selected model/reasoning and JSON schema
+are sent, returned JSON passes resume validation, and page files are cleaned up.
+The runtime preserves original image bytes but omits a separate `detail` field
+on the outgoing Responses image item. No account, credentials, or external AI
+inference are used; live extraction quality is not established by this check.
+
+```sh
+ORT_CODEX_QUALIFY_PATH=/temporary/verified/codex cargo test --locked -p ort-desktop pdf_image_runtime_qualification -- --ignored
+```
+
+Optionally set `ORT_CODEX_QUALIFY_PAGE_DIR` to a directory containing synthetic
+`page-1.png` and `page-2.png` files produced by the renderer. The October 16 check
+passed with two 1,800-pixel browser-rendered pages using unembedded Helvetica,
+under the app's restrictive resource policy.
+
+The October 16 link-validation regression check also passed against the installed
+0.162.0 executable at GPT-6.1 Sol/Medium with synthetic pages. The local mock
+provider returned a bare LinkedIn address; native mapping added HTTPS and
+validated the complete resume. The updated schema and both images reached the
+mock provider, and scratch files were removed after the pass.
+
+Hyperlink/layout regressions additionally verify the annotation sidecar on all
+three API adapters, project links retained in the left subheading, consolidated
+contact sections, bounded source metadata, and contact-link editing. A synthetic
+two-page PDF with a rotated second page exercises the real PDF.js worker on both
+routes. The runtime qualification accepts `ORT_CODEX_QUALIFY_LINKS_PATH` alongside
+the rendered page directory to check that source destinations and positions reach
+the offline mock provider unchanged.

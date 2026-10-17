@@ -30,6 +30,7 @@ mod chatgpt_plan;
 mod close_guard;
 mod codex_archive;
 mod codex_egress;
+mod codex_import;
 mod codex_install;
 mod codex_pass;
 mod codex_readiness;
@@ -765,6 +766,9 @@ pub fn run() {
             ai_settings::clear_ai_monitoring,
             ai_settings::export_ai_monitoring,
             import_review::begin::begin_document_import,
+            import_review::ai::begin_ai_document_import,
+            import_review::ai_pdf::complete_ai_import_render,
+            import_review::ai::ai_import_status,
             import_review::begin::cancel_document_import,
             import_review::begin::document_import_available,
             import_review::read_import_review,

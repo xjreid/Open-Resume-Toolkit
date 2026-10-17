@@ -41,7 +41,7 @@ pub(crate) struct CancelSignal {
     notify: Notify,
 }
 impl CancelSignal {
-    fn cancel(&self) {
+    pub(crate) fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);
         self.notify.notify_one();
     }
@@ -607,6 +607,11 @@ fn material_schema_bytes(
     provider: Provider,
     operation: OperationType,
 ) -> Result<usize, &'static str> {
+    if operation == OperationType::ImportMapping {
+        return serde_json::to_vec(&ort_ai::resume_import::provider_output_schema(provider))
+            .map(|bytes| bytes.len())
+            .map_err(|_| "AI_INPUT_INVALID");
+    }
     if !matches!(
         operation,
         OperationType::TailorResume | OperationType::RefineResume

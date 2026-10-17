@@ -76,7 +76,6 @@ export function isImportReviewSnapshot(
     value.mappingVersion !== 1 ||
     !Array.isArray(value.blocks) ||
     value.blocks.length > 1000 ||
-    value.blocks.length === 0 ||
     !Array.isArray(value.sections) ||
     value.sections.length > 100 ||
     !object(value.contacts, ["fullName", "email", "phone", "location"])

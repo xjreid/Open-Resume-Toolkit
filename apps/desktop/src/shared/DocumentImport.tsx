@@ -4,12 +4,17 @@ import type { ImportReviewSnapshot } from "@ort/contracts/import";
 import type { VersionedResume } from "@ort/contracts/resume";
 import {
   beginDocumentImport,
+  beginAiDocumentImport,
   cancelDocumentImport,
   documentImportAvailable,
 } from "./import-client";
+import { AiImportPanel } from "./AiImportPanel";
+import { aiImportError } from "./ai-import";
+import { AiFailureDetailsView } from "./AiFailureDetailsView";
 import { ImportReviewFlow } from "./ImportReviewFlow";
 
 export function DocumentImport({
+  active = true,
   disabled,
   reviewDisabled = false,
   disabledReason,
@@ -21,6 +26,7 @@ export function DocumentImport({
   onReloadRequired,
   onReload,
 }: {
+  active?: boolean;
   disabled: boolean;
   reviewDisabled?: boolean;
   disabledReason?: string;
@@ -34,17 +40,26 @@ export function DocumentImport({
 }) {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [pending, setPending] = useState(false);
+  const [method, setMethod] = useState<"local" | "ai">("local");
+  const [errorDetails, setErrorDetails] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [review, setReview] = useState<ImportReviewSnapshot | null>(null);
   const reviewId = review?.id ?? null;
   const [error, setError] = useState<string | null>(null);
   const launch = useRef<HTMLButtonElement>(null);
+  const errorPanel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) errorPanel.current?.scrollIntoView?.({ block: "nearest" });
+  }, [error]);
   const restoreFocus = useRef(false);
   useEffect(() => {
-    if (reviewId === null && restoreFocus.current) {
+    if (reviewId === null && restoreFocus.current && method === "local") {
       restoreFocus.current = false;
       launch.current?.focus();
     }
-  }, [reviewId]);
+  }, [reviewId, method]);
   const inFlight = useRef(false);
   const reloadNeeded = useRef(false);
   const mounted = useRef(true);
@@ -58,16 +73,27 @@ export function DocumentImport({
       mounted.current = false;
     };
   }, []);
-  async function begin() {
-    if (disabled || !available || inFlight.current || reviewId) return;
+  async function begin(method: "local" | "ai", button: HTMLButtonElement) {
+    if (
+      disabled ||
+      (method === "local" && !available) ||
+      inFlight.current ||
+      reviewId
+    )
+      return;
+    launch.current = button;
+    setMethod(method);
     inFlight.current = true;
     cancelled.current = false;
     reloadNeeded.current = false;
     setPending(true);
     setError(null);
+    setErrorDetails(null);
     onBusyChange(true);
     onOperationChange?.(true);
-    const result = await beginDocumentImport(revision);
+    const result = await (method === "ai"
+      ? beginAiDocumentImport(revision)
+      : beginDocumentImport(revision));
     inFlight.current = false;
     if (!mounted.current) return;
     setPending(false);
@@ -78,8 +104,20 @@ export function DocumentImport({
       setReview(result.value);
     } else {
       onBusyChange(false);
-      if (!result.ok && !cancelled.current)
-        setError(importFailureMessage(result.error.code));
+      if (!result.ok && !cancelled.current) {
+        setError(
+          method === "ai"
+            ? aiImportError(result.error.code)
+            : importFailureMessage(result.error.code),
+        );
+        setErrorDetails({
+          ...result.error.details,
+          diagnostic: {
+            code: result.error.code,
+            ...((result.error.details?.diagnostic as object) ?? {}),
+          },
+        });
+      }
     }
   }
   async function cancel() {
@@ -137,24 +175,82 @@ export function DocumentImport({
               </p>
             </div>
           </div>
-          <div className="resume-import-start__file">
-            <div>
-              <strong>Start with your resume file</strong>
-              <p>Text-based PDF or DOCX</p>
+          {error ? (
+            <div className="resume-import-error" role="alert" ref={errorPanel}>
+              <p>{error}</p>
+              {errorDetails && (
+                <AiFailureDetailsView details={errorDetails} open />
+              )}
             </div>
-            <button
-              type="button"
-              ref={launch}
-              disabled={disabled || !available || pending}
-              onClick={() => void begin()}
+          ) : null}
+          {disabledReason && !pending ? (
+            <p role="status">{disabledReason}</p>
+          ) : null}
+          {pending ? (
+            <div className="resume-import-progress" role="status">
+              <p>
+                {method === "ai"
+                  ? "Reading your PDF with AI… Page preparation may take 30 seconds, followed by up to 2 minutes for AI."
+                  : "Reading resume…"}
+              </p>
+              <button type="button" onClick={() => void cancel()}>
+                Cancel import
+              </button>
+            </div>
+          ) : null}
+          <div className="resume-import-methods">
+            <section
+              className="resume-import-method"
+              aria-labelledby="local-import-heading"
             >
-              Import resume
-            </button>
+              <div>
+                <h3 id="local-import-heading">Import locally</h3>
+                <p>
+                  Extract text from your resume on this device, then organize
+                  and refine it.
+                </p>
+              </div>
+              <div className="resume-import-method__local-note">
+                <strong>No AI connection needed</strong>
+                <p>
+                  Your file stays on this device. Works with text-based PDFs and
+                  DOCX files.
+                </p>
+              </div>
+              <div className="resume-import-method__action">
+                <p>Text-based PDF or DOCX</p>
+                <button
+                  type="button"
+                  ref={launch}
+                  disabled={disabled || !available || pending}
+                  onClick={(event) => void begin("local", event.currentTarget)}
+                >
+                  Import resume
+                </button>
+              </div>
+              {available === false ? (
+                <p role="status">Local import is unavailable in this build.</p>
+              ) : null}
+            </section>
+            <AiImportPanel
+              active={active}
+              disabled={disabled || pending}
+              pending={pending && method === "ai"}
+              onImport={(button) => void begin("ai", button)}
+              onReady={(button) => {
+                if (restoreFocus.current && method === "ai") {
+                  restoreFocus.current = false;
+                  button.focus();
+                }
+              }}
+            />
           </div>
           <ol className="resume-import-start__steps" aria-label="Import steps">
             <li>
               <strong>Choose a file</strong>
-              <span>Open a text-based PDF or DOCX from your computer.</span>
+              <span>
+                Choose local or AI import and select your resume file.
+              </span>
             </li>
             <li>
               <strong>Review your resume</strong>
@@ -170,23 +266,8 @@ export function DocumentImport({
           <p className="resume-import-start__note">
             Your saved resume stays unchanged until you confirm the import.
           </p>
-          {available === false ? (
-            <p role="status">Import is unavailable in this build.</p>
-          ) : null}
-          {disabledReason && available && !pending ? (
-            <p role="status">{disabledReason}</p>
-          ) : null}
-          {pending ? (
-            <div role="status">
-              <p>Reading resume…</p>
-              <button type="button" onClick={() => void cancel()}>
-                Cancel import
-              </button>
-            </div>
-          ) : null}
         </div>
       )}
-      {error ? <p role="alert">{error}</p> : null}
     </section>
   );
 }

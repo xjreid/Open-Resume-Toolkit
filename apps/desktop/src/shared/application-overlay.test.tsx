@@ -1402,7 +1402,7 @@ it("retains detailed native failures in the tailoring popup without saving", asy
               providerReason: null,
               pageCount: null,
               validationIssues: [
-                "Missing required schema v6 field: reviewIssues.",
+                "Missing required schema v7 field: reviewIssues.",
               ],
             },
           },
@@ -1417,7 +1417,7 @@ it("retains detailed native failures in the tailoring popup without saving", asy
   expect(host.textContent).toContain("15.2 seconds");
   expect(host.textContent).toContain("gemini-3.5-flash-lite");
   expect(host.textContent).toContain(
-    "Missing required schema v6 field: reviewIssues.",
+    "Missing required schema v7 field: reviewIssues.",
   );
   expect(host.querySelector(".ai-failure-details")?.hasAttribute("open")).toBe(
     true,

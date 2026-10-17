@@ -67,7 +67,7 @@ fn confirmed_candidate_saves_once_without_changing_published_snapshot_and_surviv
         published.document
     );
     assert_eq!(
-        review.proposal().source().blocks()[0].text,
+        review.proposal().unwrap().source().blocks()[0].text,
         "Synthetic reviewed contribution — 示例"
     );
     eprintln!("import-round-trip: closing and reopening profile");
@@ -109,5 +109,5 @@ fn edit_racing_after_preparation_is_not_overwritten_by_import_commit() {
     ));
     assert_eq!(store.load_draft().unwrap().unwrap().document, edited);
     // Failed storage commit leaves the caller-owned review/source intact.
-    assert_eq!(review.proposal().items().len(), 1);
+    assert_eq!(review.proposal().unwrap().items().len(), 1);
 }

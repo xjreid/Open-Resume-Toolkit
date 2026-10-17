@@ -17,35 +17,28 @@ is a strong relevance reason to depart.
 Existing sections and entries may be reordered or omitted. Their retained
 headings and identities cannot be created, renamed, split, merged, or moved
 between sections. Names, titles, dates, metrics, contact information, links,
-and non-selectable metadata remain protected. The app copies protected fields
-locally rather than asking the model to reproduce them. Description rewrites
+and all subsection header metadata remain protected. The app copies protected
+fields locally rather than asking the model to reproduce them. Description rewrites
 must preserve meaning and exact metrics. One sentence and two rendered lines
 per bullet are editorial guidance; the app measures whole-document page count,
 not individual line geometry.
 
-## Skills and coursework
+## Protected headers and editable bodies
 
-The master editor's **AI list selection** setting classifies a field as Skills,
-Coursework, or Protected details. `NamedField.listKind` is optional; existing
-`isSkill: true` fields continue to work without migration. Clearing the setting
-removes the optional classification and clears the legacy skill flag. Publish
-master changes before tailoring with them.
+All retained subsection header fields are copied unchanged: title, role,
+details, dates, location, extra, and any additional named header fields. The AI
+cannot select, reorder, rewrite, or remove individual header fields or items
+within them. Sections and subsections can still be omitted as a whole.
 
-Only classified metadata lists may be pruned or reordered. Uniform comma,
-semicolon, pipe, or newline separators outside balanced parentheses/brackets
-produce temporary source items. Compound terms, slashes, hyphens, and nested
-punctuation remain intact. Mixed delimiters, unbalanced grouping, empty items,
-backslash escapes, colon-prefixed text, and common prose/bullet prefixes remain
-atomic. The app retains the
-source separator convention and exact item wording. Complete unchanged lists
-retain their original whitespace. Coursework in descriptions uses the regular
-source-backed body contract.
+Skills and coursework in body content use the regular source-backed body
+contract. Their relevance can guide selection, reordering, and rewriting while
+preserving facts. Skills or coursework placed in header fields remain protected.
 
-The model selects field IDs and zero-based item indexes, not list wording.
-Indexes refer to the full published list even during refinement, allowing an
-omitted item to return. Persisted values remain free text. Other metadata is
-not made editable by a label that merely looks like coursework. Fields added only
-to a reviewed draft remain protected and cannot supply AI list selections.
+The former **AI list selection** controls and provider selection contract were
+removed because header classification did not fit this distinction. Existing
+`isSkill` and `listKind` metadata remains readable for saved-document compatibility,
+but grants no AI editing permission and is not included in provider context.
+Manual editing still permits users to change header values directly.
 
 ## Bounded quality pipeline
 
@@ -87,13 +80,13 @@ but export may require a manual content adjustment before files can be prepared.
 
 ## Evidence and refinement
 
-Schema v6 requires each bullet/paragraph to cite published bullet or field IDs.
+Schema v7 requires each bullet/paragraph to cite published bullet or field IDs.
 References must be nonempty, unique, known, and owned by the entry's published
 anchor. Every entry uses exactly one published anchor; published entries may
 anchor only themselves. Unknown or duplicate
-identities, cross-entry references, protected output fields, invalid list
-selections, empty sections, malformed documents, and document-limit violations
-are rejected locally.
+identities, cross-entry references, protected output fields, obsolete list-selection
+requests, empty sections, malformed documents, and document-limit violations are
+rejected locally.
 
 References provide traceability; they do not prove that every rewritten claim
 is true. The mandatory model review checks source support, role relevance,
@@ -101,7 +94,7 @@ distinct value, and concision. `reviewIssues` cannot override local validation.
 The user still reviews the final resume. New applicant facts belong in the
 master and must be published before tailoring uses them.
 
-Refinement can restore published sections, entries, fields, or list items that
+Refinement can restore published sections, entries, and body content that
 previous tailoring omitted. Current reviewed headers win for retained identities;
 absent identities are copied from the published source. Unrelated reviewed body
 edits and ordering should remain where possible, with minimal additional cuts
@@ -113,15 +106,19 @@ The overlay shows the phase, call number out of four, and latest measured page
 count during generation. The existing tailoring
 notes explain job-specific decisions. **What changed** is computed locally from
 the before/after documents and summarizes actual removals, restoration,
-reordering, description edits, and list selection. The export renderer supplies
+reordering and description edits. The export renderer supplies
 the displayed page count; unsaved edits invalidate the visible page-fit claim.
 
-All providers share the same v6 contract: `tailoringPlan`, `rolePriorities`,
+All providers share the same v7 contract: `tailoringPlan`, `rolePriorities`,
 `reviewIssues`, `roleInfo`, `templateSections`, and `alerts`. OpenAI uses the
 strict Responses output schema; Gemini uses its existing structured-output
 adapter with unsupported string-length keywords omitted and checked locally.
 Older response schemas cannot bypass the overlay permissions. Existing saved
 resumes and workspaces remain readable.
+
+The provider response contract is v7 because header-list selection was removed.
+It is separate from saved-resume schema versions; no saved document migration
+or republishing is required to protect existing headers.
 
 Qualification alerts still check exact mandatory job excerpts against the full
 published source rather than the selective draft. Cover letters and answers
@@ -153,4 +150,4 @@ and resume/job text. Rejected content still retains trustworthy billing evidence
 Recording a material failure does not change settled costs or spending caps.
 
 The synthetic evaluation corpus and an opt-in live comparison procedure are in
-`fixtures/ai/tailoring-v6/README.md`.
+`fixtures/ai/tailoring-v7/README.md`.

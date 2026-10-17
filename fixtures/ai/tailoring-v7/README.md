@@ -1,4 +1,4 @@
-# Resume tailoring v6 evaluation corpus
+# Resume tailoring v7 evaluation corpus
 
 All identities and facts are synthetic. Each JSON contains a master source,
 job description and source-cited candidate. Rust contract and pipeline tests
@@ -32,14 +32,14 @@ compare model quality:
 | Dimension | Acceptance |
 | --- | --- |
 | Factual support | Every claim is explicit in this master; zero invented tools, scope, metrics or qualifications. Any unsupported claim is a hard failure. |
-| Protected facts | Names, titles, dates, exact metrics and links remain accurate. |
+| Protected facts | All retained header fields remain unchanged, including legacy classified skills/coursework; body facts and exact metrics remain accurate. |
 | Role relevance | Strong direct evidence leads; job requirements are never treated as applicant evidence. |
 | Distinct value | Weak/redundant material is omitted even when space remains. |
 | Concision | Specific technical evidence survives tightening; bullets avoid filler and stacked clauses. |
-| Structure | Ordering is intentional, retained identities stay in their sections, and ambiguous skills stay intact. |
+| Structure | Ordering is intentional and retained identities stay in their sections. |
 | Page fit | Exactly one page with the original template settings. |
 
-Also exercise Refine with AI by asking to restore an omitted entry/list item,
+Also exercise Refine with AI by asking to restore an omitted entry or body content,
 then making a focused description correction. Check preservation of unrelated
 reviewed edits, visible change summaries, and minimal additional page-fit cuts.
 

@@ -401,7 +401,7 @@ function monitoring(args: Record<string, any>) {
                 providerReason: null,
                 pageCount: null,
                 validationIssues: [
-                  "Missing required schema v6 field: reviewIssues. Return the complete candidate, including empty arrays where appropriate.",
+                  "Missing required schema v7 field: reviewIssues. Return the complete candidate, including empty arrays where appropriate.",
                 ],
               },
             },

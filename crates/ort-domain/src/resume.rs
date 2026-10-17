@@ -350,6 +350,7 @@ pub struct NamedField {
     pub order: u16,
     pub label: String,
     pub value: String,
+    // Legacy classification retained for saved-document compatibility; never an AI editing permission.
     pub is_skill: bool,
     #[serde(
         default,
@@ -357,6 +358,7 @@ pub struct NamedField {
         deserialize_with = "present_option"
     )]
     #[schemars(with = "ListKind")]
+    // Legacy classification retained for saved-document compatibility; header text is always protected.
     pub list_kind: Option<ListKind>,
 }
 
@@ -365,13 +367,6 @@ pub struct NamedField {
 pub enum ListKind {
     Skills,
     Coursework,
-}
-
-impl NamedField {
-    #[must_use]
-    pub fn selectable(&self) -> bool {
-        self.role() != FieldRole::Paragraph && (self.list_kind.is_some() || self.is_skill)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
