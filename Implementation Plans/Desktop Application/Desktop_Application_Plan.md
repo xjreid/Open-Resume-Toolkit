@@ -136,6 +136,13 @@ A blocking startup state provides safe diagnostics and approved recovery actions
 - Edit normalized sections/entries addressed by stable IDs, not array positions.
 - Validate field types locally for responsive feedback and authoritatively in Rust before persistence.
 - Autosave a debounced snapshot only when locally valid; retain explicit save/retry status.
+- Contact-link label/address inputs write directly to the draft on change,
+  including invalid intermediate values; no blur-only buffer can bypass dirty,
+  undo, validation, or quit state.
+- Store the divider in `ContactDetails.divider`, shared by canvas, read view,
+  import review, and native PDF/DOCX renderers. Omit the default dot during
+  serialization to preserve historical snapshot bytes and hashes. Nondefault
+  choices travel with the ordinary document revision and portable backup.
 - Reordering emits an ordered list of IDs and is keyboard-operable.
 - Publish invokes a backend transaction that validates the whole document and creates an immutable snapshot.
 - Preview requests are revision-addressed and cancellable. A late result for an older revision is discarded.

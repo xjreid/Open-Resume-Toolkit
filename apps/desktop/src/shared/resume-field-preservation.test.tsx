@@ -41,8 +41,6 @@ it("editing Extra preserves every ordinary named field", async () => {
       <ResumeCanvas
         document={resume}
         style="technical"
-        contactDivider="dot"
-        onContactDividerChange={() => {}}
         disabled={false}
         canAddEntry
         onChange={(update) => {
@@ -136,8 +134,6 @@ it("keeps legacy header classifications readable without exposing AI permission 
         <ResumeCanvas
           document={resume}
           style="technical"
-          contactDivider="dot"
-          onContactDividerChange={() => {}}
           disabled={false}
           canAddEntry
           onChange={onChange}

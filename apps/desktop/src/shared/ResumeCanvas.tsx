@@ -1,6 +1,5 @@
 import type { ResumeDocument, ResumeEntry } from "@ort/contracts/resume";
 import type { DocumentStyle } from "@ort/contracts/export";
-import type { ContactDivider } from "./resume-view-types";
 import { CanvasField } from "./CanvasField";
 import { CanvasDateField } from "./CanvasDateField";
 import { ContactInformationEditor } from "./ContactInformationEditor";
@@ -14,8 +13,6 @@ import {
 export function ResumeCanvas({
   document,
   style,
-  contactDivider,
-  onContactDividerChange,
   showContactDivider = true,
   onFocusSection,
   disabled,
@@ -24,8 +21,6 @@ export function ResumeCanvas({
 }: {
   document: ResumeDocument;
   style: DocumentStyle;
-  contactDivider: ContactDivider;
-  onContactDividerChange: (divider: ContactDivider) => void;
   showContactDivider?: boolean;
   onFocusSection?: (sectionId: string) => void;
   disabled: boolean;
@@ -81,10 +76,8 @@ export function ResumeCanvas({
         />
         <ContactInformationEditor
           contact={document.contact}
-          divider={contactDivider}
           disabled={disabled}
-          onDividerChange={onContactDividerChange}
-          showDivider={showContactDivider}
+          showDivider={showContactDivider && style !== "plain"}
           onChange={(contact) =>
             onChange((current) => ({ ...current, contact }))
           }

@@ -74,6 +74,9 @@
     "ContactDetails": {
       "type": "object",
       "properties": {
+        "divider": {
+          "$ref": "#/$defs/ContactDivider"
+        },
         "email": {
           "type": "string"
         },
@@ -100,6 +103,14 @@
         "phone",
         "location",
         "links"
+      ]
+    },
+    "ContactDivider": {
+      "type": "string",
+      "enum": [
+        "dot",
+        "bar",
+        "dash"
       ]
     },
     "DateEnd": {

@@ -111,6 +111,9 @@ pub struct ContactDetails {
     pub phone: String,
     pub location: String,
     pub links: Vec<Link>,
+    // Omit the historical default so existing snapshot bytes/hashes stay stable.
+    #[serde(default, skip_serializing_if = "crate::ContactDivider::is_default")]
+    pub divider: crate::ContactDivider,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

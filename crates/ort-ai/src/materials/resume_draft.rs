@@ -169,17 +169,13 @@ fn materialize_entry(
     }
     let mut bullets = Vec::new();
     match draft.main_info.format {
-        BodyFormat::Paragraph => field(
-            &mut fields,
-            PARAGRAPH,
-            &draft
-                .main_info
-                .items
-                .iter()
-                .map(|i| i.text.trim())
-                .collect::<Vec<_>>()
-                .join("\n\n"),
-        )?,
+        BodyFormat::Paragraph => {
+            for body in crate::paragraph_packing::pack_paragraphs(
+                draft.main_info.items.iter().map(|i| i.text.trim()),
+            ) {
+                field(&mut fields, PARAGRAPH, &body)?;
+            }
+        }
         BodyFormat::Bullets => {
             for (i, item) in draft.main_info.items.into_iter().enumerate() {
                 bullets.push(Bullet {

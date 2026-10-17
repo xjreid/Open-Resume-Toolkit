@@ -35,9 +35,17 @@ Edit mode shows the section navigator and editable resume canvas.
 
 ### Contact information
 
-Contact fields are edited directly in the resume. Contact links and the visual
-divider are part of the editable presentation. Only user-entered information
-is rendered.
+Contact fields are edited directly in the resume. Contact links have separate
+label and address inputs; every edit updates the draft immediately, including
+while the input retains focus. Incomplete or unsafe addresses block saving,
+publication, and export, and remain protected by the unsaved-work quit guard.
+Undo restores earlier values. Only user-entered information is rendered.
+
+The contact divider (dot, bar, or dash) is saved with the resume, including edits
+made during import review. Published and tailored copies retain that choice;
+PDF and Word exports use the divider in the selected saved snapshot. Older
+resumes default to a dot. Plain style keeps contacts on separate lines and
+hides the divider selector.
 
 ### Sections
 

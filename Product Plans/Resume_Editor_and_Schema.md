@@ -29,6 +29,12 @@ A starting profile changes suggested sections only and never restricts later con
 ## Draft and published state
 
 - Ordinary edits autosave to the one local draft.
+- Contact-link labels and addresses update that draft on each keystroke. Invalid
+  addresses remain editable and undoable, block saving/publication/export, and
+  count as unsaved work when quitting.
+- The contact divider belongs to the resume snapshot. Dot, bar, and dash choices
+  survive reload, import mapping, publication, tailoring, and styled PDF/Word
+  export; Plain style retains its separate contact lines.
 - A persistent status distinguishes **Draft saved**, **Saving**, **Save failed**, and **Published master resume**.
 - Undo and redo are available for current editing.
 - The user explicitly publishes the validated draft when ready.

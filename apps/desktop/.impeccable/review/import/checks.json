@@ -16,11 +16,7 @@
         "height": 44
       }
     ],
-    "metadata": [
-      "Codex",
-      "gpt-6.1-sol",
-      "high"
-    ]
+    "metadata": ["Codex", "gpt-6.1-sol", "high"]
   },
   {
     "name": "default",
@@ -39,11 +35,7 @@
         "height": 44
       }
     ],
-    "metadata": [
-      "Codex",
-      "gpt-6.1-sol",
-      "high"
-    ]
+    "metadata": ["Codex", "gpt-6.1-sol", "high"]
   },
   {
     "name": "minimum",
@@ -62,11 +54,7 @@
         "height": 44
       }
     ],
-    "metadata": [
-      "Codex",
-      "gpt-6.1-sol",
-      "high"
-    ]
+    "metadata": ["Codex", "gpt-6.1-sol", "high"]
   },
   {
     "name": "mobile",
@@ -85,11 +73,7 @@
         "height": 44
       }
     ],
-    "metadata": [
-      "Codex",
-      "gpt-6.1-sol",
-      "high"
-    ]
+    "metadata": ["Codex", "gpt-6.1-sol", "high"]
   },
   {
     "aiError": "Import failed because AI returned an invalid resume; try another model."

@@ -243,19 +243,13 @@ export function ApplicationPopup() {
           </label>
         )}
         {snapshot.kind === "resume-view" && snapshot.resume && (
-          <PublishedResume
-            document={snapshot.resume}
-            style={snapshot.style}
-            contactDivider="dot"
-          />
+          <PublishedResume document={snapshot.resume} style={snapshot.style} />
         )}
         {snapshot.kind === "resume-edit" && snapshot.resume && (
           <div className="application-popup__resume-layout">
             <ResumeCanvas
               document={snapshot.resume}
               style={snapshot.style}
-              contactDivider="dot"
-              onContactDividerChange={() => undefined}
               showContactDivider={false}
               disabled={snapshot.disabled}
               canAddEntry={canAddEntry}

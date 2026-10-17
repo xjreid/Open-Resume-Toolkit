@@ -1,6 +1,5 @@
 import type { ResumeDocument, ResumeEntry } from "@ort/contracts/resume";
 import type { DocumentStyle } from "@ort/contracts/export";
-import type { ContactDivider } from "./resume-view-types";
 import { FormattedText, safeInlineHref } from "./FormattedText";
 import { dateText } from "./resume-dates";
 import { fieldsForRole } from "./resume-fields";
@@ -19,7 +18,6 @@ export function PublishedResume({
   document,
   pdf = false,
   style = "technical",
-  contactDivider = "dot",
   onSelect,
   onSelectEntry,
   onAddEntry,
@@ -28,7 +26,6 @@ export function PublishedResume({
   document: ResumeDocument;
   pdf?: boolean;
   style?: DocumentStyle;
-  contactDivider?: ContactDivider;
   onSelect?: (part: string) => void;
   onSelectEntry?: (sectionId: string, entryId: string) => void;
   onAddEntry?: (sectionId: string) => void;
@@ -52,7 +49,7 @@ export function PublishedResume({
       }
     >
       <header
-        className={`resume-document__contact resume-document__contact--${contactDivider}`}
+        className={`resume-document__contact resume-document__contact--${document.contact.divider ?? "dot"}`}
       >
         {onSelect ? (
           <button

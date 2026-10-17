@@ -258,12 +258,12 @@ fn paragraphs(
             &document.contact.location,
         ] {
             if !normalized(value).is_empty() {
-                append_separator(&mut contact, "  •  ");
+                append_separator(&mut contact, document.contact.divider.separator());
                 append_runs(&mut contact, value, false, false);
             }
         }
         for value in &document.contact.links {
-            append_separator(&mut contact, "  •  ");
+            append_separator(&mut contact, document.contact.divider.separator());
             append_link(&mut contact, value)?;
         }
         push_paragraph(&mut out, "contact", contact, vec![]);
@@ -665,6 +665,52 @@ pub fn render_pdf_with_style(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn saved_contact_dividers_reach_styled_pdf_content() {
+        use ort_domain::ContactDivider;
+        let mut document = ResumeDocument::empty("Synthetic");
+        document.contact.full_name = "Example Person".into();
+        document.contact.email = "person@example.com".into();
+        document.contact.location = "Boston".into();
+        document.contact.links.push(Link {
+            id: None,
+            order: None,
+            label: "Portfolio".into(),
+            url: "https://example.com".into(),
+        });
+        for (divider, separator) in [
+            (ContactDivider::Dot, "  •  "),
+            (ContactDivider::Bar, "  |  "),
+            (ContactDivider::Dash, "  -  "),
+        ] {
+            document.contact.divider = divider;
+            for style in [
+                DocumentStyle::Technical,
+                DocumentStyle::Professional,
+                DocumentStyle::Modern,
+            ] {
+                let content = paragraphs(&document, style).unwrap();
+                let contact = content.iter().find(|p| p.kind == "contact").unwrap();
+                assert_eq!(
+                    contact.text,
+                    format!("person@example.com{separator}Boston{separator}Portfolio")
+                );
+                assert_eq!(
+                    render_pdf_with_style(&document, style)
+                        .unwrap()
+                        .receipt
+                        .page_count,
+                    1
+                );
+            }
+            assert!(
+                !paragraphs(&document, DocumentStyle::Plain)
+                    .unwrap()
+                    .iter()
+                    .any(|p| p.text.contains(separator))
+            );
+        }
+    }
     #[test]
     fn bundled_template_compiles_without_warnings() {
         let _guard = RENDER_LOCK.lock().unwrap();

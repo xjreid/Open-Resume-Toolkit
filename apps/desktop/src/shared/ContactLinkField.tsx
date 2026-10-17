@@ -1,9 +1,9 @@
-import { useEffect, useId, useState } from "react";
-import type { Link } from "@ort/contracts/resume";
+import { useId } from "react";
+import { DOCUMENT_LIMITS, type Link } from "@ort/contracts/resume";
 import { safeInlineHref } from "./FormattedText";
 
-// Keep partial edits local. A malformed address must not replace a valid saved
-// link while the user types the editor's normal [label](URL) notation.
+// Both inputs belong to the document draft, including incomplete addresses.
+// Normal validation blocks persistence while dirty/undo/close state stays exact.
 export function ContactLinkField({
   link,
   index,
@@ -17,62 +17,60 @@ export function ContactLinkField({
   onChange: (link: Link) => void;
   onRemove: () => void;
 }) {
-  const original = `[${link.label || link.url}](${link.url})`;
-  const [value, setValue] = useState(original);
-  const [invalid, setInvalid] = useState(false);
   const errorId = useId();
-  useEffect(() => {
-    setValue(original);
-    setInvalid(false);
-  }, [original]);
-  function commit() {
-    const match = value.match(/^\[([^\]]+)\]\(([^\s]+)\)$/);
-    if (
-      !match ||
-      !safeInlineHref(match[2]) ||
-      [...match[1]].length > 2000 ||
-      [...match[2]].length > 2000
-    ) {
-      setInvalid(true);
-      return;
-    }
-    setInvalid(false);
-    onChange({ ...link, label: match[1], url: match[2] });
-  }
+  const labelTooLong = [...link.label].length > DOCUMENT_LIMITS.fieldCharacters;
+  const addressInvalid = !safeInlineHref(link.url);
+  const addressTooLong = [...link.url].length > DOCUMENT_LIMITS.fieldCharacters;
+  const invalid = labelTooLong || addressInvalid || addressTooLong;
   return (
-    <div className="contact-information-editor__item">
-      <input
-        aria-label={`Contact link ${index + 1}`}
-        value={value}
-        disabled={disabled}
-        aria-invalid={invalid || undefined}
-        aria-describedby={invalid ? errorId : undefined}
-        onChange={(event) => {
-          setValue(event.target.value);
-          setInvalid(false);
-        }}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commit();
-          }
-        }}
-      />
+    <div
+      className="contact-information-editor__item"
+      role="group"
+      aria-label={`Contact link ${index + 1}`}
+    >
+      <div className="contact-information-editor__link-fields">
+        <label>
+          Label
+          <input
+            aria-label={`Contact link ${index + 1} label`}
+            value={link.label}
+            disabled={disabled}
+            aria-invalid={labelTooLong || undefined}
+            aria-describedby={labelTooLong ? errorId : undefined}
+            onChange={(event) =>
+              onChange({ ...link, label: event.target.value })
+            }
+          />
+        </label>
+        <label>
+          Address
+          <input
+            aria-label={`Contact link ${index + 1} address`}
+            value={link.url}
+            disabled={disabled}
+            aria-invalid={addressInvalid || addressTooLong || undefined}
+            aria-describedby={
+              addressInvalid || addressTooLong ? errorId : undefined
+            }
+            onChange={(event) => onChange({ ...link, url: event.target.value })}
+          />
+        </label>
+      </div>
       <button
         type="button"
         className="contact-information-editor__delete button--quiet"
         aria-label={`Delete contact link ${index + 1}`}
         title="Delete contact link"
         disabled={disabled}
-        onMouseDown={(event) => event.preventDefault()}
         onClick={onRemove}
       >
         ×
       </button>
       {invalid && (
         <span id={errorId} className="field-error" role="alert">
-          Use [label](address) with an http, https, or mailto address.
+          {labelTooLong || addressTooLong
+            ? `Use at most ${DOCUMENT_LIMITS.fieldCharacters} characters in each field.`
+            : "Enter a complete HTTP, HTTPS, or mailto address."}
         </span>
       )}
     </div>

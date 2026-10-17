@@ -280,31 +280,44 @@ fn check_entry(entry: &Entry, path: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn paragraphs(fields: &mut Vec<NamedField>, items: Vec<String>) -> Result<(), String> {
-    // Several valid paragraph items need not fit in one native field. Pack
-    // consecutive items without exceeding its bound or discarding source text.
-    let maximum = DocumentLimits::default().field_characters;
-    let mut body = String::new();
-    let mut characters = 0;
-    for item in items {
-        let count = item.chars().count();
-        if !body.is_empty() && characters + 2 + count > maximum {
-            field(
-                fields,
-                ort_domain::PARAGRAPH_FIELD_LABEL,
-                std::mem::take(&mut body),
-            )?;
-            characters = 0;
+fn materialize_entry(entry: Entry, index: usize, path: &str) -> Result<ResumeEntry, String> {
+    check_entry(&entry, path)?;
+    let mut fields = Vec::new();
+    field(&mut fields, "Details", entry.details)?;
+    field(&mut fields, "Extra", entry.extra)?;
+    let mut bullets = Vec::new();
+    match entry.main_info.format {
+        BodyFormat::Bullets => {
+            for (index, text) in entry.main_info.items.into_iter().enumerate() {
+                bullets.push(Bullet {
+                    id: EntityId::new(),
+                    order: order(index)?,
+                    text,
+                });
+            }
         }
-        if !body.is_empty() {
-            body.push_str("\n\n");
-            characters += 2;
+        BodyFormat::Paragraph => {
+            for body in crate::paragraph_packing::pack_paragraphs(
+                entry.main_info.items.iter().map(String::as_str),
+            ) {
+                field(&mut fields, ort_domain::PARAGRAPH_FIELD_LABEL, body)?;
+            }
         }
-        body.push_str(&item);
-        characters += count;
     }
-    field(fields, ort_domain::PARAGRAPH_FIELD_LABEL, body)
+    Ok(ResumeEntry {
+        id: EntityId::new(),
+        order: order(index)?,
+        heading: entry.title,
+        subheading: entry.role,
+        date_range: entry.date,
+        dates: Some(vec![]),
+        location: entry.location,
+        fields,
+        bullets,
+        links: vec![],
+    })
 }
+
 /// Validates the entire response before it may enter a review session. Errors
 /// contain structural diagnostics, never provider-returned resume text.
 /// # Errors
@@ -324,6 +337,7 @@ pub fn decode(text: &str) -> Result<ResumeDocument, String> {
         email: proposal.contact.email,
         phone: proposal.contact.phone,
         location: proposal.contact.location,
+        divider: ort_domain::ContactDivider::default(),
         links: proposal
             .contact
             .links
@@ -347,38 +361,11 @@ pub fn decode(text: &str) -> Result<ResumeDocument, String> {
         }
         let mut entries = Vec::new();
         for (index, entry) in section.entries.into_iter().enumerate() {
-            check_entry(
-                &entry,
+            entries.push(materialize_entry(
+                entry,
+                index,
                 &format!("sections[{section_index}].entries[{index}]"),
-            )?;
-            let mut fields = Vec::new();
-            field(&mut fields, "Details", entry.details)?;
-            field(&mut fields, "Extra", entry.extra)?;
-            let mut bullets = Vec::new();
-            match entry.main_info.format {
-                BodyFormat::Bullets => {
-                    for (index, text) in entry.main_info.items.into_iter().enumerate() {
-                        bullets.push(Bullet {
-                            id: EntityId::new(),
-                            order: order(index)?,
-                            text,
-                        });
-                    }
-                }
-                BodyFormat::Paragraph => paragraphs(&mut fields, entry.main_info.items)?,
-            }
-            entries.push(ResumeEntry {
-                id: EntityId::new(),
-                order: order(index)?,
-                heading: entry.title,
-                subheading: entry.role,
-                date_range: entry.date,
-                dates: Some(vec![]),
-                location: entry.location,
-                fields,
-                bullets,
-                links: vec![],
-            });
+            )?);
         }
         document.sections.push(ResumeSection {
             id: EntityId::new(),

@@ -86,7 +86,9 @@ anchor. Every entry uses exactly one published anchor; published entries may
 anchor only themselves. Unknown or duplicate
 identities, cross-entry references, protected output fields, obsolete list-selection
 requests, empty sections, malformed documents, and document-limit violations are
-rejected locally.
+rejected locally. Valid paragraph items are packed into consecutive native
+paragraph fields without exceeding the per-field limit. This preserves multiple
+long source paragraphs; oversized individual items still fail validation.
 
 References provide traceability; they do not prove that every rewritten claim
 is true. The mandatory model review checks source support, role relevance,

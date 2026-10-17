@@ -260,12 +260,14 @@ export type CloseStatusResponse = { pendingAttempt: string | null };
 export type ConnectionSource = "direct_api" | "chatgpt_plan";
 export type ConnectionStatus = { available: boolean; connected: boolean };
 export type ContactDetails = {
+  divider?: ContactDivider;
   email: string;
   fullName: string;
   links: Array<Link>;
   location: string;
   phone: string;
 };
+export type ContactDivider = "dot" | "bar" | "dash";
 export type CredentialProvider = "openai" | "anthropic" | "gemini";
 export type DateEnd =
   | { kind: "present" }

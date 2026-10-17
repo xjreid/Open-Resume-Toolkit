@@ -173,6 +173,11 @@ Every operation is initiated from the desktop application after review. The brow
 
 ## Factual boundaries and result validation
 
+Valid paragraph collections must survive import and tailoring without truncation.
+Several individually valid paragraphs may occupy multiple native fields when
+their combined text exceeds one field's limit. Oversized individual paragraphs
+and documents remain invalid; packing does not relax content limits.
+
 AI output may reorganize, select, condense, and rewrite confirmed facts. It may not invent or infer employers, dates, degrees, credentials, projects, skills, metrics, achievements, authorization, identity, or intentions.
 
 Before display, ORT validates:

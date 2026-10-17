@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { ResumeDocument } from "@ort/contracts/resume";
-import type { ContactDivider } from "./resume-view-types";
 import { FormattedText, safeInlineHref } from "./FormattedText";
 import { ContactLinkField } from "./ContactLinkField";
 import {
@@ -10,19 +9,16 @@ import {
 } from "./inline-formatting";
 export function ContactInformationEditor({
   contact,
-  divider,
   disabled,
   onChange,
-  onDividerChange,
   showDivider = true,
 }: {
   contact: ResumeDocument["contact"];
-  divider: ContactDivider;
   disabled: boolean;
   onChange: (contact: ResumeDocument["contact"]) => void;
-  onDividerChange: (divider: ContactDivider) => void;
   showDivider?: boolean;
 }) {
+  const divider = contact.divider ?? "dot";
   const details = useRef<HTMLDetailsElement>(null);
   const initialItems = [
     contact.email,
@@ -335,15 +331,14 @@ export function ContactInformationEditor({
             <select
               value={divider}
               disabled={disabled}
-              onChange={(event) =>
-                onDividerChange(
-                  event.target.value === "bar"
-                    ? "bar"
-                    : event.target.value === "dash"
-                      ? "dash"
-                      : "dot",
-                )
-              }
+              onChange={(event) => {
+                const next = { ...contact };
+                const divider = event.target.value;
+                if (divider === "bar" || divider === "dash")
+                  next.divider = divider;
+                else delete next.divider;
+                onChange(next);
+              }}
             >
               <option value="dot">Dot •</option>
               <option value="bar">Bar |</option>

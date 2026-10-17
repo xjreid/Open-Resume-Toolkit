@@ -102,6 +102,11 @@ Provider-native structured output is used where reliable. The complete response 
 
 ## Tailoring response contract
 
+Import mapping and tailoring share bounded paragraph packing in `ort-ai`.
+Consecutive items join only when their Unicode character count, including
+separators, fits the native field limit. Longer collections use multiple fields;
+individual oversized items remain subject to validation, with no truncation.
+
 One tailoring call returns:
 
 - a structured resume proposal referencing source entry/field IDs;

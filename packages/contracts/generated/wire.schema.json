@@ -1483,6 +1483,9 @@
     "ContactDetails": {
       "additionalProperties": false,
       "properties": {
+        "divider": {
+          "$ref": "#/$defs/ContactDivider"
+        },
         "email": {
           "type": "string"
         },
@@ -1510,6 +1513,14 @@
         "links"
       ],
       "type": "object"
+    },
+    "ContactDivider": {
+      "enum": [
+        "dot",
+        "bar",
+        "dash"
+      ],
+      "type": "string"
     },
     "CredentialProvider": {
       "enum": [

@@ -29,7 +29,6 @@ export function ImportedResumeEditor({
     undo: [] as ResumeDocument[],
     redo: [] as ResumeDocument[],
   });
-  const [divider, setDivider] = useState<"dot" | "bar" | "dash">("dot");
   const heading = useRef<HTMLHeadingElement>(null);
   const headingId = useId();
   useEffect(() => {
@@ -161,8 +160,6 @@ export function ImportedResumeEditor({
             <ResumeCanvas
               document={document}
               style={style}
-              contactDivider={divider}
-              onContactDividerChange={setDivider}
               disabled={disabled}
               canAddEntry={
                 documentUsage(document).entries < DOCUMENT_LIMITS.entries

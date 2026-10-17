@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 mod backup;
+mod contact_divider;
+pub use contact_divider::ContactDivider;
 mod document_style;
 mod import_choices;
 mod import_commands;

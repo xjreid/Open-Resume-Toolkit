@@ -59,6 +59,11 @@
 .contact-information-editor__item .field-error {
   grid-column: 1 / -1;
 }
+.contact-information-editor__link-fields {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
 .contact-information-editor__delete {
   width: 30px;
   min-width: 30px;

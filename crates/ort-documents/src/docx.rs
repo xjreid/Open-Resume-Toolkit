@@ -303,11 +303,11 @@ fn contact_paragraphs(
             if value.is_empty() {
                 continue;
             }
-            append_separator(&mut content, "  •  ");
+            append_separator(&mut content, document.contact.divider.separator());
             content.extend(spans(&value, false, false)?);
         }
         for link in &document.contact.links {
-            append_separator(&mut content, "  •  ");
+            append_separator(&mut content, document.contact.divider.separator());
             content.push(link_span(link)?);
         }
         paragraph_with_spans(
@@ -614,6 +614,45 @@ const RELS_START: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn saved_contact_dividers_reach_styled_docx_content() {
+        use ort_domain::ContactDivider;
+        let mut document = ResumeDocument::empty("Synthetic");
+        document.contact.email = "person@example.com".into();
+        document.contact.location = "Boston".into();
+        document.contact.links.push(Link {
+            id: None,
+            order: None,
+            label: "Portfolio".into(),
+            url: "https://example.com".into(),
+        });
+        for (divider, separator) in [
+            (ContactDivider::Dot, "  •  "),
+            (ContactDivider::Bar, "  |  "),
+            (ContactDivider::Dash, "  -  "),
+        ] {
+            document.contact.divider = divider;
+            for style in [
+                DocumentStyle::Technical,
+                DocumentStyle::Professional,
+                DocumentStyle::Modern,
+                DocumentStyle::Plain,
+            ] {
+                let mut body = Xml::default();
+                let mut relationships = Xml::default();
+                contact_paragraphs(&mut body, &mut relationships, &mut 0, &document, style)
+                    .unwrap();
+                assert_eq!(
+                    body.0.matches(separator).count(),
+                    if style == DocumentStyle::Plain { 0 } else { 2 }
+                );
+                assert!(body.0.contains("Portfolio"));
+                assert!(relationships.0.contains("https://example.com"));
+                render_docx_with_style(&document, style).unwrap();
+            }
+        }
+    }
 
     #[test]
     fn xml_growth_is_checked_before_copying() {

@@ -9,7 +9,7 @@ import { ContactInformationEditor } from "../src/shared/ContactInformationEditor
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-it("shows imported profile links at the top and edits their normal link notation without losing identity", async () => {
+it("shows imported profile links at the top and edits labels and addresses immediately without losing identity", async () => {
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -38,9 +38,7 @@ it("shows imported profile links at the top and edits their normal link notation
     return (
       <ContactInformationEditor
         contact={current}
-        divider="dot"
         disabled={false}
-        onDividerChange={() => {}}
         onChange={(next) => {
           contact = next;
           setCurrent(next);
@@ -60,9 +58,9 @@ it("shows imported profile links at the top and edits their normal link notation
         ?.textContent,
     ).toBe("LinkedIn");
     const input = host.querySelector<HTMLInputElement>(
-      'input[aria-label="Contact link 1"]',
+      'input[aria-label="Contact link 1 address"]',
     )!;
-    expect(input.value).toBe("[GitHub](https://github.com/example)");
+    expect(input.value).toBe("https://github.com/example");
     const change = async (value: string) =>
       act(async () => {
         Object.getOwnPropertyDescriptor(
@@ -71,16 +69,21 @@ it("shows imported profile links at the top and edits their normal link notation
         )!.set!.call(input, value);
         input.dispatchEvent(new Event("input", { bubbles: true }));
       });
-    const commit = async () =>
-      act(async () => {
-        input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
-      });
-    await change("[GitHub](javascript:alert(1))");
-    await commit();
+    await change("javascript:alert(1)");
     expect(input.getAttribute("aria-invalid")).toBe("true");
-    expect(contact.links[0].url).toBe("https://github.com/example");
-    await change("[Source](https://github.com/example/new)");
-    await commit();
+    expect(contact.links[0].url).toBe("javascript:alert(1)");
+    expect(summary.querySelector('a[href^="javascript:"]')).toBeNull();
+    await change("https://github.com/example/new");
+    const label = host.querySelector<HTMLInputElement>(
+      'input[aria-label="Contact link 1 label"]',
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!.call(label, "Source");
+      label.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     expect(contact.links[0]).toMatchObject({
       id: "01900000-0000-7000-8000-000000000001",
       order: 0,
@@ -88,6 +91,18 @@ it("shows imported profile links at the top and edits their normal link notation
       url: "https://github.com/example/new",
     });
     expect(contact.location).toBe("Boston");
+    const divider = host.querySelector("select")!;
+    await act(async () => {
+      divider.value = "bar";
+      divider.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(contact.divider).toBe("bar");
+    expect(summary.textContent).toContain(" | ");
+    await act(async () => {
+      divider.value = "dot";
+      divider.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(contact).not.toHaveProperty("divider");
     await act(async () =>
       host
         .querySelector<HTMLButtonElement>(

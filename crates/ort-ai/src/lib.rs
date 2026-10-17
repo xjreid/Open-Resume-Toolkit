@@ -1,6 +1,7 @@
 //! Direct-AI provider, catalog, accounting, monitoring, and guardrail boundary.
 
 pub mod materials;
+mod paragraph_packing;
 pub mod plan;
 mod provider_diagnostics;
 pub use provider_diagnostics::provider_request_issues;

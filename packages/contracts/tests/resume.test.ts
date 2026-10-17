@@ -20,6 +20,24 @@ const document = {
 };
 
 describe("resume command response validation", () => {
+  it("accepts saved dividers and rejects unsupported values", () => {
+    for (const divider of ["dot", "bar", "dash", "invalid", null, 1]) {
+      expect(
+        isVersionedResumeCommandResponse({
+          ok: true,
+          value: {
+            revision: 1,
+            document: {
+              ...document,
+              contact: { ...document.contact, divider },
+            },
+          },
+        }),
+      ).toBe(
+        typeof divider === "string" && ["dot", "bar", "dash"].includes(divider),
+      );
+    }
+  });
   it("accepts exact workspace, save, and publish responses", () => {
     const versioned = { revision: 1, document };
 

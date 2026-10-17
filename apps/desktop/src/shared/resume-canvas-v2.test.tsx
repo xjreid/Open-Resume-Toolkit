@@ -26,8 +26,6 @@ it("adds a valid blank item to a version 2 tailored resume", async () => {
       <ResumeCanvas
         document={resume}
         style="technical"
-        contactDivider="dot"
-        onContactDividerChange={() => undefined}
         disabled={false}
         canAddEntry
         onChange={(update) => {

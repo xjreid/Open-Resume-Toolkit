@@ -216,6 +216,12 @@
 .resume-document__contact--dash > span + span::before {
   content: "-";
 }
+.resume-document--plain .resume-document__contact > span {
+  flex-basis: 100%;
+}
+.resume-document--plain .resume-document__contact > span + span::before {
+  content: none;
+}
 .resume-document__entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(125px, 0.28fr);

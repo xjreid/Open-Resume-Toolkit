@@ -10,6 +10,7 @@ export const MAX_RESUME_DATES = 200;
 export type Link = Wire.Link;
 
 export type ContactDetails = Wire.ContactDetails;
+export type ContactDivider = Wire.ContactDivider;
 
 export type NamedField = Wire.NamedField;
 
@@ -163,7 +164,18 @@ function isContactDetails(
 ): value is ContactDetails {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ["fullName", "email", "phone", "location", "links"]) &&
+    hasExactKeys(value, [
+      "fullName",
+      "email",
+      "phone",
+      "location",
+      "links",
+      ...(Object.hasOwn(value, "divider") ? ["divider"] : []),
+    ]) &&
+    (!Object.hasOwn(value, "divider") ||
+      value.divider === "dot" ||
+      value.divider === "bar" ||
+      value.divider === "dash") &&
     typeof value.fullName === "string" &&
     typeof value.email === "string" &&
     typeof value.phone === "string" &&

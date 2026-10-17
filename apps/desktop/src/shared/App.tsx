@@ -2,7 +2,6 @@ import { useResumeSession } from "./use-resume-session";
 import { ResumeCanvas } from "./ResumeCanvas";
 import { PublishedResume } from "./PublishedResume";
 import { HealthBadge, type HealthState } from "./HealthBadge";
-import type { ContactDivider } from "./resume-view-types";
 import { SettingsWorkspace } from "./SettingsWorkspace";
 import { invokeDesktop as invoke } from "./desktop-client";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -117,7 +116,6 @@ function ResumeEditor() {
   const [documentStyle, setDocumentStyle] =
     useState<DocumentStyle>("technical");
   const [exportSource, setExportSource] = useState<ExportSource>("saved_draft");
-  const [contactDivider, setContactDivider] = useState<ContactDivider>("dot");
   const [focusedPart, setFocusedPart] = useState<string | null>(null);
   const [validationFocus, setValidationFocus] =
     useState<ValidationFocusRequest | null>(null);
@@ -654,8 +652,6 @@ function ResumeEditor() {
                   <ResumeCanvas
                     document={document}
                     style={documentStyle}
-                    contactDivider={contactDivider}
-                    onContactDividerChange={setContactDivider}
                     onFocusSection={setFocusedPart}
                     disabled={busy || mustReload}
                     canAddEntry={usage!.entries < DOCUMENT_LIMITS.entries}
@@ -669,7 +665,6 @@ function ResumeEditor() {
                         : document
                     }
                     style={documentStyle}
-                    contactDivider={contactDivider}
                   />
                 )}
               </section>
