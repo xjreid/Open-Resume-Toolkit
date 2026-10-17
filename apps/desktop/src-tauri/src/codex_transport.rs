@@ -58,6 +58,7 @@ mod tests {
     use std::process::{Command, Stdio};
 
     #[test]
+    #[cfg(unix)]
     fn cancelled_or_expired_dispatch_writes_zero_bytes() {
         for cancelled in [true, false] {
             let mut child = Command::new("/bin/cat")
@@ -84,5 +85,22 @@ mod tests {
             assert!(result.status.success());
             assert!(result.stdout.is_empty());
         }
+    }
+
+    #[test]
+    #[cfg(not(unix))]
+    fn unsupported_transport_rejects_a_real_pipe() {
+        // Spawn the test binary in listing mode: no shell/Python dependency,
+        // recursive test execution, runtime discovery, or account access.
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .arg("--list")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
+        let result = Writer::new(child.stdin.take().unwrap());
+        let _ = child.kill();
+        child.wait().unwrap();
+        assert!(matches!(result, Err("PLAN_PLATFORM_UNSUPPORTED")));
     }
 }

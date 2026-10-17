@@ -1,6 +1,7 @@
 use super::*;
 
 #[test]
+#[cfg(unix)]
 fn pdf_readiness_requires_the_current_signed_in_image_capable_model() {
     for mode in ["success", "text_only"] {
         let (manager, profile, settings) = signed_in(mode);
@@ -27,6 +28,7 @@ fn pdf_readiness_requires_the_current_signed_in_image_capable_model() {
 }
 
 #[test]
+#[cfg(unix)]
 fn session_retirement_interrupts_stalled_writes_for_disconnect_and_shutdown() {
     for shutdown in [false, true] {
         let (manager, profile, settings) = signed_in("stall_after_account");
@@ -69,6 +71,7 @@ fn session_retirement_interrupts_stalled_writes_for_disconnect_and_shutdown() {
 }
 
 #[test]
+#[cfg(unix)]
 fn failed_quota_refresh_clears_the_published_snapshot_without_ending_sign_in() {
     for mode in ["quota_then_missing", "quota_then_rejected"] {
         let (manager, profile, settings) = signed_in(mode);
@@ -92,6 +95,7 @@ fn failed_quota_refresh_clears_the_published_snapshot_without_ending_sign_in() {
     }
 }
 
+#[cfg(unix)]
 fn signed_in(mode: &str) -> (PlanRuntime, Uuid, PlanSettings) {
     let manager = PlanRuntime::default();
     let profile = Uuid::now_v7();
@@ -128,6 +132,7 @@ fn signed_in(mode: &str) -> (PlanRuntime, Uuid, PlanSettings) {
 }
 
 #[test]
+#[cfg(unix)]
 fn local_controls_and_status_do_not_force_oauth_refresh() {
     let (manager, profile, settings) = signed_in("slow_refresh");
     let start = Instant::now();
@@ -163,6 +168,7 @@ fn local_controls_and_status_do_not_force_oauth_refresh() {
 }
 
 #[test]
+#[cfg(unix)]
 fn busy_protocol_does_not_queue_polls_or_block_settings_and_disconnect_interrupts_refresh() {
     let (manager, profile, settings) = signed_in("slow_quota");
     let manager = std::sync::Arc::new(manager);
@@ -219,6 +225,7 @@ fn busy_protocol_does_not_queue_polls_or_block_settings_and_disconnect_interrupt
 }
 
 #[test]
+#[cfg(unix)]
 fn disconnect_and_restart_destroy_authorization_and_failure_never_reuses_it() {
     let (manager, profile, settings) = signed_in("success");
     manager.disconnect(Uuid::now_v7());
@@ -279,6 +286,7 @@ fn disabled_permission_never_starts_runtime_and_enabled_signed_out_is_valid() {
 }
 
 #[test]
+#[cfg(unix)]
 fn a_queued_status_check_rechecks_permission_after_disable_and_cannot_restart() {
     let (manager, profile, settings) = signed_in("success");
     let manager = std::sync::Arc::new(manager);
@@ -329,6 +337,7 @@ fn a_queued_status_check_rechecks_permission_after_disable_and_cannot_restart() 
 }
 
 #[test]
+#[cfg(unix)]
 fn app_shutdown_destroys_sign_in_and_permanently_blocks_restart() {
     let (manager, profile, settings) = signed_in("success");
     manager.shutdown();

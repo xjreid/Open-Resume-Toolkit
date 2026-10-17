@@ -47,6 +47,7 @@ pub(crate) fn prepare(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::time::{Duration, Instant};
 
     #[test]
@@ -122,6 +123,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn page_input_passes_stdio_with_no_tool_requests_and_cleans_up_after_rejection() {
         for mode in ["pdf_import", "turn_start_rejected"] {
             let mut session = crate::codex_runtime::test_session(mode);

@@ -482,3 +482,14 @@ two-page PDF with a rotated second page exercises the real PDF.js worker on both
 routes. The runtime qualification accepts `ORT_CODEX_QUALIFY_LINKS_PATH` alongside
 the rendered page directory to check that source destinations and positions reach
 the offline mock provider unchanged.
+
+## Cross-platform CI coverage
+
+Synthetic stdio tests use Unix nonblocking pipes and POSIX fixture executables;
+they compile and run on the Linux and macOS CI jobs. The fixture helper is also
+Unix-only, so new unguarded fixture callers fail compilation on Windows. Portable
+runtime-policy, tool-denial, lifecycle-permission, and page-scratch checks remain
+enabled on Windows. Unsupported platforms assert that discovery and startup reject
+without creating authentication state; non-Unix targets additionally test that a
+real child pipe is rejected with `PLAN_PLATFORM_UNSUPPORTED`. The Windows matrix
+job and its other desktop/storage/document checks remain enabled.

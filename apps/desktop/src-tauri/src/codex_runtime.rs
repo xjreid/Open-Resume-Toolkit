@@ -980,7 +980,9 @@ pub fn qualified_version() -> &'static str {
     &compatibility().version
 }
 
-#[cfg(test)]
+// The synthetic server exercises the Unix-only nonblocking pipe transport.
+// Keeping the helper Unix-only also catches unguarded fixture tests at compile time.
+#[cfg(all(test, unix))]
 pub(crate) fn test_session(mode: &str) -> Session {
     let child = Command::new("/usr/bin/python3")
         .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/codex-app-server.py"))

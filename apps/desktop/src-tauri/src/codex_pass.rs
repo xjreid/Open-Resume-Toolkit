@@ -232,7 +232,7 @@ pub(crate) async fn execute(
     }).await.unwrap_or_else(|_| Err("PLAN_RUNTIME_UNAVAILABLE".into()))
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     fn signed_in(mode: &str) -> crate::codex_runtime::Session {

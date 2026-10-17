@@ -1,6 +1,7 @@
 use super::*;
 
 #[test]
+#[cfg(unix)]
 fn pipe_backpressure_obeys_deadlines_and_cancellation_without_a_watchdog() {
     for cancel in [false, true] {
         let mut session = test_session("stall_input");
@@ -30,6 +31,7 @@ fn pipe_backpressure_obeys_deadlines_and_cancellation_without_a_watchdog() {
 }
 
 #[test]
+#[cfg(unix)]
 fn cancellation_before_dispatch_retires_the_session_without_sending() {
     let mut session = test_session("success");
     assert_eq!(
@@ -41,6 +43,7 @@ fn cancellation_before_dispatch_retires_the_session_without_sending() {
 }
 
 #[test]
+#[cfg(unix)]
 fn every_nonfatal_exit_after_thread_creation_releases_the_thread() {
     for (mode, expected) in [
         ("wrong_model", "PLAN_MODEL_UNAVAILABLE"),
@@ -78,6 +81,7 @@ fn every_nonfatal_exit_after_thread_creation_releases_the_thread() {
 }
 
 #[test]
+#[cfg(unix)]
 fn failed_thread_release_retires_the_process_even_after_an_early_error() {
     let mut session = test_session("unsubscribe_failed");
     let result = session.with_ephemeral_thread(
@@ -178,6 +182,7 @@ fn raw_tool_policy_requires_explicit_disable_at_the_highest_enabled_layer() {
 }
 
 #[test]
+#[cfg(unix)]
 fn each_pass_clears_reports_and_a_thread_start_rejection_targets_the_requested_model() {
     let mut session = test_session("reject_model");
     session.selected_model = Some("gpt-6.1-sol".into());
@@ -249,6 +254,7 @@ fn signed_out_thread_qualification() {
         .expect("passive thread close notification");
 }
 #[test]
+#[cfg(unix)]
 fn fake_stdio_auth_login_logout_and_quota() {
     let mut s = test_session("success");
     assert_eq!(s.models.len(), 6);
@@ -291,6 +297,7 @@ fn fake_stdio_auth_login_logout_and_quota() {
     );
 }
 #[test]
+#[cfg(unix)]
 fn fake_stdio_passes_normalize_usage_and_retries_without_double_counting() {
     for mode in [
         "success",
@@ -344,6 +351,7 @@ fn fake_stdio_passes_normalize_usage_and_retries_without_double_counting() {
     }
 }
 #[test]
+#[cfg(unix)]
 fn fake_stdio_declined_malformed_stale_and_deadline_fail_closed() {
     let mut declined = test_session("declined");
     declined
@@ -466,6 +474,7 @@ fn runtime_qualification() {
     assert_eq!(session.models.len(), 6);
 }
 #[test]
+#[cfg(unix)]
 fn provider_diagnostics_are_safe_and_model_rejection_disables_only_that_model() {
     let mut s = test_session("success");
     assert_eq!(s.provider_failure(&json!({"codexErrorInfo":{"httpConnectionFailed":{"httpStatusCode":503}},"message":"private resume contents"})), "AI_PROVIDER_TEMPORARY");
@@ -489,6 +498,7 @@ fn provider_diagnostics_are_safe_and_model_rejection_disables_only_that_model() 
     assert!(s.models.iter().filter(|m|m.id!="gpt-6.1-sol").all(|m|m.explanation.as_deref() != Some("Codex rejected access to this model for the connected account. Reconnect after account access changes.")));
 }
 #[test]
+#[cfg(unix)]
 fn startup_can_be_cancelled_before_protocol_initialization() {
     let child = Command::new("/usr/bin/python3")
         .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/codex-app-server.py"))
@@ -546,4 +556,17 @@ fn sandbox_does_not_allow_tools_or_user_roots() {
     assert!(!p.contains("/Library/Keychains"));
     assert!(!p.contains("authorization-right-obtain"));
     assert!(!p.contains("com.apple.securityd"));
+}
+
+#[test]
+#[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+fn unsupported_platform_refuses_discovery_and_start_without_creating_auth_state() {
+    assert!(matches!(discover(), Err("PLAN_PLATFORM_UNSUPPORTED")));
+    let scratch = tempfile::tempdir().unwrap();
+    let auth = scratch.path().join("must-not-be-created");
+    assert!(matches!(
+        Session::start(&auth, Instant::now() + Duration::from_secs(1), &|| false),
+        Err("PLAN_PLATFORM_UNSUPPORTED")
+    ));
+    assert!(!auth.exists());
 }
