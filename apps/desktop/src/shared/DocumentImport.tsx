@@ -10,7 +10,6 @@ import {
 } from "./import-client";
 import { AiImportPanel } from "./AiImportPanel";
 import { aiImportError } from "./ai-import";
-import { AiFailureDetailsView } from "./AiFailureDetailsView";
 import { ImportReviewFlow } from "./ImportReviewFlow";
 
 export function DocumentImport({
@@ -41,10 +40,6 @@ export function DocumentImport({
   const [available, setAvailable] = useState<boolean | null>(null);
   const [pending, setPending] = useState(false);
   const [method, setMethod] = useState<"local" | "ai">("local");
-  const [errorDetails, setErrorDetails] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
   const [review, setReview] = useState<ImportReviewSnapshot | null>(null);
   const reviewId = review?.id ?? null;
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +83,6 @@ export function DocumentImport({
     reloadNeeded.current = false;
     setPending(true);
     setError(null);
-    setErrorDetails(null);
     onBusyChange(true);
     onOperationChange?.(true);
     const result = await (method === "ai"
@@ -110,13 +104,6 @@ export function DocumentImport({
             ? aiImportError(result.error.code)
             : importFailureMessage(result.error.code),
         );
-        setErrorDetails({
-          ...result.error.details,
-          diagnostic: {
-            code: result.error.code,
-            ...((result.error.details?.diagnostic as object) ?? {}),
-          },
-        });
       }
     }
   }
@@ -164,36 +151,35 @@ export function DocumentImport({
               viewBox="0 0 32 32"
               aria-hidden="true"
             >
-              <path d="M9 3h10l6 6v20H9V3Z" />
-              <path d="M19 3v7h6M13 15h8M13 19h8M13 23h5" />
+              <path d="M17 4H8a2 2 0 0 0-2 2v20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-7M17 4v7h7M17 4l7 7" />
+              <path d="M11 17h5M11 22h9M26 16V5m-4 4 4-4 4 4" />
             </svg>
             <div>
-              <h2>Import a resume</h2>
-              <p className="resume-import-start__description">
-                Bring your existing resume into the editor, then review and
-                refine it.
-              </p>
+              <h2>Import your resume</h2>
             </div>
           </div>
           {error ? (
             <div className="resume-import-error" role="alert" ref={errorPanel}>
               <p>{error}</p>
-              {errorDetails && (
-                <AiFailureDetailsView details={errorDetails} open />
-              )}
             </div>
           ) : null}
           {disabledReason && !pending ? (
-            <p role="status">{disabledReason}</p>
+            <p className="resume-import-notice" role="status">
+              {disabledReason}
+            </p>
           ) : null}
           {pending ? (
             <div className="resume-import-progress" role="status">
               <p>
                 {method === "ai"
-                  ? "Reading your PDF with AI… Page preparation may take 30 seconds, followed by up to 2 minutes for AI."
+                  ? "Reading your PDF with AI… This may take a few minutes."
                   : "Reading resume…"}
               </p>
-              <button type="button" onClick={() => void cancel()}>
+              <button
+                type="button"
+                className="button--secondary"
+                onClick={() => void cancel()}
+              >
                 Cancel import
               </button>
             </div>
@@ -203,29 +189,31 @@ export function DocumentImport({
               className="resume-import-method"
               aria-labelledby="local-import-heading"
             >
-              <div>
-                <h3 id="local-import-heading">Import locally</h3>
-                <p>
-                  Extract text from your resume on this device, then organize
-                  and refine it.
-                </p>
-              </div>
+              <h3 id="local-import-heading">Parse Locally</h3>
               <div className="resume-import-method__local-note">
-                <strong>No AI connection needed</strong>
-                <p>
-                  Your file stays on this device. Works with text-based PDFs and
-                  DOCX files.
-                </p>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="5" y="10" width="14" height="11" rx="2" />
+                  <path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" />
+                </svg>
+                <div>
+                  <strong>Stays on this device</strong>
+                  <p>No AI connection needed.</p>
+                </div>
               </div>
               <div className="resume-import-method__action">
                 <p>Text-based PDF or DOCX</p>
                 <button
                   type="button"
+                  className="resume-import-file-button"
+                  aria-label="Choose file to parse locally"
                   ref={launch}
                   disabled={disabled || !available || pending}
                   onClick={(event) => void begin("local", event.currentTarget)}
                 >
-                  Import resume
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v1M3 7h16a2 2 0 0 1 2 2l-2 10H5L3 7Z" />
+                  </svg>
+                  Choose file
                 </button>
               </div>
               {available === false ? (
@@ -245,26 +233,9 @@ export function DocumentImport({
               }}
             />
           </div>
-          <ol className="resume-import-start__steps" aria-label="Import steps">
-            <li>
-              <strong>Choose a file</strong>
-              <span>
-                Choose local or AI import and select your resume file.
-              </span>
-            </li>
-            <li>
-              <strong>Review your resume</strong>
-              <span>
-                Edit the content and organize its sections in the resume editor.
-              </span>
-            </li>
-            <li>
-              <strong>Save when ready</strong>
-              <span>Map the reviewed content to your saved master resume.</span>
-            </li>
-          </ol>
           <p className="resume-import-start__note">
-            Your saved resume stays unchanged until you confirm the import.
+            Review before saving. Your master resume stays unchanged until you
+            confirm.
           </p>
         </div>
       )}
@@ -275,14 +246,14 @@ export function DocumentImport({
 function importFailureMessage(code: string): string {
   switch (code) {
     case "LOCAL_DATA_OPERATION_BUSY":
-      return "Another file operation is in progress. Try again when it finishes.";
+      return "Another file operation is in progress; try again when it finishes.";
     case "REVISION_CONFLICT":
-      return "Your saved resume changed. Reload it before importing.";
+      return "Your saved resume changed; reload it before importing.";
     case "IMPORT_INVALID_SOURCE":
-      return "This file is unsupported, encrypted, or too large to import.";
+      return "This document could not be read; try an unencrypted PDF or DOCX.";
     case "IMPORT_DISABLED":
       return "Import is unavailable in this build.";
     default:
-      return "This resume could not be imported. Try exporting a new PDF or DOCX copy.";
+      return "Import failed; try exporting a new PDF or DOCX copy.";
   }
 }

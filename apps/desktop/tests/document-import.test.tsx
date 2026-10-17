@@ -116,17 +116,26 @@ it("owns one pending request and retains a review if cancellation races completi
 });
 
 it.each([
-  ["IMPORT_FAILED", "Try exporting a new PDF or DOCX copy."],
-  ["IMPORT_INVALID_SOURCE", "unsupported, encrypted, or too large"],
-  ["LOCAL_DATA_OPERATION_BUSY", "Another file operation is in progress."],
-  ["REVISION_CONFLICT", "Reload it before importing."],
+  ["IMPORT_FAILED", "try exporting a new PDF or DOCX copy."],
+  ["IMPORT_INVALID_SOURCE", "This document could not be read"],
+  ["LOCAL_DATA_OPERATION_BUSY", "Another file operation is in progress;"],
+  ["REVISION_CONFLICT", "reload it before importing."],
   ["IMPORT_DISABLED", "Import is unavailable in this build."],
 ])("reports %s without changing the saved resume", async (code, message) => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   client.documentImportAvailable.mockResolvedValue(true);
   client.beginDocumentImport.mockReset().mockResolvedValue({
     ok: false,
-    error: { code },
+    error: {
+      code,
+      details: {
+        diagnostic: {
+          code,
+          httpStatus: 400,
+          validationIssues: ["Internal parser error"],
+        },
+      },
+    },
   });
   const host = document.createElement("div");
   const root = createRoot(host);
@@ -148,6 +157,8 @@ it.each([
       message,
     );
     expect(host.textContent).not.toContain("Choose a text-based PDF");
+    expect(host.textContent).not.toContain("Internal parser error");
+    expect(host.querySelector("details")).toBeNull();
     expect(saved).not.toHaveBeenCalled();
     expect(busy).toHaveBeenLastCalledWith(false);
     expect(host.querySelector("button")!.disabled).toBe(false);

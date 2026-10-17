@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isCommandResponse, type CommandResponse } from "@ort/contracts/resume";
-import { aiFailureReason } from "./AiFailureDetailsView";
 
 export type AiImportStatus = {
   ready: boolean;
@@ -50,58 +49,80 @@ export async function aiImportStatus(): Promise<
 export function aiImportError(code: string): string {
   const messages: Record<string, string> = {
     AI_DISABLED:
-      "Connect Codex, or select an active API key and model in AI & monitoring to import with AI.",
+      "Choose a provider and model in AI & monitoring to import with AI.",
     AI_MODEL_IMAGE_UNSUPPORTED:
-      "The selected Codex model does not report image support. Select a model that accepts images to import PDF pages.",
-    AI_PDF_RENDER_FAILED:
-      "This PDF could not be prepared for AI import. It may be encrypted or damaged. Try exporting a new PDF.",
+      "This model cannot read PDFs; choose one that supports images.",
+    AI_PDF_RENDER_FAILED: "This PDF could not be read; try an unencrypted PDF.",
     AI_PDF_LINK_LIMIT:
-      "This PDF has too many hyperlinks or overly long link data. Try a simpler PDF; nothing was sent to your provider.",
+      "This PDF has too many links; try exporting a simpler PDF.",
     AI_PDF_RENDER_TIMEOUT:
-      "Preparing this PDF took too long. Try a smaller or simpler PDF. Nothing was sent to your provider.",
+      "This PDF took too long to prepare; try a smaller file.",
     AI_PDF_PAGE_LIMIT:
-      "Codex PDF import supports 1–10 pages; API imports support up to 1,000 pages. Choose a shorter PDF and try again.",
+      "This PDF exceeds the page limit; choose a shorter document.",
     AI_PDF_IMAGES_TOO_LARGE:
-      "The rendered PDF pages exceed the image size limit. Try a PDF with fewer or simpler pages.",
-    PLAN_AUTH_REQUIRED:
-      "Connect your account on the Codex page to import with Codex.",
+      "This PDF is too complex to import; try a simpler PDF.",
+    PLAN_AUTH_REQUIRED: "Sign in on the Codex page to import with AI.",
     PLAN_REQUEST_TIMEOUT:
-      "Codex import timed out after 2 minutes. Check usage on the Codex page before retrying.",
+      "AI import timed out; check usage in AI & monitoring before retrying.",
     AI_IMPORT_STATUS_UNAVAILABLE:
-      "AI readiness could not be checked. Check the connection and try again.",
+      "AI readiness could not be checked; check your connection.",
     AI_OUTPUT_INVALID:
-      "The AI response does not match the resume format. Review the validation details, then try again or select another model.",
+      "Import failed because AI returned an invalid resume; try another model.",
     AI_PDF_REQUIRED:
-      "AI import accepts PDF files. Export your resume as a PDF and try again.",
-    AI_PDF_TOO_LARGE:
-      "This PDF is larger than 10 MB. Choose a smaller PDF and try again.",
+      "AI import needs a PDF; export your resume as a PDF first.",
+    AI_PDF_TOO_LARGE: "This PDF is larger than 10 MB; choose a smaller file.",
     AI_PROVIDER_BAD_REQUEST:
-      "The provider rejected the import request. Its document input or structured-output settings may be unsupported. Check the failure details before trying another file or model.",
+      "Your AI provider could not accept this document; try another file or model.",
     AI_PROVIDER_TIMEOUT:
-      "The AI import timed out after 2 minutes. Check usage in AI & monitoring before retrying, or choose another model.",
+      "AI import timed out; check usage in AI & monitoring before retrying.",
     AI_CREDENTIAL_MISSING:
-      "The selected API key is unavailable. Reconnect it in AI & monitoring.",
+      "Your API key is unavailable; reconnect it in AI & monitoring.",
     AI_CONFIGURATION_INVALID:
-      "The AI provider configuration is incomplete. Select an active key and model in AI & monitoring.",
+      "Choose an active provider and model in AI & monitoring.",
     AI_CAP_REJECTED:
-      "Your spending cap cannot cover this PDF request. PDF imports reserve the model’s full input allowance because their token count is unknown. Review your cap in AI & monitoring or use local import.",
-    AI_BUSY:
-      "Another AI request is running. Wait for it to finish, then try again.",
-    AI_CANCELLED: "AI import was cancelled. Your saved resume is unchanged.",
+      "This import exceeds your spending cap; adjust it in AI & monitoring.",
+    AI_BUSY: "AI is busy; try again when the current request finishes.",
+    AI_CANCELLED: "AI import was cancelled.",
     IMPORT_INVALID_SOURCE:
-      "This file could not be read as a PDF. Check that it is a regular PDF file no larger than 10 MB and try again.",
+      "This document could not be read; choose a valid PDF under 10 MB.",
     IMPORT_REVIEW_OUTCOME_UNKNOWN:
-      "The import result could not be confirmed. Reload the app before importing again.",
+      "The import result could not be confirmed; reload before trying again.",
     IMPORT_REVIEW_UNAVAILABLE:
-      "The extracted resume could not be opened for review. Your saved resume is unchanged. Try importing again.",
+      "Your imported resume could not be opened; try importing again.",
     LOCAL_DATA_OPERATION_BUSY:
-      "Another file operation is in progress. Try again when it finishes.",
+      "Another file operation is in progress; try again when it finishes.",
     REVISION_CONFLICT:
-      "Your saved resume or AI profile changed. Reload before importing again.",
+      "Your resume or AI settings changed; reload before importing again.",
     STORAGE_UNAVAILABLE:
-      "Local storage is unavailable. Reopen your workspace before importing.",
+      "Local storage is unavailable; reopen your workspace before importing.",
+    AI_PROVIDER_UNAVAILABLE:
+      "The AI connection failed; check your internet connection.",
+    AI_PROVIDER_SERVICE_UNAVAILABLE:
+      "Your AI provider is unavailable; try again later.",
+    AI_PROVIDER_TEMPORARY:
+      "Your AI provider is temporarily unavailable; try again later.",
+    AI_RATE_LIMITED:
+      "Your AI provider's usage limit was reached; try again later.",
+    AI_AUTHENTICATION_FAILED:
+      "Your API key was not accepted; reconnect it in AI & monitoring.",
+    AI_MODEL_UNAVAILABLE:
+      "This AI model is unavailable; choose another in AI & monitoring.",
+    AI_OUTPUT_LIMIT: "AI returned an incomplete resume; try another model.",
+    AI_OUTPUT_INCOMPLETE:
+      "AI returned an incomplete resume; try importing again.",
+    AI_OUTPUT_BLOCKED: "Your AI provider declined to read this document.",
+    PLAN_RESERVE_REJECTED: "This import would exceed your Codex usage reserve.",
+    PLAN_QUOTA_UNAVAILABLE:
+      "Codex usage could not be checked; try again later.",
+    PLAN_MODEL_UNAVAILABLE:
+      "This Codex model is unavailable; choose another model.",
+    PLAN_RUNTIME_UNAVAILABLE:
+      "Codex is unavailable; reconnect it on the Codex page.",
   };
-  return messages[code] ?? aiFailureReason(code, null);
+  return (
+    messages[code] ??
+    "Import failed; try again or choose another import method."
+  );
 }
 
 export const importProviderLabel = (provider: string | null) =>

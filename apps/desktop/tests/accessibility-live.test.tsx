@@ -768,7 +768,7 @@ it("guards an idle import review after failed cancellation and waits for actual 
   });
   const container = await render(<App surface="main" />);
   await act(async () => buttonNamed(container, "Import").click());
-  await act(async () => buttonNamed(container, "Import resume").click());
+  await act(async () => buttonNamed(container, "Choose file").click());
   closeAttempt = createEntityId();
   await act(async () => wake());
   expect(
@@ -860,7 +860,7 @@ it("keeps import edits separate until mapping and returns cancellation to the im
   });
   const container = await render(<App surface="main" />);
   await act(async () => buttonNamed(container, "Import").click());
-  await act(async () => buttonNamed(container, "Import resume").click());
+  await act(async () => buttonNamed(container, "Choose file").click());
   const review = container.querySelector(".import-review-editor")!;
   expect(review.textContent).toContain("Imported Person");
   await expectSurfaceAccessible(container);
@@ -879,7 +879,7 @@ it("keeps import edits separate until mapping and returns cancellation to the im
   );
   await act(async () => buttonNamed(review, "Cancel").click());
   expect(container.querySelector(".import-review-editor")).toBeNull();
-  expect(buttonNamed(container, "Import resume").disabled).toBe(false);
+  expect(buttonNamed(container, "Choose file").disabled).toBe(false);
   expect(container.querySelector(".resume-page")!.textContent).toContain(
     "Synthetic Person",
   );
@@ -889,7 +889,7 @@ it("keeps import edits separate until mapping and returns cancellation to the im
         command === "save_resume" || command === "map_import_review",
     ),
   ).toBe(false);
-  await act(async () => buttonNamed(container, "Import resume").click());
+  await act(async () => buttonNamed(container, "Choose file").click());
   expect(
     container.querySelector(".import-review-editor")!.textContent,
   ).not.toContain("Discarded Edit");

@@ -98,9 +98,10 @@ it("requires a ready provider, shows Codex model and reasoning, and refreshes wh
     issue: "AI_DISABLED",
   };
   await render();
-  expect(button("Import with AI").disabled).toBe(true);
+  expect(button("Choose PDF").disabled).toBe(true);
+  expect(button("Check connection")).toBeUndefined();
   expect(host.textContent).toContain(
-    "Connect Codex, or select an active API key",
+    "Choose a provider and model in AI & monitoring",
   );
   status = {
     ...ready,
@@ -109,28 +110,30 @@ it("requires a ready provider, shows Codex model and reasoning, and refreshes wh
     reasoning: "high",
     issue: null,
   };
-  await act(async () => button("Check connection").click());
+  await act(async () => window.dispatchEvent(new Event("focus")));
   expect(host.textContent).toContain("Codex");
   expect(host.textContent).toContain("sample-model");
   expect(host.textContent).toContain("high");
-  expect(host.textContent).toContain("Pages are sent to Codex as images");
-  expect(button("Import with AI").disabled).toBe(false);
+  expect(host.textContent).toContain(
+    "Pages are sent to Codex using your ChatGPT plan",
+  );
+  expect(button("Choose PDF").disabled).toBe(false);
   status = { ...status, ready: false, issue: "AI_MODEL_IMAGE_UNSUPPORTED" };
-  await act(async () => button("Check connection").click());
-  expect(host.textContent).toContain("does not report image support");
-  expect(button("Import with AI").disabled).toBe(true);
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  expect(host.textContent).toContain("This model cannot read PDFs");
+  expect(button("Choose PDF").disabled).toBe(true);
   await render(false);
   status = { ...ready };
   await render(true);
-  expect(button("Import with AI").disabled).toBe(false);
+  expect(button("Choose PDF").disabled).toBe(false);
 });
 
 it("opens the exact shared review for AI output even when the local parser is unavailable, without saving", async () => {
   const value = snapshot();
   result = { ok: true, value };
   await render();
-  expect(button("Import resume").disabled).toBe(true);
-  await act(async () => button("Import with AI").click());
+  expect(button("Choose file").disabled).toBe(true);
+  await act(async () => button("Choose PDF").click());
   expect(native.invoke).toHaveBeenCalledWith("begin_ai_document_import", {
     request: expect.objectContaining({ payload: { expectedRevision: 3 } }),
   });
@@ -141,19 +144,20 @@ it("opens the exact shared review for AI output even when the local parser is un
   expect(busy).toHaveBeenLastCalledWith(true);
   await act(async () => button("Cancel shared review").click());
   expect(busy).toHaveBeenLastCalledWith(false);
-  expect(document.activeElement).toBe(button("Import with AI"));
+  expect(document.activeElement).toBe(button("Choose PDF"));
 });
 
 it.each([
-  ["AI_PROVIDER_TIMEOUT", "timed out after 2 minutes"],
-  ["AI_PROVIDER_BAD_REQUEST", "structured-output settings"],
-  ["AI_OUTPUT_INVALID", "does not match the resume format"],
+  ["AI_PROVIDER_TIMEOUT", "AI import timed out"],
+  ["AI_PROVIDER_BAD_REQUEST", "could not accept this document"],
+  ["AI_OUTPUT_INVALID", "AI returned an invalid resume"],
   ["AI_PROVIDER_UNAVAILABLE", "connection failed"],
-  ["AI_PDF_RENDER_FAILED", "could not be prepared"],
-  ["AI_PDF_PAGE_LIMIT", "1–10 pages"],
-  ["PLAN_REQUEST_TIMEOUT", "Codex import timed out"],
+  ["AI_PDF_RENDER_FAILED", "This PDF could not be read"],
+  ["AI_PDF_PAGE_LIMIT", "exceeds the page limit"],
+  ["PLAN_REQUEST_TIMEOUT", "AI import timed out"],
+  ["UNEXPECTED_PROVIDER_DIAGNOSTIC", "Import failed; try again"],
 ])(
-  "shows %s and its detailed diagnostic without entering review",
+  "shows a concise %s error without exposing diagnostics or entering review",
   async (code, message) => {
     result = {
       ok: false,
@@ -173,12 +177,13 @@ it.each([
       },
     };
     await render();
-    await act(async () => button("Import with AI").click());
+    await act(async () => button("Choose PDF").click());
     const error = host.querySelector('[role="alert"]')!;
     expect(error.textContent).toContain(message);
-    expect(error.textContent).toContain(code);
-    expect(error.textContent).toContain("400");
-    expect(error.textContent).toContain("Missing required entry slot.");
+    expect(error.textContent).not.toContain(code);
+    expect(error.textContent).not.toContain("400");
+    expect(error.textContent).not.toContain("Missing required entry slot.");
+    expect(error.querySelector("details")).toBeNull();
     expect(review.render).not.toHaveBeenCalled();
     expect(saved).not.toHaveBeenCalled();
     expect(busy).toHaveBeenLastCalledWith(false);
@@ -187,15 +192,15 @@ it.each([
 
 it("handles picker cancellation and blocks duplicate launches while a request is pending", async () => {
   await render();
-  await act(async () => button("Import with AI").click());
+  await act(async () => button("Choose PDF").click());
   expect(busy).toHaveBeenLastCalledWith(false);
   let finish!: (value: unknown) => void;
   result = new Promise((resolve) => {
     finish = resolve;
   });
   await act(async () => {
-    button("Import with AI").click();
-    button("Import with AI").click();
+    button("Choose PDF").click();
+    button("Choose PDF").click();
   });
   expect(
     native.invoke.mock.calls.filter(
@@ -215,7 +220,7 @@ it("rejects malformed native readiness and import replies instead of enabling im
   expect((await aiImportStatus()).ok).toBe(false);
   expect((await beginAiDocumentImport(3)).ok).toBe(false);
   await render();
-  expect(button("Import with AI").disabled).toBe(true);
+  expect(button("Choose PDF").disabled).toBe(true);
   expect(host.querySelector('[role="alert"]')?.textContent).toContain(
     "readiness could not be checked",
   );

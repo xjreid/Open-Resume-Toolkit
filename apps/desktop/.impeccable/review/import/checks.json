@@ -1,0 +1,101 @@
+[
+  {
+    "name": "desktop",
+    "width": 990,
+    "scrollWidth": 990,
+    "radius": "12px",
+    "buttons": [
+      {
+        "text": "Choose file",
+        "disabled": false,
+        "height": 44
+      },
+      {
+        "text": "Choose PDF",
+        "disabled": false,
+        "height": 44
+      }
+    ],
+    "metadata": [
+      "Codex",
+      "gpt-6.1-sol",
+      "high"
+    ]
+  },
+  {
+    "name": "default",
+    "width": 850,
+    "scrollWidth": 850,
+    "radius": "12px",
+    "buttons": [
+      {
+        "text": "Choose file",
+        "disabled": false,
+        "height": 44
+      },
+      {
+        "text": "Choose PDF",
+        "disabled": false,
+        "height": 44
+      }
+    ],
+    "metadata": [
+      "Codex",
+      "gpt-6.1-sol",
+      "high"
+    ]
+  },
+  {
+    "name": "minimum",
+    "width": 614,
+    "scrollWidth": 614,
+    "radius": "12px",
+    "buttons": [
+      {
+        "text": "Choose file",
+        "disabled": false,
+        "height": 44
+      },
+      {
+        "text": "Choose PDF",
+        "disabled": false,
+        "height": 44
+      }
+    ],
+    "metadata": [
+      "Codex",
+      "gpt-6.1-sol",
+      "high"
+    ]
+  },
+  {
+    "name": "mobile",
+    "width": 284,
+    "scrollWidth": 284,
+    "radius": "12px",
+    "buttons": [
+      {
+        "text": "Choose file",
+        "disabled": false,
+        "height": 44
+      },
+      {
+        "text": "Choose PDF",
+        "disabled": false,
+        "height": 44
+      }
+    ],
+    "metadata": [
+      "Codex",
+      "gpt-6.1-sol",
+      "high"
+    ]
+  },
+  {
+    "aiError": "Import failed because AI returned an invalid resume; try another model."
+  },
+  {
+    "a11y": [],
+    "errors": []
+  }
+]
