@@ -269,19 +269,112 @@ fn styled_exports_keep_dates_and_match_preview_page_geometry() {
 
     let mut document = support::fixture("standard");
     document.sections[0].entries[0].date_range = "2022–Present".into();
-    for (style, tab, margin) in [
-        (DocumentStyle::Technical, "10710", "765"),
-        (DocumentStyle::Professional, "10470", "885"),
-        (DocumentStyle::Modern, "10530", "855"),
+    for (style, width, margin) in [
+        (DocumentStyle::Technical, "10500", "765"),
+        (DocumentStyle::Professional, "10260", "885"),
+        (DocumentStyle::Modern, "10320", "855"),
     ] {
         let values = parts(&ort_documents::render_docx_with_style(&document, style).unwrap());
         assert!(values["word/document.xml"].contains("2022–Present"));
         assert!(
             values["word/document.xml"]
-                .contains(&format!("<w:tab w:val=\"right\" w:pos=\"{tab}\"/>"))
+                .contains(&format!("<w:tblW w:w=\"{width}\" w:type=\"dxa\"/>"))
         );
         assert!(values["word/document.xml"].contains(&format!(
             "w:top=\"675\" w:right=\"{margin}\" w:bottom=\"675\" w:left=\"{margin}\""
         )));
+    }
+}
+
+#[test]
+fn every_export_style_places_legacy_and_structured_dates_before_location() {
+    use ort_domain::{CalendarDate, DateEnd, DocumentStyle, EntityId, ResumeDate};
+    for structured in [false, true] {
+        let mut document = support::fixture("standard").upgraded_v2().unwrap();
+        let entry = &mut document.sections[0].entries[0];
+        entry.location = "Example City, MD".into();
+        entry.date_range = if structured {
+            String::new()
+        } else {
+            "Aug. 2026–Dec. 2029".into()
+        };
+        entry.dates = Some(if structured {
+            vec![ResumeDate {
+                id: EntityId::new(),
+                order: 0,
+                label: String::new(),
+                start: Some(CalendarDate {
+                    year: 2026,
+                    month: Some(8),
+                    expected: false,
+                }),
+                end: Some(DateEnd::Date {
+                    value: CalendarDate {
+                        year: 2029,
+                        month: Some(12),
+                        expected: false,
+                    },
+                }),
+            }]
+        } else {
+            vec![]
+        });
+        for style in [
+            DocumentStyle::Plain,
+            DocumentStyle::Technical,
+            DocumentStyle::Professional,
+            DocumentStyle::Modern,
+        ] {
+            let values = parts(&ort_documents::render_docx_with_style(&document, style).unwrap());
+            let xml = &values["word/document.xml"];
+            assert!(
+                xml.find("Aug. 2026–Dec. 2029").unwrap() < xml.find("Example City, MD").unwrap(),
+                "{style:?}, structured={structured}"
+            );
+        }
+        let text = ort_documents::render_plain_text(&document).unwrap();
+        assert!(text.find("Aug. 2026–Dec. 2029").unwrap() < text.find("Example City, MD").unwrap());
+    }
+}
+
+#[test]
+fn wrapped_header_text_and_metadata_use_independent_top_aligned_columns() {
+    use ort_domain::DocumentStyle;
+    for style in [
+        DocumentStyle::Plain,
+        DocumentStyle::Technical,
+        DocumentStyle::Professional,
+        DocumentStyle::Modern,
+    ] {
+        let mut document = support::fixture("standard");
+        let entry = &mut document.sections[0].entries[0];
+        entry.heading = "Organization with a long name that can wrap across multiple lines".into();
+        entry.subheading =
+            "*First role line*\n[Second role line](https://example.org/role)\nThird role line"
+                .into();
+        entry.location = "Example City".into();
+        let values = parts(&ort_documents::render_docx_with_style(&document, style).unwrap());
+        let xml = &values["word/document.xml"];
+        let table = xml
+            .split("<w:tbl>")
+            .nth(1)
+            .unwrap()
+            .split("</w:tbl>")
+            .next()
+            .unwrap();
+        let cells = table.split("<w:tc>").skip(1).collect::<Vec<_>>();
+        assert_eq!(cells.len(), 2);
+        assert!(cells[0].contains("First role line") && cells[0].contains("Third role line"));
+        assert!(
+            cells[0].contains("<w:br/>")
+                && cells[0].contains("<w:i/>")
+                && cells[0].contains("<w:hyperlink")
+        );
+        assert!(!cells[0].contains("Example City"));
+        assert!(cells[1].contains("2023–2026") && cells[1].contains("Example City"));
+        assert!(!cells[1].contains("role line"));
+        assert_eq!(table.matches("<w:vAlign w:val=\"top\"/>").count(), 2);
+        assert!(cells[1].contains("<w:jc w:val=\"right\"/>"));
+        assert!(xml.find("</w:tbl>").unwrap() < xml.find("Built an offline").unwrap());
     }
 }

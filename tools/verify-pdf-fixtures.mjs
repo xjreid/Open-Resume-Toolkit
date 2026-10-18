@@ -136,7 +136,7 @@ const expectedVisibleText = (source, documentStyle) => {
         .map((field) => field.value)
         .filter((value) => value.trim())
         .join("\n");
-      const rightRows = [entry.location, dates, extras].filter((value) =>
+      const rightRows = [dates, entry.location, extras].filter((value) =>
         value.trim(),
       );
       if (documentStyle === "plain") {
@@ -259,6 +259,19 @@ for (const kind of kinds) {
       assert(structure, "tagged reading structure");
       collectRoles(structure);
       const content = await page.getTextContent();
+      if (kind === "standard" && number === 1) {
+        const entry = source.sections[0].entries[0];
+        const date = entry.dateRange || visibleDate(entry.dates[0]);
+        const dateItem = content.items.find((item) => item.str === date);
+        const locationItem = content.items.find(
+          (item) => item.str === entry.location,
+        );
+        assert(dateItem && locationItem, "date and location are visible");
+        assert(
+          dateItem.transform[5] > locationItem.transform[5],
+          "entry date appears above location",
+        );
+      }
       for (const item of content.items) {
         if (!("str" in item)) continue;
         text += item.str + (item.hasEOL ? "\n" : " ");

@@ -172,17 +172,13 @@ pub fn render_plain_text(document: &ResumeDocument) -> Result<String, TextExport
         let mut entries = Vec::new();
         for entry in &section.entries {
             let mut lines = Vec::new();
-            for value in [
-                &entry.heading,
-                &entry.subheading,
-                &entry.date_range,
-                &entry.location,
-            ] {
+            for value in [&entry.heading, &entry.subheading, &entry.date_range] {
                 push_nonempty(&mut lines, value)?;
             }
             for date in entry.dates.iter().flatten() {
                 push_nonempty(&mut lines, &date.display_text())?;
             }
+            push_nonempty(&mut lines, &entry.location)?;
             for field in &entry.fields {
                 let value = normalized(&field.value)?;
                 if value.is_empty() {

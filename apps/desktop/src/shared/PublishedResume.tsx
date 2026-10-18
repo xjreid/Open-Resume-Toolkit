@@ -174,11 +174,6 @@ export function PublishedResume({
                   ) : null}
                 </div>
                 <div className="resume-document__meta">
-                  {entry.location.trim() ? (
-                    <p>
-                      <FormattedText value={entry.location} />
-                    </p>
-                  ) : null}
                   {entry.dateRange.trim() ? (
                     <p>
                       <FormattedText value={entry.dateRange} />
@@ -189,6 +184,11 @@ export function PublishedResume({
                     .map((date) => (
                       <p key={date.id}>{dateText(date)}</p>
                     ))}
+                  {entry.location.trim() ? (
+                    <p>
+                      <FormattedText value={entry.location} />
+                    </p>
+                  ) : null}
                   {fieldsForRole(entry, "extra")
                     .filter((field) => field.value.trim())
                     .map((field) => (

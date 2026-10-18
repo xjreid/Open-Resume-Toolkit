@@ -89,3 +89,52 @@ it("keeps entry actions in the editable view without inventing document content"
   }
   expect(JSON.stringify(document)).toBe(before);
 });
+
+it.each(["technical", "professional", "modern"] as const)(
+  "%s keeps legacy and structured dates above location and extra details",
+  (style) => {
+    for (const structured of [false, true]) {
+      const document = createResumeDocument();
+      const section = createSection(0);
+      const entry = createEntry(0);
+      entry.heading = "Example University";
+      entry.subheading = "B.S. in Computer Science";
+      entry.location = "Example City, MD";
+      entry.dateRange = structured ? "" : "Aug. 2026–Dec. 2029";
+      entry.dates = structured
+        ? [
+            {
+              id: crypto.randomUUID(),
+              order: 0,
+              label: "",
+              start: { year: 2026, month: 8, expected: false },
+              end: {
+                kind: "date",
+                value: { year: 2029, month: 12, expected: false },
+              },
+            },
+          ]
+        : [];
+      entry.fields = [
+        { ...createNamedField(0), label: "Extra", value: "GPA: 4.0/4.0" },
+      ];
+      section.entries = [entry];
+      document.sections = [section];
+      const before = JSON.stringify(document);
+      for (const pdf of [false, true]) {
+        const html = renderToStaticMarkup(
+          <PublishedResume document={document} style={style} pdf={pdf} />,
+        );
+        const meta = html.slice(html.indexOf('class="resume-document__meta"'));
+        expect(meta.indexOf("Aug. 2026–Dec. 2029")).toBeGreaterThan(-1);
+        expect(meta.indexOf("Aug. 2026–Dec. 2029")).toBeLessThan(
+          meta.indexOf("Example City, MD"),
+        );
+        expect(meta.indexOf("Example City, MD")).toBeLessThan(
+          meta.indexOf("GPA: 4.0/4.0"),
+        );
+      }
+      expect(JSON.stringify(document)).toBe(before);
+    }
+  },
+);

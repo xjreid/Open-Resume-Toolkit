@@ -402,7 +402,7 @@ fn entry_header(
     };
     let extras = entry.field_text(ort_domain::FieldRole::Extra, "\n");
     if style != DocumentStyle::Plain {
-        let right = [entry.location.as_str(), dates.as_str(), extras.as_str()]
+        let right = [dates.as_str(), entry.location.as_str(), extras.as_str()]
             .into_iter()
             .filter(|value| !value.trim().is_empty())
             .collect::<Vec<_>>()
@@ -411,7 +411,7 @@ fn entry_header(
         if !title.is_empty() || !subtitle.is_empty() || !right.is_empty() {
             let index = entries.len();
             // One pair of independent stacks: a wrapped title must not move
-            // the location/dates down. The body still follows both stacks.
+            // the dates/location down. The body still follows both stacks.
             if title.is_empty() && right.is_empty() {
                 push_paragraph(entries, "entry", subtitle, vec![]);
             } else {
@@ -423,7 +423,7 @@ fn entry_header(
         }
         return;
     }
-    let mut right_rows = [entry.location.as_str(), dates.as_str(), extras.as_str()]
+    let mut right_rows = [dates.as_str(), entry.location.as_str(), extras.as_str()]
         .into_iter()
         .map(|value| inline_runs(value, false, false))
         .filter(|runs| !runs.is_empty());

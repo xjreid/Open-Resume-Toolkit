@@ -9,9 +9,7 @@ pub const DOCX_TEMPLATE_ID: &str = "plain_docx_v1";
 pub const MAX_DOCX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_XML_BYTES: usize = 1024 * 1024;
 const CONTENT_INDENT_TWIPS: u16 = 210;
-const TECHNICAL_TAB_TWIPS: u16 = 10_710;
-const PROFESSIONAL_TAB_TWIPS: u16 = 10_470;
-const MODERN_TAB_TWIPS: u16 = 10_530;
+mod header;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocxExportError {
@@ -87,7 +85,7 @@ pub fn render_docx_with_style(
                 &mut relationships,
                 &mut next_link,
                 entry,
-                tab_position(style),
+                style,
             )?;
             for field in entry
                 .fields_for_role(ort_domain::FieldRole::Paragraph)
@@ -184,15 +182,6 @@ pub fn render_docx_with_style(
             },
         ),
     ])
-}
-
-const fn tab_position(style: DocumentStyle) -> u16 {
-    match style {
-        DocumentStyle::Plain => 9360,
-        DocumentStyle::Technical => TECHNICAL_TAB_TWIPS,
-        DocumentStyle::Professional => PROFESSIONAL_TAB_TWIPS,
-        DocumentStyle::Modern => MODERN_TAB_TWIPS,
-    }
 }
 
 const fn document_end(style: DocumentStyle) -> &'static str {
@@ -328,7 +317,7 @@ fn entry_rows(
     relationships: &mut Xml,
     next_link: &mut usize,
     entry: &ort_domain::ResumeEntry,
-    tab_position: u16,
+    style: DocumentStyle,
 ) -> Result<(), DocxExportError> {
     let mut title = spans(&entry.heading, true, false)?;
     let details = entry.field_text(ort_domain::FieldRole::Details, " | ");
@@ -349,49 +338,22 @@ fn entry_rows(
     );
     let dates = date_lines.join("\n");
     let extras = entry.field_text(ort_domain::FieldRole::Extra, "\n");
-    let mut right_rows = [entry.location.as_str(), dates.as_str(), extras.as_str()]
+    let right_rows = [dates.as_str(), entry.location.as_str(), extras.as_str()]
         .into_iter()
         .map(|value| spans(value, false, false))
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
-        .filter(|runs| !runs.is_empty());
-
-    let first_right = right_rows.next().unwrap_or_default();
-    paired_paragraph(
+        .filter(|runs| !runs.is_empty())
+        .collect::<Vec<_>>();
+    header::write(
         body,
         relationships,
         next_link,
-        "Heading2",
+        style,
         &title,
-        &first_right,
-        tab_position,
-        false,
-    )?;
-
-    let second_right = right_rows.next().unwrap_or_default();
-    paired_paragraph(
-        body,
-        relationships,
-        next_link,
-        "Normal",
         &spans(&entry.subheading, false, false)?,
-        &second_right,
-        tab_position,
-        true,
-    )?;
-    for right in right_rows {
-        paired_paragraph(
-            body,
-            relationships,
-            next_link,
-            "Normal",
-            &[],
-            &right,
-            tab_position,
-            true,
-        )?;
-    }
-    Ok(())
+        &right_rows,
+    )
 }
 
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
@@ -450,61 +412,6 @@ fn paragraph_with_spans(
     }
     body.push("</w:pPr>")?;
     write_spans(body, relationships, next_link, content)?;
-    body.push("</w:p>")
-}
-
-#[allow(clippy::too_many_arguments)]
-fn paired_paragraph(
-    body: &mut Xml,
-    relationships: &mut Xml,
-    next_link: &mut usize,
-    style: &str,
-    left: &[InlineSpan],
-    right: &[InlineSpan],
-    tab_position: u16,
-    compact: bool,
-) -> Result<(), DocxExportError> {
-    if left.is_empty() && right.is_empty() {
-        return Ok(());
-    }
-    body.push("<w:p><w:pPr><w:pStyle w:val=\"")?;
-    body.push(style)?;
-    body.push("\"/>")?;
-    if style == "Heading2" {
-        body.push("<w:keepNext/><w:spacing w:before=\"40\" w:after=\"20\"/>")?;
-    } else if compact {
-        // Reserve a real line box for right-only rows in Word and LibreOffice.
-        // This prevents baseline collisions without adding empty lines.
-        body.push(match tab_position {
-            TECHNICAL_TAB_TWIPS => {
-                "<w:keepNext/><w:spacing w:after=\"40\" w:line=\"247\" w:lineRule=\"atLeast\"/>"
-            }
-            PROFESSIONAL_TAB_TWIPS => {
-                "<w:keepNext/><w:spacing w:after=\"40\" w:line=\"277\" w:lineRule=\"atLeast\"/>"
-            }
-            MODERN_TAB_TWIPS => {
-                "<w:keepNext/><w:spacing w:after=\"40\" w:line=\"272\" w:lineRule=\"atLeast\"/>"
-            }
-            _ => "<w:keepNext/><w:spacing w:after=\"0\"/>",
-        })?;
-    }
-    body.push("<w:ind w:left=\"")?;
-    body.push(&CONTENT_INDENT_TWIPS.to_string())?;
-    body.push("\"/>")?;
-    body.push("<w:tabs><w:tab w:val=\"right\" w:pos=\"")?;
-    body.push(&tab_position.to_string())?;
-    body.push("\"/></w:tabs></w:pPr>")?;
-    if left.is_empty() && !right.is_empty() {
-        // A non-empty left run gives LibreOffice a line box for metadata-only
-        // rows, preventing the following bullet from sharing its baseline.
-        body.text_run(" ", false, false, false)?;
-    } else {
-        write_spans(body, relationships, next_link, left)?;
-    }
-    if !right.is_empty() {
-        body.push("<w:r><w:tab/></w:r>")?;
-        write_spans(body, relationships, next_link, right)?;
-    }
     body.push("</w:p>")
 }
 

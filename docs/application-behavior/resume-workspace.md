@@ -109,6 +109,16 @@ remains editable; no dates or professional facts are invented. Sections can be
 renamed, added, deleted and reordered with drag or keyboard buttons. Edits and
 undo/redo affect only this imported draft; review does not autosave.
 
+AI import uses the same review canvas. Date details always map to its top-right
+Date selector, regardless of source placement; other details retain their source
+side and order. Dates populate structured selector values and display as
+month/year or year-only dates and ranges, with Present for ongoing ranges.
+Missing months stay unspecified; qualifiers such as Expected remain in ordinary
+detail text. Unsupported date values fail validation instead of entering the
+selector as free text. Consecutive
+unbulleted body items, including skills and coursework, stay consecutive without
+added blank lines; explicit source paragraph breaks remain intact.
+
 **Map to current saved resume** validates the reviewed document and replaces the
 entire saved draft in one revision-checked transaction, then opens Edit. It does
 not merge with old content or modify published snapshots. **Cancel** discards the
@@ -133,6 +143,12 @@ version switch selects:
 The selected source determines both what is displayed and what the View export
 buttons export. A published snapshot never silently changes when the draft is
 edited later.
+
+Entry dates appear above location, followed by any extra details, matching the
+Edit layout. The same order applies to PDF, Word, and plain-text output for
+both existing free-text dates and structured dates. Word entry headers use
+independent columns: line breaks or wrapping in the title and role do not move
+the date, location, or extra details down. Body content follows both columns.
 
 ## Resume style
 

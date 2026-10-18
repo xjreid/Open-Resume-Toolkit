@@ -70,21 +70,13 @@ def expected_paragraphs(source, style):
             date_values.extend(date_text(date) for date in entry.get("dates", []) if date_text(date))
             extras = "\n".join(normalized(field["value"]) for field in fields
                                if normalized(field["label"]).lower() == "extra")
-            right_rows = [normalized(entry["location"]), "\n".join(date_values), extras]
+            right_rows = ["\n".join(date_values), normalized(entry["location"]), extras]
             right_rows = [value for value in right_rows if value]
 
-            def paired(left, right, paragraph_style):
-                if not left and not right:
-                    return
-                # Inputs are already normalized. Preserve the renderer's line-box
-                # spacer and semantic tab in metadata-only header rows.
-                spacer = " " if not left and right else ""
-                paragraphs.append((spacer + left + ("\t" + right if right else ""), paragraph_style, False))
-
-            paired(title, right_rows.pop(0) if right_rows else "", "Heading2")
-            paired(normalized(entry["subheading"]), right_rows.pop(0) if right_rows else "", "Normal")
+            add(title, "Heading2")
+            add(entry["subheading"])
             for right in right_rows:
-                paired("", right, "Normal")
+                add(right)
             for field in fields:
                 if field["label"] == "__ort_body_paragraph__":
                     add(field["value"])
@@ -120,11 +112,13 @@ def expected_text(source):
         entries = []
         for entry in section["entries"]:
             lines = []
-            for key in ("heading", "subheading", "dateRange", "location"):
+            for key in ("heading", "subheading", "dateRange"):
                 value = normalized(entry[key])
                 if value:
                     lines.append(value)
             lines.extend(date_text(date) for date in entry.get("dates", []) if date_text(date))
+            if normalized(entry["location"]):
+                lines.append(normalized(entry["location"]))
             for field in entry["fields"]:
                 value, label = normalized(field["value"]), normalized(field["label"])
                 if value:
@@ -169,12 +163,29 @@ def verify(data, source, style="plain"):
     assert document.tag == W + "document"
     allowed = {W + tag for tag in ("document", "body", "p", "pPr", "pStyle", "r", "rPr", "t",
                "br", "tab", "tabs", "numPr", "ilvl", "numId", "hyperlink", "sectPr", "pgSz", "pgMar",
-               "spacing", "ind", "keepNext", "b", "i", "u", "color")}
+               "spacing", "ind", "keepNext", "b", "i", "u", "color", "jc",
+               "tbl", "tblPr", "tblW", "tblInd", "tblLayout", "tblCellMar",
+               "top", "left", "bottom", "right", "tblGrid", "gridCol", "tr",
+               "tc", "tcPr", "tcW", "vAlign", "tcMar")}
     assert all(node.tag in allowed for node in document.iter()), "no fields, media or active content"
     body = document.find(W + "body")
     assert body is not None
+    width = {"plain": 9360, "technical": 10710, "professional": 10470, "modern": 10530}[style] - 210
+    for table in body.iter(W + "tbl"):
+        assert table in list(body), "only entry header tables; no nesting"
+        assert table.find(f"{W}tblPr/{W}tblLayout").get(W + "type") == "fixed"
+        assert table.find(f"{W}tblPr/{W}tblW").get(W + "w") == str(width)
+        rows = table.findall(W + "tr")
+        assert len(rows) == 1, "independent columns share one row"
+        cells = rows[0].findall(W + "tc")
+        assert len(cells) == 2, "two header columns"
+        for cell, cell_width in zip(cells, (width - width // 4, width // 4)):
+            assert cell.find(f"{W}tcPr/{W}vAlign").get(W + "val") == "top"
+            assert cell.find(f"{W}tcPr/{W}tcW").get(W + "w") == str(cell_width)
+        for p in cells[1].findall(W + "p"):
+            assert p.find(f"{W}pPr/{W}jc").get(W + "val") == "right"
     actual = []
-    for p in body.findall(W + "p"):
+    for p in body.iter(W + "p"):
         # Paragraph-property tabs describe layout; only tabs in content runs
         # are semantic text separators.
         content_nodes = (n for child in p if child.tag != W + "pPr" for n in child.iter())
@@ -245,7 +256,7 @@ def rejection_checks(data, source, style="plain"):
         {"word/document.xml": original["word/document.xml"].replace(b"<w:body>", b"<w:body><w:object/>")},
         {"word/document.xml": original["word/document.xml"].replace(b"Software Engineer", b"Changed content")},
         {"word/document.xml": original["word/document.xml"].replace(b'val="Heading1"', b'val="Normal"')},
-        {"word/document.xml": original["word/document.xml"].replace(b"<w:r><w:tab/></w:r>", b"", 1)},
+        {"word/document.xml": original["word/document.xml"].replace(b'<w:vAlign w:val="top"/>', b'<w:vAlign w:val="bottom"/>', 1)},
         {"word/_rels/document.xml.rels": original["word/_rels/document.xml.rels"].replace(b"/hyperlink", b"/attachedTemplate")},
         {"word/_rels/document.xml.rels": original["word/_rels/document.xml.rels"].replace(b"https://example.org/project", b"file:///private/secret")},
         {"word/styles.xml": original["word/styles.xml"].replace(b"\n", b"\r\n")},

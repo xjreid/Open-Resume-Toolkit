@@ -350,3 +350,80 @@ it("requests a saved-workspace refresh after an uncertain mapping and keeps the 
   expect(host.textContent).toContain("save was not confirmed");
   expect(saved).not.toHaveBeenCalled();
 });
+
+it.each([
+  {
+    startMonth: 1,
+    endMonth: 9,
+    ongoing: false,
+    display: "Jan. 2020–Sep. 2024",
+  },
+  {
+    startMonth: 5,
+    endMonth: null,
+    ongoing: true,
+    display: "May. 2020–Present",
+  },
+  { startMonth: null, endMonth: null, ongoing: false, display: "2020–2024" },
+])(
+  "opens imported $display with populated date selectors and saves structured values",
+  async ({ startMonth, endMonth, ongoing, display }) => {
+    const entry = snapshot.importedDocument.sections[0].entries[0];
+    entry.dateRange = "";
+    entry.dates = [
+      {
+        id: crypto.randomUUID(),
+        order: 0,
+        label: "",
+        start: { year: 2020, month: startMonth, expected: false },
+        end: ongoing
+          ? { kind: "present" }
+          : {
+              kind: "date",
+              value: { year: 2024, month: endMonth, expected: false },
+            },
+      },
+    ];
+    client.mapImportReview.mockImplementation(async (_id, document) => ({
+      ok: true,
+      value: { revision: 2, document },
+    }));
+    await render();
+    expect(host.textContent).toContain(display);
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>(".canvas-date-field button")!
+        .click(),
+    );
+    expect(
+      host.querySelector<HTMLInputElement>('input[aria-label="Start year"]')!
+        .value,
+    ).toBe("2020");
+    expect(
+      host.querySelector<HTMLSelectElement>('select[aria-label="Start month"]')!
+        .value,
+    ).toBe(startMonth?.toString() ?? "");
+    expect(
+      host.querySelector<HTMLSelectElement>(
+        ".canvas-date-editor__end-mode select",
+      )!.value,
+    ).toBe(ongoing ? "present" : "date");
+    if (!ongoing) {
+      expect(
+        host.querySelector<HTMLInputElement>('input[aria-label="End year"]')!
+          .value,
+      ).toBe("2024");
+      expect(
+        host.querySelector<HTMLSelectElement>('select[aria-label="End month"]')!
+          .value,
+      ).toBe(endMonth?.toString() ?? "");
+    }
+    expect(host.textContent).not.toContain("Choosing a date below replaces");
+    await act(async () => button("Done").click());
+    await act(async () => button("Map to current saved resume").click());
+    const submitted =
+      client.mapImportReview.mock.calls[0][1].sections[0].entries[0];
+    expect(submitted.dateRange).toBe("");
+    expect(submitted.dates).toEqual(entry.dates);
+  },
+);

@@ -15,13 +15,8 @@ fn maps_all_seven_slots_and_generates_valid_native_identities() {
     assert_eq!(document.contact.links[0].url, "https://example.com");
     let entry = &document.sections[0].entries[0];
     assert_eq!(
-        (
-            &*entry.heading,
-            &*entry.subheading,
-            &*entry.date_range,
-            &*entry.location
-        ),
-        ("Example Company", "Engineer", "2022–Present", "Remote")
+        (&*entry.heading, &*entry.subheading, &*entry.location),
+        ("Example Company", "Engineer", "Remote")
     );
     assert_eq!(
         entry.field_text(ort_domain::FieldRole::Details, ""),
@@ -33,8 +28,13 @@ fn maps_all_seven_slots_and_generates_valid_native_identities() {
     );
     assert_eq!(entry.bullets[0].text, "Built a sample service.");
     assert_eq!(
+        entry.dates.as_ref().unwrap()[0].display_text(),
+        "2022–Present"
+    );
+    assert!(entry.date_range.is_empty());
+    assert_eq!(
         document.sections[1].entries[0].field_text(ort_domain::FieldRole::Paragraph, ""),
-        "First paragraph.\n\nSecond paragraph."
+        "First paragraph.\nSecond paragraph."
     );
     assert_ne!(
         document.document_id,
@@ -331,21 +331,24 @@ fn gemini_import_limits_reasoning_to_leave_room_for_resume_json() {
 }
 
 #[test]
-fn positional_slots_keep_links_under_the_title_and_dates_on_the_left() {
+fn dates_override_position_without_moving_project_links_or_losing_right_hand_text() {
     let mut value = input()["formatExampleOnly"].clone();
     let entry = &mut value["sections"][1]["entries"][0];
     entry["leftSubheading"] = json!("[GitHub](https://github.com/example/project)\n2024–2025");
     entry["rightTop"] = json!("Boston");
-    entry["rightMiddle"] = json!("2025");
+    entry["rightMiddle"] = json!("");
     let document = decode(&value.to_string()).unwrap();
     let project = &document.sections[1].entries[0];
     assert_eq!(
         project.subheading,
-        "[GitHub](https://github.com/example/project)\n2024–2025"
+        "[GitHub](https://github.com/example/project)"
     );
     assert_eq!(project.heading, "Example Project");
-    assert_eq!(project.date_range, "Boston");
-    assert_eq!(project.location, "2025");
+    assert_eq!(
+        project.dates.as_ref().unwrap()[0].display_text(),
+        "2024–2025"
+    );
+    assert_eq!(project.location, "Boston");
     assert_eq!(project.field_text(ort_domain::FieldRole::Extra, ""), "");
     assert_eq!(
         project.field_text(ort_domain::FieldRole::Details, ""),
@@ -517,4 +520,184 @@ fn gemini_pdf_schema_avoids_nested_union_and_array_limit_expansion() {
     let mut value = input()["formatExampleOnly"].clone();
     value["sections"][0]["entries"][0]["mainInfo"]["items"] = json!(["x".repeat(501)]);
     assert!(decode(&value.to_string()).is_err());
+}
+
+#[test]
+fn import_body_lines_do_not_gain_blank_lines_and_explicit_paragraph_breaks_survive() {
+    for heading in ["Skills", "Coursework"] {
+        let mut value = proposal();
+        value["sections"][1]["heading"] = json!(heading);
+        value["sections"][1]["entries"][0]["mainInfo"]["items"] = json!([
+            "Programming: Rust, Python",
+            "Tools: Git, SQL",
+            "First paragraph.\n\nSecond paragraph."
+        ]);
+        let document = decode(&value.to_string()).unwrap();
+        assert_eq!(
+            document.sections[1].entries[0].field_text(ort_domain::FieldRole::Paragraph, ""),
+            "Programming: Rust, Python\nTools: Git, SQL\nFirst paragraph.\n\nSecond paragraph."
+        );
+    }
+}
+
+#[test]
+fn dates_in_every_header_slot_and_standalone_body_lines_use_the_date_box() {
+    for slot in [
+        "leftHeading",
+        "leftSubheading",
+        "headingSuffix",
+        "rightMiddle",
+        "rightBottom",
+    ] {
+        let mut value = input()["formatExampleOnly"].clone();
+        let entry = &mut value["sections"][1]["entries"][0];
+        entry["rightTop"] = json!("");
+        entry[slot] = json!("Expected May 2027");
+        let document = decode(&value.to_string()).unwrap();
+        let entry = &document.sections[1].entries[0];
+        assert_eq!(
+            entry.dates.as_ref().unwrap()[0].display_text(),
+            "May. 2027",
+            "{slot}"
+        );
+        assert!(entry.date_range.is_empty());
+        assert_eq!(
+            entry.field_text(ort_domain::FieldRole::Extra, ""),
+            "Expected"
+        );
+        assert!(
+            ![
+                entry.heading.as_str(),
+                entry.subheading.as_str(),
+                entry.location.as_str()
+            ]
+            .contains(&"Expected May 2027")
+        );
+        assert!(
+            entry
+                .fields
+                .iter()
+                .all(|field| !field.value.contains("Expected May 2027"))
+        );
+    }
+    let mut value = input()["formatExampleOnly"].clone();
+    let entry = &mut value["sections"][1]["entries"][0];
+    entry["rightTop"] = json!("");
+    entry["mainInfo"] =
+        json!({"format":"paragraph","items":["May 2024–Present", "Built tools in 2024."]});
+    let document = decode(&value.to_string()).unwrap();
+    let entry = &document.sections[1].entries[0];
+    assert_eq!(
+        entry.dates.as_ref().unwrap()[0].display_text(),
+        "May. 2024–Present"
+    );
+    assert_eq!(
+        entry.field_text(ort_domain::FieldRole::Paragraph, ""),
+        "Built tools in 2024."
+    );
+}
+
+#[test]
+fn date_mapping_preserves_nondate_content_and_displaced_right_hand_order() {
+    let mut value = input()["formatExampleOnly"].clone();
+    let entry = &mut value["sections"][1]["entries"][0];
+    entry["leftHeading"] = json!("Project 2024");
+    entry["leftSubheading"] = json!("Engineer | Jan. 2022–Present");
+    entry["headingSuffix"] = json!("SQL Server 2022");
+    entry["rightTop"] = json!("Boston");
+    entry["rightMiddle"] = json!("Remote");
+    entry["rightBottom"] = json!("Part time");
+    let document = decode(&value.to_string()).unwrap();
+    let entry = &document.sections[1].entries[0];
+    assert_eq!(entry.heading, "Project 2024");
+    assert_eq!(entry.subheading, "Engineer");
+    assert_eq!(
+        entry.field_text(ort_domain::FieldRole::Details, ""),
+        "SQL Server 2022"
+    );
+    assert_eq!(
+        entry.dates.as_ref().unwrap()[0].display_text(),
+        "Jan. 2022–Present"
+    );
+    assert_eq!(entry.location, "Boston");
+    assert_eq!(
+        entry.field_text(ort_domain::FieldRole::Extra, ""),
+        "Remote\nPart time"
+    );
+}
+
+#[test]
+fn date_slot_normalizes_supported_formats_into_selector_values() {
+    for (source, display, start_month, end_month) in [
+        (
+            "January 2020 - September 2024",
+            "Jan. 2020–Sep. 2024",
+            Some(1),
+            Some(9),
+        ),
+        ("05/2020 to current", "May. 2020–Present", Some(5), None),
+        ("2020 - 2024", "2020–2024", None, None),
+        ("June 12, 2024", "Jun. 2024", Some(6), None),
+        ("2024-06-12", "Jun. 2024", Some(6), None),
+        ("Fall 2020–Spring 2024", "2020–2024", None, None),
+        ("Present", "Present", None, None),
+    ] {
+        let mut value = proposal();
+        value["sections"][0]["entries"][0]["date"] = json!(source);
+        let document = decode(&value.to_string()).unwrap();
+        let entry = &document.sections[0].entries[0];
+        assert!(entry.date_range.is_empty());
+        let dates = entry.dates.as_ref().unwrap();
+        assert_eq!(dates.len(), 1);
+        let date = &dates[0];
+        assert_eq!(date.display_text(), display);
+        assert_eq!(
+            date.start.as_ref().and_then(|start| start.month),
+            start_month
+        );
+        assert_eq!(
+            match &date.end {
+                Some(ort_domain::DateEnd::Date { value }) => value.month,
+                _ => None,
+            },
+            end_month
+        );
+        assert!(date.label.is_empty());
+        assert!(date.start.as_ref().is_none_or(|start| !start.expected));
+        assert_eq!(entry.location, "Remote");
+        document.validate(DocumentLimits::default()).unwrap();
+    }
+}
+
+#[test]
+fn invalid_or_conflicting_dates_are_not_imported_as_free_text_or_hidden_dates() {
+    for date in ["13/2024", "June someday 2024", "2020–2024\n2015–2016"] {
+        let mut value = proposal();
+        value["sections"][0]["entries"][0]["date"] = json!(date);
+        let error = decode(&value.to_string()).unwrap_err();
+        assert!(error.starts_with("sections[0].entries[0]"));
+        assert!(!error.contains(date));
+    }
+    let mut value = proposal();
+    value["sections"][0]["entries"][0]["date"] = json!("2020–2024\n2020 - 2024");
+    let document = decode(&value.to_string()).unwrap();
+    assert_eq!(
+        document.sections[0].entries[0]
+            .dates
+            .as_ref()
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn a_date_only_entry_remains_readable_after_structured_conversion() {
+    let value = json!({"contact":{}, "sections":[{"heading":"Certification", "entries":[{
+        "rightTop":"May 2024", "mainInfo":{"format":"paragraph", "items":[]}
+    }]}]});
+    let document = decode(&value.to_string()).unwrap();
+    let entry = &document.sections[0].entries[0];
+    assert!(entry.date_range.is_empty());
+    assert_eq!(entry.dates.as_ref().unwrap()[0].display_text(), "May. 2024");
 }

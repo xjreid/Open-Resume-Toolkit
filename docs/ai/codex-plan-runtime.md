@@ -405,7 +405,21 @@ limits, URL rules, and a synthetic format example. Import keys describe position
 `leftHeading`, `headingSuffix` (same line), `leftSubheading` (below the heading),
 `rightTop`, `rightMiddle`, `rightBottom`, and `mainInfo`. These map to the editor's
 existing Title, Details, Role, Date, Location, Extra, and body fields respectively;
-the editor labels never override source placement. Linked entry text uses the
+dates are the one exception to source placement. Any entry date detail or range
+belongs in `rightTop`, the dedicated top-right Date selector, wherever it appears
+in the source. Non-date right-hand content keeps its order in `rightMiddle` and
+`rightBottom`. Native mapping also moves recognizable standalone date details
+out of other slots without reclassifying years in prose or technology names.
+Dates are converted to native structured selector values, with an empty legacy
+free-text date field: month/year ranges, ongoing ranges ending in Present, or
+year-only ranges (and single dates). Missing months stay unspecified; day-level
+dates display at month/year precision. Qualifiers such as Expected or season
+names remain in ordinary detail text. Unparseable date values or multiple
+conflicting date ranges fail validation instead of populating an invalid date
+field or hiding dates behind the single-date selector. Paragraph body items join with
+a single newline; genuine paragraph breaks are explicit inside items, and the
+AI is instructed to rejoin visual wrapping with spaces. Adjacent skills and
+coursework lines do not gain automatic blank lines. Linked entry text uses the
 editor's `[label](URL)` notation in its original slot. Personal profile links
 belong to the single top contact block; explicit extra contact-information
 sections are consolidated without moving project-specific links out of their

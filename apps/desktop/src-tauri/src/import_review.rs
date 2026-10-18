@@ -78,7 +78,8 @@ impl ReviewState {
         let Ok(accepted) = u16::try_from(
             review
                 .proposal()
-                .map_or(0, |proposal| proposal.items().len()),
+                // AI review accepts one whole document, not parser blocks.
+                .map_or(1, |proposal| proposal.items().len()),
         ) else {
             return failure("IMPORT_REVIEW_INVALID");
         };
@@ -587,6 +588,67 @@ mod tests {
         ));
         assert_eq!(store.load_draft().unwrap().unwrap().revision, 1);
         assert_eq!(store.load_draft().unwrap().unwrap().document, imported);
+    }
+
+    #[test]
+    fn native_ai_mapping_saves_reviewed_document_once_for_new_and_existing_drafts() {
+        for existing in [false, true] {
+            let directory = TempDir::new().unwrap();
+            let vault = MemoryDatabaseKeyVault::new();
+            let store =
+                EncryptedStore::open_or_initialize(directory.path(), "test", &vault).unwrap();
+            let mut base = VersionedResumeResponse {
+                revision: 0,
+                document: ResumeDocument::empty("Saved Resume"),
+            };
+            let published = if existing {
+                let saved = store.create_draft(&base.document).unwrap();
+                base.revision = saved.revision;
+                Some(store.publish_draft(saved.revision).unwrap())
+            } else {
+                None
+            };
+            let state = ReviewState::default();
+            let mut imported = ort_ai::resume_import::decode(
+                &ort_ai::resume_import::input()["formatExampleOnly"].to_string(),
+            )
+            .unwrap();
+            let token = state
+                .sessions
+                .lock()
+                .unwrap()
+                .begin_document(state.owner, base.clone(), imported.clone(), Instant::now())
+                .unwrap();
+            imported.contact.full_name = "Edited AI Import".into();
+            let bytes = serde_json::to_vec(&imported).unwrap();
+            let result = state.map(&store, &token.identifier(), &bytes);
+            let CommandResponse::Success { value, .. } = result else {
+                panic!("AI mapping failed: {result:?}");
+            };
+            assert_eq!(value.revision, base.revision + 1);
+            assert_eq!(value.document, imported);
+            assert_eq!(store.load_draft().unwrap().unwrap().document, imported);
+            assert_eq!(store.load_latest_published().unwrap(), published);
+            let events = store.load_recent_diagnostics(10).unwrap();
+            let event = events
+                .iter()
+                .find(|event| event.event_code == "IMPORT_REVIEW_APPLIED")
+                .unwrap();
+            assert_eq!(event.safe_context["accepted"], 1);
+            assert_eq!(event.safe_context["rejected"], 0);
+            assert!(matches!(
+                state.map(&store, &token.identifier(), &bytes),
+                CommandResponse::Failure { .. }
+            ));
+            assert_eq!(
+                store.load_draft().unwrap().unwrap().revision,
+                value.revision
+            );
+            drop(store);
+            let reopened =
+                EncryptedStore::open_or_initialize(directory.path(), "test", &vault).unwrap();
+            assert_eq!(reopened.load_draft().unwrap().unwrap().document, imported);
+        }
     }
 
     #[test]

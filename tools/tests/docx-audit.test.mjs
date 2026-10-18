@@ -51,9 +51,9 @@ print(json.dumps({style:module.expected_paragraphs(source,style)[0] for style in
         "Heading1",
         false,
       ],
-      [" \tRemote", "Heading2", false],
-      [" \t2023–2026", "Normal", false],
-      [" \tAward", "Normal", false],
+      ["2023–2026", "Normal", false],
+      ["Remote", "Normal", false],
+      ["Award", "Normal", false],
       ["Built reliable software.", "ListParagraph", true],
     ]);
   }

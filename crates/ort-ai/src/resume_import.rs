@@ -17,6 +17,7 @@ pub use schema::{SYSTEM, input, output_schema, provider_output_schema};
 mod pdf_links;
 pub use pdf_links::{PdfHyperlink, input_with_pdf_hyperlinks, valid_pdf_hyperlinks};
 mod contacts;
+mod dates;
 
 pub const MAX_PDF_BYTES: usize = 10 * 1024 * 1024;
 
@@ -280,7 +281,9 @@ fn check_entry(entry: &Entry, path: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn materialize_entry(entry: Entry, index: usize, path: &str) -> Result<ResumeEntry, String> {
+fn materialize_entry(mut entry: Entry, index: usize, path: &str) -> Result<ResumeEntry, String> {
+    check_entry(&entry, path)?;
+    let dates = dates::map_to_date_slot(&mut entry, path)?;
     check_entry(&entry, path)?;
     let mut fields = Vec::new();
     field(&mut fields, "Details", entry.details)?;
@@ -297,7 +300,7 @@ fn materialize_entry(entry: Entry, index: usize, path: &str) -> Result<ResumeEnt
             }
         }
         BodyFormat::Paragraph => {
-            for body in crate::paragraph_packing::pack_paragraphs(
+            for body in crate::paragraph_packing::pack_import_lines(
                 entry.main_info.items.iter().map(String::as_str),
             ) {
                 field(&mut fields, ort_domain::PARAGRAPH_FIELD_LABEL, body)?;
@@ -309,8 +312,8 @@ fn materialize_entry(entry: Entry, index: usize, path: &str) -> Result<ResumeEnt
         order: order(index)?,
         heading: entry.title,
         subheading: entry.role,
-        date_range: entry.date,
-        dates: Some(vec![]),
+        date_range: String::new(),
+        dates: Some(dates),
         location: entry.location,
         fields,
         bullets,
@@ -382,6 +385,7 @@ pub fn decode(text: &str) -> Result<ResumeDocument, String> {
             entry.heading.trim().is_empty()
                 && entry.subheading.trim().is_empty()
                 && entry.date_range.trim().is_empty()
+                && entry.dates.as_ref().is_none_or(Vec::is_empty)
                 && entry.location.trim().is_empty()
                 && entry.fields.is_empty()
                 && entry
