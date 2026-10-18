@@ -2,7 +2,7 @@
 #[path = "../tests/support/mod.rs"]
 #[allow(dead_code)]
 mod support;
-use ort_domain::{DocumentStyle, EntityId, NamedField};
+use ort_domain::{DocumentStyle, EntityId, NamedField, ResumeSection};
 use std::{fs, path::PathBuf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -43,6 +43,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     entry.heading = "A deliberately long organization name with an extended division and research program that wraps onto another line".into();
     entry.subheading = "Full Stack Engineer with a deliberately long role description that wraps naturally without a manual line break and continues onto multiple lines".into();
     document.sections[0].entries.push(entry);
+    let mut body_only = document.sections[0].entries[0].clone();
+    body_only.id = EntityId::new();
+    body_only.order = 0;
+    body_only.heading.clear();
+    body_only.subheading.clear();
+    body_only.date_range.clear();
+    body_only.location.clear();
+    body_only.bullets.clear();
+    body_only.fields = vec![NamedField {
+        id: EntityId::new(),
+        order: 0,
+        is_skill: true,
+        list_kind: None,
+        label: "__ort_body_paragraph__".into(),
+        value: "**Languages:** Java, Python, C, JavaScript, TypeScript, SQL, HTML/CSS\n**Frameworks:** React, Vite, Spring Boot, FastAPI".into(),
+    }];
+    document.sections.push(ResumeSection {
+        id: EntityId::new(),
+        order: 1,
+        heading: "Technical Skills".into(),
+        entries: vec![body_only],
+    });
     for (name, style) in [
         ("plain", DocumentStyle::Plain),
         ("technical", DocumentStyle::Technical),

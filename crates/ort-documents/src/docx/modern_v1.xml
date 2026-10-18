@@ -44,7 +44,7 @@
     <w:qFormat />
     <w:pPr>
       <w:keepNext />
-      <w:spacing w:before="160" w:after="40" />
+      <w:spacing w:before="160" w:after="80" />
       <w:outlineLvl w:val="0" />
       <w:pBdr>
         <w:bottom w:val="single" w:sz="12" w:space="3" w:color="276A78" />
@@ -66,7 +66,7 @@
     <w:qFormat />
     <w:pPr>
       <w:keepNext />
-      <w:spacing w:before="40" w:after="20" />
+      <w:spacing w:before="0" w:after="20" />
       <w:outlineLvl w:val="1" />
     </w:pPr>
     <w:rPr />

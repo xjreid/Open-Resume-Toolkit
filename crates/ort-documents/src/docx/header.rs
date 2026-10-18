@@ -10,7 +10,11 @@ pub(super) fn write(
     title: &[InlineSpan],
     role: &[InlineSpan],
     metadata: &[Vec<InlineSpan>],
-) -> Result<(), DocxExportError> {
+    first_content: bool,
+) -> Result<bool, DocxExportError> {
+    // The section heading owns the gap before its first visible content. Space
+    // inside the first table row would add to it instead of collapsing with it.
+    let before = if first_content { 0 } else { 40 };
     let has_left = !title.is_empty() || !role.is_empty();
     let columns = has_left && !metadata.is_empty();
     let width = match style {
@@ -20,13 +24,21 @@ pub(super) fn write(
         DocumentStyle::Modern => 10_530,
     } - CONTENT_INDENT_TWIPS;
     if columns {
+        // Pages otherwise creates a full-height table anchor using the preceding
+        // section heading. Keep its anchor explicit and effectively zero-height.
+        // The first table's cell padding supplies the same 4 pt gap used by
+        // section headings followed by ordinary paragraphs.
+        if first_content {
+            body.push(SECTION_TABLE_ANCHOR)?;
+        }
+        let top = if first_content { 80 } else { 0 };
         let right_width = width / 4;
         let left_width = width - right_width;
         body.push(&format!(
             "<w:tbl><w:tblPr><w:tblW w:w=\"{width}\" w:type=\"dxa\"/>\
              <w:tblInd w:w=\"{CONTENT_INDENT_TWIPS}\" w:type=\"dxa\"/>\
              <w:tblLayout w:type=\"fixed\"/>\
-             <w:tblCellMar><w:top w:w=\"0\" w:type=\"dxa\"/>\
+             <w:tblCellMar><w:top w:w=\"{top}\" w:type=\"dxa\"/>\
              <w:left w:w=\"0\" w:type=\"dxa\"/><w:bottom w:w=\"0\" w:type=\"dxa\"/>\
              <w:right w:w=\"0\" w:type=\"dxa\"/></w:tblCellMar></w:tblPr>\
              <w:tblGrid><w:gridCol w:w=\"{left_width}\"/><w:gridCol w:w=\"{right_width}\"/>\
@@ -51,6 +63,7 @@ pub(super) fn write(
                 line,
                 false,
                 !columns,
+                before,
             )?;
         }
     }
@@ -71,13 +84,19 @@ pub(super) fn write(
             },
             true,
             !columns,
+            before,
         )?;
     }
     if columns {
         body.push("</w:tc></w:tr></w:tbl>")?;
     }
-    Ok(())
+    Ok(columns)
 }
+
+const SECTION_TABLE_ANCHOR: &str = "<w:p><w:pPr><w:pStyle w:val=\"Normal\"/><w:keepNext/>\
+    <w:spacing w:before=\"0\" w:after=\"0\" w:line=\"1\" w:lineRule=\"exact\"/>\
+    <w:rPr><w:sz w:val=\"2\"/></w:rPr></w:pPr>\
+    <w:r><w:rPr><w:sz w:val=\"2\"/></w:rPr></w:r></w:p>";
 
 fn cell_start(body: &mut Xml, width: u16, left: bool) -> Result<(), DocxExportError> {
     body.push(&format!(
@@ -105,6 +124,7 @@ fn paragraph(
     line: Line,
     right: bool,
     indent: bool,
+    before: u16,
 ) -> Result<(), DocxExportError> {
     let style = if matches!(line, Line::Title) {
         "Heading2"
@@ -114,7 +134,7 @@ fn paragraph(
     let before = if matches!(line, Line::Continuation) {
         0
     } else {
-        40
+        before
     };
     body.push(&format!(
         "<w:p><w:pPr><w:pStyle w:val=\"{style}\"/><w:keepNext/>\

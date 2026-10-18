@@ -79,14 +79,18 @@ pub fn render_docx_with_style(
     )?;
     for section in &document.sections {
         let mut entries = Xml::default();
+        let mut starts_with_table = false;
         for entry in &section.entries {
-            entry_rows(
+            let first_content = entries.0.is_empty() && !section.heading.trim().is_empty();
+            let table = entry_rows(
                 &mut entries,
                 &mut relationships,
                 &mut next_link,
                 entry,
                 style,
+                first_content,
             )?;
+            starts_with_table |= first_content && table;
             for field in entry
                 .fields_for_role(ort_domain::FieldRole::Paragraph)
                 .filter(|field| !field.value.trim().is_empty())
@@ -137,18 +141,18 @@ pub fn render_docx_with_style(
                     false,
                     &heading,
                     false,
+                    starts_with_table.then_some(0),
                 )?;
             } else {
-                rich_paragraph(
+                paragraph_with_spans(
                     &mut body,
                     &mut relationships,
                     &mut next_link,
                     "Heading1",
-                    &section.heading,
                     false,
-                    true,
+                    &spans(&section.heading, true, false)?,
                     false,
-                    false,
+                    starts_with_table.then_some(0),
                 )?;
             }
             body.push(&entries.0)?;
@@ -307,6 +311,7 @@ fn contact_paragraphs(
             false,
             &content,
             false,
+            None,
         )?;
     }
     Ok(())
@@ -318,7 +323,8 @@ fn entry_rows(
     next_link: &mut usize,
     entry: &ort_domain::ResumeEntry,
     style: DocumentStyle,
-) -> Result<(), DocxExportError> {
+    first_content: bool,
+) -> Result<bool, DocxExportError> {
     let mut title = spans(&entry.heading, true, false)?;
     let details = entry.field_text(ort_domain::FieldRole::Details, " | ");
     if !details.is_empty() {
@@ -353,6 +359,7 @@ fn entry_rows(
         &title,
         &spans(&entry.subheading, false, false)?,
         &right_rows,
+        first_content,
     )
 }
 
@@ -381,9 +388,11 @@ fn rich_paragraph(
         bullet,
         &content,
         content_indent,
+        None,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn paragraph_with_spans(
     body: &mut Xml,
     relationships: &mut Xml,
@@ -392,6 +401,7 @@ fn paragraph_with_spans(
     bullet: bool,
     content: &[InlineSpan],
     content_indent: bool,
+    space_after: Option<u16>,
 ) -> Result<(), DocxExportError> {
     if content.is_empty() {
         return Ok(());
@@ -402,13 +412,15 @@ fn paragraph_with_spans(
     if bullet {
         body.push("<w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"1\"/></w:numPr>")?;
     }
-    if content_indent {
+    if let Some(after) = space_after {
+        body.push(&format!("<w:spacing w:after=\"{after}\"/>"))?;
+    } else if content_indent {
         body.push("<w:spacing w:after=\"20\"/>")?;
-        if !bullet {
-            body.push("<w:ind w:left=\"")?;
-            body.push(&CONTENT_INDENT_TWIPS.to_string())?;
-            body.push("\"/>")?;
-        }
+    }
+    if content_indent && !bullet {
+        body.push("<w:ind w:left=\"")?;
+        body.push(&CONTENT_INDENT_TWIPS.to_string())?;
+        body.push("\"/>")?;
     }
     body.push("</w:pPr>")?;
     write_spans(body, relationships, next_link, content)?;
@@ -508,7 +520,16 @@ fn hyperlink(
         return Err(DocxExportError::InvalidDocument);
     }
     let content = [link_span(link)?];
-    paragraph_with_spans(body, rels, next, "Normal", false, &content, content_indent)
+    paragraph_with_spans(
+        body,
+        rels,
+        next,
+        "Normal",
+        false,
+        &content,
+        content_indent,
+        None,
+    )
 }
 
 const DOCUMENT_START: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><w:body>";

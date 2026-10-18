@@ -163,7 +163,7 @@ def verify(data, source, style="plain"):
     assert document.tag == W + "document"
     allowed = {W + tag for tag in ("document", "body", "p", "pPr", "pStyle", "r", "rPr", "t",
                "br", "tab", "tabs", "numPr", "ilvl", "numId", "hyperlink", "sectPr", "pgSz", "pgMar",
-               "spacing", "ind", "keepNext", "b", "i", "u", "color", "jc",
+               "spacing", "ind", "keepNext", "b", "i", "u", "color", "jc", "sz",
                "tbl", "tblPr", "tblW", "tblInd", "tblLayout", "tblCellMar",
                "top", "left", "bottom", "right", "tblGrid", "gridCol", "tr",
                "tc", "tcPr", "tcW", "vAlign", "tcMar")}
@@ -185,6 +185,7 @@ def verify(data, source, style="plain"):
         for p in cells[1].findall(W + "p"):
             assert p.find(f"{W}pPr/{W}jc").get(W + "val") == "right"
     actual = []
+    blocks = list(body)
     for p in body.iter(W + "p"):
         # Paragraph-property tabs describe layout; only tabs in content runs
         # are semantic text separators.
@@ -194,6 +195,21 @@ def verify(data, source, style="plain"):
                        for n in content_nodes)
         paragraph_style = p.find(f"{W}pPr/{W}pStyle")
         bullet = p.find(f"{W}pPr/{W}numPr/{W}numId")
+        if not text:
+            # Only the explicit, empty section/table anchor is layout rather
+            # than resume content. Never silently discard arbitrary paragraphs.
+            assert p in blocks and 0 < blocks.index(p) < len(blocks) - 1
+            index = blocks.index(p)
+            assert blocks[index - 1].find(f"{W}pPr/{W}pStyle").get(W + "val") == "Heading1"
+            assert blocks[index + 1].tag == W + "tbl"
+            assert paragraph_style.get(W + "val") == "Normal" and bullet is None
+            assert p.find(f"{W}pPr/{W}keepNext") is not None
+            assert p.find(f"{W}pPr/{W}spacing").attrib == {
+                W + "before": "0", W + "after": "0", W + "line": "1", W + "lineRule": "exact"}
+            assert [node.attrib for node in p.iter(W + "sz")] == [{W + "val": "2"}] * 2
+            assert not any(next(p.iter(W + tag), None) is not None
+                           for tag in ("t", "br", "tab", "hyperlink"))
+            continue
         if bullet is not None:
             assert bullet.get(W + "val") == "1"
         actual.append((text, paragraph_style.get(W + "val") if paragraph_style is not None else "Normal", bullet is not None))
@@ -257,6 +273,7 @@ def rejection_checks(data, source, style="plain"):
         {"word/document.xml": original["word/document.xml"].replace(b"Software Engineer", b"Changed content")},
         {"word/document.xml": original["word/document.xml"].replace(b'val="Heading1"', b'val="Normal"')},
         {"word/document.xml": original["word/document.xml"].replace(b'<w:vAlign w:val="top"/>', b'<w:vAlign w:val="bottom"/>', 1)},
+        {"word/document.xml": original["word/document.xml"].replace(b'w:line="1"', b'w:line="240"', 1)},
         {"word/_rels/document.xml.rels": original["word/_rels/document.xml.rels"].replace(b"/hyperlink", b"/attachedTemplate")},
         {"word/_rels/document.xml.rels": original["word/_rels/document.xml.rels"].replace(b"https://example.org/project", b"file:///private/secret")},
         {"word/styles.xml": original["word/styles.xml"].replace(b"\n", b"\r\n")},
@@ -309,7 +326,7 @@ def main():
         text_digest = hashlib.sha256(text).hexdigest()
         assert schema_v2 or text_digest == text_goldens[name], f"{name}: reviewed plain-text golden changed"
     rejection_checks((root / "standard.docx").read_bytes(), json.loads((root / "standard.json").read_text(encoding="utf-8")), style)
-    print(f"{style}: Eight DOCX/text fixtures: {'golden SHA-256' if style == 'plain' and not schema_v2 else 'independent style audit (corpus goldens checked separately)'}, exact text, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; {9 if schema_v2 else 8} negative controls rejected.")
+    print(f"{style}: Eight DOCX/text fixtures: {'golden SHA-256' if style == 'plain' and not schema_v2 else 'independent style audit (corpus goldens checked separately)'}, exact text, ZIP/CRC, fixed OPC parts, LF-only XML, semantic parity, relationships, headings/lists and geometry passed; {10 if schema_v2 else 9} negative controls rejected.")
 
 
 if __name__ == "__main__":

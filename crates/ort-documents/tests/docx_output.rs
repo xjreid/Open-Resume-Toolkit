@@ -378,3 +378,129 @@ fn wrapped_header_text_and_metadata_use_independent_top_aligned_columns() {
         assert!(xml.find("</w:tbl>").unwrap() < xml.find("Built an offline").unwrap());
     }
 }
+
+fn section_spacing_fixture(shape: &str) -> ResumeDocument {
+    use ort_domain::{Bullet, EntityId, NamedField};
+
+    let mut document = support::fixture("optional").upgraded_v2().unwrap();
+    let mut empty = document.sections[0].entries[0].clone();
+    empty.heading.clear();
+    let mut first = empty.clone();
+    first.id = EntityId::new();
+    first.order = 1;
+    match shape {
+        "columns" => {
+            first.heading = "University".into();
+            first.subheading = "Degree".into();
+            first.date_range = "2026–2029".into();
+            first.location = "College Park".into();
+        }
+        "title" => first.heading = "University".into(),
+        "role" => first.subheading = "Degree".into(),
+        "metadata" => first.date_range = "2026–2029".into(),
+        "details" | "paragraph" => first.fields.push(NamedField {
+            id: EntityId::new(),
+            order: 0,
+            label: if shape == "paragraph" {
+                "__ort_body_paragraph__"
+            } else {
+                "Tools"
+            }
+            .into(),
+            value: "**Languages:** Rust, Python\n**Frameworks:** React".into(),
+            is_skill: true,
+            list_kind: None,
+        }),
+        "bullet" => first.bullets.push(Bullet {
+            id: EntityId::new(),
+            order: 0,
+            text: "Built reliable software".into(),
+        }),
+        "link" => first.links.push(Link {
+            id: Some(EntityId::new()),
+            order: Some(0),
+            label: "Portfolio".into(),
+            url: "https://example.org".into(),
+        }),
+        _ => unreachable!(),
+    }
+    let mut later = empty.clone();
+    later.id = EntityId::new();
+    later.order = 2;
+    later.heading = "Later entry".into();
+    later.date_range = "2025".into();
+    document.sections[0].entries = vec![empty, first, later];
+    document
+}
+
+#[test]
+fn section_spacing_handles_empty_leading_entries_and_every_first_content_shape() {
+    use ort_domain::DocumentStyle;
+
+    for shape in [
+        "columns",
+        "title",
+        "role",
+        "metadata",
+        "details",
+        "paragraph",
+        "bullet",
+        "link",
+    ] {
+        let document = section_spacing_fixture(shape);
+
+        for style in [
+            DocumentStyle::Plain,
+            DocumentStyle::Technical,
+            DocumentStyle::Professional,
+            DocumentStyle::Modern,
+        ] {
+            let values = parts(&ort_documents::render_docx_with_style(&document, style).unwrap());
+            let xml = &values["word/document.xml"];
+            let heading = values["word/styles.xml"]
+                .split("w:styleId=\"Heading1\"")
+                .nth(1)
+                .unwrap()
+                .split("</w:style>")
+                .next()
+                .unwrap();
+            assert!(
+                heading.contains("w:after=\"80\""),
+                "{style:?}: section content gap"
+            );
+            assert_eq!(
+                xml.matches("w:line=\"1\"").count(),
+                usize::from(shape == "columns"),
+                "{style:?}, {shape}: only a leading table needs an anchor"
+            );
+            let section = xml
+                .split("w:val=\"Heading1\"")
+                .nth(1)
+                .unwrap()
+                .split("</w:p>")
+                .next()
+                .unwrap();
+            assert_eq!(
+                section.contains("<w:spacing w:after=\"0\"/>"),
+                shape == "columns"
+            );
+            let table = xml.split("<w:tbl>").nth(1).unwrap();
+            let top = if shape == "columns" { "80" } else { "0" };
+            assert!(table.contains(&format!("<w:tblCellMar><w:top w:w=\"{top}\"")));
+            for p in xml.split("<w:p>").skip(1) {
+                let p = p.split("</w:p>").next().unwrap();
+                if p.contains("Later entry") || p.contains(">2025</w:t>") {
+                    assert!(
+                        p.contains("w:before=\"40\""),
+                        "{style:?}, {shape}: later entry separation"
+                    );
+                } else if p.contains("w:val=\"Heading2\"") || p.contains(">2026–2029</w:t>") {
+                    assert!(
+                        p.contains("w:before=\"0\""),
+                        "{style:?}, {shape}: first header has no extra space"
+                    );
+                }
+            }
+        }
+    }
+}
