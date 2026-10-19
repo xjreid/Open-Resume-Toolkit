@@ -69,6 +69,18 @@ Store extension does not download or install its required native host by itself.
 - Extension updates are handled by their stores. The desktop and extension negotiate protocol compatibility during staggered rollouts.
 - Sideload instructions are available for developers and advanced users but are not the default mainstream installation path.
 
+## Planned application-answer release disclosures
+
+Before shipping the [M5 answer capability](Application_Answer_Autofill.md), qualify
+the matching desktop/native-host/extension versions and disclose its v2 answer
+capability with preserved v1 capture. Update Store purpose/permissions/privacy
+copy for explicit modes, foreground application-field processing, sensitive/
+context approvals, local answer retention, website disclosure at fill time,
+unsupported controls, stop/Undo, portable data, and restore-Off. Do not reuse
+capture-only claims that the extension has no popup or never reads form values.
+Current capture-only packages/listings remain described as such until implementation.
+M5 development acceptance does not replace M7 signed/Store-installed qualification.
+
 ## Release documentation
 
 Every public release provides:

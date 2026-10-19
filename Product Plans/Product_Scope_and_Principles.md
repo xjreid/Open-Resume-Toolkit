@@ -19,9 +19,9 @@ The software may be used internationally, but documentation must not imply that 
 
 ## Product surfaces
 
-1. **Desktop application main window** — creates, imports, edits, previews, and publishes the one master resume. It also provides the tracker, aggregate AI monitoring, provider/settings controls, backup, restoration, updates, and browser-connection management. It does not present the current job-specific tailoring workspace.
+1. **Desktop application main window** — creates, imports, edits, previews, and publishes the one master resume. It also provides the tracker, aggregate AI monitoring, provider/settings controls, backup, restoration, updates, and browser-connection management. Planned M5 adds a separate **Application answers** profile library after Tracker and before Settings. It does not present the current job-specific tailoring workspace.
 2. **Desktop overlay** — owns the entire current application workflow: job-description capture review, tailoring, change summary, Required Qualification Alerts, resume/cover-letter PDF cards, expanded editing/preview, application-question capture and answers, regeneration, downloads, drag-out, Finish Application, and reset. It is a resizable always-on-top desktop window, not browser-injected UI.
-3. **Chrome and Edge extensions** — permission-constrained bridges that capture user-selected job descriptions or application questions after an explicit browser or authorized overlay capture action and return them to the overlay. They do not provide a parallel application workflow.
+3. **Chrome and Edge extensions** — permission-constrained bridges for deliberate selected-text capture and the separately opted-in planned M5 [application-answer feature](Application_Answer_Autofill.md). Its toolbar popup handles current-page approval, Undo, and stop actions; full library management remains in the desktop. They do not provide a parallel tailoring/application workflow.
 4. **GitHub repository** — canonical public source, issue tracker, release history, contribution process, security policy, and build provenance.
 
 ## Core product principles
@@ -74,7 +74,7 @@ The software may be used internationally, but documentation must not imply that 
 ## Initial non-goals
 
 - Accounts, subscription billing, hosted user storage, cross-device sync, or web-based resume editing.
-- Automatic application submission, automatic form completion, or continuous browsing monitoring.
+- Automatic application submission and unrelated/background browsing monitoring. The approved, unimplemented M5 [application-answer feature](Application_Answer_Autofill.md) is the sole opt-in exception for foreground application-form learning and filling; it does not authorize arbitrary form automation.
 - Multiple named master resumes or an unlimited career-profile database.
 - Permanent storage of every intermediate AI draft.
 - Employer/recruiter features, applicant ranking, or hiring decisions.
@@ -90,6 +90,7 @@ The software may be used internationally, but documentation must not imply that 
 - **Published master resume:** the deliberate snapshot used as the factual source for AI tailoring.
 - **Application workspace:** the one current job-specific working set owned and presented by the overlay, containing captured context and temporary generated material.
 - **Application tracker:** the local spreadsheet-like history of jobs and deliberately retained structured materials.
+- **Application answers:** the planned M5 encrypted reusable question/answer library, distinct from temporary overlay answers and tracker snapshots; it owns capture/autofill modes, reviewed aliases, and ordinary correction review.
 - **Structured snapshot:** an immutable saved JSON representation of a selected tailored resume, cover letter, or answer set.
 - **Derived export:** a locally generated PDF, DOCX, or text file that is outside ORT's canonical database once saved.
 - **Provider adapter:** local code that translates an ORT request into a user-selected AI provider's API and validates the response.

@@ -49,6 +49,43 @@ resends an unconfirmed payload automatically.
 
 Schema-specific limits below remain tighter than the overall native-message envelope.
 
+## Application-answer defaults — planned M5
+
+These are approved design defaults, not implemented constants. The
+[feature authority](Application_Answer_Autofill.md) owns behavior and the
+[technical plan](../Implementation%20Plans/Browser%20Extensions/Application_Answer_Autofill_Plan.md)
+owns the future interfaces; no code or protocol is changed by this register.
+
+- Modes: Off, Capture only, Autofill + capture. Fresh profiles and replacement
+  restores start Off. Normal restarts preserve mode intent but require fresh
+  connected browser authorization; no offline answer cache.
+- Scope: foreground tab in the focused browser, supported main-document native
+  controls, recognized or explicitly approved application pages. Exact-origin
+  website exclusions override page approval.
+- Matching: deterministic local normalized wording/qualifiers and compatible
+  control/choices, plus explicitly reviewed aliases; no AI/semantic fallback.
+- Capture: direct user text edit plus blur, or native dropdown user selection;
+  never every keystroke, focus alone, or website/ORT-prefilled values. Sensitive/
+  unclassified save approval and current-page sensitive/context reuse approval
+  are mandatory; unchanged rerenders do not repeatedly ask.
+- Autofill: empty/verified-placeholder values only; never truncate, overwrite
+  meaningful values, or repeatedly retry a rejected write. Undo preserves later
+  edits and suppresses automatic refill of that field on the current page.
+- Protocol: negotiate v2 answer capability; preserve v1 capture compatibility.
+  Reuse the native envelope/text/queue ceilings and existing structured-string,
+  nesting, and aggregate backup ceilings. Bounds apply before collection/decoding
+  and to encoded responses as well as requests; split batches only at field
+  boundaries and fail oversized fields visibly without truncation.
+- Monitoring: bounded initial scan, debounced changed-control observation,
+  bounded per-turn work, deduplicated lookups, and short-lived revocable leases.
+  Lease/debounce/batch constants must be centralized and frozen with generated
+  schemas during implementation; synthetic tests use controllable clocks rather
+  than a new timing/benchmark campaign. No retained-record product quota is added.
+- Portability: saved answers, aliases, and explicit origin exclusions are
+  portable; active modes, browser/page grants, pending corrections, and temporary
+  captures are not. Ordinary corrections are locally durable until resolved;
+  unapproved sensitive/unclassified values are memory-only until page/session end.
+
 ## Resume and structured-content defaults
 
 - Master resume: 30,000 visible characters, 20 sections, 100 entries across sections, 500 bullets, 100 skill/keyword items, 25 links, and five rendered pages.

@@ -8,6 +8,17 @@
   production release qualification remain separate; synthetic hostile-input,
   retirement and size-bound regressions are ordinary automated checks.
 
+## Planned M5 extension — not implemented
+
+The [answer-library technical plan](../../Implementation%20Plans/Browser%20Extensions/Application_Answer_Autofill_Plan.md)
+reserves schema 10/backup 1.10 on the current baseline for typed saved answers,
+reviewed aliases, and user-created website exclusions. It requires new inventory/
+bounded validation and content-schema mapping, historical-reader defaults to an
+empty library, safe old-reader rejection, and replacement restore with automation
+Off. Active modes, browser/page grants, pending corrections, and temporary values
+are excluded. This is not a current writer/reader or header-format change;
+format 1.9 and its existing vectors remain the implemented contract below.
+
 ## Fixed header
 
 All integers are unsigned big-endian. The complete 76-byte header is AEAD

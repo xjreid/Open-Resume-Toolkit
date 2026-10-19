@@ -6,6 +6,13 @@ not hosted CI, production-release, or milestone acceptance evidence. The
 [roadmap](../../Implementation%20Plans/System%20Documentation/Delivery_Roadmap.md)
 retains authority over milestone closure.
 
+**Planning addition — October 19, 2026:** M5 now includes
+[Application-answer autofill](../../Product%20Plans/Application_Answer_Autofill.md)
+and its [technical design](../../Implementation%20Plans/Browser%20Extensions/Application_Answer_Autofill_Plan.md).
+The desktop library/modes, foreground monitor, toolbar popup, protocol v2,
+schema 10, and backup 1.10 are not implemented by this documentation update.
+The current schema 9/backup 1.9/capture v1 facts below remain unchanged; M5 stays open.
+
 ## Features and boundaries
 
 | Area | Implemented today | Remaining boundary |

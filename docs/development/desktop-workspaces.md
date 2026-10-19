@@ -4,6 +4,14 @@ The desktop uses the user-approved Open Folio direction in
 [Aesthetic](../../Aesthetic/README.md) and the [design system](../../DESIGN.md). The app
 identity and controls are separate from the exported document styles.
 
+**Planned M5:** [Application answers](../../Product%20Plans/Application_Answer_Autofill.md)
+will add a destination after Tracker and before Settings, with modes/status,
+saved answers/aliases, exclusions, and correction review. It is not an implemented
+destination and is not added to the shell by this documentation change. The
+[technical plan](../../Implementation%20Plans/Browser%20Extensions/Application_Answer_Autofill_Plan.md)
+keeps it separate from overlay/tracker answers and reuses the ownership and
+revision/close patterns described below.
+
 - `AppShell.tsx` owns the shared brand, destination navigation, status slot, and
   persistent navigation rail. Add a destination to `WORKSPACE_DESTINATIONS` only when
   its workspace is implemented. The implemented tracker and My Keys/Codex/Data workspaces use this shell rather

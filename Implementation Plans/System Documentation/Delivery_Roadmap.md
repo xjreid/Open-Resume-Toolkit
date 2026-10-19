@@ -10,7 +10,7 @@
 | M2.5 | Complete | Usable desktop layout, approved aesthetic and professional resume designs |
 | M3 | Complete | Direct AI foundation |
 | M4 | Complete | Tailoring, alerts and application materials |
-| M5 | In progress | Workspace, tracker and browser bridge |
+| M5 | In progress | Workspace, tracker, browser bridge and planned reusable answer autofill |
 | M6 | Implemented in development; acceptance open | Optional external Codex integration |
 | M7 | Planned | Distribution and stable hardening |
 
@@ -21,6 +21,12 @@ explicit installation, Start/Stop server, memory-only login, models/reasoning,
 usage/reserve checks, and supervised shutdown. Local automated/containment
 records do not constitute a new user milestone sign-off or account-specific
 live acceptance. See the [implementation map](../../docs/development/current-state.md).
+
+On October 19, 2026 the user approved [Application-answer autofill](../../Product%20Plans/Application_Answer_Autofill.md)
+as distinct additional M5 scope. Its library, modes, foreground monitor, popup,
+protocol v2, and schema/backup changes are planned, not implemented or accepted.
+The new [technical plan](../Browser%20Extensions/Application_Answer_Autofill_Plan.md)
+defines the future sequence without changing the current implementation claims above.
 
 M0–M2 completion applies to macOS Apple Silicon development. See the
 [closure and accepted limitations](../../evidence/0.0.0-dev/m2-acceptance-closure.md).
@@ -128,6 +134,38 @@ smoke check on the active Mac using the development app and host; save/reopen
 and failed-save preservation; representative wrong-client, replay/oversized
 message, desktop-absent and version-mismatch rejection.
 Confirm capture does not start AI automatically. No full browser/profile/OS matrix.
+
+### Application-answer autofill — added 2026-10-19; not implemented
+
+**Deliver:** the [approved feature](../../Product%20Plans/Application_Answer_Autofill.md)
+as a separate Application answers main-navigation section after Tracker and before
+Settings; Off/Capture only/Autofill + capture; encrypted saved answers, aliases,
+ordinary correction review, and website exclusions. Add bounded foreground
+application-form monitoring, native text/textarea/single-select filling, explicit
+sensitive/unclassified save and per-page sensitive/context reuse approval, a
+toolbar popup with Use once/linking/Undo/pause/exclude/stop, and typed v2 messages
+with v1 capture compatibility. Preserve manual capture and the separate overlay
+Answers workflow. No AI matching, implicit record imports, automatic submission,
+background collection, or durable extension answer database.
+
+**Implementation order:** domain/storage/contracts → desktop library →
+authorization/protocol → capture-only monitoring → autofill/popup → integrated
+Chrome/Edge qualification. The [technical plan](../Browser%20Extensions/Application_Answer_Autofill_Plan.md)
+owns the planned schema 10/backup 1.10 transitions and component contracts.
+
+**Minimum checks:** focused matching/choice/alias and classification fixtures;
+genuine user edits versus programmatic events; correction revision conflicts;
+empty-field/user-edit/Undo protection; native/framework inputs and rejected writes;
+foreground/navigation/worker restart/revocation and version skew; encrypted
+migration, historical/new backup, restore-Off, deletion, and redaction. Record one
+Chrome learn/review/fill/correct/Undo journey, an Edge smoke check, and accessible
+desktop/popup controls. Unsupported widgets/frames stay manual. No broad site or
+platform matrix or paid provider calls are required.
+
+M5 remains open until this distinct development capability and the existing
+browser deliverables pass. Paid Apple signing is not a prerequisite; M7 still
+qualifies production identities, Store-installed behavior, and truthful updated
+permission/privacy disclosures. Documentation is not implementation evidence.
 
 ## M6 — optional external Codex
 

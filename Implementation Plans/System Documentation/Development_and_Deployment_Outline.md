@@ -185,7 +185,18 @@ For a compatible protocol change, deployment order is:
 4. keep the previous protocol during the documented compatibility window;
 5. remove old protocol support only in a later coordinated desktop release.
 
-An extension must never require an unreleased desktop. Emergency capability disablement occurs in the desktop/host without causing the extension to capture passively or retain content.
+An extension must never require an unreleased desktop. Emergency capability
+disablement occurs in the desktop/host and revokes page/field authorizations
+without fallback collection or retained browser content. Planned answer monitoring
+is allowed only under its explicit desktop mode and fresh foreground lease.
+
+For the [planned M5 answer feature](../Browser%20Extensions/Application_Answer_Autofill_Plan.md),
+implement domain/storage/contracts → desktop library → v2 authorization/protocol
+with v1 capture compatibility → capture-only monitor → autofill/popup → Chrome/
+Edge qualification. Schema 10 and backup 1.10 are future transitions, not current
+artifact versions. M5 development tests may use the explicit current-user bridge;
+M7 ships the exact qualified app/host/extension artifacts with matching capability,
+permission, privacy, backup-compatibility, and Store-review documentation.
 
 ## Version ownership
 
@@ -198,6 +209,7 @@ The desktop product version may be shared across Windows and macOS even when pac
 - SQLCipher/vault gate before storing real user content or secrets.
 - Hostile-document worker sandbox gate before enabling PDF/DOCX import on a target.
 - Native-host registration and IPC/vault-sharing gate before advertising browser integration on a package/channel.
+- Planned answer capability: mode consent, foreground/revocable authorization, field/capture/reuse policy, correction/Undo, portable/deletion, and accessible popup/library checks before enablement; preserve v1 capture when answer capability is unavailable.
 - Direct-provider contract, privacy, accounting, and guardrail gates before enabling each provider/model preset.
 - Codex executable-identity and OS-containment gate before showing Codex as available.
 - Renderer/DOCX fidelity, license, and accessibility gates before calling an export format supported.

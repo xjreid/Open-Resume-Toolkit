@@ -2,19 +2,22 @@
 
 ## Privacy promise
 
-ORT may accurately describe itself as local-first when all canonical user content remains on the user's device. It must not imply that AI-assisted content never leaves the device.
+ORT may accurately describe itself as local-first when canonical user content
+remains on the user's device. It must not imply that deliberate AI transmission
+or authorized answer autofill never discloses content outside that local store.
 
 The project must distinguish:
 
 - Local editing, storage, search, rendering, backup, and export.
 - Deliberate transmission to a user-selected direct AI provider or to OpenAI through a user-authorized ChatGPT/Codex subscription.
+- Planned M5 answer capture into the encrypted local library and authorized filling that exposes a selected answer to the active website, potentially before submission; these modes do not call AI.
 - Update checks and browser-store communication.
 
 Project maintainers cannot access local resumes, job descriptions, tracker entries, generated materials, or AI keys unless a user deliberately shares them outside the application.
 
 ## Protected assets
 
-- Master draft, published master, imported content, application workspace, tracker, retained snapshots, AI activity ledger, AI guardrail state, Codex usage snapshots, backups, and exports.
+- Master draft, published master, imported content, application workspace, tracker, retained snapshots, planned reusable answer library/aliases/corrections, AI activity ledger, AI guardrail state, Codex usage snapshots, backups, and exports.
 - Direct-provider credentials, Codex authentication tokens, and provider account information.
 - Local database encryption keys when implemented.
 - Native-messaging and local-IPC secrets.
@@ -87,9 +90,29 @@ Project maintainers cannot access local resumes, job descriptions, tracker entri
 - The native host exposes a narrow typed protocol, not a general command or filesystem interface.
 - Browser messages cannot select arbitrary local paths or invoke arbitrary binaries.
 
+### Application-answer disclosure — planned M5
+
+The [feature authority](Application_Answer_Autofill.md) is the sole opt-in
+exception for bounded foreground form observation/filling. Off is the default;
+the desktop owns modes, exact-origin exclusions, and short-lived page/field
+authorizations. No background/unrelated form collection, bulk library access by
+content scripts, automatic submission, or provider call is authorized.
+
+Sensitive/unclassified capture needs save approval before persistence; sensitive/
+context reuse needs per-question current-page approval. Preview candidate values
+inside extension-owned UI, never the webpage DOM. Hard-excluded fields remain
+blocked even with page approval or aliases. Revalidate emptiness/user edits,
+identity, choices, revisions, and authorization immediately before a write;
+revoke on navigation, disablement, deletion, or connection loss. A malicious page
+can read values after an authorized fill; the consent and popup must explain this.
+
+Keep unapproved sensitive values memory-only, ordinary corrections encrypted,
+and the reusable library out of durable extension storage, logs, and diagnostics.
+Backups contain saved answers/aliases/exclusions only; restore starts Off.
+
 ## Telemetry and diagnostics
 
-- No resume, job, answer, credential, full URL, filename, or document content is collected automatically.
+- No resume, job, answer, credential, full URL, filename, or document content is collected for telemetry or ordinary diagnostics. The separately opted-in planned M5 answer feature may capture eligible completed user answers into encrypted local product data under its explicit approval/retention rules; it is not maintainer telemetry.
 - Initial releases should operate without centralized telemetry.
 - The AI accounting ledger is encrypted local product data recording calls made by ORT and supplying aggregate AI Monitoring; it is not maintainer telemetry and is never uploaded automatically.
 - Activity records exclude prompts, responses, document content, API keys, provider-account credentials, and full URLs. Raw provider-reported measurements remain distinguishable from ORT estimates.
@@ -103,6 +126,7 @@ There is no remote account-deletion workflow because ORT holds no product accoun
 
 - Current application workspace
 - Individual tracker artifacts or entries
+- Planned reusable answer entries, aliases, correction proposals, and associated mode/website-exclusion preferences
 - Direct provider credentials and the local Codex sign-in/session
 - Selected or all AI activity records
 - AI guardrail policies and counters through a separate confirmed reset/removal action; clearing activity alone never resets them

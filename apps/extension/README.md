@@ -5,6 +5,13 @@ in ORT: no extension popup, toolbar action, competing editor, or automatic AI.
 The TypeScript implementation, build tools, regression tests and packaging policy
 are maintained here. Edge remains a capture-disabled scaffold and is separate work.
 
+**Planned M5 addition:** [Application-answer autofill](../../Product%20Plans/Application_Answer_Autofill.md)
+adds a separately enabled foreground native-field monitor and toolbar popup,
+backed by a desktop reusable-answer library. The [technical plan](../../Implementation%20Plans/Browser%20Extensions/Application_Answer_Autofill_Plan.md)
+requires protocol v2 answer negotiation while preserving v1 capture. None is
+implemented by this documentation change; the capture-only instructions below
+still describe the current 0.3.0 package.
+
 ## Workflow
 
 With ORT connected and a normal job page active in Chrome, press **Capture** in

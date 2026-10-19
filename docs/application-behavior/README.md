@@ -30,6 +30,12 @@ milestone boundaries; the [Codex guide](../ai/codex-plan-runtime.md) covers the
 ChatGPT page, installation, Launch/Quit, and memory-only sign-in.
 Current AI navigation is **My Keys**, **ChatGPT**, and **Data**.
 
+The approved M5 [Application answers](../../Product%20Plans/Application_Answer_Autofill.md)
+library, foreground capture/autofill, and extension popup are **planned, not
+implemented**. They are not current controls or new acceptance evidence. When
+implemented, document them separately from the overlay's AI Answers tab and
+tracker snapshots, following the [technical plan](../../Implementation%20Plans/Browser%20Extensions/Application_Answer_Autofill_Plan.md).
+
 ## Core distinctions
 
 Several product concepts must remain separate during development:

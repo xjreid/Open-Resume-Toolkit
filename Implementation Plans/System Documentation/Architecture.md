@@ -12,13 +12,17 @@ This document records the architecture and remaining release design. The [implem
 ## Architectural goals
 
 1. The desktop application remains useful without an account, extension, AI connection, or network access.
-2. Resume content, tracker records, activity history, and credentials remain on the device except for the minimum content the user deliberately sends to a chosen AI provider.
+2. Canonical content and credentials remain local; deliberate AI transmission and the separately opted-in planned M5 answer feature disclose only authorized content to the chosen provider or foreground application website. Browser filling does not imply that the website waits for submission to read a value.
 3. Every durable record has one owner and one versioned schema.
 4. The same structured document produces preview and export output through the same renderer.
 5. External input is untrusted at every boundary: job pages, imported files, AI output, update metadata, backups, and extension messages.
 6. UI crashes, provider failures, extension failure, and interrupted updates cannot corrupt the last committed user state.
 
 ## Runtime topology
+
+The diagram describes existing capture. The distinct planned M5 answer monitor,
+popup, library service, and authorized desktop-to-field response path are defined
+in the [autofill plan](../Browser%20Extensions/Application_Answer_Autofill_Plan.md).
 
 ```text
 Chrome / Edge page
@@ -107,6 +111,7 @@ Rules:
 | Master resume | one draft plus zero-or-one immutable published snapshot | tailoring reads/copies the published snapshot, never a mutable draft |
 | Workspace | overlay stage/tab state, captured job input, generated artifacts, and PDF materializations | one current workspace; one active tailoring operation; user edits remain distinct from AI proposals |
 | Tracker entry | application status and structured snapshots | `Finish Application` commits workspace and tracker changes atomically |
+| Reusable answer library (planned M5) | separate encrypted profile service | conservative matching/aliases, revisioned corrections, capture/reuse approval, restore Off; never an implicit overlay/tracker import |
 | AI operation | logical user request with one or more attempts | every dispatched attempt is persisted before network I/O |
 | Guardrail policy | cap configuration, reservations, settlements | direct calls fail closed when cost cannot be bounded under an enabled cap |
 | Qualification alert | mismatch/not-found evidence linked to an operation | informational only; dismissal never edits resume facts |
@@ -157,13 +162,30 @@ Long tasks emit ordered events with `operationId`, monotonic `sequence`, lifecyc
 
 ### Browser capture
 
-1. In overlay Stage 1, a user selects job text and invokes the extension action/shortcut; the overlay may first arm and explain this step.
+1. In the current Chrome development flow, overlay Capture authorizes a two-corner rectangle on the active page; Edge capture remains open M5 work.
 2. The content script returns selection and page metadata only to the extension service worker.
 3. The extension removes fragments/credentials from the URL, enforces size limits, and sends a versioned native message. It has no parallel review UI.
 4. The host authenticates local IPC and delivers a capture intent.
 5. The overlay creates or updates Stage 1 and shows the received text for review/edit, Capture again, or Continue. No AI call starts automatically.
 
-An optional overlay-initiated capture path is gated behind narrowly scoped optional site permission and a bounded authenticated `connectNative` session. It is disabled unless feasibility and store-review testing prove that it does not require default broad host access or an indefinitely persistent extension service worker.
+The implemented Chrome capture uses declared HTTP/HTTPS host access because an
+overlay click cannot grant `activeTab`; the current [extension plan](../Browser%20Extensions/Browser_Extension_and_IPC_Plan.md)
+owns its permission/session contract. Host access alone does not authorize reading.
+
+### Reusable application answers — planned M5
+
+The [product authority](../../Product%20Plans/Application_Answer_Autofill.md) adds
+a separate application service and main-window library, a foreground isolated-world
+monitor, and an extension-owned approval/Undo/stop popup. The service worker owns
+browser lifecycle and native transport, not DOM scanning. Versioned v2 lookup,
+capture, approval, and revocation messages preserve v1 capture compatibility.
+
+The desktop owns normalization/classification, typed saved answers/aliases,
+encrypted ordinary corrections, preferences, and revocable field-bound results.
+Content scripts cannot enumerate the library or reach credentials/providers;
+only authorized answers flow back to current empty supported fields. This path
+does not create an overlay workspace, tracker entry, or AI operation. See the
+technical plan for schema/backup transitions and the staged implementation order.
 
 ### Overlay PDF handoff
 

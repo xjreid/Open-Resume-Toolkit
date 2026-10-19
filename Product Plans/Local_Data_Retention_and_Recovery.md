@@ -91,9 +91,37 @@ empty. External exports and backups stay outside this boundary.
 
 ## Browser-extension content
 
+The following capture-only rules describe existing delivery. The separately
+opted-in [planned M5 answer feature](Application_Answer_Autofill.md) adds transient
+current-field data and the retention rules below; it does not add durable
+extension storage or a general browsing history.
+
 - Captured text and URL remain only long enough to review, transmit, retry safely, or allow the user to copy after a connection error.
 - Clear extension capture data after desktop acknowledgement or cancellation and during extension uninstall/reset.
 - Extension preferences contain no resume, tracker, provider-key, or generated content.
+
+## Reusable answer library — planned M5
+
+- Saved answers, aliases, and user-created website exclusions live in the encrypted
+  desktop profile until edited/deleted. Finish Application, tracker deletion,
+  and AI activity clearing do not remove them.
+- Ordinary corrections remain encrypted in Needs review across restarts until
+  approved, rejected, or deleted; they do not replace the saved answer early.
+- Unapproved sensitive/unclassified captures stay memory-only and expire when
+  their page/session ends. Explicit approval is required before persistence.
+- Extension field results, approval grants, and Undo receipts are current-page
+  memory only. Navigation, disablement, disconnection, expiry, or identity changes
+  invalidate automation and clear pending content; no content queue survives a
+  service-worker restart.
+- Encrypted backup and deliberate full-data export include saved entries, aliases,
+  and exclusions, but exclude active modes, page grants, pending corrections, and
+  temporary captures. Replacement restore starts Off and does not merge libraries.
+- Individual deletion removes dependent aliases/corrections and revokes pending
+  results. Delete all local data also removes mode/exclusion preferences under
+  existing profile-retirement rules. External exports/backups and values already
+  disclosed to websites remain outside ORT deletion.
+- No question/answer content, full source URLs, or browsing history enters logs or
+  diagnostics. The feature authority owns the complete capture and approval policy.
 
 ## Diagnostics
 
@@ -117,6 +145,7 @@ The settings area supports:
 
 - Discard current application workspace
 - Delete individual tracker artifacts or entries
+- Delete reusable answer entries/aliases and reject ordinary corrections when the planned M5 library is implemented
 - Remove provider credentials
 - Clear selected or all AI activity history
 - Disable or reset AI guardrail policies/counters through a separate confirmation

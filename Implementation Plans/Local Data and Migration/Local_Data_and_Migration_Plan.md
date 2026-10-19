@@ -35,6 +35,30 @@ AI lifetime/guardrail accounting remain portable. See the
 [backup reference](../../docs/backup/backup-v1.md) and
 [current implementation map](../../docs/development/current-state.md).
 
+## Planned M5 answer-library migration
+
+The [feature authority](../../Product%20Plans/Application_Answer_Autofill.md) and
+[technical plan](../Browser%20Extensions/Application_Answer_Autofill_Plan.md) add
+dedicated saved-answer, alias, and ordinary-correction records with indexed
+normalized lookup, typed text/single-choice data, timestamps, optimistic revisions,
+and deletion relationships. Preferences hold mode/consent/configuration revision
+and exact-origin exclusions separately; do not put answer collections in settings
+or promote overlay/tracker answers. Sensitive/unclassified candidates remain
+memory-only until explicit save approval.
+
+Plan schema **10** and backup **1.10** on the current baseline, including explicit
+content-schema mapping, a typed `PortableAnswerLibraryV1`, inventory counts,
+bounded collection/validation, and legacy readers/vectors. Preserve schema 9 and
+backup 1.9 as current implemented facts until future code changes land.
+
+Portable saved answers/aliases/exclusions exclude active modes, browser/page
+grants, Undo receipts, pending corrections, and temporary captures. Historical
+backups default to an empty library; older readers reject 1.10 safely. Replacement
+restore starts Off and rebuilds derived lookup indexes; no merge is added.
+Delete-all includes the library/preferences under existing lifecycle/retirement
+rules. Individual deletion invalidates pending field results and dependent rows;
+workspace finish, tracker deletion, and AI-history clearing remain separate.
+
 ## Storage layout
 
 Resolve all paths through the operating-system application-data APIs. Never derive them from the current working directory.

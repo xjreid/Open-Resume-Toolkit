@@ -15,7 +15,9 @@ This is the central register for implementation gates, unresolved validation/rel
 
 The [implementation map](../docs/development/current-state.md) distinguishes
 working features from planned distribution. M0–M4 have recorded development
-acceptance. M5 remains open for Edge/browser acceptance; optional M6 Codex is
+acceptance. M5 remains open for Edge/browser acceptance and the October 19, 2026
+approved, unimplemented [application-answer feature](Application_Answer_Autofill.md);
+optional M6 Codex is
 implemented in development without a full milestone sign-off. M7 production
 signing, notarization, final host/Store identities and release/update qualification
 remain planned. This documentation refresh does not grant milestone acceptance.
@@ -59,11 +61,12 @@ unsigned test transport a silent production fallback.
 10. Finish Application and a local tracker retaining selected resume, cover-letter, and answer JSON snapshots.
 11. Encrypted portable backup/restore and full structured data export.
 12. Check-for-updates behavior appropriate to unsigned macOS preview limitations and a later Developer ID-signed channel. Windows GitHub/Store update behavior is deferred with Windows qualification.
+13. **[IMPLEMENTATION — M5]** Application answers: encrypted reusable question/answer library, Off/Capture only/Autofill + capture modes, foreground native application-field monitoring, reviewed aliases, approval/Undo/stop popup, and portable saved data under the [feature authority](Application_Answer_Autofill.md). No AI matching, implicit resume/tracker import, automatic submission, or durable extension answer store.
 
 ## Initial non-goals
 
 - ORT-owned accounts, authentication, subscriptions, payment, cloud storage, synchronization, hosted AI, admin tools, or behavioral analytics. User-authorized provider authentication remains optional and provider-controlled.
-- Automatic application submission or form completion.
+- Automatic application submission and form completion outside the narrowly opted-in [M5 answer capability](Application_Answer_Autofill.md). Unrelated/background collection, custom widgets/embedded forms, and broader controls remain outside its v1 scope.
 - Job-board notifications, reminders, calendars, employer tooling, or job recommendations.
 - OCR, scanned resume support, or bundled local-model inference.
 - Multiple master resumes or permanent intermediate-draft libraries.
@@ -92,6 +95,7 @@ The current selections and module-level acceptance criteria are documented under
 16. **[IMPLEMENTED]** Overlay Stage 1/Stage 2, structured editing/PDF preview, macOS temporary drag cleanup, atomic Finish, tracker snapshots and background paginated search. Cross-platform drag qualification remains deferred.
 17. **[IMPLEMENTED]** Open Folio light-only app direction and independent Technical/Professional/Modern document styles. Prior Quiet Navy/Precision Workbench plans are historical. **[RELEASE]** Final shipped asset/license review remains required.
 18. **[IMPLEMENTED]** Deterministic reviewed No-AI PDF/DOCX import without provider transmission. Optional AI mapping requires its separate explicit action and valid provider.
+19. **[IMPLEMENTATION — M5]** Reusable answer domain/storage/contracts → desktop library → v2 authorization/protocol with v1 capture compatibility → capture-only monitor → autofill/popup → focused Chrome/Edge qualification. Schema 10 and backup 1.10 are planned transitions from the current schema 9/backup 1.9, not implemented formats. M5 stays open; production identities, disclosures, and Store checks remain M7.
 
 ## Validation and release work
 
@@ -116,6 +120,12 @@ milestone checks and record known limitations. M0–M2 remain closed.
    service risk justifies changing future releases from GPLv3 to AGPLv3. The default
    remains `GPL-3.0-only`; any change requires copyright authority, compatibility
    review, a documented transition and updates to every license/public claim.
+
+The new M5 answer feature additionally needs its own focused matching/approval,
+user-edit versus programmatic-event, empty-field/Undo, navigation/revocation,
+migration/backup/deletion, and redaction checks, plus one Chrome learning-to-Undo
+journey, an Edge smoke check, and accessible desktop/popup controls. Existing
+capture acceptance cannot stand in for these [future checks](../Implementation%20Plans/Browser%20Extensions/Application_Answer_Autofill_Plan.md).
 
 ## Later possibilities
 

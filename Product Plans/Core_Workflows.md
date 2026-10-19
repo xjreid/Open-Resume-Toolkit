@@ -112,6 +112,29 @@ Answer text is not rendered as a PDF or dragged as a file.
 
 ORT refuses to generate or infer answers requiring personal or legal attestation, including citizenship, visa or work authorization, criminal history, medical or disability information, protected characteristics, signatures, consent, salary history not supplied by the user, or declarations of truthfulness. It explains that the user must answer such questions personally.
 
+## Reusable Application answers — planned M5
+
+The [Application-answer autofill authority](Application_Answer_Autofill.md) owns
+this approved, unimplemented workflow. Add Application answers after Tracker and
+before Settings with Off, Capture only, and Autofill + capture, connection/status,
+a searchable editable library, alias management, and Needs review. It remains
+independent of the overlay's AI Answers tab and tracker snapshots.
+
+With a mode deliberately enabled, recognize application forms only in the
+foreground tab; ambiguous pages require approval. Learn eligible completed user
+edits, review corrections before replacing a known answer, and require explicit
+save approval for sensitive/unclassified questions. Autofill uses conservative
+local matches/reviewed aliases in empty standard native fields only; sensitive/
+context-dependent reuse requires current-question/page approval. No AI call,
+implicit resume/tracker import, submission, or workspace/tracker mutation occurs.
+
+The extension popup handles approval, Use once versus alias linking, safe Undo,
+page pause, website exclusion, global stop, and opening the desktop library.
+Modes survive ordinary restarts but require fresh connected authorization;
+restored profiles start Off. Finish Application does not clear this library.
+Unsupported widgets/frames and excluded data/actions remain manual. See the
+feature authority for exact support, retention, and disclosure rules.
+
 ## Rendering and export
 
 - Preview and export occur locally using the same structured input, template, fonts, layout rules, locale, page target, and renderer version.

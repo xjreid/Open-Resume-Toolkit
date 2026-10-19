@@ -6,6 +6,19 @@ with the publisher-supplied contact and effective date. Use that standalone page
 for hosting, and [dashboard-fields.md](dashboard-fields.md) for the form entries.
 It must still be hosted publicly before store submission.
 
+## Future M5 privacy revision — planning only
+
+The [approved answer feature](../../../Product%20Plans/Application_Answer_Autofill.md)
+will require a reviewed privacy/listing revision before shipping: bounded
+foreground application question/choice and completed-answer processing; explicit
+modes and website exclusions; desktop encrypted saved answers/aliases/corrections;
+memory-only unapproved sensitive values; per-page reuse approval; website access
+to values immediately on filling; popup/Undo/stop; backup/export/deletion and
+restore-Off; unsupported fields; and no AI, submission, browsing history, or
+durable extension answer database. Current capture-only policy statements below
+remain descriptions of the existing package, not the future feature. This
+documentation change does not modify or republish `privacy-policy.html`.
+
 ## Data handled
 
 When you press Capture in the ORT overlay and click two corners on the active

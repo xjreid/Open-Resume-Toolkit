@@ -49,6 +49,28 @@ A failed tracker save returns to Final resume selected or Active with all worksp
 
 These states are presented in the overlay, not as a main-window job workspace. The main window remains responsible for the master resume and supporting tracker, AI monitoring, connection, backup, update, and settings surfaces.
 
+## Application-answer automation — planned M5
+
+The [feature authority](Application_Answer_Autofill.md) defines a separate profile
+library and these future transitions. They do not advance the overlay workspace.
+
+- Persisted intent is Off, Capture only, or Autofill + capture; initial/restored
+  profiles are Off. Intent is distinct from a current browser authorization.
+- Runtime status is inactive/Off, awaiting permission/page approval, active,
+  paused/unavailable, unsupported, or stopping. New connections reauthorize;
+  background tabs, disconnect, unavailable profiles, and incompatible peers pause.
+- A completed eligible user edit becomes saved ordinary data, an ordinary
+  correction pending review, or a memory-only sensitive/unclassified save request.
+- Correction approval checks the base revision atomically; reject/stale conflict
+  preserves the current answer. Sensitive save requires explicit approval first.
+- Lookup results are bound to document/question/choices/configuration/answer
+  revisions. Sensitive/context reuse awaits per-question current-page approval.
+  Navigation, relevant changes, deletion, disablement, and disconnect revoke it.
+- Filling revalidates an empty eligible field and verifies the site's value.
+  Failure stays manual. Undo checks no intervening edit and suppresses refill.
+- Stop everywhere sets Off and shows stopping until monitors acknowledge or their
+  leases expire. Restarts never revive stale page decisions or answer caches.
+
 ## Resume-import states
 
 1. **File selected** — local file has not been parsed or transmitted.

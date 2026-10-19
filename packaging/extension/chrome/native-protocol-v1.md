@@ -101,3 +101,12 @@ name relays to the current-user development socket. For M7, the signed host uses
 verified native identities and a scoped vault secret instead. No authentication
 secret crosses this browser contract. Native version/capability metadata may be
 extended compatibly; a breaking change needs deliberate protocol/version rollout.
+
+## Planned answer capability — not part of v1
+
+The [M5 autofill plan](../../../Implementation%20Plans/Browser%20Extensions/Application_Answer_Autofill_Plan.md)
+adds negotiated protocol v2 lookup/capture/approval/revocation families and scoped
+field responses, preserving this v1 capture contract. Current v1 hosts do not
+accept those requests. Older peers report autofill unavailable; no unknown v1
+fields, offline answer cache, or broader fallback is introduced. Install/roll out
+compatible desktop/host support before an answer-capable extension.

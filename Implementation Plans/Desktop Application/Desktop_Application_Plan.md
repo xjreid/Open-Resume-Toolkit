@@ -35,6 +35,19 @@ accessibility qualification rather than inheriting the macOS result.
 
 Owns master-resume creation/import/editing/publishing plus tracker, aggregate AI Monitoring, connection setup, settings, backup, update, and repair. It contains no current-job tailoring/editor route. The current profile-lifecycle owner acquires a stable OS lock before recovery and refuses secondary profile access. Existing-instance intent forwarding is still planned. Authorized browser capture targets the overlay. Closing behavior follows the OS convention; the app does not stay resident merely to collect browsing data.
 
+### Application answers — planned M5
+
+Add a main-navigation section after Tracker and before Settings using existing
+Open Folio/shared controls. The [product authority](../../Product%20Plans/Application_Answer_Autofill.md)
+and [technical plan](../Browser%20Extensions/Application_Answer_Autofill_Plan.md)
+own Off/Capture only/Autofill + capture, consent/status, searchable paginated
+saved answers, answer edits/deletion, aliases, website exclusions, and Needs
+review for ordinary corrections. It is a profile library, not a job workspace.
+Use main-window-only typed commands, shared answer-library use cases, optimistic
+revisions, accessible forms/review dialogs, and existing dirty/close guards.
+The browser popup handles current-page approvals/Use once/linking/Undo/stop;
+it does not become a second library editor. No implementation is claimed here.
+
 ### Overlay window
 
 A real Tauri always-on-top window that owns the complete current-application workflow. Stage 1 captures and reviews job text. Stage 2 supplies Resume, Cover letter, and Answers tabs; PDF preview/edit/download/drag controls; change summaries and alerts; answer copy/reset; and persistent Finish Application. It is never injected into a job site and receives only the backend commands needed for that workflow.
@@ -57,6 +70,7 @@ browser repair, and production About/Legal controls remain release work:
 /resume                   master draft editor and publish state
 /tracker                  application tracker and filters
 /tracker/:id              saved application and immutable snapshots
+/application-answers      planned M5 reusable library, capture/autofill mode and review
 /monitoring               aggregate tokens and direct cost by Week/Month/Year/All time
 /settings/ai              No AI / Direct API / Codex connection and controls
 /settings/data            storage, backup, restore, export, deletion

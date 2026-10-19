@@ -6,6 +6,12 @@ These plans select the architecture, module boundaries, durable records, protoco
 
 Implementation may refine library versions and internal names without changing product behavior. Any change to privacy promises, supported AI modes, data ownership, release channels, or the user-visible lifecycle must first be approved in `../Product Plans/`.
 
+The October 19, 2026 M5 [Application-answer addition](../Product%20Plans/Application_Answer_Autofill.md)
+is approved planning only. Its [technical plan](Browser%20Extensions/Application_Answer_Autofill_Plan.md)
+defines the new library, foreground capture/autofill modes, popup, v2/v1 protocol
+compatibility, planned schema/backup transitions, and implementation order.
+M5 remains open; no app code or prior milestone acceptance changes with this update.
+
 ## Active platform scope
 
 Active development and native qualification target macOS Apple Silicon only.
@@ -48,6 +54,8 @@ Exact versions are pinned in the current manifests and lockfiles. They must pass
 - [`System Documentation/Requirement_Traceability.md`](System%20Documentation/Requirement_Traceability.md) — stable requirement IDs for issues, tests, and release evidence.
 
 ### Component plans
+
+- [`Browser Extensions/Application_Answer_Autofill_Plan.md`](Browser%20Extensions/Application_Answer_Autofill_Plan.md) — planned M5 reusable answer service/library, foreground native-field monitor, popup/approvals/Undo, protocol v2/v1 compatibility, portability, and focused acceptance.
 
 - [`Desktop Application/Desktop_Application_Plan.md`](Desktop%20Application/Desktop_Application_Plan.md)
 - [`AI and Document Processing/AI_and_Document_Processing_Plan.md`](AI%20and%20Document%20Processing/AI_and_Document_Processing_Plan.md)

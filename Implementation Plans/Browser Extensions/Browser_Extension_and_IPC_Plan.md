@@ -2,12 +2,17 @@
 
 ## Status and requirements
 
-- Status: Chrome 0.3.0 development capture implemented; Edge and production qualification open
+- Status: Chrome 0.3.0 development capture implemented; M5 answer library/autofill planned; Edge and production qualification open
 - Owner: browser/IPC maintainer
 - Milestone: M5 development functionality; M7 signed production bridge and Store qualification
 - Product authority: `../../Product Plans/Desktop_Extension_Communication.md`, `Security_Privacy_and_Open_Source.md`, and `Configuration_Limits_and_Defaults.md`
 
-Non-goals: scraping an entire page, running automatically, modifying job sites, collecting browsing history, calling AI providers, or operating without the desktop application/native host.
+Non-goals: whole-page scraping, unrelated/background collection, browsing-history
+collection, automatic submission, AI calls, and operation without the connected
+desktop/native host. The approved, unimplemented [M5 answer feature](../../Product%20Plans/Application_Answer_Autofill.md)
+is the sole exception for opt-in foreground application-field observation and
+modification. Its [technical plan](Application_Answer_Autofill_Plan.md) owns monitor,
+popup, library, and v2 contracts; existing rectangle capture remains distinct.
 
 ## Extension architecture
 
@@ -30,6 +35,12 @@ repair/version and negative checks. The production authentication design below
 remains an M7 requirement. This scope revision does not itself enable a runtime
 feature or complete either milestone.
 
+The October 19 M5 addition also requires the separate reusable-answer library,
+capture/autofill modes, typed v2 authorization, foreground monitor, and approval/
+Undo/stop popup plus focused Chrome/Edge checks. None is implemented by the
+capture modules below. M7 must additionally qualify the actual answer-capable
+Store packages and updated permission/privacy disclosures.
+
 One TypeScript codebase produces Chrome and Edge Manifest V3 packages. Browser-specific checked-in templates provide extension name, Store ID, icons later supplied by the aesthetic plan, and native-host allowlist. Production, preview, and development IDs are distinct.
 
 Current modules in `apps/extension/src/` are `service-worker.ts`, `capture.ts`,
@@ -37,6 +48,9 @@ Current modules in `apps/extension/src/` are `service-worker.ts`, `capture.ts`,
 Manifests/build scripts select the browser and host identity. There is no popup,
 toolbar action, context-menu flow, parallel editor, extension storage, or AI code.
 The service worker is the authority; page scripts cannot address the native host.
+This describes current capture. Planned autofill adds separate packaged monitor/
+adapter modules and an extension-owned toolbar popup; it retains no durable
+extension answer database or provider code.
 
 ## Current permissions
 
@@ -97,7 +111,7 @@ Request envelope v1:
 }
 ```
 
-Response is the common `ok/value` or `ok/error` shape with desktop/host/protocol versions and retryability. The current capture envelope rejects unknown fields; future additive protocol changes require an explicit compatible version/schema. Unsupported major versions return `PROTOCOL_INCOMPATIBLE` and a repair/update action.
+Response is the common `ok/value` or `ok/error` shape with desktop/host/protocol versions and retryability. The current capture envelope rejects unknown fields; future additive protocol changes require an explicit compatible version/schema. Unsupported major versions return `PROTOCOL_INCOMPATIBLE` and a repair/update action. Planned autofill negotiates protocol v2 for its separate request families and preserves v1 capture; old peers report autofill unavailable without accepting unknown v1 fields or broader fallback behavior.
 
 Limits are lower than browser maximums: 256 KiB total envelope, 128 KiB captured text, 4 KiB URL, bounded JSON depth/fields, serialized requests on the current native port, with bounded heartbeat/reconnect and capture-session lifetime. The detailed production desktop-launch/repair design below is not implemented by the development host.
 
@@ -136,6 +150,14 @@ Desktop copies accepted capture data into the sole current overlay workspace and
 
 If another capture arrives while review is active, the overlay asks whether to replace the pending capture; it never silently overwrites accepted job text or another tab's work. Pending intents are encrypted only after authenticated receipt and remain subject to the one-workspace retention rules.
 
+## Planned answer-library delivery
+
+Planned answer lookup/capture/approval goes to the separate desktop answer-library
+service, never directly into overlay captures or tracker records. A content script
+receives only authorized field answers; explicit popup/main-window interactions
+alone can search the library. Foreground leases, per-question page approvals,
+configuration/answer revisions, and revocation follow the [technical plan](Application_Answer_Autofill_Plan.md).
+
 ## Installation and registration
 
 ### Windows direct installer
@@ -162,7 +184,10 @@ Release sequencing:
 2. publish Chrome/Edge extension update;
 3. after Store adoption, remove old protocol only in a later desktop release.
 
-Emergency desktop disablement is local capability-based; the extension itself still collects nothing until the user invokes it.
+Emergency desktop disablement is local capability-based. Deliberate capture still
+requires invocation; planned answer monitoring requires an explicitly enabled
+desktop mode and fresh foreground authorization. Disablement revokes leases and
+queued work without passive fallback collection or retained browser content.
 
 ## Security tests
 
@@ -188,7 +213,8 @@ that captured content does not remain.
 ## Completion criteria
 
 - A deliberate selection can reach desktop review on Chrome and Edge/Windows and macOS.
-- No tested passive navigation/selection event creates storage or native traffic.
+- With answer modes Off, passive navigation/selection creates no page-content storage or content-bearing native traffic. In an enabled planned answer mode, only authorized foreground application-field work is permitted; background/unrelated forms remain inactive and content-free connection traffic is not collection.
 - Unauthenticated, replayed, expired, malformed, oversized, or wrong-origin messages cannot create a workspace.
 - Changed installation, repair, update, version-skew, or uninstall behavior has concise evidence on its active supported path.
 - The extension contains no provider credentials, AI logic, telemetry, or persistent job content.
+- The new answer capability additionally meets its [focused future checks](Application_Answer_Autofill_Plan.md): learning/review/fill/Undo, conservative matching, native/framework controls, current-page approvals, correction revisions, foreground/revocation/version skew, portability/deletion, and accessible desktop/popup UI. Capture-only evidence cannot close it.

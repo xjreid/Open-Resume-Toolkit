@@ -14,7 +14,11 @@ owns milestone scope and acceptance.
 
 M0–M4 have recorded macOS Apple Silicon development acceptance. M5 remains open:
 the overlay, tracker, and Chrome development capture are implemented, while Edge
-capture and the remaining browser acceptance are unfinished. Optional M6 Codex
+capture and the remaining browser acceptance are unfinished. The October 19, 2026
+M5 scope addition, [Application-answer autofill](<Product Plans/Application_Answer_Autofill.md>),
+is approved planning only: the reusable library, opt-in foreground monitor,
+toolbar popup, protocol v2, and schema/backup transitions are not implemented.
+Optional M6 Codex
 runtime/install/login/accounting work is implemented and locally tested, but no
 full M6 acceptance is recorded. M7 production signing, notarization, final host/
 Store identities, and release/update qualification remain planned. Do not infer
@@ -44,8 +48,8 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - ORT is free and open source. It is not described as a nonprofit.
 - The repository license is `GPL-3.0-only`, supplemented for identified original project material by the reasonable author-attribution term in `ADDITIONAL_TERMS.md` as permitted by GPLv3 Section 7(b). Commercial use, sale, modification, and redistribution remain permitted. The exact dependency, contribution, and additional-term compatibility remains subject to legal and license review before the first stable release.
 - `NOTICE` identifies the canonical source repository and copyright attribution. `TRADEMARKS.md` requires modified and third-party distributions to avoid implying that they are official releases; it does not restrict GPL rights in the code.
-- The desktop application is the primary product. Chrome and Edge extensions are narrow capture companions, not replacements for the desktop experience.
-- User content is local-first and remains on the user's computer. ORT operates no account service, ORT subscription, product database, cloud document store, provider quota, admin portal, or centrally funded AI key. Optional local guardrails govern only future ORT calls.
+- The desktop application is the primary product. Chrome and Edge extensions are narrow companions for deliberate capture and the separately opted-in planned M5 application-answer feature, not replacements for the desktop experience.
+- Canonical user content is local-first. Deliberate AI transmission and authorized answer autofill disclose selected content to the chosen provider or active website; ORT operates no account service, ORT subscription, product database, cloud document store, provider quota, admin portal, or centrally funded AI key. Optional local guardrails govern only future ORT calls.
 - The desktop app remains useful without AI for manual resume editing, deterministic reviewed PDF/DOCX import into existing/custom sections, local document rendering, application tracking, and exports.
 - AI features use exactly one active mode: a deliberately configured OpenAI, Anthropic, or Gemini API key; a managed ChatGPT/Codex subscription connection; or No AI. Direct-provider API keys use the operating-system credential vault. Codex authorization is memory-only in its supervised process and ends at Stop server or quit; neither kind is exposed to the browser extension. Vault storage protects the documented OS-user boundary and is not claimed to defeat malware already executing as the same unlocked user.
 - Direct API keys store explicit tested model IDs from the signed catalog; the earlier Economy/Balanced/Quality names remain legacy catalog/migration metadata. Codex models are the tested intersection of the account's current app-server model list and ORT compatibility catalog; no adapter silently falls back or enables an untested model.
@@ -56,6 +60,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - Tailoring uses the published master, never unpublished draft changes.
 - The tailoring operation also produces optional Required Qualification Alerts for explicit mandatory job requirements that map to resume content. Alerts distinguish a confirmed conflict from a qualification not found in the published master, ignore preferred/ambiguous/personal-or-legal requirements, never become a fit score, and never block the user from continuing.
 - One active overlay-owned application workspace has Stage 1 capture/review and Stage 2 Resume/Cover letter/Answers tabs. The main window has no job-specific route.
+- Planned M5 **Application answers** is a separate profile library after Tracker and before Settings. Off, Capture only, and Autofill + capture govern foreground application forms; fresh/restored profiles start Off. Matching is local and conservative with reviewed aliases; sensitive/context-dependent reuse needs current-page approval. No automatic submission, AI matching, implicit resume/tracker import, or durable extension answer store is authorized. See the feature authority for capture, correction, Undo, exclusion, and portability rules.
 - Resume and cover-letter PDF cards provide both Download and temporary operating-system drag-out; expanded preview edits structured source, not PDF bytes.
 - Open Folio is the approved light-only application direction; prior Quiet Navy/Open Frame references are archived. Resume and cover-letter documents remain visually independent; the default Technical template follows the supplied Jake's Resume reference as licensing permits.
 - Finish Application optionally creates a local tracker entry with the selected final resume, cover letter, and approved answer set as structured snapshots, then deletes unselected temporary material and resets the workspace.
@@ -88,6 +93,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - [Product scope and principles](<Product Plans/Product_Scope_and_Principles.md>) — mission, audience, surfaces, terminology, goals, and non-goals.
 - [Resume editor and schema](<Product Plans/Resume_Editor_and_Schema.md>) — detailed editor layout, section and entry types, fields, ordering, optional-value rendering, and draft/publish experience.
 - [Core workflows](<Product Plans/Core_Workflows.md>) — master resume, overlay capture/tailoring/material generation, AI Monitoring, Finish Application, and tracker behavior.
+- [Application-answer autofill](<Product Plans/Application_Answer_Autofill.md>) — approved, unimplemented M5 reusable answer library, foreground capture/autofill modes, native-control support, approvals, popup, aliases, Undo, retention, and exclusions.
 - [Local data and document model](<Product Plans/Local_Data_and_Document_Model.md>) — local records, ownership, draft/publish rules, structured snapshots, AI activity/guardrails, Codex usage cache, backup, deletion, rendering, and migration.
 - [Product states and operations](<Product Plans/Product_States_and_Operations.md>) — canonical resume, workspace, import, AI connection/operation/activity/guardrail, tracker-save, and update states.
 - [Configuration limits and defaults](<Product Plans/Configuration_Limits_and_Defaults.md>) — centralized compatibility, payload, document, AI model, spend/quota guardrail, timeout, retention, and performance defaults.
@@ -103,6 +109,7 @@ If two product plans genuinely conflict, update both deliberately. Precedence is
 - [Implementation plans](<Implementation Plans/README.md>) — selected technical baseline, component plans, delivery order, and implementation gates.
 - [Next milestones](<Implementation Plans/Next_Milestones.md>) — completed M3 review route and ordered navigation to M4–M7; the delivery roadmap remains authoritative for scope and exit evidence.
 - [Development and deployment outline](<Implementation Plans/System Documentation/Development_and_Deployment_Outline.md>) — shared desktop/extension source ownership, platform and Store artifacts, environments, CI/release sequence, mandatory gates, rollback, and M0 readiness.
+- [Application-answer autofill implementation](<Implementation Plans/Browser Extensions/Application_Answer_Autofill_Plan.md>) — future M5 component/data flow, typed contracts, protocol v2/v1 compatibility, schema 10/backup 1.10 design, implementation order, and focused acceptance checks.
 - Component folders under `Implementation Plans/` — implementation-ready plans for architecture/security/build, desktop, extensions/IPC, local data/migration, AI/document processing, and distribution/updates.
 - [Aesthetic planning](Aesthetic/README.md) — approved Open Folio direction, archived incumbent references, surface responsibilities, document independence, and remaining visual deliverables.
 
@@ -136,7 +143,7 @@ and final extension Store qualification, per the user decision of October 5,
 2026, with production qualification assigned to M7 in the current October 7 roadmap. Existing authentication/integrity requirements remain in effect.
 
 1. Read [Next milestones](<Implementation Plans/Next_Milestones.md>).
-2. Read M5 in the [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>) and its linked product authority before continuing work.
+2. Read M5 in the [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>), the [autofill product authority](<Product Plans/Application_Answer_Autofill.md>), and its [technical plan](<Implementation Plans/Browser Extensions/Application_Answer_Autofill_Plan.md>) before continuing work. Preserve current capture while implementing the distinct opt-in feature; documentation does not qualify it.
 3. Use [M2 acceptance closure](evidence/0.0.0-dev/m2-acceptance-closure.md) as the completed offline-path boundary; do not reopen completed M0–M2 scope unless a regression requires it.
 4. Use the [M3 evidence](evidence/0.0.0-dev/m3/README.md) and [M4 closure](evidence/0.0.0-dev/m4/closure.md) as completed boundaries. Track remaining M5–M7 acceptance against the roadmap; locally implemented M6 work does not close missing M5 browser evidence or M7 release gates.
 

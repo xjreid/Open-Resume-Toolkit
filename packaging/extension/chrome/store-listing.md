@@ -5,6 +5,19 @@ walkthrough, current private-testing description, approved Open Folio assets,
 and outstanding public policy/reviewer links. The prepared publishing policy is
 [privacy-policy.html](privacy-policy.html).
 
+## Future M5 answer-capable package — planning only
+
+The [approved feature](../../../Product%20Plans/Application_Answer_Autofill.md)
+is not in the current package. Before submitting an answer-capable extension,
+revise the single purpose, permissions, reviewer steps, privacy policy, and
+dashboard copy together. Disclose the explicit modes, foreground form learning,
+local saved library, sensitive/context approvals, website exposure before
+submission, popup/Undo/stop/exclusion controls, supported native fields, and
+absence of AI/submission/background collection/durable extension answers.
+Provide a compatible v2 desktop/host, retain v1 capture, and test installed
+integration under M7. Do not submit the capture-only copy below as a description
+of the future capability or claim current implementation from this plan.
+
 ## Single purpose
 
 Capture text from a user-chosen rectangle on a job page and deliver it to the

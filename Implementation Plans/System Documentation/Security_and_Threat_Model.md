@@ -133,6 +133,40 @@ The official app-server surface includes command, filesystem, process, tool, app
 
 If supported public OS mechanisms cannot enforce these properties without administrative installation, unstable private APIs, or a misleading user promise, stable builds ship with Codex mode disabled. This outcome does not block No AI or Direct API modes.
 
+## Planned M5 application-answer boundary
+
+The [product authority](../../Product%20Plans/Application_Answer_Autofill.md) and
+[technical plan](../Browser%20Extensions/Application_Answer_Autofill_Plan.md) define
+the sole separately opted-in foreground form-reading/writing capability. The
+desktop remains the authority; browser content is still hostile input.
+
+- Authorize only the active browser/tab/main document and an eligible or explicitly
+  approved application page. Off, exclusion, incompatible peers, unavailable
+  profile, or disconnection permits no automatic processing.
+- Bind short-lived results to origin/connection/document/navigation/field,
+  configuration, answer revision, choices, expiry, and replay identity. Mode,
+  site, entry/alias, navigation, and lifecycle changes revoke dependent work.
+- Content scripts receive field-scoped answers, not record enumeration. Library
+  search/detail is an explicit extension-popup/main-window action; no webpage
+  messaging, path/command, or provider capability is added.
+- Sensitive/unclassified captures need approval before persistence; sensitive/
+  context reuse needs per-question current-page approval. Show candidate values
+  in extension-owned UI until approved. Aliases cannot weaken these policies or
+  the always-excluded credential/payment/identifier/upload/signature fields.
+- Verify empty values, compatible choices, constraints, and no intervening edit
+  immediately before filling; verify retention afterward. Failed/unsupported
+  writes remain manual, without truncation, repeated retries, or submission.
+- Keep the reusable library/corrections encrypted and the browser memory-only.
+  Backups exclude modes/grants/pending/temporary data and restore Off; logs and
+  diagnostics exclude answers, questions, full URLs, and browsing history.
+- Disclose that the destination page can read an authorized filled value before
+  submission. Local-first storage and isolated script variables cannot prevent
+  a website from reading its own form values.
+
+Use focused negative checks and a representative journey. Existing capture-only
+tests are not evidence for these unimplemented controls; M7 still qualifies the
+production desktop/helper identity, vault sharing, Store packages, and disclosures.
+
 ## Native IPC protocol controls
 
 The user-assigned milestone boundary is M5 development functionality and M7

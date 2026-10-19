@@ -45,6 +45,17 @@ Contains local preferences, schema version, installation identity, backup prefer
 - Associates with zero or one selected final tailored-resume snapshot, zero or one selected cover-letter snapshot, and one ordered approved answer set.
 - Uses stable identifiers and timestamps so exports, migrations, and future linking do not depend on row position.
 
+### Reusable application-answer library — planned M5
+
+Reusable application answers are a separate planned M5 canonical category, not
+tracker snapshots. Their [product authority](Application_Answer_Autofill.md) and
+[technical plan](../Implementation%20Plans/Browser%20Extensions/Application_Answer_Autofill_Plan.md)
+define saved typed answers, reviewed aliases, exact-origin exclusions, and durable
+ordinary correction proposals with timestamps and optimistic revisions. Keep
+entries indexed and separate from generic preferences and workspace answers.
+Sensitive/unclassified candidates remain memory-only until explicit save approval.
+Page grants, current mode authorization, and Undo receipts are operational state.
+
 ### Structured material snapshot
 
 - Immutable saved JSON typed as tailored resume, cover letter, or question-answer set.
@@ -120,7 +131,7 @@ Contains bounded non-content troubleshooting facts needed beyond the durable AI 
 
 Because ORT has no cloud recovery, the application must provide a first-class portable backup.
 
-- A backup contains the local profile, master draft and published snapshot, tracker entries, retained structured materials, activity and guardrail settings safe to transfer, schema manifests, and integrity metadata.
+- A backup contains the local profile, master draft and published snapshot, tracker entries, retained structured materials, activity and guardrail settings safe to transfer, schema manifests, and integrity metadata. Planned M5 additionally includes saved reusable answers, aliases, and website exclusions as a typed collection; active modes, browser/page grants, pending corrections, and temporary captures are excluded. Replacement restore forces answer automation Off; historical backups restore an empty library. Current backup behavior is unchanged until that format is implemented.
 - Backups use a documented, versioned container such as `.ort-backup`.
 - Backups are encrypted with a user-supplied passphrase using the versioned Argon2id/XChaCha20-Poly1305 format and bounded reader policy in `Configuration_Limits_and_Defaults.md`; exact header/associated-data behavior is defined by the implementation plan and frozen with test vectors.
 - API keys, Codex sessions, and credential-vault secrets are excluded by default and must be reconfigured on the destination device. Imported guardrail policies remain inactive until the user binds and confirms them for a new credential or Codex connection; historical counters never silently attach to a different identity.

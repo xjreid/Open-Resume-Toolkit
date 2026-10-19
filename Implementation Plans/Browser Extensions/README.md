@@ -1,5 +1,7 @@
 # Browser extension implementation
 
+- [`Application_Answer_Autofill_Plan.md`](Application_Answer_Autofill_Plan.md) defines the approved, unimplemented M5 foreground answer monitor/popup, desktop library, v2/v1 compatibility, planned schema/backup transitions, implementation sequence, and focused checks. [Product authority](../../Product%20Plans/Application_Answer_Autofill.md).
+
 - [`Browser_Extension_and_IPC_Plan.md`](Browser_Extension_and_IPC_Plan.md) defines the shared Manifest V3 extension, native host, authenticated desktop IPC, packaging identities, repair, and version-skew behavior.
 - The extension is optional and never performs AI work or persistently stores captured job content.
 - The Chrome store-source package and an explicit unsigned macOS development

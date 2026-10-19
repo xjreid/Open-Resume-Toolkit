@@ -8,6 +8,30 @@
 - Provider outages or API changes degrade AI features without blocking manual editing, rendering, tracking, backup, or export.
 - Desktop, extensions, native host, updater, and local schema are versioned and tested as one compatibility system.
 
+## Application-answer verification — planned M5
+
+The approved, unimplemented [feature](Application_Answer_Autofill.md) adds focused
+coverage under the existing lightweight policy; current capture evidence does
+not qualify it. Use synthetic forms, mocks, and controllable clocks for:
+
+- Conservative normalization/qualifiers/choices, reviewed aliases and conflicts,
+  ordinary/context/sensitive/unclassified decisions, and hard exclusions.
+- Genuine edit completion versus website/ORT-prefilled events, correction approval
+  and stale revisions, occupied values, native/framework-controlled inputs,
+  dynamic fields, failed writes, and Undo preserving later edits.
+- Foreground changes, navigation/rerenders, worker restart, mode/site stops,
+  permission loss/disconnect, invalid/replayed/stale authorization and v1/v2 skew.
+- Encrypted persistence, planned schema/backup transitions, historical readers,
+  restore-Off, deletion/revocation, portable exclusions, and log redaction.
+- One Chrome learn → review → fill → correct → Undo journey and an Edge smoke
+  check; keyboard and brief screen-reader checks of the new route and popup.
+
+Confirm no AI calls, automatic submission, unrelated/background collection, or
+durable extension answer storage. Unsupported controls stay visibly manual.
+Production Store-installed behavior and accurate updated privacy/permission
+disclosures remain M7 release checks. Do not add a universal site matrix, paid AI
+campaign, timing benchmark, or repeat M0–M4 acceptance merely for this feature.
+
 ## Requirement traceability
 
 Future implementation planning assigns stable identifiers using these categories:

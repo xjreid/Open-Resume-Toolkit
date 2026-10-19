@@ -43,6 +43,13 @@ release/update infrastructure, and final Store qualification remain planned.
 See the [current implementation map](docs/development/current-state.md) and
 [delivery roadmap](<Implementation Plans/System Documentation/Delivery_Roadmap.md>).
 
+M5 also includes the approved, **not yet implemented**
+[Application-answer autofill and reusable library](<Product Plans/Application_Answer_Autofill.md>).
+Its [technical plan](<Implementation Plans/Browser Extensions/Application_Answer_Autofill_Plan.md>)
+adds opt-in foreground learning/filling, a desktop library and extension popup,
+with approval, Undo, and privacy controls. The current app/extension behavior
+listed above has not changed.
+
 ## Develop and verify
 
 Start with [DEVELOPMENT.md](DEVELOPMENT.md) for pinned prerequisites, local builds,

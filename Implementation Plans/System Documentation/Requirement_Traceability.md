@@ -47,9 +47,15 @@ These IDs provide stable anchors for code issues, tests, and release evidence. T
 | ORT-CODEX-003 | Codex cannot use tools/files/commands and has provider-only egress | Security / Codex containment | AI, security | per-platform containment report |
 | ORT-CODEX-005 | A manual or discovered Codex path cannot bypass official runtime identity/provenance checks or enable experimental/side-effect protocol surfaces | Security / Codex containment | AI, platform | counterfeit-runtime and method/event allowlist suite |
 | ORT-CODEX-004 | Codex quota data retains provider/account-wide provenance; no API-equivalent cost is shown | AI and import / Codex usage | AI, desktop | account snapshot/provenance tests |
-| ORT-IPC-001 | Extension captures selected text only after an explicit user action; the overlay owns review and Continue/Generate decisions | Desktop-extension / Capture | Extension, desktop | passive-browsing and overlay-review tests |
+| ORT-IPC-001 | Rectangle capture sends selected text only after explicit capture activation; the overlay owns review and Continue/Generate decisions | Desktop-extension / Capture | Extension, desktop | capture-only passive-browsing and overlay-review tests |
 | ORT-IPC-002 | Native messaging and desktop IPC are versioned, bounded, origin-checked, authenticated, and replay resistant | Desktop-extension / IPC | Extension, IPC | hostile protocol suite |
 | ORT-IPC-003 | Install, launch, repair, update, and uninstall preserve valid native-host registration | Desktop-extension / Installation | IPC, distribution | representative registration lifecycle check |
+| ORT-IPC-004 | Planned M5 answer modes authorize only foreground application fields with revocable document/field/configuration/answer bindings; Off/background/disconnect stay inactive | [Application answers](../../Product%20Plans/Application_Answer_Autofill.md) / Eligible pages and fields | Extension, IPC, desktop | foreground/navigation/restart/revocation and invalid-client/version checks |
+| ORT-IPC-005 | Local conservative matching and reviewed aliases preserve question/choice meaning; sensitive/unclassified save and current-page sensitive/context reuse require approval | Application answers / Learning, matching, and approvals | Domain, application, extension | category/normalization/alias/choice/approval fixtures |
+| ORT-IPC-006 | Native empty-field filling preserves edits, verifies site retention, supports safe Undo, and never submits or retries unsupported widgets | Application answers / Filling and browser popup | Extension | native/framework inputs, genuine edits, failed writes and Undo races |
+| ORT-IPC-007 | Content scripts cannot enumerate the library; approved values alone reach bound fields; no AI, durable extension answer store, content logs, or unrelated collection | Application answers / Ownership, retention, and portability | IPC, application, security | scoped-access, redaction, exclusion and no-provider/submission checks |
+| ORT-DATA-008 | Planned answer entries/aliases/corrections use encrypted revisioned records; portable saved data excludes pending/runtime state and replacement restore starts Off | Application answers / Ownership; local data / planned library | Storage, domain, backup | migration, stale correction, legacy/new backup, restore-Off and deletion tests |
+| ORT-APP-003 | Planned Application answers follows Tracker/before Settings with three modes, status, saved answers, aliases, exclusions, and Needs review; popup handles page decisions | Application answers / Desktop and popup | Desktop, extension | Chrome learning-to-Undo journey, Edge smoke, keyboard/screen-reader checks |
 | ORT-APP-001 | The main window owns master/admin surfaces and has no job-specific route; the overlay owns both application stages and all tailoring/material interactions | Core workflows / Overlay application workflow | Desktop | route/capability and full overlay journey tests |
 | ORT-APP-002 | Stage 2 has Resume/Cover letter/Answers tabs, no more than three change points, prompted regeneration, resettable question capture, and persistent Finish Application | Core workflows / Stage 2 | Desktop, AI | state-machine and accessibility tests |
 | ORT-TRK-001 | Finish Application atomically saves selected structured snapshots and clears temporary workspace data | Core workflows / Finish Application | Desktop, local data | failure-injection journey |
@@ -60,6 +66,10 @@ These IDs provide stable anchors for code issues, tests, and release evidence. T
 | ORT-ACC-001 | Critical journeys support keyboard, screen reader, scaling, high contrast, and reduced motion | Quality / Accessibility | Desktop, extension | focused automated and manual journey check |
 
 ## Maintenance rule
+
+ORT-IPC-004–007, ORT-DATA-008, and ORT-APP-003 describe approved, unimplemented
+M5 answer scope. Their evidence cells specify future checks, not current results;
+the implementation order is in the [autofill plan](../Browser%20Extensions/Application_Answer_Autofill_Plan.md).
 
 Implementation work identifies the IDs it satisfies or affects when useful for
 review. Record evidence for changed critical controls under the proportional
