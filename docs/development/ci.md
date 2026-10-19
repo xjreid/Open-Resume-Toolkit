@@ -32,6 +32,22 @@ The renderer uses fixed templates and denies external YAML/bibliography files;
 regression tests exercise both paths. This exception does not suppress other
 advisories against that package or either lockfile.
 
+The October 19 CI repair adds exact RUSTSEC-2026-0370, RUSTSEC-2026-0371, and
+RUSTSEC-2026-0372 exceptions for `zvariant`, `zbus_names`, and `zvariant_derive`.
+They enter only through `keyring`'s Linux Secret Service backend; no Linux app is
+distributed. The OSV policy test checks all-feature workspace dependency graphs
+for Apple Silicon macOS, Intel macOS, Windows, and Linux: these packages must be
+absent on both Mac architectures and Windows, and present in the Linux graph.
+The exceptions expire December 4, 2026 and must be reviewed before distributing
+the Linux backend. Both lockfiles and other advisories remain subject to the
+full hosted scan.
+
+The DOCX parser round-trip test checks every exported header line in reading
+order, heading/list kinds, and section associations in all four styles. It also
+checks body-only Skills content and excludes empty table anchors from extracted
+content. Its former tab-joined header expectation predates the independent
+header columns and no longer describes the exporter.
+
 The default build's fail-closed native-host tests are preserved. Feature-enabled
 macOS tests exercise the current-user development capability; they do not enable
 or qualify the production bridge. Non-macOS builds cannot run that adapter.

@@ -53,6 +53,26 @@ id = "RUSTSEC-2024-0370"
 ignoreUntil = 2026-12-04
 reason = "Unmaintained proc-macro-error is build-time and enters only through the Linux-only GTK graph."
 
+# keyring 4.2's Secret Service backend is Linux/Unix-only. These exact advisories
+# were reported by the October 18 scan with no fixed release. Target dependency
+# graph checks in tools/tests/osv-policy.test.mjs keep all three packages out of
+# Apple Silicon macOS, Intel macOS, and Windows. No Linux app is distributed;
+# review the advisories before shipping that backend or at the expiry below.
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0370"
+ignoreUntil = 2026-12-04
+reason = "Flagged zvariant is Linux-only through keyring's Secret Service backend; absent from macOS/Windows dependency graphs; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0371"
+ignoreUntil = 2026-12-04
+reason = "Flagged zbus_names is Linux-only through keyring's Secret Service backend; absent from macOS/Windows dependency graphs; no Linux ORT build is distributed."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0372"
+ignoreUntil = 2026-12-04
+reason = "Flagged zvariant_derive is Linux-only through keyring's Secret Service backend; absent from macOS/Windows dependency graphs; no Linux ORT build is distributed."
+
 # Tauri's URL-pattern implementation currently carries informational-only,
 # unmaintained rust-unic crates. Tauri owns the replacement path.
 [[IgnoredVulns]]

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -26,6 +27,9 @@ const expected = new Set([
   "RUSTSEC-2026-0194",
   "RUSTSEC-2026-0195",
   "RUSTSEC-2026-0206",
+  "RUSTSEC-2026-0370",
+  "RUSTSEC-2026-0371",
+  "RUSTSEC-2026-0372",
 ]);
 
 test("OSV exceptions are exact, explained, expiring, and wired into both lockfile scans", async () => {
@@ -58,4 +62,40 @@ test("OSV exceptions are exact, explained, expiring, and wired into both lockfil
   assert.match(workflow, /^\s*--lockfile=pnpm-lock\.yaml$/m);
   assert.match(workflow, /^\s*--lockfile=Cargo\.lock$/m);
   assert.doesNotMatch(workflow, /fail-on-vuln:\s*false/);
+});
+
+test("excepted Secret Service packages stay out of macOS and Windows dependency graphs", () => {
+  const packages = ["zvariant", "zbus_names", "zvariant_derive"];
+  for (const target of [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+  ]) {
+    const graph = execFileSync(
+      "cargo",
+      [
+        "tree",
+        "--locked",
+        "--offline",
+        "--workspace",
+        "--all-features",
+        "--target",
+        target,
+        "--prefix",
+        "none",
+        "--format",
+        "{p}",
+      ],
+      { cwd: new URL("../../", import.meta.url), encoding: "utf8" },
+    );
+    const names = new Set(graph.split("\n").map((line) => line.split(" ")[0]));
+    for (const name of packages) {
+      assert.equal(
+        names.has(name),
+        target === "x86_64-unknown-linux-gnu",
+        `${target}: review ${name}'s advisory exception when its target reachability changes`,
+      );
+    }
+  }
 });
