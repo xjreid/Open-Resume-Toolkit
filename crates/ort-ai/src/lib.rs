@@ -119,7 +119,7 @@ impl fmt::Debug for ApiKey {
 }
 impl Drop for ApiKey {
     fn drop(&mut self) {
-        self.0.fill(0);
+        self.0.zeroize();
     }
 }
 

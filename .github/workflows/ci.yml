@@ -34,6 +34,9 @@ jobs:
       - name: Use pinned pnpm
         run: corepack enable && corepack prepare pnpm@11.19.0 --activate
 
+      - name: Install checksum-verified secret scanner
+        run: python3 tools/install-gitleaks.py
+
       - name: Use pinned Rust
         run: rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt
 
@@ -106,6 +109,10 @@ jobs:
       - name: Use pinned pnpm
         shell: bash
         run: corepack enable && corepack prepare pnpm@11.19.0 --activate
+
+      - name: Install checksum-verified secret scanner
+        shell: bash
+        run: python3 tools/install-gitleaks.py
 
       - name: Use pinned Rust
         shell: bash

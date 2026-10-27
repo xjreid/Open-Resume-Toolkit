@@ -13,6 +13,8 @@
     "check": "pnpm format:check && pnpm lint && pnpm test && pnpm build && pnpm check:security && pnpm check:licenses && pnpm check:docs",
     "check:licenses": "node tools/check-licenses.mjs",
     "check:security": "node tools/check-web-security.mjs && node tools/check-secrets.mjs",
+    "check:secrets:history": "node tools/check-secrets.mjs --history",
+    "security:setup": "python3 tools/install-gitleaks.py && git config --local core.hooksPath .githooks",
     "dev": "pnpm --filter @ort/desktop tauri dev",
     "dev:extension:chrome": "pnpm --filter @ort/extension dev:chrome",
     "dev:extension:edge": "pnpm --filter @ort/extension dev:edge",

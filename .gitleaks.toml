@@ -1,0 +1,50 @@
+title = "Open Resume Toolkit secret scanning"
+
+[extend]
+# Same pinned upstream detectors, with broad filename exclusions removed.
+# Installed and checksum-verified alongside the binary by install-gitleaks.py.
+path = "target/security-tools/gitleaks-rules.toml"
+
+# Exact reviewed false positives only. No directory, commit, fixture, or entropy bypass.
+
+[[allowlists]]
+description = "Chrome chrome-dev-key DER SubjectPublicKeyInfo; public extension identity, not signing authority"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(?:apps/extension/manifest/chrome-dev-key\.json|(?:^|/|!)manifest\.json)$''']
+regexTarget = "secret"
+regexes = ['''^MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAt0Cy6ZIfhPos/1ZANXih0oaLzSHjL2p/ffREnRQJrbuz94CoHnG9mbOyzSTsb8vmNNSjBvKLMxJWBJTwhR\+QL5lOklnm0DP3jtfEG9L5GDgpRXj3Nm0VxZVPI2zXMgzrJzGejpkt3sjuPxdiEjypewlwCAoTwW9C23B7PULpPN90/hYtIWkfOsqJePZ6nA\+FJZuZXVM\+mwFkAmaHKex5gS94efbNLDevsrDHmCPaEiJB1sRPTDE2bwMsb57fSj0hhE15q\+k/7qmVaYFUF\+TFWdTyWmJgEg/hwzT6dTrg2D0LLovVamHRcxxSl7C7/0blZtG/p0IRVNyqgOIN3P5TowIDAQAB$''']
+
+[[allowlists]]
+description = "Chrome chrome-store-key DER SubjectPublicKeyInfo; public extension identity, not signing authority"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(?:apps/extension/manifest/chrome-store-key\.json|(?:^|/|!)manifest\.json)$''']
+regexTarget = "secret"
+regexes = ['''^MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvAXjHq0sDssD2QXoqpp7BBVfZzmq7ikVNqnFIzq4TBEyJW6P83eKjD\+d5VBmAW9tVPK/CxS0u1EuUDOYTkBpPun3kmW5fBG24wZ286bWniXSlEvepeulIgtns2KaC/VjlID\+zbhDLcsE8PqJRwLsUoTGrdtBHpVJJoiZMPR6aQXaim/AppYjc3VkBI1NrU8Yoz4fAPRi7espCCRJK/F1Bh\+ZSQfgiLnN8/X2YKRcoLyQaIe\+MEOYqNxSK0ooX\+BQGjTputVdE0ZII/HS1rF67Z4WKiBcRJguRBT8xh7C\+ou8VEjKfPOKXctKxo6YLB/ekkV3LaX8kWIv7hFqZiy/2wIDAQAB$''']
+
+[[allowlists]]
+description = "Database setting identifier"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''crates/ort\-backup/src/lib\.rs$''']
+regexTarget = "secret"
+regexes = ['''^application\.stage1\.v1$''']
+
+[[allowlists]]
+description = "Name of a published cryptographic algorithm"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''Implementation\ Plans/System\ Documentation/Technical_Reference_Baseline\.md$''']
+regexTarget = "secret"
+regexes = ['''^XChaCha20\-Poly1305$''']
+
+# Catch even low-entropy credential literals in shipped client source.
+# Provider/token detectors still run across every file, including tests/history.
+[[rules]]
+id = "ort-client-credential-literal"
+description = "Hardcoded client credential assignment"
+path = '''(?:^|/)apps/(?:desktop/src|extension/src)/.*\.[jt]sx?$'''
+regex = '''(?i)\b(?:api_?key|access_?token|refresh_?token|client_?secret|password|passwd)\b["']?[ \t]*[:=][ \t]*["']([^"'\r\n]{4,})["']'''
+secretGroup = 1
+keywords = ["key", "token", "secret", "password", "passwd"]

@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "pnpm build:chrome && pnpm build:edge",
-    "build:chrome": "node scripts/write-manifest.mjs chrome store prepare && tsc -p tsconfig.json --outDir dist/chrome && node scripts/write-manifest.mjs chrome store",
-    "build:edge": "tsc -p tsconfig.json --outDir dist/edge && node scripts/write-manifest.mjs edge",
+    "build:chrome": "node scripts/write-manifest.mjs chrome store prepare && tsc -p tsconfig.json --outDir dist/chrome && node scripts/write-manifest.mjs chrome store && node ../../tools/check-secrets.mjs --artifacts dist/chrome",
+    "build:edge": "tsc -p tsconfig.json --outDir dist/edge && node scripts/write-manifest.mjs edge && node ../../tools/check-secrets.mjs --artifacts dist/edge",
     "dev:chrome": "node scripts/write-manifest.mjs chrome dev prepare && tsc -p tsconfig.json --outDir dist/chrome-dev && node scripts/write-manifest.mjs chrome dev",
     "dev:edge": "pnpm build:edge",
     "lint": "tsc --noEmit",

@@ -15,6 +15,11 @@ available. See the [current implementation map](../docs/development/current-stat
 for availability and limitations. Supported-version information must be updated
 before a public supported binary release.
 
+The [secret-protection guide](../docs/development/secret-protection.md) describes
+credential handling, local/build/CI checks, required GitHub controls, and the
+revocation process for suspected exposure. Never place a shared service or signing
+credential in client source, build environment injection, or distributable artifacts.
+
 ## Reporting a vulnerability
 
 Do not report a suspected vulnerability, exposed credential, personal resume

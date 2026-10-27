@@ -13,7 +13,9 @@ the hosted runs for an uncommitted working tree have passed.
 | Embedded source bytes | `node --test tools/tests/docx-checkout.test.mjs` | Before dependency installation on every runner; LF/catalog-signature positive and negative controls |
 | JavaScript | `pnpm format:check`, `pnpm lint`, `pnpm test`, `pnpm build` | Ubuntu quality job; all workspace packages and extension packaging regressions |
 | Documentation links | `pnpm check:docs` | Entry-point, community, product/implementation plan, component README, and `docs/` local destinations; excludes external URLs/heading validation |
-| Local security | `pnpm check:security` | Current source: forbidden web APIs/remote assets and forbidden secret files/private-key markers |
+| Local security | `pnpm check:security` | Source/archives: pinned Gitleaks rules, sensitive filenames, forbidden web APIs/remote assets and client environment access |
+| Secret history | `pnpm check:secrets:history`; independent `secret-scan.yml` | Full fetched Git history; all pushes, PRs, weekly schedule/manual; local pre-push hook |
+| Client artifacts | Build scripts and Chrome packager | Scan actual desktop/Chrome/Edge build outputs and Chrome ZIP inputs; missing scanner/input blocks publication preparation |
 | Licenses | `pnpm check:licenses`; target JS-only checks | Cargo/pnpm locked graph and explicit platform policies; inventory under `target/licenses/` |
 | Generated contracts | `cargo run --locked -p ort-contract-generator` then `git diff --exit-code -- packages/contracts/generated` | Ubuntu; Rust-owned schemas, types, decoders, wire fixtures |
 | Rust | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --locked` | Ubuntu quality job |
@@ -121,8 +123,12 @@ failure.
 A local arm64 run does not prove hosted Linux/Intel/Windows execution, OSV
 results, branch protection, production signing, or Store qualification. YAML
 parsing is not full GitHub Actions validation; use `actionlint` when installed.
-The current secret scanner is intentionally narrow and does not prove that
-outgoing Git history is free of tokens or personal data.
+The October 27 scanner hardening adds source, staged-index, full-history, archive,
+and client-artifact scans. It requires the checksum-pinned Gitleaks installation
+from `pnpm security:setup` or `just bootstrap`. See [secret protection](secret-protection.md)
+and the [public credential audit](security-audit-2026-10-27.md). Pattern detection
+does not prove the absence of unknown secrets or personal data; GitHub push
+protection is needed before publication and branch rules must enforce checks.
 
 ## Local review result — October 15, 2026
 
