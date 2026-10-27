@@ -3,7 +3,7 @@
 The executable definitions are [CI](../../.github/workflows/ci.yml),
 [dependency scanning](../../.github/workflows/dependency-scan.yml),
 [package scripts](../../package.json), and [justfile](../../justfile).
-This map was reviewed on October 16, 2026. It describes checks, not a claim that
+This map was updated on October 27, 2026. It describes checks, not a claim that
 the hosted runs for an uncommitted working tree have passed.
 
 ## Gates
@@ -13,7 +13,9 @@ the hosted runs for an uncommitted working tree have passed.
 | Embedded source bytes | `node --test tools/tests/docx-checkout.test.mjs` | Before dependency installation on every runner; LF/catalog-signature positive and negative controls |
 | JavaScript | `pnpm format:check`, `pnpm lint`, `pnpm test`, `pnpm build` | Ubuntu quality job; all workspace packages and extension packaging regressions |
 | Documentation links | `pnpm check:docs` | Entry-point, community, product/implementation plan, component README, and `docs/` local destinations; excludes external URLs/heading validation |
-| Local security | `pnpm check:security` | Current source: forbidden web APIs/remote assets and forbidden secret files/private-key markers |
+| Local security | `pnpm check:security` | Source/archives: pinned Gitleaks rules, sensitive filenames, forbidden web APIs/remote assets and client environment access |
+| Secret history | `pnpm check:secrets:history`; independent `secret-scan.yml` | Full fetched Git history; all pushes, PRs, weekly schedule/manual; local pre-push hook |
+| Client artifacts | Build scripts and Chrome packager | Scan actual desktop/Chrome/Edge build outputs and Chrome ZIP inputs; missing scanner/input blocks publication preparation |
 | Licenses | `pnpm check:licenses`; target JS-only checks | Cargo/pnpm locked graph and explicit platform policies; inventory under `target/licenses/` |
 | Generated contracts | `cargo run --locked -p ort-contract-generator` then `git diff --exit-code -- packages/contracts/generated` | Ubuntu; Rust-owned schemas, types, decoders, wire fixtures |
 | Rust | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --locked` | Ubuntu quality job |
@@ -41,6 +43,21 @@ absent on both Mac architectures and Windows, and present in the Linux graph.
 The exceptions expire December 4, 2026 and must be reviewed before distributing
 the Linux backend. Both lockfiles and other advisories remain subject to the
 full hosted scan.
+
+The October 27 security repair updates Vite to 8.2.4, Vitest and its companion
+packages to 4.1.12, the jsdom Undici override to 8.12.2, Tokio to 1.53.3,
+ctutils to 0.4.4, rustls-webpki to 0.103.16, and webpki-root-certs to 1.0.10.
+Both Rust certificate-validation fixes are applied, including the verifier that
+is separate from the bundled-root data. The exact certificate-data license entry
+moves to 1.0.10 with the same license text, obligation, and review deadline.
+
+One additional aggregate finding, GHSA-qwgh-2vcv-g2f7, incorrectly includes
+block-buffer 0.10.4. The [maintainer advisory](https://github.com/RustCrypto/utils/security/advisories/GHSA-qwgh-2vcv-g2f7)
+limits the affected inline-cursor implementation to >=0.11.0,<0.12.1; the locked
+0.10.4 has a separate cursor field. Its exact advisory exception expires December
+4, 2026. A lockfile guard forbids the affected releases, and Rust integration
+tests exercise the caught-panic scenarios against the actual legacy dependency.
+This is a version-range correction, not a waiver for an affected implementation.
 
 The DOCX parser round-trip test checks every exported header line in reading
 order, heading/list kinds, and section associations in all four styles. It also
@@ -121,8 +138,12 @@ failure.
 A local arm64 run does not prove hosted Linux/Intel/Windows execution, OSV
 results, branch protection, production signing, or Store qualification. YAML
 parsing is not full GitHub Actions validation; use `actionlint` when installed.
-The current secret scanner is intentionally narrow and does not prove that
-outgoing Git history is free of tokens or personal data.
+The October 27 scanner hardening adds source, staged-index, full-history, archive,
+and client-artifact scans. It requires the checksum-pinned Gitleaks installation
+from `pnpm security:setup` or `just bootstrap`. See [secret protection](secret-protection.md)
+and the [public credential audit](security-audit-2026-10-27.md). Pattern detection
+does not prove the absence of unknown secrets or personal data; GitHub push
+protection is needed before publication and branch rules must enforce checks.
 
 ## Local review result — October 15, 2026
 

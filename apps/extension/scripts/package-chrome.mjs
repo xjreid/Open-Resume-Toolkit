@@ -15,6 +15,15 @@ const dev = process.argv[2] === "dev-bridge";
 if (process.argv.length > 3 || (process.argv[2] !== undefined && !dev))
   throw new Error("Use package-chrome.mjs [dev-bridge].");
 const build = resolve(root, dev ? "dist/chrome-dev-bridge" : "dist/chrome");
+const scanned = spawnSync(
+  process.execPath,
+  [resolve(root, "../../tools/check-secrets.mjs"), "--artifacts", build],
+  { stdio: "inherit" },
+);
+if (scanned.error || scanned.status !== 0)
+  throw new Error(
+    "Chrome package secret scan failed; refusing to create an archive.",
+  );
 const { manifest, files, hostName } = inspectChromePackage(build, dev);
 const artifactRoot = resolve(root, "../../artifacts/extension/chrome");
 mkdirSync(artifactRoot, { recursive: true });

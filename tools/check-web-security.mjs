@@ -16,6 +16,10 @@ const forbidden = [
   [/\beval\s*\(/g, "dynamic code evaluation"],
   [/new\s+Function\s*\(/g, "dynamic Function construction"],
   [/https?:\/\//g, "remote web asset or endpoint"],
+  [
+    /\b(?:process|import\.meta|Deno|Bun)\s*\.\s*env\b/g,
+    "client environment access",
+  ],
 ];
 const failures = [];
 

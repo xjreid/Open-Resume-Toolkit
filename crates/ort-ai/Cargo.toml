@@ -20,6 +20,9 @@ url.workspace = true
 
 [dev-dependencies]
 ed25519-dalek = { workspace = true, features = ["rand_core"] }
+# Reproduce the upstream panic case on the legacy implementation brought by
+# ed25519-dalek; this version keeps its cursor outside the input buffer.
+block-buffer-legacy = { package = "block-buffer", version = "=0.10.4" }
 
 [lints]
 workspace = true

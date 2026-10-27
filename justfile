@@ -5,6 +5,8 @@ default:
 
 bootstrap:
 	@node tools/bootstrap.mjs
+	python3 tools/install-gitleaks.py
+	git config --local core.hooksPath .githooks
 	pnpm install --frozen-lockfile
 
 generate:

@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const expected = new Set([
+  "GHSA-qwgh-2vcv-g2f7",
   "RUSTSEC-2024-0320",
   "RUSTSEC-2024-0370",
   "RUSTSEC-2024-0411",
@@ -45,7 +46,9 @@ test("OSV exceptions are exact, explained, expiring, and wired into both lockfil
   assert.equal(entries.length, expected.size);
   const actual = new Set();
   for (const entry of entries) {
-    const id = entry.match(/^\s*id = "(RUSTSEC-\d{4}-\d{4})"/m)?.[1];
+    const id = entry.match(
+      /^\s*id = "((?:RUSTSEC-\d{4}-\d{4})|(?:GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}))"/m,
+    )?.[1];
     const expiry = entry.match(/^\s*ignoreUntil = (\d{4}-\d{2}-\d{2})/m)?.[1];
     const reason = entry.match(/^\s*reason = "([^"]+)"/m)?.[1];
     assert.ok(
@@ -62,6 +65,32 @@ test("OSV exceptions are exact, explained, expiring, and wired into both lockfil
   assert.match(workflow, /^\s*--lockfile=pnpm-lock\.yaml$/m);
   assert.match(workflow, /^\s*--lockfile=Cargo\.lock$/m);
   assert.doesNotMatch(workflow, /fail-on-vuln:\s*false/);
+});
+
+test("block-buffer advisory exception cannot hide an affected inline-cursor release", async () => {
+  const lock = await readFile(
+    new URL("../../Cargo.lock", import.meta.url),
+    "utf8",
+  );
+  const versions = lock
+    .split("[[package]]")
+    .filter((entry) => /^\s*name = "block-buffer"$/m.test(entry))
+    .map((entry) => entry.match(/^version = "([^"]+)"$/m)?.[1]);
+  assert.ok(
+    versions.includes("0.10.4"),
+    "Remove the exception when the legacy dependency is retired",
+  );
+  for (const version of versions) {
+    assert.match(version, /^\d+\.\d+\.\d+$/);
+    const [major, minor, patch] = version.split(".").map(Number);
+    assert.ok(
+      version === "0.10.4" ||
+        major > 0 ||
+        minor > 12 ||
+        (minor === 12 && patch >= 1),
+      `Review block-buffer ${version}: the exception only covers 0.10.4 and upstream-patched releases`,
+    );
+  }
 });
 
 test("excepted Secret Service packages stay out of macOS and Windows dependency graphs", () => {

@@ -1,6 +1,16 @@
 # Every exception is exact, time-bounded, and reviewed by
 # tools/tests/osv-policy.test.mjs. New advisories remain blocking.
 
+# The aggregate advisory currently omits the maintainer's >=0.11.0 lower bound:
+# https://github.com/RustCrypto/utils/security/advisories/GHSA-qwgh-2vcv-g2f7
+# block-buffer 0.10.4 stores pos separately, not inside the input buffer. The
+# ort-ai legacy_block_buffer integration tests reproduce caught-panic cases;
+# the policy test rejects every resolved version in >=0.11.0,<0.12.1.
+[[IgnoredVulns]]
+id = "GHSA-qwgh-2vcv-g2f7"
+ignoreUntil = 2026-12-04
+reason = "Aggregate range false positive: maintainer limits GHSA-qwgh-2vcv-g2f7 to >=0.11.0,<0.12.1; locked 0.10.4 has a separate cursor. Panic regressions and the lockfile version guard enforce this assessment."
+
 # Tauri's Linux CI-only WebKit/GTK graph. ORT's supported desktop targets are
 # macOS and Windows; the Ubuntu job compiles/tests but is not distributed.
 [[IgnoredVulns]]

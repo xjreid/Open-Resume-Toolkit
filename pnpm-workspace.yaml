@@ -2,8 +2,8 @@ packages:
   - apps/*
   - packages/*
 
-# Patched WebSocket decompression handling (GHSA-3wwx-pv8p-q78v).
+# Patched Undici content-encoding, integrity, and EventSource handling.
 overrides:
-  jsdom>undici: 8.10.2
+  jsdom>undici: 8.12.2
   # Patched source-map parsing (GHSA-68fv-2mgg-jv7q).
   source-map-js: 1.2.2

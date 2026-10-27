@@ -223,7 +223,7 @@ test("canonical local and CI gates execute license and contract drift checks", a
     [
       {
         ecosystem: "rust",
-        package: "webpki-root-certs@1.0.9",
+        package: "webpki-root-certs@1.0.10",
         license: "CDLA-Permissive-2.0",
       },
     ],

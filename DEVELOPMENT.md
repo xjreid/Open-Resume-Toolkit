@@ -30,6 +30,12 @@ Bootstrap installs locked JavaScript dependencies. `just dev` checks the isolate
 jobs, provider fixtures, and disposable profiles for development and tests.
 Never reset a real profile to make a check pass.
 
+Bootstrap also installs the checksum-pinned secret scanner and enables the local
+pre-commit/pre-push hooks. For an existing checkout run `pnpm security:setup`.
+See [secret protection](docs/development/secret-protection.md) for source,
+history, client-build, packaging, and GitHub enforcement details. Missing scanner
+tools fail the security/build gates; setup requires network, subsequent scans do not.
+
 ## Current development builds
 
 `just dev` runs the frontend and Tauri shell. Import requires the signed parser
