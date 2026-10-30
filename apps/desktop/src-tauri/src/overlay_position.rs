@@ -150,6 +150,8 @@ pub(crate) fn restore(window: &WebviewWindow) -> tauri::Result<()> {
 mod tests {
     use super::*;
     use ort_vault::testing::MemoryDatabaseKeyVault;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
 
     #[test]
     fn position_survives_storage_reopen_and_retains_a_valid_location() {

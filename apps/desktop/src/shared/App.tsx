@@ -221,6 +221,12 @@ function ResumeEditor() {
     dispatch({ type: "edit", update });
   }
 
+  function retryStorage() {
+    void invoke("retry_storage")
+      .then(() => void loadWorkspace())
+      .catch(() => void loadWorkspace());
+  }
+
   const storageReady =
     health.kind === "ready" && health.health.storageStatus === "ready";
   const alreadyPublished =
@@ -244,16 +250,7 @@ function ResumeEditor() {
       }}
       overlayVisible={overlayVisible}
       navigationBlocked={busy || confirmReload || close.pending}
-      status={
-        <HealthBadge
-          state={health}
-          onRetry={() => {
-            void invoke("retry_storage")
-              .then(() => void loadWorkspace())
-              .catch(() => void loadWorkspace());
-          }}
-        />
-      }
+      status={<HealthBadge state={health} onRetry={retryStorage} />}
     >
       {overlayError && <p role="alert">{overlayError}</p>}
       <CloseDialog
@@ -415,8 +412,8 @@ function ResumeEditor() {
         ) : null}
         {editor.errorCode ? (
           <p className="notice" role="alert">
-            {friendlyError(editor.errorCode)} We’ll keep your edits here until
-            you try again.
+            {friendlyError(editor.errorCode)}
+            {document ? " We’ll keep your edits here until you try again." : ""}
           </p>
         ) : null}
         {issues.length ? (
@@ -672,11 +669,19 @@ function ResumeEditor() {
           </fieldset>
         ) : !document ? (
           <section className="status-card">
-            <h2>Opening your workspace</h2>
-            <p className="description">Getting your local resume ready.</p>
+            <h2>
+              {editor.errorCode
+                ? "Your workspace is unavailable"
+                : "Opening your workspace"}
+            </h2>
+            <p className="description">
+              {editor.errorCode
+                ? "Resolve the storage issue above, then retry."
+                : "Getting your local resume ready."}
+            </p>
             {!busy ? (
-              <button type="button" onClick={() => void loadWorkspace()}>
-                Try again
+              <button type="button" onClick={retryStorage}>
+                Retry storage
               </button>
             ) : null}
           </section>
@@ -829,6 +834,8 @@ function friendlyError(code: string): string {
       return "The resume contains an invalid or oversized field. Review required headings and links.";
     case "STORAGE_UNAVAILABLE":
       return "Your local storage is unavailable. Please try again.";
+    case "WINDOWS_LEGACY_PROFILE_REQUIRES_BACKUP":
+      return "Your earlier Windows profile needs recovery. Use the previous build to create an encrypted backup, then move its profiles folder to a safe location and retry. Restore the backup from Settings. Keep the old profile until you verify the restored data.";
     case "COMMAND_UNAVAILABLE":
     case "INVALID_RESPONSE":
       return "The save result is uncertain. Reload the saved draft to check what reached storage before retrying.";

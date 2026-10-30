@@ -38,6 +38,42 @@ tools fail the security/build gates; setup requires network, subsequent scans do
 
 ## Current development builds
 
+### Windows integration branch
+
+Windows 11 x64 integration is in progress. See the
+[implementation record](docs/development/windows-integration.md) for completed
+checks, unfinished adapters, and feature gates. This is not yet a Windows
+support or application-qualification claim.
+
+The [Windows development guide](packaging/windows/nsis/README.md) covers pinned
+prerequisites, source checks, the explicit later build command and per-user Chrome
+development registration. Those build/registration commands have not been run.
+
+Windows library checks require PowerShell 7, the pinned Rust toolchain, Microsoft
+C++ Build Tools with the x64 tools and Windows SDK, and native Windows Perl
+(for vendored SQLCipher/OpenSSL). Git/MSYS Perl is not a replacement. Use:
+
+```powershell
+pwsh -File tools/check-windows.ps1 -CheckOnly -DesktopSource
+# Optional disposable OS-vault tests; never reads application credentials:
+pwsh -File tools/check-windows.ps1 -NativeVault
+# Optional disposable helper, credential-denial, file and local-pipe probes:
+pwsh -File tools/check-windows.ps1 -NativeContainment
+```
+
+These commands verify library adapters; `-DesktopSource` also typechecks desktop
+and test targets without linking a runnable app. They do not package, install,
+or launch the desktop app. If the isolated development toolchain exists under ignored
+`target/windows-toolchain`, the script uses it without changing the system PATH.
+Otherwise it uses deliberately installed tools on the current PATH.
+
+The Windows credential policy explicitly selects device-local persistence.
+Existing ORT credentials are retained at the same address and converted to local
+persistence without changing their secret when accessed. This change cannot
+revoke copies that may already have roamed under an earlier experimental build.
+
+### macOS development app
+
 `just dev` runs the frontend and Tauri shell. Import requires the signed parser
 helper and its executable/running-code pins. Codex installation requires its
 packaged helper and digest. A bare shell build does not establish that either

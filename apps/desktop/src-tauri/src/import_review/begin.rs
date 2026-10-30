@@ -190,7 +190,37 @@ fn extract(
     .extract(format, &source.bytes, cancel)
     .map_err(|_| ())
 }
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn extract(
+    source: &ort_platform::NativeDocumentSource,
+    cancel: &AtomicBool,
+) -> Result<ort_documents::import::ValidatedExtraction, ()> {
+    if option_env!("ORT_WINDOWS_PARSER_POLICY") != Some(ort_platform::WINDOWS_PARSER_POLICY) {
+        return Err(());
+    }
+    let hash = option_env!("ORT_PARSER_HELPER_SHA256").ok_or(())?;
+    if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(());
+    }
+    let mut digest = [0; 32];
+    for (index, byte) in digest.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&hash[index * 2..index * 2 + 2], 16).map_err(|_| ())?;
+    }
+    let executable = std::env::current_exe().map_err(|_| ())?;
+    let helper = executable
+        .parent()
+        .ok_or(())?
+        .join("helpers/ort-parser-helper.exe");
+    let format = match source.format {
+        ort_platform::NativeDocumentFormat::Pdf => ort_documents::import::InputFormat::Pdf,
+        ort_platform::NativeDocumentFormat::Docx => ort_documents::import::InputFormat::Docx,
+    };
+    ort_platform::ParserHelper::new(helper, digest)
+        .map_err(|_| ())?
+        .extract(format, &source.bytes, cancel)
+        .map_err(|_| ())
+}
+#[cfg(not(any(target_os = "macos", windows)))]
 fn extract(
     _: &ort_platform::NativeDocumentSource,
     _: &AtomicBool,

@@ -107,6 +107,9 @@ fn read_bounded_selection(
     name: &str,
     max_bytes: usize,
 ) -> Result<Vec<u8>, NativeInputError> {
+    #[cfg(windows)]
+    let _guards = ort_windows::selected_source_handles(path)
+        .map_err(|_| NativeInputError::InvalidSelection)?;
     let parent = Dir::open_ambient_dir(
         path.parent().ok_or(NativeInputError::InvalidSelection)?,
         ambient_authority(),

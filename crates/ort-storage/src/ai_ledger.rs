@@ -440,6 +440,8 @@ impl EncryptedStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
     #[test]
     fn schema_seven_totals_migrate_atomically_and_keep_partial_exposure_after_retention() {
         let temp = tempfile::tempdir().unwrap();

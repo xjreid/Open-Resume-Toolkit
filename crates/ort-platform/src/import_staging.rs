@@ -8,16 +8,17 @@
 use std::{
     ffi::OsString,
     io::{self, Read, Write},
-    path::{Component, Path},
+    path::Path,
     time::{Duration, SystemTime},
 };
 
 #[cfg(unix)]
+use cap_std::ambient_authority;
+use cap_std::fs::{Dir, DirBuilder, File, OpenOptions};
+#[cfg(unix)]
 use cap_std::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
-use cap_std::{
-    ambient_authority,
-    fs::{Dir, DirBuilder, File, OpenOptions},
-};
+#[cfg(unix)]
+use std::path::Component;
 use uuid::Uuid;
 
 use crate::{NativeDocumentFormat, NativeDocumentSource};

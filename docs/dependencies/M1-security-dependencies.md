@@ -1,6 +1,7 @@
 # M1 security dependency review
 
 - Reviewed: 2026-09-01; native logging configuration amended 2026-09-02
+- Windows adapter and device-local persistence amendment: 2026-10-29
 - Scope: encrypted local database and operating-system database-key storage
 - Release state: approved for development; Windows/macOS platform proof still required
 
@@ -9,7 +10,9 @@
 | Boundary | Pinned dependency | Configuration | Reason |
 | --- | --- | --- | --- |
 | Encrypted SQLite | `rusqlite 0.40.2` | `backup`, `bundled-sqlcipher-vendored-openssl` | Maintained Rust API with a reproducible SQLCipher/OpenSSL source build on Windows and macOS |
-| OS credential vault | `keyring 4.2.0` | default platform stores | Uses macOS Keychain and Windows Credential Manager without exposing either API to the webview |
+| OS credential vault | `keyring 4.2.0` | macOS default store; explicit Windows store below | Keeps credential APIs out of the webview |
+| Windows credential persistence | `keyring-core 1.0.0`, `windows-native-keyring-store 1.1.0` | explicit per-entry `Local` specifier; no global store mutation | Keeps credentials on this computer for the current user; preserves existing target names and secret bytes |
+| Windows native security | `windows-sys 0.61.2` through `ort-windows` | narrow filesystem/ACL, mutex, overlapped-pipe, AppContainer/Job and development-registration adapters | Confines reviewed FFI to four native modules; application/storage crates retain the unsafe-code prohibition |
 | Exclusive macOS key creation | `security-framework 3.7.0` | macOS-only direct dependency, already pinned transitively | Safe wrapper for native add-only creation in the same User-domain Keychain; duplicate items are refused without an upsert |
 | Random keys | `getrandom 0.4.3` | OS random source | Generates a local 256-bit database key without command-line or environment transport |
 | Secret clearing | `zeroize 1.9.0` | key wrapper and temporary encodings | Clears owned key buffers and temporary raw-key strings on drop/use |
@@ -81,24 +84,42 @@ MIT/Apache-2.0 license; it adds no package version, unsafe application code, or
 secret transport. The native regression includes a deterministic negative
 control for the old upsert interleaving, followed by competing independent
 adapters using the exclusive operation. Neither is signed-app or cross-process
-access-control qualification. Windows and other non-macOS creation still use
-the old compatibility path and require an exclusive-create design before later
-native qualification; no cross-process overwrite guarantee is claimed there.
+access-control qualification.
+
+Windows now serializes cooperating ORT adapters and processes with a private,
+current-user SID-scoped named mutex before reading, creating or deleting vault
+entries. A two-process native test verifies that concurrent creation has one
+winner and preserves its bytes. Existing Session/Enterprise entries are converted
+to Local persistence without changing their secret or address; a native regression
+verifies the conversion. This is not an OS atomic add-only credential primitive
+against arbitrary same-user software. Generic credentials remain an account trust
+boundary. Other non-macOS/non-Windows targets retain the compatibility path.
+
+The Windows direct dependencies reuse already locked packages and their reviewed
+licenses. Native FFI is confined to `ort-windows` security, pipes, parser and
+registration modules. Its public safe wrappers and synthetic native evidence are
+recorded in the [Windows integration review](../development/windows-integration.md).
 
 - macOS development uses the legacy Keychain adapter because unsigned builds
   cannot honestly claim a signed application access group. Signed preview and
   release builds must prove their code-requirement/access policy across first
   run, app moves, updates, and native-host access before persistence is enabled.
-- Windows uses a channel/install/profile-scoped Generic Credential. This protects
-  against other accounts and offline disk access, but not malware already
-  running as the same signed-in user. Windows VM tests must prove namespace,
-  cross-user, update, uninstall, and denial behavior.
+- Windows uses channel/install/profile-scoped Generic Credentials with explicit
+  Local persistence (`CRED_PERSIST_LOCAL_MACHINE`): the same user on the same
+  computer across subsequent logons. The OS protects stored secrets; ORT does not
+  claim TPM binding or protection from other processes running as that user.
+  Native synthetic roundtrip, persistence conversion, overwrite refusal and
+  concurrent-creation tests passed. Cross-user, application-update/uninstall and
+  installed-application qualification remain unrun.
 - Ordinary unit/integration tests use an in-memory vault and synthetic content;
   they never create OS credentials.
-- `just test-platform-vault` is the explicit opt-in native proof. It creates one
-  randomized credential in the platform-test namespace, verifies round-trip and
-  overwrite denial, then deletes the credential through an idempotent cleanup
-  guard.
+- `just test-platform-vault` is the existing explicit native opt-in. Windows uses
+  `tools/check-windows.ps1 -NativeVault` for its ignored, environment-gated vault
+  tests. `-NativeContainment` separately enables ignored `native-probes` parser
+  fixtures, including denial of a randomized synthetic credential. Merely enabling
+  shared private-directory fixture support does not enable these probes. Cleanup
+  guards delete the randomized test credentials; no application credentials are
+  accessed.
 
 ## References
 

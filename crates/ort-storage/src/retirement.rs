@@ -191,6 +191,8 @@ mod tests {
     };
     use ort_vault::testing::{MemoryDatabaseKeyVault, MemoryProviderCredentialVault};
     use ort_vault::{ProviderSecret, VaultError};
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
     use std::sync::atomic::{AtomicBool, Ordering};
 
     struct FailingProviders {

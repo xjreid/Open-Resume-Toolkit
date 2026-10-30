@@ -7,6 +7,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -21,6 +22,9 @@ def digest(path):
 
 
 def main():
+    if sys.platform == "win32":
+        run([sys.executable, "tools/build-development-windows.py", *sys.argv[1:]])
+        return
     parser_manifest = ROOT / "target/parser-helper-package.json"
     if not parser_manifest.exists():
         run(["python3", "tools/package-parser-helper.py"])

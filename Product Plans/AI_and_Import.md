@@ -53,6 +53,7 @@ The broader release design calls for model capability and provenance disclosure,
 
 - The desktop app receives direct-provider API keys from the user.
 - Credentials are stored in Windows Credential Manager, macOS Keychain, or an equivalently protected OS facility.
+- Windows generic credentials explicitly use device-local persistence for the current user, not Enterprise roaming. ORT processes serialize creation and deletion so a competing startup cannot overwrite an existing database/API credential identity.
 - Vault storage protects secrets from offline theft and other operating-system users; it is not represented as protection from malware already executing as the same unlocked user. Windows generic credentials remain inside that user-session boundary. On macOS, the implementation must use the narrowest workable Keychain accessibility and trusted-application/access-control policy for the desktop and native host, and must test how preview and signed identities behave across update, move, repair, and uninstall.
 - The vault adapter exposes only create, use, replace, and delete operations. Ordinary UI commands cannot enumerate secret values or read a credential back. Secret access is permitted only immediately before the specific database, IPC, or provider operation that needs it.
 - Credentials never appear in the local content database, logs, backups by default, browser-extension storage, native-messaging payloads, exports, crash reports, or diagnostic bundles.

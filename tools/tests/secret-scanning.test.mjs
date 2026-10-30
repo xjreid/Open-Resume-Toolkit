@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { test } from "node:test";
 import {
   forbiddenSecretPath,
@@ -140,7 +140,7 @@ test("archive members are scanned", (t) => {
   const directory = temporary(t),
     report = temporary(t);
   const fixture = put(report, "credential.txt", token());
-  execFileSync("python3", [
+  execFileSync(process.platform === "win32" ? "python" : "python3", [
     "-c",
     "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w',compression=zipfile.ZIP_DEFLATED); z.write(sys.argv[2],'client.js'); z.close()",
     join(directory, "package.zip"),
@@ -183,17 +183,15 @@ test("missing scanners fail closed", (t) => {
   );
 });
 
-test(
-  "artifact traversal rejects links instead of reading an external credential",
-  { skip: process.platform === "win32" },
-  (t) => {
-    const directory = temporary(t),
-      outside = temporary(t);
-    const path = put(outside, "private.txt", token());
-    symlinkSync(path, join(directory, "linked.js"));
-    assert.throws(() => inspectScanDirectory(directory), /symlinks/);
-  },
-);
+test("artifact traversal rejects links instead of reading an external credential", (t) => {
+  const directory = temporary(t),
+    outside = temporary(t);
+  const path = put(outside, "private.txt", token());
+  if (process.platform === "win32")
+    symlinkSync(outside, join(directory, "linked"), "junction");
+  else symlinkSync(path, join(directory, "linked.js"));
+  assert.throws(() => inspectScanDirectory(directory), /symlinks/);
+});
 
 test("staged scan reads the index rather than a cleaned working copy", (t) => {
   const directory = repository(t),
@@ -246,7 +244,9 @@ test("renderer build excludes environment canaries and unimported public files",
     "apps/desktop/node_modules/vite/dist/node/index.js",
   );
   assert.ok(existsSync(vitePath), "Install locked dependencies first");
-  const { build, loadConfigFromFile } = await import(vitePath);
+  const { build, loadConfigFromFile } = await import(
+    pathToFileURL(vitePath).href
+  );
   const { config: desktop } = await loadConfigFromFile(
     { command: "build", mode: "production" },
     join(root, "apps/desktop/vite.config.ts"),

@@ -298,6 +298,8 @@ mod tests {
     use super::*;
     use ort_backup::BackupPassphrase;
     use ort_vault::testing::MemoryDatabaseKeyVault;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
     use serde_json::json;
     use tempfile::TempDir;
 

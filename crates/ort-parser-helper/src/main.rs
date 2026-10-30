@@ -1,12 +1,13 @@
 //! One request per disposable process. The guest has no OS capabilities.
-//! Native packaging must apply App Sandbox and verify this executable identity.
+//! Native packaging must apply platform containment and verify executable identity.
+#![cfg_attr(windows, windows_subsystem = "windows")]
 use ort_documents::{
     import::{InputFormat, ValidatedExtraction},
     import_source::MAX_IMPORT_SOURCE_BYTES,
     worker_output::WorkerExtractionBuilder,
 };
 use std::io::{Read, Write};
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 use std::time::{Duration, Instant};
 mod guests {
     include!(concat!(env!("OUT_DIR"), "/guests.rs"));
@@ -50,7 +51,25 @@ fn watchdog() -> Result<(), ()> {
         .map_err(|_| ())?;
     Ok(())
 }
-#[cfg(not(unix))]
+#[cfg(windows)]
+fn watchdog() -> Result<(), ()> {
+    // Parent ownership is enforced by the non-inherited kill-on-close Job.
+    // The helper also bounds its own lifetime independently of pipe progress.
+    let start = Instant::now();
+    std::thread::Builder::new()
+        .name("ort-parser-watchdog".into())
+        .spawn(move || {
+            loop {
+                if start.elapsed() >= Duration::from_secs(60) {
+                    std::process::exit(124);
+                }
+                std::thread::sleep(Duration::from_millis(25));
+            }
+        })
+        .map_err(|_| ())?;
+    Ok(())
+}
+#[cfg(not(any(unix, windows)))]
 fn watchdog() -> Result<(), ()> {
     Err(())
 }

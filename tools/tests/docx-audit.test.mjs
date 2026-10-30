@@ -37,7 +37,7 @@ print(json.dumps({style:module.expected_paragraphs(source,style)[0] for style in
   const actual = JSON.parse(
     execFileSync(
       process.platform === "win32" ? "python" : "python3",
-      ["-B", "-c", code],
+      ["-X", "utf8", "-B", "-c", code],
       { input: JSON.stringify(source), encoding: "utf8" },
     ),
   );

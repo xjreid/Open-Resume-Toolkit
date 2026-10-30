@@ -204,9 +204,12 @@ test("canonical local and CI gates execute license and contract drift checks", a
   );
   assert.match(
     justfile,
-    /^verify-contracts:\n\s+cargo run --locked -p ort-contract-generator\n\s+git diff --exit-code -- packages\/contracts\/generated/m,
+    /^verify-contracts:\r?\n\s+cargo run --locked -p ort-contract-generator\r?\n\s+git diff --exit-code -- packages\/contracts\/generated/m,
   );
-  assert.match(justfile, /^check:\n\s+pnpm check\n\s+just verify-contracts/m);
+  assert.match(
+    justfile,
+    /^check:\r?\n\s+pnpm check\r?\n\s+just verify-contracts/m,
+  );
   assert.match(workflow, /name: Verify dependency licenses/);
   assert.match(workflow, /run: pnpm check:licenses/);
   const parsedPolicy = JSON.parse(policy);

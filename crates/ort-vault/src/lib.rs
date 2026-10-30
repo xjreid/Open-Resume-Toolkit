@@ -8,6 +8,31 @@ use std::sync::Mutex;
 
 use zeroize::Zeroize;
 
+#[cfg(windows)]
+mod windows;
+
+#[cfg(windows)]
+fn native_lock() -> Result<ort_windows::CredentialLock, VaultError> {
+    ort_windows::CredentialLock::acquire().map_err(|_| VaultError::Unavailable)
+}
+
+fn native_entry(service: &str, account: &str) -> Result<keyring::Entry, VaultError> {
+    #[cfg(windows)]
+    {
+        windows::entry(service, account)
+    }
+    #[cfg(not(windows))]
+    {
+        keyring::Entry::new(service, account).map_err(|_| VaultError::Unavailable)
+    }
+}
+
+fn native_secret(entry: &keyring::Entry) -> Result<Vec<u8>, VaultError> {
+    #[cfg(windows)]
+    windows::ensure_local(entry)?;
+    entry.get_secret().map_err(|error| map_read_error(&error))
+}
+
 const DATABASE_KEY_BYTES: usize = 32;
 const COMPONENT_MAX_BYTES: usize = 64;
 
@@ -138,8 +163,7 @@ impl OsProviderCredentialVault {
         Self::default()
     }
     fn entry(reference: &ProviderCredentialReference) -> Result<keyring::Entry, VaultError> {
-        keyring::Entry::new(reference.service(), reference.account())
-            .map_err(|_| VaultError::Unavailable)
+        native_entry(reference.service(), reference.account())
     }
 }
 impl ProviderCredentialVault for OsProviderCredentialVault {
@@ -152,9 +176,9 @@ impl ProviderCredentialVault for OsProviderCredentialVault {
             .operations
             .lock()
             .map_err(|_| VaultError::Unavailable)?;
-        let bytes = Self::entry(reference)?
-            .get_secret()
-            .map_err(|error| map_read_error(&error))?;
+        #[cfg(windows)]
+        let _native_guard = native_lock()?;
+        let bytes = native_secret(&Self::entry(reference)?)?;
         Ok(operation(&ProviderSecret::from_bytes(bytes)?))
     }
     fn store_new(
@@ -166,6 +190,8 @@ impl ProviderCredentialVault for OsProviderCredentialVault {
             .operations
             .lock()
             .map_err(|_| VaultError::Unavailable)?;
+        #[cfg(windows)]
+        let _native_guard = native_lock()?;
         let entry = Self::entry(reference)?;
         match entry.get_secret() {
             Ok(mut existing) => {
@@ -184,6 +210,8 @@ impl ProviderCredentialVault for OsProviderCredentialVault {
             .operations
             .lock()
             .map_err(|_| VaultError::Unavailable)?;
+        #[cfg(windows)]
+        let _native_guard = native_lock()?;
         match Self::entry(reference)?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(_) => Err(VaultError::Unavailable),
@@ -325,8 +353,7 @@ impl OsDatabaseKeyVault {
     }
 
     fn entry(reference: &VaultReference) -> Result<keyring::Entry, VaultError> {
-        keyring::Entry::new(reference.service(), reference.account())
-            .map_err(|_| VaultError::Unavailable)
+        native_entry(reference.service(), reference.account())
     }
 }
 
@@ -336,9 +363,9 @@ impl DatabaseKeyVault for OsDatabaseKeyVault {
             .operations
             .lock()
             .map_err(|_| VaultError::Unavailable)?;
-        let bytes = Self::entry(reference)?
-            .get_secret()
-            .map_err(|error| map_read_error(&error))?;
+        #[cfg(windows)]
+        let _native_guard = native_lock()?;
+        let bytes = native_secret(&Self::entry(reference)?)?;
         DatabaseKey::from_bytes(bytes)
     }
 
@@ -347,6 +374,8 @@ impl DatabaseKeyVault for OsDatabaseKeyVault {
             .operations
             .lock()
             .map_err(|_| VaultError::Unavailable)?;
+        #[cfg(windows)]
+        let _native_guard = native_lock()?;
         store_new_native(reference, key)
     }
 
@@ -355,6 +384,8 @@ impl DatabaseKeyVault for OsDatabaseKeyVault {
             .operations
             .lock()
             .map_err(|_| VaultError::Unavailable)?;
+        #[cfg(windows)]
+        let _native_guard = native_lock()?;
         match Self::entry(reference)?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(_) => Err(VaultError::Unavailable),
@@ -383,8 +414,8 @@ fn store_new_native(reference: &VaultReference, key: &DatabaseKey) -> Result<(),
 
 #[cfg(not(target_os = "macos"))]
 fn store_new_native(reference: &VaultReference, key: &DatabaseKey) -> Result<(), VaultError> {
-    // Other native platforms remain deferred qualification targets. This
-    // compatibility path does not claim cross-process exclusive creation.
+    // Windows holds its current-user OS mutex across this lookup and write.
+    // Other native targets retain compatibility-only qualification status.
     let entry = OsDatabaseKeyVault::entry(reference)?;
 
     match entry.get_secret() {

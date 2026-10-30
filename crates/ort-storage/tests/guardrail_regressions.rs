@@ -9,6 +9,8 @@ use ort_storage::{
     },
 };
 use ort_vault::testing::MemoryDatabaseKeyVault;
+#[cfg(windows)]
+use ort_windows::testing as tempfile;
 use uuid::Uuid;
 
 fn attempt(credential_id: Uuid, started: i64, cost: u64) -> AiAttemptPreflight {

@@ -502,6 +502,8 @@ fn read_portable_render_manifests(
 mod tests {
     use super::*;
     use ort_vault::testing::MemoryDatabaseKeyVault;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
 
     #[test]
     fn aggregate_probe_rejects_history_before_any_record_is_materialized() {

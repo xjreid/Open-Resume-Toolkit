@@ -381,6 +381,10 @@ impl EncryptedStore {
     ) -> Result<Self, StorageError> {
         validate_channel(channel)?;
         reject_symlink(root)?;
+        // Validate privacy before reading recovery state, manifests, or keys.
+        #[cfg(windows)]
+        let _private_root = ort_windows::PrivateDirectory::create(root)
+            .map_err(|_| StorageError::UnsafeLocation)?;
 
         let manifest_path = root.join(MANIFEST_FILENAME);
         let database_path = root.join(DATABASE_FILENAME);
@@ -2276,6 +2280,9 @@ fn is_safe_diagnostic_value(value: &Value) -> bool {
 }
 
 fn reject_symlink(path: &Path) -> Result<(), StorageError> {
+    #[cfg(windows)]
+    let _guards =
+        ort_windows::reject_reparse_path(path).map_err(|_| StorageError::UnsafeLocation)?;
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_symlink() => Err(StorageError::UnsafeLocation),
         Ok(_) => Ok(()),
@@ -2285,6 +2292,11 @@ fn reject_symlink(path: &Path) -> Result<(), StorageError> {
 }
 
 fn reject_directory_symlink(path: &Path) -> Result<(), StorageError> {
+    reject_symlink(path)?;
+    #[cfg(windows)]
+    if path.is_dir() {
+        ort_windows::PrivateDirectory::create(path).map_err(|_| StorageError::UnsafeLocation)?;
+    }
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_dir() => {
             Err(StorageError::UnsafeLocation)
@@ -2296,6 +2308,7 @@ fn reject_directory_symlink(path: &Path) -> Result<(), StorageError> {
 }
 
 fn known_optional_file(path: &Path) -> Result<bool, StorageError> {
+    reject_symlink(path)?;
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
             Err(StorageError::UnsafeLocation)
@@ -2307,6 +2320,7 @@ fn known_optional_file(path: &Path) -> Result<bool, StorageError> {
 }
 
 fn known_optional_directory(path: &Path) -> Result<bool, StorageError> {
+    reject_symlink(path)?;
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_dir() => {
             Err(StorageError::UnsafeLocation)
@@ -2716,25 +2730,36 @@ fn validate_cleanup_profile_directory(root: &Path) -> Result<(), StorageError> {
         if metadata.file_type().is_symlink() || !metadata.is_file() {
             return Err(StorageError::UnsafeLocation);
         }
+        reject_symlink(&entry.path())?;
     }
     Ok(())
 }
 
 fn create_private_directory(path: &Path) -> Result<(), StorageError> {
-    fs::create_dir_all(path).map_err(|_| StorageError::Unavailable)?;
-    if !path.is_dir() {
-        return Err(StorageError::UnsafeLocation);
-    }
-    #[cfg(unix)]
+    #[cfg(windows)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o700))
-            .map_err(|_| StorageError::Unavailable)?;
+        ort_windows::PrivateDirectory::create(path).map_err(|_| StorageError::UnsafeLocation)?;
+        Ok(())
     }
-    Ok(())
+    #[cfg(not(windows))]
+    {
+        fs::create_dir_all(path).map_err(|_| StorageError::Unavailable)?;
+        if !path.is_dir() {
+            return Err(StorageError::UnsafeLocation);
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+                .map_err(|_| StorageError::Unavailable)?;
+        }
+        Ok(())
+    }
 }
 
 fn set_private_file_permissions(path: &Path) -> Result<(), StorageError> {
+    #[cfg(windows)]
+    ort_windows::secure_file(path).map_err(|_| StorageError::UnsafeLocation)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -2882,6 +2907,7 @@ fn remove_previous_manifest(root: &Path) -> Result<(), StorageError> {
 }
 
 fn remove_exact_optional_file(path: &Path) -> Result<(), StorageError> {
+    reject_symlink(path)?;
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
             Err(StorageError::UnsafeLocation)
@@ -2897,6 +2923,12 @@ fn sync_directory(root: &Path) -> Result<(), StorageError> {
     File::open(root)
         .and_then(|directory| directory.sync_all())
         .map_err(|_| StorageError::Unavailable)?;
+    // Windows does not provide the POSIX directory-fsync contract. Files are
+    // flushed individually and recovery markers remain authoritative; at least
+    // recheck the private root at this boundary rather than silently accepting
+    // redirected/missing directories. Do not claim power-loss equivalence.
+    #[cfg(windows)]
+    ort_windows::PrivateDirectory::open(root).map_err(|_| StorageError::UnsafeLocation)?;
     Ok(())
 }
 
@@ -3150,6 +3182,8 @@ mod native_qualification;
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
     use std::fs;
     use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -3464,7 +3498,7 @@ mod tests {
             .create_draft(&ResumeDocument::empty(PLAINTEXT_MARKER))
             .expect("create draft");
 
-        fs::create_dir(&crash_root).expect("create crash snapshot directory");
+        create_private_directory(&crash_root).expect("create private crash snapshot directory");
         for filename in ["profile.json", "profile.db", "profile.db-wal"] {
             let source = profile_root.join(filename);
             assert!(source.is_file(), "crash source must contain {filename}");

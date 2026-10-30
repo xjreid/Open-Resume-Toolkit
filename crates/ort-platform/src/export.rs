@@ -4,11 +4,13 @@ use std::{
     path::{Component, Path},
 };
 
+#[cfg(not(windows))]
+use cap_std::fs::DirBuilder;
 #[cfg(unix)]
 use cap_std::fs::{DirBuilderExt, OpenOptionsExt};
 use cap_std::{
     ambient_authority,
-    fs::{Dir, DirBuilder, OpenOptions},
+    fs::{Dir, OpenOptions},
 };
 use uuid::Uuid;
 
@@ -68,6 +70,8 @@ pub struct ExportDestination {
     parent: Dir,
     name: OsString,
     file_type: ExportFileType,
+    #[cfg(windows)]
+    _guards: Vec<std::fs::File>,
 }
 
 impl ExportDestination {
@@ -97,6 +101,9 @@ impl ExportDestination {
         if !safe_filename(name, file_type) {
             return Err(ExportWriteError::InvalidDestination);
         }
+        #[cfg(windows)]
+        let guards = ort_windows::reject_reparse_path(path)
+            .map_err(|_| ExportWriteError::InvalidDestination)?;
         let parent = Dir::open_ambient_dir(
             path.parent().ok_or(ExportWriteError::InvalidDestination)?,
             ambient_authority(),
@@ -107,6 +114,8 @@ impl ExportDestination {
             parent,
             name: name.into(),
             file_type,
+            #[cfg(windows)]
+            _guards: guards,
         })
     }
 
@@ -135,20 +144,34 @@ impl ExportDestination {
     #[cfg(not(target_os = "macos"))]
     fn write_named(self, bytes: &[u8]) -> Result<ExportWriteReceipt, ExportWriteError> {
         let stage_name = format!(".ort-export-{}", Uuid::now_v7());
-        let builder = private_directory_builder();
-        self.parent
-            .create_dir_with(&stage_name, &builder)
-            .map_err(|_| ExportWriteError::Unavailable)?;
+        #[cfg(windows)]
+        let private_stage =
+            ort_windows::PrivateDirectory::create_child(&self.parent, stage_name.as_ref())
+                .map_err(|_| ExportWriteError::Unavailable)?;
+        #[cfg(not(windows))]
+        {
+            let builder = private_directory_builder();
+            self.parent
+                .create_dir_with(&stage_name, &builder)
+                .map_err(|_| ExportWriteError::Unavailable)?;
+        }
         let Ok(stage) = self.parent.open_dir(&stage_name) else {
+            #[cfg(windows)]
+            drop(private_stage);
             let _ = self.parent.remove_dir(&stage_name);
             return Err(ExportWriteError::Unavailable);
         };
+        #[cfg(windows)]
+        let result = self.write_staged(&stage, bytes, private_stage.path());
+        #[cfg(not(windows))]
         let result = self.write_staged(&stage, bytes);
         let cleaned_file = match stage.remove_file("payload") {
             Ok(()) => true,
             Err(error) => error.kind() == io::ErrorKind::NotFound,
         };
         drop(stage);
+        #[cfg(windows)]
+        drop(private_stage);
         let cleaned_dir = self.parent.remove_dir(&stage_name).is_ok();
         result?;
         // Some filesystems cannot fsync directories. Report committed bytes
@@ -161,13 +184,21 @@ impl ExportDestination {
     }
 
     #[cfg(not(target_os = "macos"))]
-    fn write_staged(&self, stage: &Dir, bytes: &[u8]) -> Result<(), ExportWriteError> {
+    fn write_staged(
+        &self,
+        stage: &Dir,
+        bytes: &[u8],
+        #[cfg(windows)] stage_path: &Path,
+    ) -> Result<(), ExportWriteError> {
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
         #[cfg(unix)]
         options.mode(0o600);
         let mut file = stage
             .open_with("payload", &options)
+            .map_err(|_| ExportWriteError::Unavailable)?;
+        #[cfg(windows)]
+        ort_windows::secure_file(&stage_path.join("payload"))
             .map_err(|_| ExportWriteError::Unavailable)?;
         file.write_all(bytes)
             .and_then(|()| file.sync_all())
@@ -274,6 +305,7 @@ enum ExportPhase {
     Published,
 }
 
+#[cfg(not(windows))]
 fn private_directory_builder() -> DirBuilder {
     #[cfg(unix)]
     {
@@ -489,12 +521,21 @@ mod tests {
         let dir = TempDir::new().expect("dir");
         let path = dir.path().join("race.txt");
         let token = ExportDestination::from_native_dialog(&path).expect("select");
+        #[cfg(windows)]
+        let private =
+            ort_windows::PrivateDirectory::create_child(&token.parent, "staging".as_ref()).unwrap();
+        #[cfg(not(windows))]
         token.parent.create_dir("staging").expect("staging");
         let stage = token.parent.open_dir("staging").expect("open");
         // Simulate another writer after the last target-absence check.
         fs::write(&path, "original").expect("racer");
         assert_eq!(
-            token.write_staged(&stage, b"replacement"),
+            token.write_staged(
+                &stage,
+                b"replacement",
+                #[cfg(windows)]
+                private.path()
+            ),
             Err(ExportWriteError::AlreadyExists)
         );
         assert_eq!(fs::read_to_string(&path).expect("read"), "original");

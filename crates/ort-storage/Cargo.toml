@@ -22,6 +22,12 @@ thiserror.workspace = true
 uuid.workspace = true
 zeroize.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+ort-windows = { path = "../ort-windows" }
+
+[target.'cfg(windows)'.dev-dependencies]
+ort-windows = { path = "../ort-windows", features = ["test-support"] }
+
 [dev-dependencies]
 ort-vault = { path = "../ort-vault", features = ["test-support"] }
 tempfile.workspace = true

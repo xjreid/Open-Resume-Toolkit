@@ -51,9 +51,16 @@ ort-codex-install = { path = "../../../crates/ort-codex-install" }
 ort-macos-lifecycle = { path = "../../../crates/ort-macos-lifecycle" }
 drag = "2.1.1"
 
+[target.'cfg(windows)'.dependencies]
+ort-windows = { path = "../../../crates/ort-windows" }
+drag = "=2.1.1"
+
 [dev-dependencies]
 ort-vault = { path = "../../../crates/ort-vault", features = ["test-support"] }
 tempfile.workspace = true
+
+[target.'cfg(windows)'.dev-dependencies]
+ort-windows = { path = "../../../crates/ort-windows", features = ["test-support"] }
 
 [lints]
 workspace = true

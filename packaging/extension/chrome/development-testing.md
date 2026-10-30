@@ -1,5 +1,9 @@
 # Test the separate Chrome BETA with the unsigned ORT development app
 
+For Windows source preparation and later explicit per-user setup, use the
+[Windows development guide](../../windows/nsis/README.md). The macOS commands
+and live-testing steps below have not been run during Windows source preparation.
+
 For the production Chrome ZIP and testing its exact Store identity with the
 development app, use [the production setup](README.md). This guide is only for
 the separate BETA extension.

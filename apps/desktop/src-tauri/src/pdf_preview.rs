@@ -919,6 +919,8 @@ mod tests {
     use super::*;
     use crate::DesktopStorage;
     use ort_vault::testing::MemoryDatabaseKeyVault;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
     use tempfile::TempDir;
     fn preview() -> Arc<Preview> {
         let mut document = ort_domain::ResumeDocument::empty("Private title");

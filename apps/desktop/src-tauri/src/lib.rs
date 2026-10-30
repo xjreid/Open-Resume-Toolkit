@@ -7,7 +7,6 @@ use ort_domain::{
     VersionedResumeResponse, validate_health_request,
 };
 use ort_storage::{EncryptedStore, StorageError, VersionedResume};
-use ort_vault::OsDatabaseKeyVault;
 use serde::Deserialize;
 use std::sync::Mutex;
 use tauri::{
@@ -40,11 +39,19 @@ mod codex_transport;
 mod data_deletion;
 #[cfg(target_os = "macos")]
 mod drag_artifacts;
+#[cfg(windows)]
+mod drag_artifacts {
+    pub(crate) use ort_platform::WindowsDragArtifact as DragArtifact;
+    pub(crate) use ort_platform::sweep_windows_drag_artifacts as sweep_stale;
+}
 mod import_review;
+#[cfg(not(windows))]
 mod menu;
 mod overlay_position;
 mod pdf_preview;
 mod plan_runtime;
+mod platform_paths;
+use platform_paths::initialize_storage;
 mod text_export;
 mod tracker;
 use close_guard::CloseGuard;
@@ -181,6 +188,7 @@ fn request_native_close(app: &AppHandle) -> bool {
 enum DesktopStorage {
     Ready(EncryptedStore),
     Unavailable,
+    StartupBlocked(platform_paths::StartupError),
 }
 
 struct DesktopState {
@@ -206,7 +214,9 @@ impl DesktopState {
             .ok()
             .map_or(StorageStatus::Unavailable, |storage| match &*storage {
                 DesktopStorage::Ready(_) => StorageStatus::Ready,
-                DesktopStorage::Unavailable => StorageStatus::Unavailable,
+                DesktopStorage::Unavailable | DesktopStorage::StartupBlocked(_) => {
+                    StorageStatus::Unavailable
+                }
             })
     }
 
@@ -215,7 +225,9 @@ impl DesktopState {
         let mut storage = self.storage.lock().map_err(|_| StorageError::Unavailable)?;
         match std::mem::replace(&mut *storage, DesktopStorage::Unavailable) {
             DesktopStorage::Ready(store) => Ok(store),
-            DesktopStorage::Unavailable => Err(StorageError::Unavailable),
+            DesktopStorage::Unavailable | DesktopStorage::StartupBlocked(_) => {
+                Err(StorageError::Unavailable)
+            }
         }
     }
 
@@ -241,6 +253,11 @@ fn health(
     }
 
     let storage_status = state.storage_status();
+    if let Ok(storage) = state.storage.lock()
+        && let DesktopStorage::StartupBlocked(error) = &*storage
+    {
+        return CommandResponse::failure(error.code(), "errors.storageUnavailable", true);
+    }
     CommandResponse::success(HealthResponse {
         status: HealthStatus::Ok,
         app_version: env!("CARGO_PKG_VERSION").to_owned(),
@@ -392,40 +409,6 @@ fn storage_failure<T: serde::Serialize>(error: &StorageError) -> CommandResponse
             CommandResponse::failure("DRAFT_NOT_FOUND", "errors.draftNotFound", false)
         }
         _ => storage_unavailable(),
-    }
-}
-
-fn initialize_storage(app: &AppHandle) -> DesktopStorage {
-    // This composition root only implements the development channel. Reject a
-    // packaging override before resolving paths or accessing any vault item.
-    if !development_identity_allowed(&app.config().identifier) {
-        return DesktopStorage::Unavailable;
-    }
-    let Some(owner) = app.try_state::<ort_storage::ProfileLifecycle>() else {
-        return DesktopStorage::Unavailable;
-    };
-    let profile_root = owner.root();
-    let vault = OsDatabaseKeyVault::new();
-    match EncryptedStore::open_or_activate_pending_restore(
-        profile_root,
-        owner.channel(),
-        &vault,
-        &ort_vault::OsProviderCredentialVault::new(),
-    ) {
-        Ok((store, _activated_restore)) => {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .ok()
-                .and_then(|duration| i64::try_from(duration.as_millis()).ok());
-            if now.is_some_and(|now| store.recover_ai_attempts(now).is_ok())
-                && chatgpt_plan::reset_server_on_launch(&store).is_ok()
-            {
-                DesktopStorage::Ready(store)
-            } else {
-                DesktopStorage::Unavailable
-            }
-        }
-        Err(_) => DesktopStorage::Unavailable,
     }
 }
 
@@ -652,7 +635,15 @@ fn hide_application_popup(window: WebviewWindow) -> CommandResponse<bool> {
 /// initialization itself fails closed and leaves the UI available for recovery.
 #[allow(clippy::too_many_lines)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Windows uses the native title bar and in-app navigation without a menu row.
+    #[cfg(not(windows))]
+    let builder = builder.menu(menu::editor_menu).on_menu_event(|app, event| {
+        if event.id().as_ref() == menu::QUIT_ID {
+            request_native_close(app);
+        }
+    });
+    builder
         .manage(CloseGuard::default())
         .manage(overlay_position::OverlayPositionState::default())
         .manage(browser_bridge::BrowserBridgeState::default())
@@ -665,17 +656,9 @@ pub fn run() {
         .manage(application_exports::DragFiles::default())
         .manage(application_exports::ApplicationExportState::default())
         .plugin(tauri_plugin_dialog::init())
-        .menu(menu::editor_menu)
-        .on_menu_event(|app, event| {
-            if event.id().as_ref() == menu::QUIT_ID {
-                request_native_close(app);
-            }
-        })
         .setup(|app| {
-            if development_identity_allowed(&app.config().identifier) {
-                let root = app.path().app_data_dir()?.join("profiles").join("default");
-                app.manage(ort_storage::ProfileLifecycle::acquire(&root, "dev")?);
-            }
+            #[cfg(windows)]
+            application_exports::DragFiles::sweep_stale();
             #[cfg(target_os = "macos")]
             {
                 application_exports::DragFiles::sweep_stale();

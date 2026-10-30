@@ -19,6 +19,11 @@ zeroize.workspace = true
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "=3.7.0"
 
+[target.'cfg(windows)'.dependencies]
+keyring-core = "=1.0.0"
+windows-native-keyring-store = "=1.1.0"
+ort-windows = { path = "../ort-windows" }
+
 [dev-dependencies]
 hex.workspace = true
 

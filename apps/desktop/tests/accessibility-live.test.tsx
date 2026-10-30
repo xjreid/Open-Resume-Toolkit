@@ -231,6 +231,46 @@ afterEach(async () => {
 });
 
 describe("M2 live editor accessibility", () => {
+  it("explains Windows legacy recovery without loading or replacing the old profile", async () => {
+    const original = native.invoke.getMockImplementation()!;
+    let recovered = false;
+    native.invoke.mockImplementation(
+      async (command: string, ...args: unknown[]) => {
+        if (command === "health" && !recovered)
+          return {
+            ok: false,
+            error: {
+              code: "WINDOWS_LEGACY_PROFILE_REQUIRES_BACKUP",
+              messageKey: "errors.storageUnavailable",
+              retryable: true,
+              details: {},
+            },
+          };
+        if (command === "retry_storage") {
+          recovered = true;
+          return { ok: true, value: true };
+        }
+        return original(command, ...args);
+      },
+    );
+    const container = await render(<App surface="main" />);
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Your earlier Windows profile needs recovery",
+    );
+    expect(container.textContent).toContain("create an encrypted backup");
+    expect(container.textContent).toContain("Your workspace is unavailable");
+    expect(container.textContent).not.toContain("We’ll keep your edits here");
+    expect(
+      native.invoke.mock.calls.some(([command]) => command === "load_resume"),
+    ).toBe(false);
+    await expectSurfaceAccessible(container);
+    await act(async () => buttonNamed(container, "Retry storage").click());
+    await settle();
+    expect(container.textContent).toContain("Encrypted storage ready");
+    expect(container.textContent).not.toContain(
+      "Your earlier Windows profile needs recovery",
+    );
+  });
   it("retries unavailable storage and toggles overlay visibility", async () => {
     const original = native.invoke.getMockImplementation()!;
     let storageReady = false;

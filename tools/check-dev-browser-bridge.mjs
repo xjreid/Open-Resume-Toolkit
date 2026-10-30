@@ -1,13 +1,13 @@
-// Exercise feature-gated macOS transport without weakening the default build's
+// Exercise feature-gated native transport without weakening the default build's
 // fail-closed tests. No installed host, browser, Keychain, or account is used.
 import { execFileSync } from "node:child_process";
 
-if (process.platform !== "darwin") {
+if (!["darwin", "win32"].includes(process.platform)) {
   console.log(
-    "Development bridge tests require macOS; default transport remains unavailable here.",
+    "Development bridge tests require macOS or Windows; default transport remains unavailable here.",
   );
 } else {
-  for (const args of [
+  const suites = [
     [
       "-p",
       "ort-ipc",
@@ -16,14 +16,16 @@ if (process.platform !== "darwin") {
       "--features",
       "ort-ipc/dev-browser-bridge,ort-native-host/dev-browser-bridge",
     ],
-    [
+  ];
+  if (process.platform === "darwin")
+    suites.push([
       "-p",
       "ort-desktop",
       "--features",
       "dev-browser-bridge",
       "browser_bridge::tests",
-    ],
-  ]) {
+    ]);
+  for (const args of suites) {
     execFileSync("cargo", ["test", "--locked", ...args], { stdio: "inherit" });
   }
 }

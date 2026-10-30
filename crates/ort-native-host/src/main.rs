@@ -1,5 +1,5 @@
 //! Bounded native-messaging entry point. Default builds require signed production
-//! transport. The opt-in macOS dev feature uses a separate temporary capability.
+//! transport. The opt-in development feature uses a separate temporary capability.
 
 use std::io;
 
@@ -8,7 +8,19 @@ use ort_ipc::{
 };
 use serde_json::json;
 
+#[cfg(all(feature = "dev-browser-bridge", windows))]
+mod development_windows;
+
 fn main() {
+    #[cfg(all(feature = "dev-browser-bridge", windows))]
+    if let Some(result) = development_windows::command() {
+        if result.is_err() {
+            eprintln!("Development Chrome registration failed; no production host was changed.");
+            std::process::exit(78);
+        }
+        println!("Development Chrome registration updated for this Windows account.");
+        return;
+    }
     let mut input = io::stdin().lock();
     let mut output = io::stdout().lock();
     loop {
@@ -24,7 +36,12 @@ fn main() {
         if write_native_frame(&mut output, &bytes).is_err() {
             break;
         }
-        if invalid_frame || !cfg!(all(feature = "dev-browser-bridge", target_os = "macos")) {
+        if invalid_frame
+            || !cfg!(all(
+                feature = "dev-browser-bridge",
+                any(target_os = "macos", windows)
+            ))
+        {
             break;
         }
     }
@@ -45,13 +62,13 @@ fn failure_response(problem: &BridgeError) -> serde_json::Value {
 
 fn process(input: &mut impl io::Read) -> Result<serde_json::Value, BridgeError> {
     let origin = std::env::args().nth(1).ok_or(BridgeError::WrongOrigin)?;
-    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+    #[cfg(not(all(feature = "dev-browser-bridge", any(target_os = "macos", windows))))]
     let ids = [
         option_env!("ORT_CHROME_EXTENSION_ID"),
         option_env!("ORT_DEV_CHROME_EXTENSION_ID"),
         option_env!("ORT_DEV_EDGE_EXTENSION_ID"),
     ];
-    #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+    #[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
     let ids = [option_env!("ORT_DEV_CHROME_EXTENSION_ID")];
     let allowed: Vec<String> = ids
         .into_iter()
@@ -74,12 +91,12 @@ fn process_with_origin(
     validate_origin(origin, allowed)?;
     let bytes = read_native_frame(input)?;
     let now = jiff::Timestamp::now().as_millisecond();
-    #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+    #[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
     {
         let _request = validate_native_request(&bytes, now)?;
         ort_ipc::development::forward(&ort_ipc::development::default_root(), origin, &bytes)
     }
-    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+    #[cfg(not(all(feature = "dev-browser-bridge", any(target_os = "macos", windows))))]
     match validate_native_request(&bytes, now)? {
         ort_ipc::NativeRequest::Status => Ok(json!({
             "ok": false,
@@ -125,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+    #[cfg(not(all(feature = "dev-browser-bridge", any(target_os = "macos", windows))))]
     fn unsigned_host_rejects_even_a_valid_capture_without_forwarding_it() {
         let mut frame = Cursor::new(framed_capture(ort_ipc::PROTOCOL_VERSION));
         assert_eq!(
@@ -163,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+    #[cfg(not(all(feature = "dev-browser-bridge", any(target_os = "macos", windows))))]
     fn reports_missing_signed_transport_without_claiming_readiness() {
         let bytes = br#"{"protocolVersion":1,"kind":"bridge.status"}"#;
         let mut frame = Vec::new();

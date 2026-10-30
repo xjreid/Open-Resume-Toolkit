@@ -11,6 +11,11 @@ operation or confirmation is active.
 The top-left brand always reads **Open Resume Toolkit**, with Open on the first
 line and Resume Toolkit on the second; it does not change with the destination.
 
+Windows uses the native title bar with the application content directly beneath
+it; no File/Edit/Window/Help menu row is attached. The macOS application menu
+continues to provide native editing and window commands. Windows title-bar Close
+and Alt+F4 still enter the normal save/close confirmation flow.
+
 The storage-health badge reflects typed native health state. When storage is
 unavailable, the badge retries opening it, including the operating-system
 keychain prompt. Features that require encrypted storage remain disabled or

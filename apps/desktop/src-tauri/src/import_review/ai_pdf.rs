@@ -32,7 +32,7 @@ impl PdfPages {
         )
         .expect("synthetic PNG pages")
     }
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(crate) fn fixture_with_links(
         count: usize,
         links: Vec<ort_ai::resume_import::PdfHyperlink>,

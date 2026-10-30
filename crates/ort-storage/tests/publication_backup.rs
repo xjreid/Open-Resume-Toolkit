@@ -2,6 +2,8 @@ use ort_backup::BackupPassphrase;
 use ort_domain::{ContactDivider, DocumentLimits, ResumeDocument};
 use ort_storage::EncryptedStore;
 use ort_vault::testing::MemoryDatabaseKeyVault;
+#[cfg(windows)]
+use ort_windows::testing as tempfile;
 use tempfile::TempDir;
 #[test]
 fn all_publications_round_trip_beyond_the_old_count_limit() {

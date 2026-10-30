@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const packageJson = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url)),
@@ -13,14 +14,28 @@ const required = {
   pnpm: packageJson.engines.pnpm,
   rustc: "1.98.0",
   cargo: "1.98.0",
-  just: "1",
+  ...(process.platform === "win32" ? {} : { just: "1" }),
 };
 
 const failures = [];
 
 for (const [command, expected] of Object.entries(required)) {
   try {
-    const output = execFileSync(command, ["--version"], {
+    const localPnpm = resolve(
+      import.meta.dirname,
+      "../target/windows-toolchain/pnpm/bin/pnpm.cjs",
+    );
+    // Execute JavaScript through Node directly; execFile cannot safely use a
+    // Windows .cmd shim as a native executable. No shell interpolation is needed.
+    const invocation =
+      command === "node"
+        ? [process.execPath, ["--version"]]
+        : process.platform === "win32" &&
+            command === "pnpm" &&
+            existsSync(localPnpm)
+          ? [process.execPath, [localPnpm, "--version"]]
+          : [command, ["--version"]];
+    const output = execFileSync(...invocation, {
       encoding: "utf8",
     }).trim();
     if (!output.includes(expected)) {

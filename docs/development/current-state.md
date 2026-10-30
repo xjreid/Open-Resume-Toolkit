@@ -15,6 +15,16 @@ The current schema 9/backup 1.9/capture v1 facts below remain unchanged; M5 stay
 
 ## Features and boundaries
 
+**Windows branch addition — October 29, 2026:** Windows 11 x64 adapters,
+device-local credentials, contained parser transport, development Chrome bridge,
+drag artifacts and per-user packaging sources are implemented. Native synthetic
+fixtures and desktop source checks passed. The development installer was then
+built and installed for the current user, with executable/helper/resource hashes
+and shortcuts verified. The app has not been launched; packaged-helper execution
+and live application qualification remain pending. Windows Codex stays unavailable. See the
+[implementation and verification record](windows-integration.md). The October 15
+feature snapshot below retains its original scope.
+
 | Area | Implemented today | Remaining boundary |
 | --- | --- | --- |
 | Platform | Tauri 2, React/TypeScript, Rust; macOS Apple Silicon development | Intel Mac and Windows have portability CI, not native support qualification |

@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 
 root = Path(sys.argv[1])
-markers = json.loads((root / "markers.json").read_text())
+markers = json.loads((root / "markers.json").read_text(encoding="utf-8"))
 for style in ("plain", "technical", "professional", "modern"):
     with ZipFile(root / f"{style}.docx") as archive:
         assert archive.testzip() is None
@@ -15,5 +15,5 @@ for style in ("plain", "technical", "professional", "modern"):
         for marker in markers:
             assert marker in text, (style, marker)
 for marker in markers:
-    assert marker in (root / "expected.txt").read_text(), marker
+    assert marker in (root / "expected.txt").read_text(encoding="utf-8"), marker
 print("All seven retained markers survived every DOCX style and plain text.")

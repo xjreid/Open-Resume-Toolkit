@@ -420,6 +420,8 @@ mod tests {
     use ort_ai::{OperationType, Price, PriceCategory, Provider, Usage};
     use ort_storage::{EncryptedStore, ai_activity::AiBucketSize};
     use ort_vault::testing::MemoryDatabaseKeyVault;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
 
     #[test]
     fn rejected_content_settles_trustworthy_billing_in_the_durable_ledger() {

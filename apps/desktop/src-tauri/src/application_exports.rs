@@ -20,20 +20,20 @@ pub struct DragFiles {
 
 #[derive(Default)]
 pub(crate) struct DragSession {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) directory: Option<crate::drag_artifacts::DragArtifact>,
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     pub(crate) directory: Option<tempfile::TempDir>,
     pub(crate) active_drags: usize,
     pub(crate) clear_pending: bool,
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) struct DragFileLease {
     pub(crate) session: Arc<Mutex<DragSession>>,
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 impl Drop for DragFileLease {
     fn drop(&mut self) {
         let mut session = self
@@ -175,7 +175,33 @@ impl ApplicationExportState {
 }
 
 impl DragFiles {
-    #[cfg(target_os = "macos")]
+    #[cfg(windows)]
+    pub(crate) fn materialize(
+        &self,
+        bytes: &[u8],
+        name: &str,
+    ) -> std::io::Result<(std::path::PathBuf, DragFileLease)> {
+        let mut guard = self
+            .session
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if guard.directory.is_none() {
+            guard.directory = Some(crate::drag_artifacts::DragArtifact::new()?);
+        }
+        let path = guard
+            .directory
+            .as_ref()
+            .expect("drag session was created")
+            .write(bytes, name)?;
+        guard.active_drags += 1;
+        Ok((
+            path,
+            DragFileLease {
+                session: Arc::clone(&self.session),
+            },
+        ))
+    }
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) fn sweep_stale() {
         crate::drag_artifacts::sweep_stale();
     }
@@ -505,12 +531,12 @@ pub async fn drag_application_export(
         Ok(value) => value,
         Err(response) => return response,
     };
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = bytes;
         error("DRAG_UNAVAILABLE")
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     {
         let drag_files = window.state::<DragFiles>();
         let Ok((path, drag_lease)) = drag_files.materialize(&bytes, format.filename(kind)) else {

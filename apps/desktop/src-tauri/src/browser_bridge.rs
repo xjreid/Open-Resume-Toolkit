@@ -5,18 +5,18 @@ use tauri::{Manager, WebviewWindow};
 
 #[derive(Default)]
 pub(crate) struct BrowserBridgeState {
-    #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+    #[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
     server: std::sync::Mutex<Option<ort_ipc::development::Server>>,
     captures: std::sync::Arc<std::sync::Mutex<ort_ipc::capture_session::CaptureSession>>,
 }
 impl BrowserBridgeState {
     // Keep the instance API on targets where no bridge server is compiled in.
     #[cfg_attr(
-        not(all(feature = "dev-browser-bridge", target_os = "macos")),
+        not(all(feature = "dev-browser-bridge", any(target_os = "macos", windows))),
         allow(clippy::unused_self)
     )]
     pub(crate) fn enabled(&self) -> bool {
-        #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+        #[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
         {
             self.server.lock().is_ok_and(|server| {
                 server
@@ -24,7 +24,7 @@ impl BrowserBridgeState {
                     .is_some_and(ort_ipc::development::Server::is_running)
             })
         }
-        #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+        #[cfg(not(all(feature = "dev-browser-bridge", any(target_os = "macos", windows))))]
         {
             false
         }
@@ -52,7 +52,7 @@ impl BrowserBridgeState {
         if let Ok(mut captures) = self.captures.lock() {
             captures.disconnect(jiff::Timestamp::now().as_millisecond());
         }
-        #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+        #[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
         {
             // Join outside the bridge mutex: intake may hold the storage mutex
             // while the overlay reads connection status.
@@ -76,8 +76,12 @@ pub fn browser_connection_status(window: WebviewWindow) -> CommandResponse<Conne
         return crate::window_not_authorized();
     }
     CommandResponse::success(ConnectionStatus {
-        available: cfg!(all(feature = "dev-browser-bridge", target_os = "macos"))
-            && crate::development_identity_allowed(&window.app_handle().config().identifier),
+        available: cfg!(all(
+            feature = "dev-browser-bridge",
+            any(target_os = "macos", windows)
+        )) && crate::development_identity_allowed(
+            &window.app_handle().config().identifier,
+        ),
         connected: window.state::<BrowserBridgeState>().enabled(),
     })
 }
@@ -105,20 +109,20 @@ pub fn connect_development_browser(window: WebviewWindow) -> CommandResponse<boo
             false,
         );
     }
-    #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+    #[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
     return connect(window.app_handle());
-    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+    #[cfg(not(all(feature = "dev-browser-bridge", any(target_os = "macos", windows))))]
     CommandResponse::failure("DEV_BRIDGE_NOT_BUILT", "errors.browserBridge", false)
 }
 
 /// Enable the registered development bridge on each launch. Missing or invalid
 /// setup leaves it disabled; starting the listener does not imply an extension is connected.
 pub(crate) fn enable_on_launch(app: &tauri::AppHandle) {
-    #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+    #[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
     if crate::development_identity_allowed(&app.config().identifier) {
         let _ = connect(app);
     }
-    #[cfg(not(all(feature = "dev-browser-bridge", target_os = "macos")))]
+    #[cfg(not(all(feature = "dev-browser-bridge", any(target_os = "macos", windows))))]
     let _ = app;
 }
 
@@ -154,7 +158,7 @@ pub fn cancel_application_capture(
     }
 }
 
-#[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+#[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
 pub(crate) fn receive_development_request(
     state: &std::sync::Mutex<ort_ipc::capture_session::CaptureSession>,
     request: ort_ipc::NativeRequest,
@@ -200,8 +204,32 @@ pub(crate) fn receive_development_request(
 }
 
 #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
-fn connect(handle: &tauri::AppHandle) -> CommandResponse<bool> {
+fn registration_id(app: &tauri::AppHandle) -> Result<String, ()> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let data = app.path().app_data_dir().map_err(|_| ())?;
+    let registration = data.join("browser-bridge-dev/registration.json");
+    let metadata = std::fs::symlink_metadata(&registration).map_err(|_| ())?;
+    if !metadata.is_file()
+        || metadata.len() > 1024
+        || metadata.permissions().mode() & 0o777 != 0o600
+        || metadata.uid() != std::fs::metadata(&data).map_or(u32::MAX, |value| value.uid())
+    {
+        return Err(());
+    }
+    let bytes = std::fs::read(registration).map_err(|_| ())?;
+    let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| ())?;
+    value
+        .get("extensionId")
+        .and_then(serde_json::Value::as_str)
+        .map(String::from)
+        .ok_or(())
+}
+#[cfg(all(feature = "dev-browser-bridge", windows))]
+fn registration_id(_: &tauri::AppHandle) -> Result<String, ()> {
+    ort_ipc::development::registered_extension_id().map_err(|_| ())
+}
+#[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
+fn connect(handle: &tauri::AppHandle) -> CommandResponse<bool> {
     use tauri::{Emitter, EventTarget};
     let app = handle.clone();
     let state = handle.state::<BrowserBridgeState>();
@@ -215,33 +243,13 @@ fn connect(handle: &tauri::AppHandle) -> CommandResponse<bool> {
         return CommandResponse::success(true);
     }
     *slot = None;
-    let Ok(data) = app.path().app_data_dir() else {
-        return failed();
-    };
-    let registration = data.join("browser-bridge-dev").join("registration.json");
-    let Ok(metadata) = std::fs::symlink_metadata(&registration) else {
-        return failed();
-    };
-    if !metadata.is_file()
-        || metadata.len() > 1024
-        || metadata.permissions().mode() & 0o777 != 0o600
-        || metadata.uid() != std::fs::metadata(&data).map_or(u32::MAX, |value| value.uid())
-    {
-        return failed();
-    }
-    let Ok(bytes) = std::fs::read(registration) else {
-        return failed();
-    };
-    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
-        return failed();
-    };
-    let Some(id) = value.get("extensionId").and_then(serde_json::Value::as_str) else {
+    let Ok(id) = registration_id(&app) else {
         return failed();
     };
     let captures = state.captures.clone();
     let server = ort_ipc::development::Server::start(
         &ort_ipc::development::default_root(),
-        id,
+        &id,
         move |request, frame| {
             let capture = matches!(request, ort_ipc::NativeRequest::Capture(_));
             let wake = capture || matches!(request, ort_ipc::NativeRequest::Event(_));
@@ -295,7 +303,7 @@ fn connect(handle: &tauri::AppHandle) -> CommandResponse<bool> {
         Err(_) => failed(),
     }
 }
-#[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
+#[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
 fn failed<T: Serialize>() -> CommandResponse<T> {
     CommandResponse::failure("DEV_BRIDGE_SETUP_REQUIRED", "errors.browserBridge", false)
 }

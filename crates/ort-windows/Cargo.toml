@@ -1,0 +1,59 @@
+[package]
+name = "ort-windows"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+test-support = []
+native-probes = ["test-support"]
+
+[dependencies]
+tempfile.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_JobObjects",
+    "Win32_System_SystemServices",
+    "Win32_System_WindowsProgramming",
+    "Win32_System_SystemInformation",
+    "Win32_System_Com",
+    "Win32_System_Registry",
+    "Win32_Security_Isolation",
+    "Win32_Security_Credentials",
+] }
+getrandom.workspace = true
+hex.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+keyring.workspace = true
+
+[[bin]]
+name = "ort-windows-probe"
+path = "tests/probes/parser.rs"
+required-features = ["native-probes"]
+
+[[test]]
+name = "parser"
+required-features = ["native-probes"]
+
+# Like ort-macos-lifecycle, only explicitly reviewed native modules permit FFI.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

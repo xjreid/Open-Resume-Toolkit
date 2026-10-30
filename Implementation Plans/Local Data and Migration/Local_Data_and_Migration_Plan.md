@@ -13,6 +13,17 @@ M1-M2 native storage qualification is currently macOS Apple Silicon only. The
 Windows adapter contract and portable format remain in source, but Windows and
 Intel-Mac native matrices are deferred and are not inferred from shared tests.
 
+The Windows integration branch now has library-level native checks for explicit
+device-local Credential Manager persistence, cross-process key creation, private
+NTFS ACLs, path/ownership checks, encrypted storage/recovery, and no-clobber
+exports. See the [integration record](../../docs/development/windows-integration.md).
+This evidence does not qualify a built or running Windows desktop application.
+Windows uses the development identity's local application-data directory and a
+private subtree; it must not silently open a new empty profile when a legacy
+experimental profile is detected in another location. Portable backup/restore
+remains the cross-platform transfer mechanism. Directory-fsync power-loss
+equivalence with macOS is not claimed on Windows.
+
 ## Current implementation — October 15, 2026
 
 The database is schema 9. Canonical tables are implemented by

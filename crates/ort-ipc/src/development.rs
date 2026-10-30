@@ -1,11 +1,7 @@
 //! Opt-in macOS development transport. Its temporary capability is deliberately
 //! readable by the current account, not a substitute for signed production IPC.
 //! No database/provider secret, captured content, or installation key goes here.
-use crate::{
-    BridgeError, CAPTURE_TTL_MS, MAX_ENVELOPE_BYTES, NativeRequest, ReplayCache,
-    authentication_tag, validate_native_request, verify_authentication,
-};
-use serde::{Deserialize, Serialize};
+use crate::{BridgeError, NativeRequest, ReplayCache, validate_native_request};
 use serde_json::{Value, json};
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
@@ -21,24 +17,11 @@ use std::time::{Duration, Instant};
 use uuid::Uuid;
 use zeroize::Zeroize;
 
-const HEADER: usize = 72; // session UUID, nonce UUID, expiry, extension ID
-const TAG: usize = 32;
-const MAX_PACKET: usize = MAX_ENVELOPE_BYTES + HEADER + TAG;
+#[cfg(test)]
+use crate::development_protocol::HEADER;
+use crate::development_protocol::{MAX_PACKET, Session, authenticate, packet, packet_size};
 const CAPABILITY: &str = "session.json";
 const SOCKET: &str = "bridge.sock";
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Session {
-    id: Uuid,
-    extension_id: String,
-    secret: [u8; 32],
-}
-impl Drop for Session {
-    fn drop(&mut self) {
-        self.secret.zeroize();
-    }
-}
 
 /// # Errors
 /// Requires a current-user-owned private directory for this dev session.
@@ -135,54 +118,6 @@ fn write_capability(root: &Path, value: &Session) -> Result<(), BridgeError> {
     }
     result
 }
-fn packet(
-    value: &Session,
-    nonce: Uuid,
-    expiry: i64,
-    body: &[u8],
-    direction: &[u8],
-) -> Result<Vec<u8>, BridgeError> {
-    if body.len() > MAX_ENVELOPE_BYTES {
-        return Err(BridgeError::Oversized);
-    }
-    let mut bytes = Vec::with_capacity(HEADER + body.len() + TAG);
-    bytes.extend_from_slice(value.id.as_bytes());
-    bytes.extend_from_slice(nonce.as_bytes());
-    bytes.extend_from_slice(&expiry.to_le_bytes());
-    bytes.extend_from_slice(value.extension_id.as_bytes());
-    bytes.extend_from_slice(body);
-    let mut transcript = direction.to_vec();
-    transcript.extend_from_slice(&bytes);
-    bytes.extend_from_slice(&authentication_tag(&value.secret, &transcript)?);
-    Ok(bytes)
-}
-fn authenticate<'a>(
-    value: &Session,
-    bytes: &'a [u8],
-    direction: &[u8],
-    now_ms: i64,
-) -> Result<(Uuid, i64, &'a [u8]), BridgeError> {
-    if bytes.len() < HEADER + TAG || bytes.len() > MAX_PACKET {
-        return Err(BridgeError::Oversized);
-    }
-    let tag_start = bytes.len() - TAG;
-    let mut transcript = direction.to_vec();
-    transcript.extend_from_slice(&bytes[..tag_start]);
-    verify_authentication(&value.secret, &transcript, &bytes[tag_start..])?;
-    if bytes[..16] != *value.id.as_bytes() || bytes[40..HEADER] != *value.extension_id.as_bytes() {
-        return Err(BridgeError::Authentication);
-    }
-    let nonce = Uuid::from_slice(&bytes[16..32]).map_err(|_| BridgeError::Malformed)?;
-    let expiry = i64::from_le_bytes(
-        bytes[32..40]
-            .try_into()
-            .map_err(|_| BridgeError::Malformed)?,
-    );
-    if expiry <= now_ms || expiry > now_ms.saturating_add(CAPTURE_TTL_MS) {
-        return Err(BridgeError::Expired);
-    }
-    Ok((nonce, expiry, &bytes[HEADER..tag_start]))
-}
 #[cfg(test)]
 fn read_packet(input: &mut impl Read) -> Result<Vec<u8>, BridgeError> {
     let mut length = [0; 4];
@@ -191,13 +126,6 @@ fn read_packet(input: &mut impl Read) -> Result<Vec<u8>, BridgeError> {
     let mut bytes = vec![0; size];
     input.read_exact(&mut bytes).map_err(unavailable)?;
     Ok(bytes)
-}
-fn packet_size(length: [u8; 4]) -> Result<usize, BridgeError> {
-    let size = usize::try_from(u32::from_le_bytes(length)).map_err(|_| BridgeError::Oversized)?;
-    if !(HEADER + TAG..=MAX_PACKET).contains(&size) {
-        return Err(BridgeError::Oversized);
-    }
-    Ok(size)
 }
 // One deadline covers the whole frame, even if a peer trickles individual bytes.
 // Nonblocking reads avoid macOS SO_RCVTIMEO fractional-duration differences.

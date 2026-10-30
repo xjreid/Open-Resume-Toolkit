@@ -53,7 +53,7 @@ spec.loader.exec_module(module)
 print(json.dumps([module.date_text(item) for item in json.load(sys.stdin)]))`;
   const actual = execFileSync(
     process.platform === "win32" ? "python" : "python3",
-    ["-c", code],
+    ["-X", "utf8", "-c", code],
     {
       input: JSON.stringify(cases.map(([input]) => input)),
       encoding: "utf8",

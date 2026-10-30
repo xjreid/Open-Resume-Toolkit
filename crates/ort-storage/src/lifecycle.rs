@@ -12,6 +12,8 @@ use std::{
 /// Keep this owner alive across store replacement and unavailable-storage retries.
 pub struct ProfileLifecycle {
     _ownership: File,
+    #[cfg(windows)]
+    _private_parent: ort_windows::PrivateDirectory,
     root: PathBuf,
     channel: String,
 }
@@ -26,6 +28,9 @@ impl ProfileLifecycle {
         let parent = root.parent().ok_or(StorageError::UnsafeLocation)?;
         reject_symlink(parent)?;
         create_private_directory(parent)?;
+        #[cfg(windows)]
+        let private_parent = ort_windows::PrivateDirectory::create(parent)
+            .map_err(|_| StorageError::UnsafeLocation)?;
         let lock_path = parent.join(".ort-profile-owner.lock");
         reject_symlink(&lock_path)?;
         let mut options = OpenOptions::new();
@@ -36,7 +41,7 @@ impl ProfileLifecycle {
             options.mode(0o600);
         }
         let ownership = options
-            .open(lock_path)
+            .open(&lock_path)
             .map_err(|_| StorageError::Unavailable)?;
         if !ownership
             .metadata()
@@ -45,11 +50,15 @@ impl ProfileLifecycle {
         {
             return Err(StorageError::UnsafeLocation);
         }
+        #[cfg(windows)]
+        ort_windows::secure_file(&lock_path).map_err(|_| StorageError::UnsafeLocation)?;
         ownership
             .try_lock()
             .map_err(|_| StorageError::ProfileInUse)?;
         Ok(Self {
             _ownership: ownership,
+            #[cfg(windows)]
+            _private_parent: private_parent,
             root: root.to_path_buf(),
             channel: channel.into(),
         })
@@ -67,6 +76,8 @@ impl ProfileLifecycle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
     use std::{
         process::{Command, Stdio},
         time::{Duration, Instant},

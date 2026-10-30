@@ -8,9 +8,14 @@ service.
 
 ## Current state
 
-**Active development target: macOS on Apple Silicon.** This is a development
-build, not a production-qualified stable release. Windows and Intel Mac CI jobs
-check portability; they do not establish platform support.
+**Validated development target: macOS on Apple Silicon.** This is a development
+build, not a production-qualified stable release. The Windows integration branch
+has a Windows 11 x64 development installer, built and installed for the current
+user with packaged-file integrity verified. Live application qualification remains
+pending. See the
+[Windows integration record](docs/development/windows-integration.md).
+Windows and Intel Mac CI jobs check portability; they do not establish native
+application qualification.
 
 The current app includes:
 

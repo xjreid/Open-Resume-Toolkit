@@ -7,6 +7,8 @@ use ort_documents::render_docx_with_style;
 use ort_domain::DocumentLimits;
 use ort_domain::{Bullet, EntityId, NamedField, ResumeEntry, ResumeSection, RoleInfo};
 use ort_vault::testing::MemoryDatabaseKeyVault;
+#[cfg(windows)]
+use ort_windows::testing as tempfile;
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 

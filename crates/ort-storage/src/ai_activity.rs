@@ -1943,6 +1943,8 @@ impl EncryptedStore {
 mod tests {
     use super::*;
     use ort_vault::testing::MemoryDatabaseKeyVault;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
 
     fn preflight(cost: u64) -> AiAttemptPreflight {
         AiAttemptPreflight {

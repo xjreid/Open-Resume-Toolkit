@@ -3,6 +3,8 @@
 use ort_domain::ResumeDocument;
 use ort_storage::EncryptedStore;
 use ort_vault::testing::MemoryDatabaseKeyVault;
+#[cfg(windows)]
+use ort_windows::testing as tempfile;
 use rusqlite::Connection;
 use tempfile::TempDir;
 

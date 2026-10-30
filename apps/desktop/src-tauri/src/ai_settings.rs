@@ -73,6 +73,8 @@ fn normalize_credential_ids(credential_ids: Option<Vec<Uuid>>) -> Result<Option<
 mod key_budget_tests {
     use super::*;
     use ort_vault::testing::MemoryDatabaseKeyVault;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
 
     #[test]
     fn paused_non_primary_keys_can_be_customized_and_calendar_caps_consolidate_once() {

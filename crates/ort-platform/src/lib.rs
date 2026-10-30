@@ -23,3 +23,13 @@ pub use worker_output_macos::MacosWorkerOutput;
 mod parser_process_macos;
 #[cfg(target_os = "macos")]
 pub use parser_process_macos::{ParserHelper, ParserProcessError};
+
+#[cfg(windows)]
+mod parser_process_windows;
+#[cfg(windows)]
+pub use parser_process_windows::{ParserHelper, ParserProcessError, WINDOWS_PARSER_POLICY};
+
+#[cfg(windows)]
+mod drag_windows;
+#[cfg(windows)]
+pub use drag_windows::{WindowsDragArtifact, sweep_windows_drag_artifacts};

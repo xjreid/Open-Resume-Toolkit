@@ -58,8 +58,9 @@ export function BrowserConnectionSettings() {
             top-left and bottom-right corners of the text in Chrome.
           </p>
           <p>
-            This development connection trusts programs running under your macOS
-            account. Disabling it lasts until the next app launch.
+            This development connection trusts programs running under your
+            operating system account. Disabling it lasts until the next app
+            launch.
           </p>
           <button type="button" disabled={busy} onClick={() => void change()}>
             {status.connected

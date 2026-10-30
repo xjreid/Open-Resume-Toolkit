@@ -201,16 +201,30 @@ fn failure<T: serde::Serialize>(code: &str) -> CommandResponse<T> {
     CommandResponse::failure(code, "errors.importReviewUnavailable", false)
 }
 fn import_available(label: &str) -> bool {
-    // The legacy native-parser gate remains off. Only a package with both
-    // pinned Wasm-helper identities can expose the new supervised import path.
+    // Only a package pinned to the reviewed native policy exposes this path.
     label == "main"
-        && cfg!(all(target_os = "macos", target_arch = "aarch64"))
         && option_env!("ORT_PARSER_HELPER_SHA256").is_some_and(|value| {
             value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
         })
-        && option_env!("ORT_PARSER_HELPER_CDHASH").is_some_and(|value| {
-            value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
-        })
+        && parser_package_policy()
+}
+fn parser_package_policy() -> bool {
+    #[cfg(windows)]
+    {
+        cfg!(target_arch = "x86_64")
+            && option_env!("ORT_WINDOWS_PARSER_POLICY") == Some(ort_platform::WINDOWS_PARSER_POLICY)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        cfg!(target_arch = "aarch64")
+            && option_env!("ORT_PARSER_HELPER_CDHASH").is_some_and(|value| {
+                value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+            })
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        false
+    }
 }
 
 #[tauri::command]
@@ -360,6 +374,8 @@ mod tests {
     use ort_documents::import::{ImportProposal, InputFormat, ValidatedExtraction};
     use ort_domain::ResumeDocument;
     use ort_vault::testing::MemoryDatabaseKeyVault;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
     use tempfile::TempDir;
 
     fn seed(state: &ReviewState, store: &EncryptedStore) -> ReviewToken {
@@ -656,12 +672,8 @@ mod tests {
         for label in ["overlay", "unknown", ""] {
             assert!(!import_available(label));
         }
-        if option_env!("ORT_PARSER_HELPER_SHA256").is_none()
-            || option_env!("ORT_PARSER_HELPER_CDHASH").is_none()
-        {
+        if option_env!("ORT_PARSER_HELPER_SHA256").is_none() || !parser_package_policy() {
             assert!(!import_available("main"));
-        } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-            assert!(import_available("main"));
         }
     }
 }

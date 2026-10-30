@@ -140,6 +140,8 @@ fn failure(code: &str, retryable: bool) -> CommandResponse<DeleteAllLocalDataRes
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicUsize, Ordering};
 

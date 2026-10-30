@@ -12,6 +12,11 @@ use uuid::Uuid;
 
 #[cfg(all(feature = "dev-browser-bridge", target_os = "macos"))]
 pub mod development;
+#[cfg(all(feature = "dev-browser-bridge", windows))]
+#[path = "development_windows.rs"]
+pub mod development;
+#[cfg(all(feature = "dev-browser-bridge", any(target_os = "macos", windows)))]
+mod development_protocol;
 
 pub mod capture_session;
 

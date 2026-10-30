@@ -59,7 +59,7 @@ struct CredentialCleanup<'a> {
 }
 
 #[test]
-#[ignore = "creates and deletes a synthetic provider Keychain item; explicit native opt-in required"]
+#[ignore = "creates and deletes a synthetic OS provider credential; explicit native opt-in required"]
 fn native_provider_credential_round_trip_and_removal() {
     assert_eq!(std::env::var(OPT_IN_ENVIRONMENT).as_deref(), Ok("1"));
     let mut random_id = [0_u8; 16];

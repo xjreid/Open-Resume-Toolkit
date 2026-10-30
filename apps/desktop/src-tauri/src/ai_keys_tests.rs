@@ -1,5 +1,7 @@
 use super::*;
 use ort_vault::{VaultError, testing::MemoryDatabaseKeyVault};
+#[cfg(windows)]
+use ort_windows::testing as tempfile;
 use std::{collections::HashMap, sync::Mutex};
 use tempfile::TempDir;
 

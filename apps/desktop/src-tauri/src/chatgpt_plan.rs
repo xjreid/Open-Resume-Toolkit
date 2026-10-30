@@ -65,10 +65,7 @@ pub(crate) fn reset_server_on_launch(store: &EncryptedStore) -> Result<(), Stora
     persist_selection(store, revision, &settings)
 }
 pub(crate) fn auth_root(window: &WebviewWindow, profile: Uuid) -> Result<PathBuf, &'static str> {
-    let root = window
-        .app_handle()
-        .path()
-        .app_data_dir()
+    let root = crate::platform_paths::data_root(window.app_handle())
         .map_err(|_| "PLAN_RUNTIME_UNAVAILABLE")?;
     std::fs::create_dir_all(&root).map_err(|_| "PLAN_RUNTIME_UNAVAILABLE")?;
     let root = root
@@ -638,6 +635,8 @@ pub fn open_chatgpt_plan_runtime_guidance(window: WebviewWindow) -> CommandRespo
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
+    use ort_windows::testing as tempfile;
 
     #[test]
     fn reopening_starts_stopped_and_preserves_model_reserve_and_cleanup_policy() {
